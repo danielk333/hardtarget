@@ -158,18 +158,20 @@ class raw_sim:
 
                     print("pass visible! t=%1.2f rs %d rxi %d oid %d r %1.2f rr %1.2f rrr %1.2f"%(tnow,rs,po["rxi"],po["oid"],po["rfun"](tnow),po["rrfun"](tnow),po["rrrfun"](tnow)))                    
                     txi0 = inow - rs
-                    print(txi0)
-                    print("inow %d"%(inow))
+#                    print(txi0)
+#                    print("inow %d"%(inow))
                     if txi0 > txb[0] and (txi0+self.ipp) < txb[1]:
                         txz = txd.read_vector_c81d(txi0,self.ipp,"tx")
                         sim_echo = csin[0:self.ipp]*txz
-                        plt.plot(sim_echo.real)
-                        plt.plot(sim_echo.imag)                    
-                        plt.show()
-                    
-                    
-                    dwo=dwos[rxi]
-                    z=arrs[rxi]
+                        arrs[rxi][:]=sim_echo
+                        if False:
+                            plt.plot(sim_echo.real)
+                            plt.plot(sim_echo.imag)                    
+                            plt.show()
+            for ci in range(n_rx):
+                dwo=dwos[rxi]
+                z=arrs[rxi]
+                dwo.rf_write(z)
             
             
 
