@@ -340,7 +340,7 @@ class simple_sim:
             rvec = self.r0 + self.v0*(tipp+tnow) + 0.5*self.a0*(tipp+tnow)**2.0
             rg = int(self.sr*rvec[0]/c.c)
             
-            print("%d %d %1.2f %1.2f"%(i,rg,tnow,self.v0+self.a0*(tipp[0]+tnow)))
+#            print("%d %d %1.2f %1.2f"%(i,rg,tnow,self.v0+self.a0*(tipp[0]+tnow)))
             phase=n.fmod(2.0*n.pi*rvec/self.wavelength,2.0*n.pi)
             echo=n.roll(txz,rg)*n.exp(1j*phase[0:self.ipp])
             

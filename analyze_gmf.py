@@ -14,12 +14,12 @@ import gmf as g
 
 comm = MPI.COMM_WORLD
 
-def analyze_gmf(conf):
+def analyze_gmf(conf,
+                n_ints=0):
     
     if conf.reanalyze:
         os.system("rm -f %s/*/*.h5"%(conf.output_dir))
 
-    
     d=drf.DigitalRFReader(conf.data_dirs)
     
     b_rx=d.get_bounds(conf.rx_channel)
@@ -38,7 +38,8 @@ def analyze_gmf(conf):
     else:
         b=(int(t0*conf.sample_rate),int(t1*conf.sample_rate))
         
-    n_ints=int(n.floor((b[1]-b[0])/(conf.ipp*conf.n_ipp))/conf.num_cohints_per_file)
+    if n_ints==0:
+        n_ints=int(n.floor((b[1]-b[0])/(conf.ipp*conf.n_ipp))/conf.num_cohints_per_file)
 
     # parallel
     for ni in range(comm.rank,n_ints,comm.size):

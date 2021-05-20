@@ -114,18 +114,17 @@ def analyze_ipps(d,i0,o,mode=0,plott=False):
     print("GMF=%1.2g r_max=%1.2f (km) vel_max=%1.2f (km/s) a_max=%1.2f (m/s**2)"%(o.frequency_decimation*n.max(gmf_vec),o.ranges[mri],v_vec[mri]/1e3,a_vec[mri]))
     return(gmf_vec,gmf_dc_vec,v_vec,a_vec,1)
 
-
 def analyze_ipps_fine(d,
                       o,
                       i0,
                       r0=1000e3,
-                      rlim=[-2e3,2e3],
-                      n_r=20,
-                      vlim=[-100,100],
-                      n_v=20,
+                      rlim=[-100,100],
+                      n_r=3,
+                      vlim=[-10.0,10.0],
+                      n_v=11,
                       v0=2e3,
                       a0=0.0,
-                      alim=[-100,100.0],
+                      alim=[0,100.0],
                       n_a=40,
                       noise_pwr=1.0,
                       plott=False):
@@ -174,9 +173,10 @@ def analyze_ipps_fine(d,
         mf = z_rx[rng_samples + idx]*phase*z_tx
         s=n.abs(n.sum(mf))
         return(-s)
+    
     drs=n.linspace(r0+rlim[0],r0+rlim[1],num=n_r)
     dvs=n.linspace(v0+vlim[0],v0+vlim[1],num=n_v)
-    das=n.linspace(a0+alim[0],a0+alim[1],num=n_a)    
+    das=n.linspace(alim[0],alim[1],num=n_a)    
     best=0.0
     xhat=[0,0,0]
     for ri in range(n_r):
@@ -189,7 +189,8 @@ def analyze_ipps_fine(d,
                 if test > best:
                     best=test
                     xhat=[r0t,v0t,a0t]
-                    print("snr %1.2f (dB) r %1.2f v %1.2f a %1.2f"%(10.0*n.log10((best-n.sqrt(noise_pwr))**2.0/noise_pwr),r0t,v0t,a0t))
+                    print("snr %1.2f (dB) r %1.5f v %1.5f a %1.5f"%(10.0*n.log10((best-n.sqrt(noise_pwr))**2.0/noise_pwr),r0t,v0t,a0t))
+    
     print("fmin")    
     xhat=sio.fmin(gmf,xhat)
     xhat=sio.fmin(gmf,xhat)
