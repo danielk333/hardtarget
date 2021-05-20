@@ -9,7 +9,7 @@
 /*
   Range-Velocity-Acceleration matched filter
 
-  optimizations:
+  todo optimizations:
   - avx
   - range dependent acceleration grid. The expected acceleration is a function
     of altitude. we only would need to search through a finite grid around 
@@ -27,7 +27,6 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
   
   nfft2=(int)(z_tx_len/dec);
   echo=(fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
-  
   in=(fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
   out=(fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
   
@@ -108,12 +107,12 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
     }
 
     int rg=(int)rgs[ri];
-    //    printf("rg %d r %d\n",ri,(int)rgs[ri]);
 
     for(int ni=0 ; ni<n_nonzero_tx ; ni++)
     {
       int ti=tx_idx[ni];
       //                rea*reb        -ima*imb
+      // z_tx*conj(z_rx)
       int tidx=ti/dec;
       // Real part of z_t[ti]x*z_rx[rg+ti]
       echo[tidx][0]+=z_tx[2*ti]*z_rx[2*(rg+ti)]-z_tx[2*ti+1]*z_rx[2*(rg+ti)+1];
@@ -139,7 +138,7 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
 	// rea*reb - ima*imb
 	in[ti][0]=echo[ti][0]*rep - echo[ti][1]*imp;
 	// rea*imb + ima*reb
-	in[ti][1]=echo[ti][1]*imp + echo[ti][1]*rep;
+	in[ti][1]=echo[ti][0]*imp + echo[ti][1]*rep;
       }
 #endif
       // fft in and store result in out

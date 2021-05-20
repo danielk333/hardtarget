@@ -36,19 +36,22 @@ class gmf_opts:
                      "sample_rate":'1000000',
                      "n_range_gates":'10000',
                      "range_gate_0":'200',
-                     "range_gate_step":'1',                     
+                     "range_gate_step":'1',
                      "frequency_decimation":'25',
-                     "ipp":'10000',
-                     "tx_pulse_length":'445',
+                     "ipp":'10000',                   # microseconds 
+                     "tx_pulse_length":'445',  
+                     "tx_bit_length":'20',
                      "ground_clutter_length":'1500',
                      "min_acceleration":'-400.0',
                      "max_acceleration":'400.0',
                      "acceleration_resolution":"0.2",
+                     "snr_thresh":"10.0",                     
                      "save_parameters":'true',
                      "doppler_sign":'1.0',
                      "rx_channel":'"ch"',
                      "tx_channel":'"ch"',
                      "radar_frequency":'500e6',
+                     "reanalyze":"true",
                      "output_dir":'"./spade_det"',
                      "debug_plot":'true',
                      "debug_plot_acc":'true',
@@ -63,11 +66,18 @@ class gmf_opts:
                 c.read(fname)
             else:
                 print("configuration file %s doesn't exist. using default values"%(fname))
-                
+
+        print(c.sections())
+        print(c.keys())
+        print(fname)
         self.fname=fname
+
+        self.t0=None
+        self.t1=None
 
         self.n_ipp=int(json.loads(c["config"]["n_ipp"]))
         self.data_dirs=json.loads(c["config"]["data_dirs"])
+        print(self.data_dirs)
         self.sample_rate=float(json.loads(c["config"]["sample_rate"]))
         self.n_range_gates=int(json.loads(c["config"]["n_range_gates"]))
         self.range_gate_0=int(json.loads(c["config"]["range_gate_0"]))
@@ -79,6 +89,7 @@ class gmf_opts:
         self.min_acceleration=float(json.loads(c["config"]["min_acceleration"]))
         self.max_acceleration=float(json.loads(c["config"]["max_acceleration"]))
         self.acceleration_resolution=float(json.loads(c["config"]["acceleration_resolution"]))
+        self.snr_thresh=float(json.loads(c["config"]["snr_thresh"]))
         self.save_parameters=bool(json.loads(c["config"]["save_parameters"]))
         self.doppler_sign=float(json.loads(c["config"]["doppler_sign"]))
         self.rx_channel=json.loads(c["config"]["rx_channel"])
@@ -88,10 +99,16 @@ class gmf_opts:
         self.debug_plot=bool(json.loads(c["config"]["debug_plot"]))
         self.debug_plot_acc=bool(json.loads(c["config"]["debug_plot_acc"]))
         self.debug_print=bool(json.loads(c["config"]["debug_print"]))
+        self.debug_plot_data_read=False
         self.num_cohints_per_file=int(json.loads(c["config"]["num_cohints_per_file"]))
         self.use_gpu=bool(json.loads(c["config"]["use_gpu"]))
+        self.reanalyze=bool(json.loads(c["config"]["reanalyze"]))        
         self.round_trip_range=bool(json.loads(c["config"]["round_trip_range"]))
-        
+        self.use_python=False
+        self.use_gpu=False
+        self.debug_gmf_output=True
+
+
         os.system("mkdir -p %s"%(self.output_dir))
         print("mkdir -p %s"%(self.output_dir))
         
@@ -111,7 +128,7 @@ class gmf_opts:
         # range-rate is doppler-shift in hertz multiplied with wavelength 
         self.wavelength = sc.c/self.radar_frequency
         self.range_rates=self.doppler_sign*self.wavelength*self.fvec
-
+        
         # time vector 
         times=self.frequency_decimation*n.arange(int(self.n_fft/self.frequency_decimation))/self.sample_rate
         times2=times**2.0
@@ -150,10 +167,10 @@ class gmf_opts:
 
         if self.debug_plot_acc:
             import matplotlib.pyplot as plt
-            plt.plot(self.accs,self.acc_phasors.real[:,self.n_fft/self.frequency_decimation-1])
-            plt.plot(self.accs,self.acc_phasors.imag[:,self.n_fft/self.frequency_decimation-1])
-            plt.plot(self.accs,self.acc_phasors.real[:,self.n_fft/self.frequency_decimation-1],"*")
-            plt.plot(self.accs,self.acc_phasors.imag[:,self.n_fft/self.frequency_decimation-1],"*")
+            plt.plot(self.accs,self.acc_phasors.real[:,int(self.n_fft/self.frequency_decimation)-1])
+            plt.plot(self.accs,self.acc_phasors.imag[:,int(self.n_fft/self.frequency_decimation)-1])
+            plt.plot(self.accs,self.acc_phasors.real[:,int(self.n_fft/self.frequency_decimation)-1],"*")
+            plt.plot(self.accs,self.acc_phasors.imag[:,int(self.n_fft/self.frequency_decimation)-1],"*")
             plt.xlabel("Accelerations (m/s^2)")
             plt.title("Acceleration phasors at maximum coherent integration")
             plt.show()

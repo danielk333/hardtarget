@@ -58,7 +58,7 @@ def analyze_gmf(conf):
         else:
             for i in range(conf.num_cohints_per_file):
                 i0=fi + i*conf.ipp*conf.n_ipp
-
+                
                 gmf_max[i,:], gmf_dc[i,:], gmf_v[i,:], gmf_a[i,:], gmf_txp[i] = g.analyze_ipps(d,i0,conf)
                 rgi=n.argmax(gmf_max[i,:])
 
