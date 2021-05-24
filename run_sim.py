@@ -22,6 +22,7 @@ class sim_conf:
                  bit_len_us=100,
                  max_doppler_vel=10e3,
                  radar_frequency=230e6,
+                 use_gpu=False,
                  n_ipp=10):
         """
         Get configuration files for coarse and fine grained GMF grid search
@@ -60,7 +61,6 @@ class sim_conf:
         round_trip_range=false
         reanalyze=true
         num_cohints_per_file=1
-        use_gpu=false
         snr_thresh=10.0
         """
         with open("cfg/sim.ini","w") as f:
@@ -73,7 +73,12 @@ class sim_conf:
             f.write("range_gate_0=%d\n"%(100*self.sr_mhz))
             f.write("range_gate_step=%d\n"%(5*self.sr_mhz))
             f.write("frequency_decimation=%d\n"%(self.freq_dec))
-            f.write("n_ipp=%d"%(n_ipp))
+            f.write("n_ipp=%d\n"%(n_ipp))
+            if use_gpu:
+                f.write("use_gpu=true")
+            else:
+                f.write("use_gpu=false")
+                
             
         # another configuration for fine-tuning the result
         fine_tune_cfg ="""
@@ -95,7 +100,6 @@ class sim_conf:
         round_trip_range=false
         reanalyze=true
         num_cohints_per_file=1
-        use_gpu=false
         snr_thresh=10.0
         range_gate_step=1
         """
@@ -109,7 +113,12 @@ class sim_conf:
             f.write("sample_rate=%d\n"%(self.sr_mhz*1000000))
             f.write("range_gate_0=%d\n"%(100*self.sr_mhz))
             f.write("frequency_decimation=%d\n"%(self.freq_dec))
-            f.write("n_ipp=%d"%(self.n_ipp))
+            f.write("n_ipp=%d\n"%(self.n_ipp))
+            if use_gpu:
+                f.write("use_gpu=true")
+            else:
+                f.write("use_gpu=false")
+            
         
         self.conf=go.gmf_opts("cfg/sim.ini")
         self.conf_fine=go.gmf_opts("cfg/sim_fine.ini")
@@ -269,15 +278,11 @@ def snr_sweep():
 
 
 def n_ipp_sweep():
-    sconf=sim_conf(dirname="/scratch/data/juha/debsim",
-                  sr_mhz=1,
-                  tx_len_us=2000,
-                  ipp_us=10000,
-                  bit_len_us=100,
-                  max_doppler_vel=10e3,
-                  radar_frequency=230e6,
-                  n_ipp=10)
     # ipp sweep
+    r0=1000e3
+    v0=1e3
+    a0=80.0
+    
     n_ipps = [5,10,15,20,25,30,35,40]
     n_ipp_results=[]
     snr=30.0
@@ -285,6 +290,14 @@ def n_ipp_sweep():
         
         dt=0.01*n_ipp
         print("n_ipp %d"%(n_ipp))
+        sconf=sim_conf(dirname="/scratch/data/juha/debsim",
+                       sr_mhz=1,
+                       tx_len_us=2000,
+                       ipp_us=10000,
+                       bit_len_us=100,
+                       max_doppler_vel=10e3,
+                       radar_frequency=230e6,
+                       n_ipp=n_ipp)
         
         res=one_cohint(sconf,
                        r0=r0,
@@ -308,8 +321,6 @@ def n_ipp_sweep():
     ho.close()
 
 if __name__ == "__main__":
-
-
     
     sconf=sim_conf(dirname="/scratch/data/juha/debsim",
                   sr_mhz=10,
