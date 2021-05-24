@@ -12,6 +12,9 @@ import scipy.constants as c
 import digital_rf as drf
 import gmf as g
 
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
+
 class sim_conf:
     def __init__(self,
                  dirname="/scratch/data/juha/debsim",
@@ -33,7 +36,7 @@ class sim_conf:
         self.bit_len=bit_len_us*sr_mhz
         self.n_ipp=n_ipp
         self.radar_frequency=radar_frequency
-        self.dirname=dirname
+        self.dirname="%s/%d"%(dirname,comm.rank)
         self.max_dop_shift = n.abs(2.0*self.radar_frequency*max_doppler_vel/c.c)
         self.sr_mhz=sr_mhz
         self.freq_dec = n.round(self.sr_mhz*1e6/self.max_dop_shift/2.0)
@@ -62,7 +65,7 @@ class sim_conf:
         num_cohints_per_file=1
         snr_thresh=10.0
         """
-        with open("cfg/sim.ini","w") as f:
+        with open("cfg/sim-%d.ini"%(comm.rank),"w") as f:
             f.writelines(cfg)
             # sample-rate specific configuration options
             f.write("data_dirs=[\"%s\"]\n"%(self.dirname))
@@ -103,7 +106,7 @@ class sim_conf:
         range_gate_step=1
         """
         
-        with open("cfg/sim_fine.ini","w") as f:
+        with open("cfg/sim_fine-%d.ini"%(comm.rank),"w") as f:
             f.writelines(fine_tune_cfg)
             # sample-rate specific configuration options
             f.write("data_dirs=[\"%s\"]\n"%(self.dirname))
@@ -119,8 +122,8 @@ class sim_conf:
                 f.write("use_gpu=false")
             
         
-        self.conf=go.gmf_opts("cfg/sim.ini")
-        self.conf_fine=go.gmf_opts("cfg/sim_fine.ini")
+        self.conf=go.gmf_opts("cfg/sim-%d.ini"%(comm.rank))
+        self.conf_fine=go.gmf_opts("cfg/sim_fine-%d.ini"%(comm.rank))
 
 def run_cohint(d,conf,i0,r0):
     """
@@ -329,13 +332,15 @@ if __name__ == "__main__":
                   max_doppler_vel=10e3,
                   radar_frequency=230e6,
                   n_ipp=10)
-    
-    # analyze one coherent integration period
-    res=one_cohint(sconf,
-                   r0=1000e3,
-                   v0=2e3,
-                   a0=80.0,
-                   snr=1000.0)
+
+    # this can be paralellized!
+    for i in range(comm.rank, 100, comm.size):
+        # analyze one coherent integration period
+        res=one_cohint(sconf,
+                       r0=1000e3,
+                       v0=2e3,
+                       a0=80.0,
+                       snr=1000.0)
     print(res)
 
     n_ipp_sweep()
