@@ -327,7 +327,7 @@ def n_ipp_sweep():
 if __name__ == "__main__":
     
     sconf=sim_conf(dirname="/scratch/data/juha/debsim",
-                  sr_mhz=1,
+                  sr_mhz=4,
                   tx_len_us=2000,
                   ipp_us=10000,
                   bit_len_us=100,
@@ -343,7 +343,7 @@ if __name__ == "__main__":
                        v0=2e3,
                        a0=80.0,
                        snr=1000.0)
-    print(res)
+        print(res)
 
     n_ipp_sweep()
     snr_sweep()
