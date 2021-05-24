@@ -211,17 +211,19 @@ def one_cohint(conf,
                                  r00)
 
     snr01=(gmf01-n.sqrt(noise_pwr))**2.0/noise_pwr
-            
-    print("Found range %1.5f,%1.5f (km) vel %1.5f,%1.5f (km/s) a %1.5f snr %1.2f,%1.2f (dB)"%(r00/1e3,
-                                                                                              r01/1e3,
-                                                                                              v00/1e3,
-                                                                                              v01/1e3,
-                                                                                              a01,
-                                                                                              10.0*n.log10(snr00),
-                                                                                              10.0*n.log10(snr01)))
     res=n.array([snr01,r01,v01,a01])
     t1 = time.time()
     fine_tune_cpu_time = t1-t0
+    
+            
+    print("Found range %1.5f,%1.5f (km) vel %1.5f,%1.5f (km/s) a %1.5f snr %1.2f,%1.2f (dB) cpu time %1.3f"%(r00/1e3,
+                                                                                                             r01/1e3,
+                                                                                                             v00/1e3,
+                                                                                                             v01/1e3,
+                                                                                                             a01,
+                                                                                                             10.0*n.log10(snr00),
+                                                                                                             10.0*n.log10(snr01),
+                                                                                                             gmf_cpu_time+fine_tune_cpu_time))
     
     print("Analysis result")
     print(res)
@@ -325,7 +327,7 @@ def n_ipp_sweep():
 if __name__ == "__main__":
     
     sconf=sim_conf(dirname="/scratch/data/juha/debsim",
-                  sr_mhz=10,
+                  sr_mhz=1,
                   tx_len_us=2000,
                   ipp_us=10000,
                   bit_len_us=100,
