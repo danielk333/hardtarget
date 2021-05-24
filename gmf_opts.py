@@ -124,8 +124,9 @@ class gmf_opts:
         self.debug_gmf_output=True
 
 
-        os.system("mkdir -p %s"%(self.output_dir))
-        print("mkdir -p %s"%(self.output_dir))
+        if self.save_parameters:
+            os.system("mkdir -p %s"%(self.output_dir))
+            print("mkdir -p %s"%(self.output_dir))
         
         # length of coherent integration
         self.n_fft=self.n_ipp*self.ipp
