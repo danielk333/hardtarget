@@ -1,4 +1,3 @@
-
 # First stage course GMF grid search
 # Numpy, C, CUDA
 import analyze_gmf as ag
@@ -6,7 +5,6 @@ import analyze_gmf as ag
 import sim_raw as sr
 # Options class
 import gmf_opts as go
-import analyze_fine as af
 import numpy as n
 import os
 import time
@@ -14,7 +12,6 @@ import h5py
 import scipy.constants as c
 import digital_rf as drf
 import gmf as g
-
 
 class sim_conf:
     def __init__(self,
@@ -312,10 +309,10 @@ def n_ipp_sweep():
 
 if __name__ == "__main__":
 
-    snr_sweep()        
+
     
     sconf=sim_conf(dirname="/scratch/data/juha/debsim",
-                  sr_mhz=1,
+                  sr_mhz=10,
                   tx_len_us=2000,
                   ipp_us=10000,
                   bit_len_us=100,
@@ -331,7 +328,9 @@ if __name__ == "__main__":
                    snr=1000.0)
     print(res)
 
+    n_ipp_sweep()
+    snr_sweep()
     
 
-#    n_ipp_sweep()    
+    
     
