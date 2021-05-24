@@ -1,6 +1,5 @@
 # First stage course GMF grid search
 # Numpy, C, CUDA
-import analyze_gmf as ag
 # Simulate raw voltage measurement
 import sim_raw as sr
 # Options class
