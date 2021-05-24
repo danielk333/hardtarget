@@ -13,6 +13,7 @@ import time
 import h5py
 import scipy.constants as c
 
+
 def one_cohint(sr_mhz=1,
                r0=1000e3,
                v0=2e3,
@@ -21,24 +22,30 @@ def one_cohint(sr_mhz=1,
                tx_len_us=2000,
                ipp_us=10000,
                bit_len_us=100,
+               max_doppler_vel=10e3,
+               radar_frequency=230e6,
                n_ipp=10):
+
+    dirname="/scratch/data/juha/debsim"
 
     # after signal processing
     tx_len=tx_len_us*sr_mhz
     ipp=ipp_us*sr_mhz
     bit_len=bit_len_us*sr_mhz
 
+    max_dop_shift = n.abs(2.0*radar_frequency*max_doppler_vel/c.c)
+    freq_dec = n.round(sr_mhz*1e6/max_dop_shift/2.0)
+    print("freq_dec %d"%(freq_dec))
+    
     # noise calculate
     snr_per_sample_lin=snr/tx_len/n_ipp
     snr_per_sample = 10.0*n.log10(snr_per_sample_lin)
     noise_pwr=(1.0/snr_per_sample_lin)*tx_len*n_ipp
     print("snr %1.2f (dB) noise_amp %1.2f"%(snr_per_sample,n.sqrt(noise_pwr)))
     
-    # let's make this self contained by generating the configuration file
-    # using this script
+    # configuration for course search
     cfg ="""
     [config]
-    data_dirs=["/media/j/ebd77b41-7efd-4238-b6f8-2b17bc33c84c/debsim"]
     n_range_gates=2000
     ground_clutter_length=0
     min_acceleration=0.0
@@ -56,23 +63,59 @@ def one_cohint(sr_mhz=1,
     round_trip_range=false
     reanalyze=true
     num_cohints_per_file=1
-    use_gpu=false
+    use_gpu=true
     snr_thresh=10.0
-"""
-    
+    """
     with open("cfg/sim.ini","w") as f:
         f.writelines(cfg)
         # sample-rate specific configuration options
+        f.write("data_dirs=[\"%s\"]\n"%(dirname))
         f.write("ipp=%d\n"%(ipp))
         f.write("tx_pulse_length=%d\n"%(tx_len))
         f.write("sample_rate=%d\n"%(sr_mhz*1000000))
         f.write("range_gate_0=%d\n"%(100*sr_mhz))
         f.write("range_gate_step=%d\n"%(5*sr_mhz))
-        f.write("frequency_decimation=%d\n"%(10*sr_mhz))
+        f.write("frequency_decimation=%d\n"%(freq_dec))
         f.write("n_ipp=%d"%(n_ipp))
 
+    # another configuration for fine-tuning the result
+    fine_tune_cfg ="""
+    [config]
+    n_range_gates=100
+    ground_clutter_length=0
+    min_acceleration=-200.0
+    max_acceleration=200.0
+    acceleration_resolution=0.02
+    save_parameters=true
+    doppler_sign=1.0
+    rx_channel="ch000"
+    tx_channel="tx"
+    radar_frequency=230e6
+    output_dir="./spade_fine"
+    debug_plot=false
+    debug_plot_acc=false
+    debug_print=false
+    round_trip_range=false
+    reanalyze=true
+    num_cohints_per_file=1
+    use_gpu=true
+    snr_thresh=10.0
+    range_gate_step=1
+    """
+    
+    with open("cfg/sim_fine.ini","w") as f:
+        f.writelines(fine_tune_cfg)
+        # sample-rate specific configuration options
+        f.write("data_dirs=[\"%s\"]\n"%(dirname))
+        f.write("ipp=%d\n"%(ipp))
+        f.write("tx_pulse_length=%d\n"%(tx_len))
+        f.write("sample_rate=%d\n"%(sr_mhz*1000000))
+        f.write("range_gate_0=%d\n"%(100*sr_mhz))
+        f.write("frequency_decimation=%d\n"%(freq_dec))
+        f.write("n_ipp=%d"%(n_ipp))
+        
     # simulate a measurement with range, range-rate and acceleration.
-    sr.simple_sim(dirname="/media/j/ebd77b41-7efd-4238-b6f8-2b17bc33c84c/debsim",
+    sr.simple_sim(dirname=dirname,
                   r0=r0,            # m
                   v0=v0,            # m/s
                   a0=a0,            # m/s^2
@@ -85,6 +128,7 @@ def one_cohint(sr_mhz=1,
                   snr=snr_per_sample)     # one sample snr
 
     conf=go.gmf_opts("cfg/sim.ini")
+    conf_fine=go.gmf_opts("cfg/sim_fine.ini")    
     # remove old analysis
     os.system("rm spade_det/*/*.h5")
 
@@ -96,7 +140,7 @@ def one_cohint(sr_mhz=1,
 
     t0 = time.time()    
     # fine tune parameters using non-linear least squares
-    res=af.fine_tune(conf,noise_pwr=noise_pwr)
+    res=af.fine_tune(conf, conf_fine,noise_pwr=noise_pwr)
     t1 = time.time()
     fine_tune_cpu_time = t1-t0
     
@@ -110,9 +154,10 @@ def snr_sweep():
     r0=1000e3
     v0=2e3
     a0=80.0
+    sr_mhz=5
     # sweeps
     # snr sweep
-    snrs = [14,20.0,30.0,40.0,50.0]
+    snrs = [30.0,40.0,50.0]
     n_reps=10
     snr_results=[]
     for snri,snr in enumerate(snrs):
@@ -120,7 +165,7 @@ def snr_sweep():
             dt=0.1
             print("snr %1.2f"%(snr))
         
-            res=one_cohint(sr_mhz=10,
+            res=one_cohint(sr_mhz=sr_mhz,
                            r0=r0,
                            v0=v0,
                            a0=a0,
@@ -160,7 +205,7 @@ def n_ipp_sweep():
         dt=0.01*n_ipp
         print("n_ipp %d"%(n_ipp))
         
-        res=one_cohint(sr_mhz=1,
+        res=one_cohint(sr_mhz=20,
                        r0=r0,
                        v0=v0,
                        a0=a0,

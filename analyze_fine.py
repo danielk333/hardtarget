@@ -20,75 +20,33 @@ import analyze_gmf as ag
 comm = MPI.COMM_WORLD
 
 
-def run_cohint(dirname="/media/j/ebd77b41-7efd-4238-b6f8-2b17bc33c84c/debsim",
-               sr=1e6,
-               r0=1000e3,
-               tx_len=2000,
-               ipp=10000,
-               dr=100,   # gates
-               n_ipp=10):
-    cfg ="""
-    [config]
+def run_cohint(d,conf,i0,r0):
+    """
+    run gmf with a finer resolution. reset range gate setting with existing high res configuration
+    """
+    n_rg=conf.n_range_gates
+    ri0 = int(n.round((r0/c.c)*conf.sample_rate)) - int(n_rg/2)
+    conf.set_n_ranges(ri0,n_rg)
     
-    ground_clutter_length=0
-    min_acceleration=0.0
-    max_acceleration=200.0
-    acceleration_resolution=0.01
-    save_parameters=true
-    doppler_sign=1.0
-    rx_channel="ch000"
-    tx_channel="tx"
-    radar_frequency=230e6
-    output_dir="./spade_fine"
-    debug_plot=false
-    debug_plot_acc=false
-    debug_print=false
-    round_trip_range=false
-    reanalyze=true
-    num_cohints_per_file=1
-    use_gpu=false
-    snr_thresh=10.0
-    range_gate_step=1
-"""
+    gmf_max, gmf_dc, gmf_v, gmf_a, gmf_txp = g.analyze_ipps(d,i0,conf)
 
-    ri0 = int((sr*r0/c.c))-dr/2
-    
-    with open("cfg/fine.ini","w") as f:
-        f.writelines(cfg)
-        # sample-rate specific configuration options
-        f.write("n_range_gates=%d\n"%(dr))
-        f.write("data_dirs=[\"%s\"]\n"%(dirname))
-        f.write("ipp=%d\n"%(ipp))
-        f.write("tx_pulse_length=%d\n"%(tx_len))
-        f.write("sample_rate=%d\n"%(int(sr)))
-        f.write("range_gate_0=%d\n"%(ri0))
-        f.write("frequency_decimation=%d\n"%(25))
-        f.write("n_ipp=%d\n"%(n_ipp))
-    
-    conf=go.gmf_opts("cfg/fine.ini")
-    # remove old analysis
-    os.system("rm spade_fine/*/*.h5")
-    ag.analyze_gmf(conf,n_ints=1)
-
-    fl=glob.glob("spade_fine/*/gmf*.h5")
-    fl.sort()
-    h=h5py.File(fl[0],"r")
-    gmf=h["gmf"][()]
-    v=h["v"][()]
-    a=h["a"][()]
-    print("gmf len %d"%(len(gmf[0,:])))
-    mi=n.argmax(gmf[0,:])
+    mi=n.argmax(gmf_max)
+    gmf = gmf_max[mi]
     rgi = ri0+mi
-    r00 = c.c*rgi/sr
-    v00 = v[0,mi]
-    a00 = a[0,mi]    
-    h.close()
-    return(r00,v00,a00)
-
+    r00 = c.c*rgi/conf.sample_rate
+    v00 = gmf_v[mi]
+    a00 = gmf_a[mi]
+    
+    return(gmf,r00,v00,a00)
 
 def fine_tune(conf,
+              conf_fine,
               noise_pwr=1.0):
-    
+    """
+    fine tuned analysis
+    """
+
+    print(conf.data_dirs)
     d=drf.DigitalRFReader(conf.data_dirs)
     b_rx=d.get_bounds(conf.rx_channel)
     b_tx=d.get_bounds(conf.tx_channel)
@@ -130,17 +88,20 @@ def fine_tune(conf,
             v0 = v[i,mi]
             snr_db=10.0*n.log10((gmf[i,mi]-n.sqrt(noise_pwr))**2.0/noise_pwr)
 
-            r00,v00,a00=run_cohint(dirname="/media/j/ebd77b41-7efd-4238-b6f8-2b17bc33c84c/debsim",
-                                   sr=conf.sample_rate,
-                                   r0=r0,
-                                   tx_len=conf.tx_pulse_length,
-                                   ipp=conf.ipp,
-                                   dr=100,   # gates
-                                   n_ipp=n_ipp)
+            # refine guess
+            gmf00,r00,v00,a00=run_cohint(d,
+                                         conf_fine,
+                                         i0,
+                                         r0)
 
+
+            # an even better but slower alternative is the following:
+            # gmf_cpu_numpy.analyze_ipps_fine
+                                  
+            best_snr=10.0*n.log10((gmf00-n.sqrt(noise_pwr))**2.0/noise_pwr)
             
-            print("Found range %1.5f,%1.5f (km) vel %1.5f,%1.5f (km/s) a %1.5f snr %1.2f (dB)"%(r0/1e3,r00/1e3,v0/1e3,v00/1e3,a00,snr_db))
-            xhat=gcpu.analyze_ipps_fine(d,conf,i0+i*ipp*n_ipp,r0=r00,v0=v00,a0=a00,plott=False,noise_pwr=noise_pwr)
+            print("Found range %1.5f,%1.5f (km) vel %1.5f,%1.5f (km/s) a %1.5f snr %1.2f,%1.2f (dB)"%(r0/1e3,r00/1e3,v0/1e3,v00/1e3,a00,snr_db,best_snr))
+            xhat=n.array([best_snr,r00,v00,a00])
             res.append(xhat)
             
         h.close()
