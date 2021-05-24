@@ -152,16 +152,16 @@ def one_cohint(conf,
                snr=1000.0):
 
     """
-    simulate measurement of one coherent integration. 
-    @sr_mhz sample-rate
+    Simulate measurement of one coherent integration. 
+    1. Simulates raw voltage
+    2. Analysis using a coarse resolution GMF
+    3. Refines the parameters using a high resolution GMF
+    
+    @conf simulation configuration
     @r0 two-way range (m)
     @v0 two-wave range-rate (m/s)
+    @a0 two-wave acceleration (m/s^2)
     @snr signal-to-noise ratio
-    @tx_len_us transmit pulse length (us)
-    @ipp_us    interpulse-period (us)
-    @bit_len_us code bit length (us)
-    @radar frequency (Hz)
-    @n_ipp number of ipps to coherently integrate
     """
     # noise power calculation
     snr_per_sample_lin=snr/conf.tx_len/conf.n_ipp
@@ -345,8 +345,8 @@ if __name__ == "__main__":
                        snr=1000.0)
         print(res)
 
-    n_ipp_sweep()
-    snr_sweep()
+    #n_ipp_sweep()
+    #snr_sweep()
     
 
     
