@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from mpi4py import MPI
 import h5py
 import numpy as n
 import os
@@ -12,7 +11,15 @@ import gmf_opts as go
 import stuffr
 import gmf as g
 
-comm = MPI.COMM_WORLD
+try:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+except ImportError:
+    class COMM_WORLD:
+        rank = 1
+        size = 1
+    comm = COMM_WORLD()
+
 
 def analyze_gmf(conf,
                 n_ints=0):

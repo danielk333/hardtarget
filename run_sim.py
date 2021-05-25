@@ -12,8 +12,14 @@ import scipy.constants as c
 import digital_rf as drf
 import gmf as g
 
-from mpi4py import MPI
-comm = MPI.COMM_WORLD
+try:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+except ImportError:
+    class COMM_WORLD:
+        rank = 1
+        size = 1
+    comm = COMM_WORLD()
 
 class sim_conf:
     def __init__(self,

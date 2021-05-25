@@ -8,11 +8,15 @@ import scipy.constants as c
 import scipy.io as sio
 
 import os
-from mpi4py import MPI
 
-comm = MPI.COMM_WORLD
-rank=comm.rank
-size=comm.size
+try:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+except ImportError:
+    class COMM_WORLD:
+        rank = 1
+        size = 1
+    comm = COMM_WORLD()
 
 def analyze_ipps(d,i0,o):
     
@@ -77,7 +81,7 @@ def analyze_ipps(d,i0,o):
     gmf_dc_vec=n.zeros(o.n_range_gates,dtype=n.float32)
     
     if tx_amp > 1.0:
-        g.gmf(z_tx, z_rx, o.acc_phasors, o.rgs_float, o.frequency_decimation, gmf_vec, gmf_dc_vec, v_vec, a_vec, rank)
+        g.gmf(z_tx, z_rx, o.acc_phasors, o.rgs_float, o.frequency_decimation, gmf_vec, gmf_dc_vec, v_vec, a_vec, comm.rank)
         
     if o.debug_plot_data_read:
         plt.plot(gmf_vec)
@@ -85,7 +89,7 @@ def analyze_ipps(d,i0,o):
     
     mri=n.argmax(gmf_vec)
     if o.debug_gmf_output:
-        print("rank %d GMF=%1.2g r_max=%1.2f (km) vel_max=%1.2f (km/s) a_max=%1.2f (m/s**2)"%(rank,n.max(gmf_vec),o.ranges[mri],o.range_rates[int(v_vec[mri])]/1e3,o.accs[int(a_vec[mri])]))
+        print("rank %d GMF=%1.2g r_max=%1.2f (km) vel_max=%1.2f (km/s) a_max=%1.2f (m/s**2)"%(comm.rank,n.max(gmf_vec),o.ranges[mri],o.range_rates[int(v_vec[mri])]/1e3,o.accs[int(a_vec[mri])]))
     
     cput1=time.time()
     if o.debug_gmf_output:
