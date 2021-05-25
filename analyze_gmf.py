@@ -32,11 +32,13 @@ def analyze_gmf(conf,
                                              stuffr.unix2datestr(b_tx[1]/conf.sample_rate)))
     
     print("Number of parallel processes %d"%(comm.size))
-    
-    if conf.t0 == None or conf.t1 == None:
-        b=b_rx
-    else:
-        b=(int(t0*conf.sample_rate),int(t1*conf.sample_rate))
+
+    b=b_rx
+    b=[b_rx[0],b_rx[1]]
+    if conf.t0 != None:
+        b[0]=int(conf.t0*conf.sample_rate)
+        
+
         
     if n_ints==0:
         n_ints=int(n.floor((b[1]-b[0])/(conf.ipp*conf.n_ipp))/conf.num_cohints_per_file)
@@ -53,7 +55,7 @@ def analyze_gmf(conf,
         gmf_v=n.zeros([conf.num_cohints_per_file,conf.n_range_gates],dtype=n.float32)
         gmf_a=n.zeros([conf.num_cohints_per_file,conf.n_range_gates],dtype=n.float32)
         gmf_txp=n.zeros(conf.num_cohints_per_file,dtype=n.float32)
-        
+    
         if os.path.exists(fname):
             print("skipping %d, file already exists"%(fi))
         else:
