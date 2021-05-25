@@ -33,7 +33,7 @@ The library operates on level 2 beamformed data streams that are stored on disk 
 
 The program can be adapted to various different radars and radar experiment parameters. This is done by editing a configuration file. An example configuration file is shown below. The example file includes comments that describe each parameter.
 
-```
+```bash
 [config]
 # data stream directory
 data_dirs=["/media/j/ebd77b41-7efd-4238-b6f8-2b17bc33c84c/debsim"]
@@ -86,8 +86,7 @@ sample_rate=10000000
 range_gate_0=1000
 # how many samples do we step in range in the first stage of the course search
 range_gate_step=50
-# how much decimation in frequency do we perform 
-¤ (this affects minimum and maximum allowed Doppler shift)
+# how much decimation in frequency do we perform (this affects minimum and maximum allowed Doppler shift)
 frequency_decimation=100
 # number of interpulse periods to coherently integrate
 n_ipp=10
