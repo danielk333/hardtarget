@@ -234,9 +234,11 @@ def one_cohint(conf,
                                                                                                              gmf_cpu_time+fine_tune_cpu_time))
     
     print("Analysis result")
-    print(res)
+    print("[%1.2f, %1.2f, %1.2f, %1.2f]"%(snr01,r01,v01,a01))
     print("Should be")
     print("[%1.2f, %1.2f, %1.2f, %1.2f]"%(snr,r0,v0,a0))
+    print("Diff (x - x0)")
+    print("[%1.2f, %1.2f, %1.2f, %1.2f]"%(snr01-snr,r01-r0,v01-v0,a01-a0))
     return([res[0],res[1],res[2],res[3],gmf_cpu_time,fine_tune_cpu_time])
 
 
@@ -343,15 +345,24 @@ if __name__ == "__main__":
                   radar_frequency=230e6,
                   n_ipp=10)
 
+    samps = 10
+
     # this can be paralellized!
-    for i in range(comm.rank, 100, comm.size):
+    res_mat = n.full((samps, 4), n.nan, dtype=n.float64)
+    for i in range(comm.rank, samps, comm.size):
         # analyze one coherent integration period
         res=one_cohint(sconf,
                        r0=1000e3,
                        v0=2e3,
                        a0=80.0,
                        snr=1000.0)
-        print(res)
+        for j in range(4):
+          res_mat[i,j] = res[j]
+        
+        print(f'[sample {i}/{samps}]')
+
+    stds = n.std(res_mat, axis=0)
+    print(f'sn_std = {stds[0]}, r_std={stds[1]} m, v_std={stds[2]} m/s, a_std={stds[3]} m/s^2')
 
     #n_ipp_sweep()
     #snr_sweep()
