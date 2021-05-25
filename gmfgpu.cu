@@ -1,6 +1,28 @@
 // header file for the plasmaline project
 #include "gmfgpu.h"
 
+void print_devices()
+{
+  int nDevices;
+
+  int ret=cudaGetDeviceCount(&nDevices);
+ 
+  for (int i = 0; i < nDevices; i++)
+  {
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, i);
+    printf("Device Number: %d\n", i);
+    printf("  Device name: %s\n", prop.name);
+    printf("  Memory Clock Rate (KHz): %d\n",
+           prop.memoryClockRate);
+    printf("  Memory Bus Width (bits): %d\n",
+           prop.memoryBusWidth);
+    printf("  Peak Memory Bandwidth (GB/s): %f\n\n",
+           2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
+  }
+}
+
+
 /*
   For each range gate (i), multiply transmit pulse with range delayed echo
   each range gate has a nfft2 length block in d_z_echo.
@@ -63,7 +85,6 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
        	       	   float *rgs, int n_rg, int dec, float *gmf_vec, float *gmf_dc_vec, float *v_vec, float *a_vec, int rank)
 {
   cudaSetDevice(rank);
-    
   // initializing pointers to device (GPU) memory, denoted with "d_"
   cufftComplex *d_z_tx;
   cufftComplex *d_z_rx;
@@ -111,11 +132,13 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
   int nfft2;
   
   nfft2=(int)(z_tx_len/dec);    
-    
+
   // allocating device memory to the above pointers
   // the signal and echo here are only one row of the CPU data (one time step)
-  if (cudaMalloc((void **) &d_z_tx, sizeof(cufftComplex) * z_tx_len) != cudaSuccess)
+  int res= cudaMalloc((void **) &d_z_tx, sizeof(cufftComplex) * z_tx_len);
+  if (res != cudaSuccess)
   {
+    printf("error %d\n",res);
     fprintf(stderr, "Cuda error: Failed to allocate tx\n");
     exit(EXIT_FAILURE);
   }

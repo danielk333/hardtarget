@@ -27,7 +27,21 @@ class gmf_opts:
                 out+="%s = %s\n"%(e,getattr(self,e))
         return(out)
 
-    
+    def set_n_ranges(self, range_gate_0, n_range_gates):
+        """
+        Reset the number of range-gates. This is useful when reanalyzing with better resolution
+        to fine-tune the result
+        """
+        self.n_range_gates=n_range_gates
+        self.range_gate_0=range_gate_0
+
+        # range gates to search through
+        self.rgs=n.arange(self.n_range_gates)*self.range_gate_step+self.range_gate_0
+        self.rgs_float=n.array(self.rgs,dtype=n.float32)
+        
+        # total propagation range
+        self.ranges=self.rgs*sc.c/1e3/self.sample_rate
+
     def __init__(self,fname=None):
         c=configparser.ConfigParser()
         # initialize with default values
@@ -58,7 +72,9 @@ class gmf_opts:
                      "debug_print":'true',
                      "round_trip_range":'true',
                      "num_cohints_per_file":'100',
-                     "use_gpu":'false'}
+                     "use_gpu":'false',
+                     "use_python":'false',
+                     "use_cpu":'true'}
 
         if fname != None:
             if os.path.exists(fname):
@@ -102,29 +118,24 @@ class gmf_opts:
         self.debug_plot_data_read=False
         self.num_cohints_per_file=int(json.loads(c["config"]["num_cohints_per_file"]))
         self.use_gpu=bool(json.loads(c["config"]["use_gpu"]))
+        self.use_python=bool(json.loads(c["config"]["use_python"]))
         self.reanalyze=bool(json.loads(c["config"]["reanalyze"]))        
         self.round_trip_range=bool(json.loads(c["config"]["round_trip_range"]))
-        self.use_python=False
-        self.use_gpu=False
         self.debug_gmf_output=True
 
 
-        os.system("mkdir -p %s"%(self.output_dir))
-        print("mkdir -p %s"%(self.output_dir))
+        if self.save_parameters:
+            os.system("mkdir -p %s"%(self.output_dir))
+            print("mkdir -p %s"%(self.output_dir))
         
         # length of coherent integration
         self.n_fft=self.n_ipp*self.ipp
 
         # frequency vector 
         self.fvec=n.fft.fftfreq(int(self.n_fft/self.frequency_decimation),d=self.frequency_decimation/self.sample_rate)
-                          
-        # range gates to search through
-        self.rgs=n.arange(self.n_range_gates)*self.range_gate_step+self.range_gate_0
-        self.rgs_float=n.array(self.rgs,dtype=n.float32)
-
-        # total propagation range
-        self.ranges=self.rgs*sc.c/1e3/self.sample_rate
-
+        
+        self.set_n_ranges(self.range_gate_0, self.n_range_gates)
+        
         # range-rate is doppler-shift in hertz multiplied with wavelength 
         self.wavelength = sc.c/self.radar_frequency
         self.range_rates=self.doppler_sign*self.wavelength*self.fvec
