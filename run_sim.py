@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # First stage course GMF grid search
 # Numpy, C, CUDA
 # Simulate raw voltage measurement
