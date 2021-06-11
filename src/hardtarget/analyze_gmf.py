@@ -7,9 +7,9 @@ import time
 import sys
 
 import digital_rf as drf
-import gmf_opts as go
-import stuffr
-import gmf as g
+from . import gmf_opts as go
+from . import stuffr
+from . import gmf as g
 
 try:
     from mpi4py import MPI

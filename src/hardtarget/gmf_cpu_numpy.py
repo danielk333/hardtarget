@@ -17,7 +17,7 @@ import digital_rf as drf
 import matplotlib.pyplot as plt
 import numpy as n
 import h5py
-import stuffr
+from . import stuffr
 import scipy.fftpack as fft
 import time
 import scipy.constants as c

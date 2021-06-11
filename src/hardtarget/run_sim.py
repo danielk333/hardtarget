@@ -3,16 +3,17 @@
 # First stage course GMF grid search
 # Numpy, C, CUDA
 # Simulate raw voltage measurement
-import sim_raw as sr
+from . import sim_raw as sr
 # Options class
-import gmf_opts as go
+from . import gmf_opts as go
+from . import gmf as g
+
 import numpy as n
 import os
 import time
 import h5py
 import scipy.constants as c
 import digital_rf as drf
-import gmf as g
 
 try:
     from mpi4py import MPI
@@ -336,7 +337,7 @@ def n_ipp_sweep():
 
 if __name__ == "__main__":
     
-    sconf=sim_conf(dirname="/scratch/data/juha/debsim",
+    sconf=sim_conf(dirname="./",
                   sr_mhz=4,
                   tx_len_us=2000,
                   ipp_us=10000,

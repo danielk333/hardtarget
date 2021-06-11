@@ -1,7 +1,7 @@
+from . import stuffr
 import digital_rf as drf
 import numpy as n
 import h5py
-import stuffr
 import scipy.fftpack as fft
 import time
 import scipy.constants as c
@@ -25,11 +25,11 @@ def analyze_ipps(d,i0,o):
    
     # we can use one of several implementations
     if o.use_gpu:
-        import gmfgpu as g
+        from .import gmfgpu as g
     elif o.use_python:
-        import gmf_cpu_numpy as g
+        from .import gmf_cpu_numpy as g
     else:
-        import gmf_c as g
+        from . import gmf_c as g
         
     cput0=time.time()
     
