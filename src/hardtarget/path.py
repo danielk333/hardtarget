@@ -1,4 +1,8 @@
+'''
+Exposes a global PATH variable to find the path to where the 
+module is installed.
+'''
 import os
-#Quite hacky way of finding the modules path. Will only work on 
-#unix like file systems, because of the '/'.
-PATH = os.path.abspath(__file__)[:-len(__file__.split('/')[-1])]
+#Quite hacky way of finding the modules path. Tested on both 
+#Windows and Ubuntu so should work for most file systems
+__PATH = os.path.abspath(__file__)[:-len(__file__.split('/')[-1])]
