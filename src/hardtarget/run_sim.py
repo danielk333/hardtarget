@@ -24,9 +24,11 @@ except ImportError:
         size = 1
     comm = COMM_WORLD()
 
+SIMDIR = '/tmp/hardtarget'
+
 class sim_conf:
     def __init__(self,
-                 dirname="/scratch/data/juha/debsim",
+                 dirname=SIMDIR,
                  sr_mhz=1,
                  tx_len_us=2000,
                  ipp_us=10000,
@@ -74,7 +76,7 @@ class sim_conf:
         num_cohints_per_file=1
         snr_thresh=10.0
         """
-        with open("cfg/sim-%d.ini"%(comm.rank),"w") as f:
+        with open(SIMDIR + "/sim-%d.ini"%(comm.rank),"w") as f:
             f.writelines(cfg)
             # sample-rate specific configuration options
             f.write("data_dirs=[\"%s\"]\n"%(self.dirname))
@@ -115,7 +117,7 @@ class sim_conf:
         range_gate_step=1
         """
         
-        with open("cfg/sim_fine-%d.ini"%(comm.rank),"w") as f:
+        with open(SIMDIR + "/sim_fine-%d.ini"%(comm.rank),"w") as f:
             f.writelines(fine_tune_cfg)
             # sample-rate specific configuration options
             f.write("data_dirs=[\"%s\"]\n"%(self.dirname))
@@ -131,8 +133,8 @@ class sim_conf:
                 f.write("use_gpu=false")
             
         
-        self.conf=go.gmf_opts("cfg/sim-%d.ini"%(comm.rank))
-        self.conf_fine=go.gmf_opts("cfg/sim_fine-%d.ini"%(comm.rank))
+        self.conf=go.gmf_opts(SIMDIR + "/sim-%d.ini"%(comm.rank))
+        self.conf_fine=go.gmf_opts(SIMDIR + "/sim_fine-%d.ini"%(comm.rank))
 
 def run_cohint(d,conf,i0,r0):
     """
@@ -335,9 +337,15 @@ def n_ipp_sweep():
     ho["finetune_time"]=n_ipp_results[:,5]
     ho.close()
 
-if __name__ == "__main__":
-    
-    sconf=sim_conf(dirname="./",
+def start_sim():
+    #Try to create a hardtarget directory in tmp to do simulation
+    try:
+        os.mkdir('/tmp/hardtarget')
+    #If it allready exists, then don't care
+    except FileExistsError:
+        pass
+
+    sconf=sim_conf(
                   sr_mhz=4,
                   tx_len_us=2000,
                   ipp_us=10000,
@@ -362,12 +370,10 @@ if __name__ == "__main__":
         
         print(f'[sample {i}/{samps}]')
 
-    stds = n.std(res_mat, axis=0)
+    stds = n.nanstd(res_mat, axis=0)
     print(f'sn_std = {stds[0]}, r_std={stds[1]} m, v_std={stds[2]} m/s, a_std={stds[3]} m/s^2')
-
-    #n_ipp_sweep()
-    #snr_sweep()
     
-
+if __name__ == "__main__":
+    start_sim()
     
     
