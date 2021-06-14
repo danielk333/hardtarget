@@ -2,9 +2,9 @@ import ctypes as C
 import numpy as n
 import time
 import matplotlib.pyplot as plt
-from .path import PATH
+from .path import _PATH
 # compile with Makefile
-_fmed = n.ctypeslib.load_library(PATH+'libgmfgpu', './Ccode')
+_fmed = n.ctypeslib.load_library(_PATH+'libgmfgpu', './Ccode')
 _fmed.gmf.restype = C.c_int
 _fmed.gmf.argtypes = [C.POINTER(C.c_float), C.c_int, C.POINTER(C.c_float), C.c_int, C.POINTER(C.c_float), C.c_int, C.POINTER(C.c_float), C.c_int, C.c_int, C.POINTER(C.c_float), C.POINTER(C.c_float), C.POINTER(C.c_float), C.POINTER(C.c_float), C.c_int]
 
