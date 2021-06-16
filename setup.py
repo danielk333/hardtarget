@@ -157,7 +157,7 @@ class custom_build_ext(build_ext):
 
 setup(
     name="hardtarget",
-    version="0.1.5",
+    version="0.1.6",
     author="Juha Vierinen",
     author_email="juha-pekka.vierinen@uit.no",
     description="Hard target processing of radar data",
