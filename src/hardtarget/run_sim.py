@@ -15,6 +15,7 @@ import h5py
 import scipy.constants as c
 import digital_rf as drf
 
+
 try:
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
@@ -337,14 +338,14 @@ def n_ipp_sweep():
     ho["finetune_time"]=n_ipp_results[:,5]
     ho.close()
 
-def start_sim():
+def start_sim(gpu):
     #Try to create a hardtarget directory in tmp to do simulation
     try:
         os.mkdir('/tmp/hardtarget')
     #If it allready exists, then don't care
     except FileExistsError:
         pass
-
+    
     sconf=sim_conf(
                   sr_mhz=4,
                   tx_len_us=2000,
@@ -352,7 +353,9 @@ def start_sim():
                   bit_len_us=100,
                   max_doppler_vel=10e3,
                   radar_frequency=230e6,
-                  n_ipp=10)
+                  n_ipp=10,
+                  use_gpu=gpu,
+                  )
 
     samps = 10
 
