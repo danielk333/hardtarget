@@ -53,55 +53,6 @@ def locate_cuda():
     return cudaconfig
 
 
-def customize_compiler_for_nvcc(self):
-    #Adapted from https://github.com/rmcgibbo/npcuda-example/blob/master/cython/setup.py
-
-    """
-    Inject deep into distutils to customize how the dispatch
-    to gcc/nvcc works.
-    If you subclass UnixCCompiler, it's not trivial to get your subclass
-    injected in, and still have the right customizations (i.e.
-    distutils.sysconfig.customize_compiler) run on it. So instead of going
-    the OO route, I have this. Note, it's kindof like a wierd functional
-    subclassing going on.
-    """
-    # Tell the compiler it can processes .cu
-    self.src_extensions.append('.cu')
-
-    # Save references to the default compiler_so and _comple methods
-    default_compiler_so = self.compiler_so
-    super = self._compile
-
-    # Now redefine the _compile method. This gets executed for each
-    # object but distutils doesn't have the ability to change compilers
-    # based on source extension: we add it.
-    def _compile(obj, src, ext, cc_args, extra_postargs, pp_opts):
-        if os.path.splitext(src)[1] == '.cu':
-            # use the cuda for .cu files
-            self.set_executable('compiler_so', CUDA['nvcc'])
-            # use only a subset of the extra_postargs, which are 1-1
-            # translated from the extra_compile_args in the Extension class
-            postargs = extra_postargs['nvcc']
-        else:
-            postargs = extra_postargs['gcc']
-
-        super(obj, src, ext, cc_args, postargs, pp_opts)
-        # Reset the default compiler_so, which we might have changed for cuda
-        self.compiler_so = default_compiler_so
-
-    # Inject our redefined _compile method into the class
-    self._compile = _compile
-
-
-
-# Run the customize_compiler
-class custom_build_ext(build_ext):
-    #Adapted from https://github.com/rmcgibbo/npcuda-example/blob/master/cython/setup.py
-    def build_extensions(self):
-        customize_compiler_for_nvcc(self.compiler)
-        build_ext.build_extensions(self)
-
-
 cudasources = ['src/hardtarget/cudafiles/gmfgpu.cu']
 cudalibraries = ['cufft']
 
@@ -124,6 +75,7 @@ gmfcmodule = Extension(
 #Try to build Cuda module
 try:
     CUDA = locate_cuda()
+    print(CUDA)
     print("Cuda compiler detected, compiling GPU optimized code")
 
     gmfgpumodule = Extension(
@@ -136,13 +88,17 @@ try:
             extra_compile_args= {
                 'gcc': [],
                 'nvcc': [
-                    '--compiler-options', "'-fPIC'"
+                    '--compiler-options', "'-fPIC'",
+                    # '-L', '/usr/local/cuda-10.1/targets/x86_64-linux/lib/'
                     ]
             },
+            include_dirs = [CUDA['include']],
             #Path to cuda source files, relative to repo root
             sources=cudasources,
             )
     #Specify that we want both C and Cuda module to be compiled
+    #The C module has to be built first because of the way we inject 
+    #a new linker without cleaning up afterwards
     extmodules = [gmfcmodule, gmfgpumodule]
 except EnvironmentError:
     print("No Cuda compiler detected, compiling serial code")
@@ -150,9 +106,58 @@ except EnvironmentError:
     extmodules = [gmfcmodule]
 
 
+def customize_compiler_for_nvcc(self):
+    #Adapted from https://github.com/rmcgibbo/npcuda-example/blob/master/cython/setup.py
+
+    """
+    Inject deep into distutils to customize how the dispatch
+    to gcc/nvcc works.
+    If you subclass UnixCCompiler, it's not trivial to get your subclass
+    injected in, and still have the right customizations (i.e.
+    distutils.sysconfig.customize_compiler) run on it. So instead of going
+    the OO route, I have this. Note, it's kindof like a wierd functional
+    subclassing going on.
+    """
+    # Tell the compiler it can processes .cu
+    self.src_extensions.append('.cu')
+
+    # Save references to the default compiler_so and _compile methods
+    default_compiler_so = self.compiler_so
+    default_linker_so = self.linker_so
+    superCompile = self._compile
+    # Now redefine the _compile method. This gets executed for each
+    # object but distutils doesn't have the ability to change compilers
+    # based on source extension: we add it.
+    def _compile(obj, src, ext, cc_args, extra_postargs, pp_opts):
+        if os.path.splitext(src)[1] == '.cu':
+            # use the cuda for .cu files
+            self.set_executable('compiler_so', CUDA['nvcc'])
+            self.set_executable('linker_so', [CUDA['nvcc'],'--shared'])
+            # use only a subset of the extra_postargs, which are 1-1
+            # translated from the extra_compile_args in the Extension class
+            postargs = extra_postargs['nvcc']
+        else:
+            postargs = extra_postargs['gcc']
+
+        superCompile(obj, src, ext, cc_args, postargs, pp_opts)
+        # Reset the default compiler_so and linker_so, which we might have changed for cuda
+        self.compiler_so = default_compiler_so
+
+    # Inject our redefined _compile method into the class
+    self._compile = _compile
+
+
+# Run the customize_compiler
+class custom_build_ext(build_ext):
+    #Adapted from https://github.com/rmcgibbo/npcuda-example/blob/master/cython/setup.py
+    def build_extensions(self):
+        customize_compiler_for_nvcc(self.compiler)
+        build_ext.build_extensions(self)
+
+
 setup(
     name="hardtarget",
-    version="0.1.4",
+    version="0.1.5",
     author="Juha Vierinen",
     author_email="juha-pekka.vierinen@uit.no",
     description="Hard target processing of radar data",
