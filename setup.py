@@ -82,17 +82,13 @@ try:
             #Where to store the .so file
             name='hardtarget.libgmfgpu',
             library_dirs=[CUDA['lib64']],
-            runtime_library_dirs = [CUDA['lib64']],
             #Libraries used
             libraries=cudalibraries,
             extra_compile_args= {
                 'gcc': [],
                 'nvcc': [
                     '-O3','--compiler-options', "'-fPIC'",
-                    # '-L', '/usr/local/cuda-10.1/targets/x86_64-linux/lib/'
                     ]
-            },
-            extra_link_args={
             },
             include_dirs = [CUDA['include']],
             #Path to cuda source files, relative to repo root
