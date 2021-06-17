@@ -88,9 +88,11 @@ try:
             extra_compile_args= {
                 'gcc': [],
                 'nvcc': [
-                    '--compiler-options', "'-fPIC'",
+                    '-O3','--compiler-options', "'-fPIC'",
                     # '-L', '/usr/local/cuda-10.1/targets/x86_64-linux/lib/'
                     ]
+            },
+            extra_link_args={
             },
             include_dirs = [CUDA['include']],
             #Path to cuda source files, relative to repo root
