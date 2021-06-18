@@ -155,12 +155,16 @@ class custom_build_ext(build_ext):
 
 setup(
     name="hardtarget",
-    version="0.1.7",
+    version="0.1.8",
     author="Juha Vierinen",
     author_email="juha-pekka.vierinen@uit.no",
     description="Hard target processing of radar data",
     long_description=long_description,
     long_description_content_type="text/markdown",
+    url="https://github.com/jvierine/hard_target",
+    project_urls={
+        "Bug Tracker": "https://github.com/jvierine/hard_target/issues",
+    },
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Environment :: GPU :: NVIDIA CUDA",
