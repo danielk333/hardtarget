@@ -1,0 +1,36 @@
+# This workflow will install Python dependencies 
+# and try to build and deploy the project to 
+# testpypi
+
+name: Build Project
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.6
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.6
+    - name: Install dependencies
+      run: |
+        apt install gcc nvidia-cuda-toolkit libfftw3-dev
+        python -m pip install --upgrade pip
+        python -m pip install build twine
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - name: Build and upload to testpypi
+      run: |
+        python3 -m build -s
+        #The pypi token should really be stored as a github secret if the repository is opend to the public
+        python3 -m twine upload -r testpypi dist/* -u __token__ -p pypi-AgENdGVzdC5weXBpLm9yZwIkMWEyZWI2NTItZWNmOS00YjhjLThkOWEtM2M5YmI4ZjA1ZTY4AAIleyJwZXJtaXNzaW9ucyI6ICJ1c2VyIiwgInZlcnNpb24iOiAxfQAABiCTAUZevBqiFRsrGy1F4wmu3bL9Sc1KIw8XbmSZoJ_oSA
