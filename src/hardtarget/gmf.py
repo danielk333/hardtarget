@@ -1,4 +1,4 @@
-from . import stuffr
+import stuffr
 import digital_rf as drf
 import numpy as n
 import h5py

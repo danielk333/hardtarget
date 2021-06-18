@@ -8,7 +8,7 @@ import sys
 
 import digital_rf as drf
 from . import gmf_opts as go
-from . import stuffr
+import stuffr
 from . import gmf as g
 
 try:
