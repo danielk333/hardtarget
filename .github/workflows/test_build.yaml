@@ -32,5 +32,3 @@ jobs:
     - name: Build and upload to testpypi
       run: |
         python3 -m build -s
-        #The pypi token should really be stored as a github secret if the repository is opend to the public
-        python3 -m twine upload -r testpypi dist/* -u __token__ -p pypi-AgENdGVzdC5weXBpLm9yZwIkMWEyZWI2NTItZWNmOS00YjhjLThkOWEtM2M5YmI4ZjA1ZTY4AAIleyJwZXJtaXNzaW9ucyI6ICJ1c2VyIiwgInZlcnNpb24iOiAxfQAABiCTAUZevBqiFRsrGy1F4wmu3bL9Sc1KIw8XbmSZoJ_oSA
