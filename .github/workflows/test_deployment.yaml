@@ -25,7 +25,7 @@ jobs:
         python-version: 3.6
     - name: Install dependencies
       run: |
-        apt install gcc nvidia-cuda-toolkit libfftw3-dev
+        sudo apt-get install gcc nvidia-cuda-toolkit libfftw3-dev -y
         python -m pip install --upgrade pip
         python -m pip install build twine
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
