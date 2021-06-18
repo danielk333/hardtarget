@@ -175,7 +175,8 @@ setup(
         'digital_rf>=2.6.6',
         'numpy>=1.19.5',
         'scipy>=1.4.1',
-        'matplotlib>=3.3.4'
+        'matplotlib>=3.3.4',
+        'stuffr>=1.0.0',
     ],
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),
