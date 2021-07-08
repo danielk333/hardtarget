@@ -6,7 +6,7 @@
 from . import sim_raw as sr
 # Options class
 from . import gmf_opts as go
-from . import gmf as g
+from . import analyze_ipps as g
 
 import numpy as n
 import os
@@ -43,6 +43,7 @@ class sim_conf:
         """
         
         # after signal processing
+        # Config for the simulator
         self.tx_len=tx_len_us*sr_mhz
         self.ipp=ipp_us*sr_mhz
         self.bit_len=bit_len_us*sr_mhz

@@ -9,7 +9,7 @@ import sys
 import digital_rf as drf
 from . import gmf_opts as go
 import stuffr
-from . import gmf as g
+from . import analyze_ipps as g
 
 try:
     from mpi4py import MPI
