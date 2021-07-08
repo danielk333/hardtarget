@@ -1,2 +1,0 @@
-graft src/hardtarget/cfiles
-graft src/hardtarget/cudafiles
