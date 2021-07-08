@@ -25,11 +25,11 @@ def analyze_ipps(d,i0,o):
    
     # we can use one of several implementations
     if o.use_gpu:
-        from .import gmfgpu as g
+        from .gmf import gmfgpu as g
     elif o.use_python:
-        from .import gmf_cpu_numpy as g
+        from .gmf import gmf_cpu_numpy as g
     else:
-        from . import gmf_c as g
+        from .gmf import gmf_c as g
         
     cput0=time.time()
     
