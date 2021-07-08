@@ -1,4 +1,4 @@
-from . import run_sim
+from .examples import run_sim
 from . import __path__
 import sys
 

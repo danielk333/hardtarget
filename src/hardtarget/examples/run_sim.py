@@ -3,10 +3,10 @@
 # First stage course GMF grid search
 # Numpy, C, CUDA
 # Simulate raw voltage measurement
-from . import sim_raw as sr
+from ..simulation import sim_raw as sr
 # Options class
-from . import gmf_opts as go
-from . import analyze_ipps as g
+from ..analysis import gmf_opts as go
+from ..analysis import analyze_ipps as g
 
 import numpy as n
 import os
