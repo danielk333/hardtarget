@@ -62,7 +62,7 @@ clibraries = ['fftw3f']
 #Build C module
 gmfcmodule = Extension(
             #Where to store the .so file
-            name='hardtarget.gmf.libgmf',
+            name='hardtarget.analysis.gmf.libgmf',
             #Libraries used
             libraries=clibraries,
             extra_compile_args= {
@@ -80,7 +80,7 @@ try:
 
     gmfgpumodule = Extension(
             #Where to store the .so file
-            name='hardtarget.gmf.libgmfgpu',
+            name='hardtarget.analysis.gmf.libgmfgpu',
             library_dirs=[CUDA['lib64']],
             #Libraries used
             libraries=cudalibraries,
