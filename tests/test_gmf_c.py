@@ -1,7 +1,7 @@
 import unittest
 import numpy as n
 import time
-from hardtarget.gmf_c import gmf
+from hardtarget.gmf.gmf_c import gmf
 
 class Test_Gmf_C(unittest.TestCase):
 
