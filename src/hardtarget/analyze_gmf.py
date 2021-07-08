@@ -3,7 +3,6 @@
 import h5py
 import numpy as n
 import os
-import time
 import sys
 
 import digital_rf as drf
