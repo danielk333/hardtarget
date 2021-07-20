@@ -1,7 +1,7 @@
-import numpy as n
+import numpy as np
 import scipy.constants as sc
 import os
-
+from ..config import Config
 try:
     import configparser
 except ImportError as e:
@@ -14,7 +14,7 @@ import os
 #
 # doppler sign convention: range reduces with positive doppler velocity.
 # 
-class gmf_opts:
+class gmf_opts(Config):
     
     def __str__(self):
         out="Configuration\n"
@@ -32,8 +32,8 @@ class gmf_opts:
         self.range_gate_0=range_gate_0
 
         # range gates to search through
-        self.rgs=n.arange(self.n_range_gates)*self.range_gate_step+self.range_gate_0
-        self.rgs_float=n.array(self.rgs,dtype=n.float32)
+        self.rgs=np.arange(self.n_range_gates)*self.range_gate_step+self.range_gate_0
+        self.rgs_float=np.array(self.rgs,dtype=np.float32)
         
         # total propagation range
         self.ranges=self.rgs*sc.c/1e3/self.sample_rate
@@ -128,7 +128,7 @@ class gmf_opts:
         self.n_fft=self.n_ipp*self.ipp
 
         # frequency vector 
-        self.fvec=n.fft.fftfreq(int(self.n_fft/self.frequency_decimation),d=self.frequency_decimation/self.sample_rate)
+        self.fvec=np.fft.fftfreq(int(self.n_fft/self.frequency_decimation),d=self.frequency_decimation/self.sample_rate)
         
         self.set_n_ranges(self.range_gate_0, self.n_range_gates)
         
@@ -150,21 +150,21 @@ class gmf_opts:
         delta_a = self.max_acceleration - self.min_acceleration
         self.n_accelerations = int(n.ceil( delta_a*(n.pi/self.wavelength)*tau**2.0 / self.acceleration_resolution))
         
-        self.accs=n.linspace(self.min_acceleration,self.max_acceleration,num=self.n_accelerations) # m/s**2
-        self.acc_phasors=n.zeros([self.n_accelerations,int(self.n_fft/self.frequency_decimation)],dtype=n.complex64)
+        self.accs=np.linspace(self.min_acceleration,self.max_acceleration,num=self.n_accelerations) # m/s**2
+        self.acc_phasors=np.zeros([self.n_accelerations,int(self.n_fft/self.frequency_decimation)],dtype=np.complex64)
 
         # precalculate phasors corresponding to different accelerations
         for ai,a in enumerate(self.accs):
-            self.acc_phasors[ai,:]=n.exp(-1j*2.0*n.pi*(self.doppler_sign*0.5*self.accs[ai]/self.wavelength)*times2)
+            self.acc_phasors[ai,:]=np.exp(-1j*2.0*n.pi*(self.doppler_sign*0.5*self.accs[ai]/self.wavelength)*times2)
             
         # how many extra ipps do we need to read for coherent integration
         self.n_extra=int(n.ceil(n.max(self.rgs)/self.ipp))+1
 
         # this stencil is used to block tx pulses and ground clutter
         self.read_length=self.n_fft+self.n_extra*self.ipp
-        self.rx_stencil=n.ones(self.read_length,dtype=n.float32)
+        self.rx_stencil=np.ones(self.read_length,dtype=np.float32)
         # this stencil is used to select tx pulses
-        self.tx_stencil=n.ones(self.read_length,dtype=n.float32)    
+        self.tx_stencil=np.ones(self.read_length,dtype=np.float32)    
 
         # for each coherently integrated IPP, create stencils
         for k in range(self.n_ipp+self.n_extra):
