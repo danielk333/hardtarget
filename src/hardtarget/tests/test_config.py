@@ -137,7 +137,7 @@ class test_Config(unittest.TestCase):
         #Create config object based on json dict
         c = Config(self.expected_json_dict)
         #Save paramaters to json file
-        c.save_param('test.json', output_dir=self.test_output_dir)
+        c.save_param('test', output_dir=self.test_output_dir)
 
         #Create expected json string from json dict
         expectedString = json.dumps(self.expected_json_dict, sort_keys=True, indent=4)
@@ -153,7 +153,7 @@ class test_Config(unittest.TestCase):
 
     def test_write_config_to_ini_file(self):
         c = Config(self.expected_ini_dict)
-        c.save_param('test.ini', output_dir=self.test_output_dir, ini=True)
+        c.save_param('test', output_dir=self.test_output_dir, ini=True)
 
         teststring = io.StringIO(self.test_ini_string)
         with open(self.test_output_dir + '/test.ini') as file:

@@ -26,7 +26,7 @@ class Config():
             #Read config from string
             config.read_string(string)
             #Create config from INI string
-            return cls(config._sections)
+            return cls(config._sections, values_as_strings = True)
 
     @classmethod
     def from_file(cls, path) -> object:
@@ -48,7 +48,7 @@ class Config():
             #Read config from file
             config.read(path)
             #Create config from INI file
-            return cls(config._sections)
+            return cls(config._sections, values_as_strings = True)
 
     @classmethod
     def from_stream(cls,stream) -> object:
@@ -71,10 +71,10 @@ class Config():
             #Read config from stream
             config.read_file(stream)
             #Create config from INI stream
-            return cls(config._sections)
+            return cls(config._sections, values_as_strings = True)
         
 
-    def __init__(self, paramaters) -> object:
+    def __init__(self, paramaters, values_as_strings = False) -> object:
         """
         A config object that can be created in four diffrent manners. Paramaters 
         can be input as a string, stream, file or dict. By default a dict is 
@@ -86,6 +86,7 @@ class Config():
                         values as values
         """
         self._params = paramaters
+        self.values_as_strings = values_as_strings
 
     def get_keys(self) -> list:
         """
@@ -125,12 +126,14 @@ class Config():
             path = output_dir + '/' + filename
 
         if ini:
+            path += '.ini'
             #Parse directory into inifile using configparser
             c = configparser.ConfigParser()
             c.read_dict(self._params)
             with open(path, 'w') as file:
                 c.write(file)
         else:
+            path += '.json'
             #Parse directory into json file using configparser
             with open(path,'w') as file:
                 json.dump(self._params,file, sort_keys=True, indent=4)
