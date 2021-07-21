@@ -1,4 +1,4 @@
-import unittest, os, io, json
+import unittest, os, io, json, shutil
 from unittest.case import expectedFailure
 from ..config import Config
 
@@ -44,6 +44,7 @@ class test_Config(unittest.TestCase):
         #Test file names
         self.test_json_file = "/tmp/test_config_json.json"
         self.test_ini_file = "/tmp/test_config_INI.ini"
+        self.test_output_dir = "/tmp/test_config_folder"
         #Create test file to read json from
         with open(self.test_json_file, 'w') as test_jsonfile:
             test_jsonfile.write(self.test_json_string)
@@ -136,14 +137,14 @@ class test_Config(unittest.TestCase):
         #Create config object based on json dict
         c = Config(self.expected_json_dict)
         #Save paramaters to json file
-        c.save_param('test.json', output_dir='/tmp/test')
+        c.save_param('test.json', output_dir=self.test_output_dir)
 
         #Create expected json string from json dict
         expectedString = json.dumps(self.expected_json_dict, sort_keys=True, indent=4)
         expectedString = io.StringIO(expectedString)
 
         #Check generated file against expected string
-        with open('/tmp/test/test.json') as file:
+        with open(self.test_output_dir + '/test.json') as file:
             for line in file:
                 expectedLine = expectedString.readline()
                 self.assertEqual(line, expectedLine, f'Expected "{expectedLine}" got {line}')
@@ -152,10 +153,10 @@ class test_Config(unittest.TestCase):
 
     def test_write_config_to_ini_file(self):
         c = Config(self.expected_ini_dict)
-        c.save_param('test.ini', output_dir='/tmp/test', ini=True)
+        c.save_param('test.ini', output_dir=self.test_output_dir, ini=True)
 
         teststring = io.StringIO(self.test_ini_string)
-        with open('/tmp/test/test.ini') as file:
+        with open(self.test_output_dir + '/test.ini') as file:
             for line in file:
                 expectedLine = teststring.readline()
                 self.assertEqual(line, expectedLine, f'Expected "{expectedLine}" got {line}')
@@ -172,7 +173,13 @@ class test_Config(unittest.TestCase):
     def tearDown(self):
         #remove files from setup
         os.remove(self.test_json_file)
-        # os.remove(self.test_ini_file)
+        os.remove(self.test_ini_file)
+        #remove test output dir folder if created
+        try:
+            shutil.rmtree(self.test_output_dir)
+        except FileNotFoundError:
+            #If the file does not exist then the tests will notify about any errors
+            pass
 
 if __name__ == '__main__':
     unittest.main()
