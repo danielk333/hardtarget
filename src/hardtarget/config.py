@@ -1,4 +1,4 @@
-import configparser, json, io
+import configparser, json, io, os
 from json.decoder import JSONDecodeError
 
 class Config():
@@ -87,14 +87,14 @@ class Config():
         """
         self._params = paramaters
 
-    def get_keys(self):
+    def get_keys(self) -> list:
         """
         Getter for paramater keys used for accsessing paramaters
 
         Returns:
             List of keys in paramater dictionary
         """
-        return self._params.keys()
+        return list(self._params.keys())
     
     def set_param(self, param, value) -> None:
         """
@@ -105,6 +105,36 @@ class Config():
         """
 
         self._params[param] = value
+    
+    def save_param(self, filename, output_dir=None, ini=False) -> None:
+        """
+        Save paramaters to file.
+        Paramaters:
+            filename: Name of file to store paramaters in
+            outputdir: Optional, specify directory to store paramaterfile in.
+                       The function will attempt to create this directory if 
+                       it is not present.
+            ini: Defaults to false, specify wether the user wants to write to 
+                  ini file, the default type is json.
+        """
+        if output_dir is None:
+            path = filename
+        else:
+            #If output dir specified create the directory
+            os.system("mkdir -p %s"%(output_dir))
+            path = output_dir + '/' + filename
+
+        if ini:
+            #Parse directory into inifile using configparser
+            c = configparser.ConfigParser()
+            c.read_dict(self._params)
+            with open(path, 'w') as file:
+                c.write(file)
+        else:
+            #Parse directory into json file using configparser
+            with open(path,'w') as file:
+                json.dump(self._params,file, sort_keys=True, indent=4)
+
 
     def __getitem__(self, param) -> any:
         """
