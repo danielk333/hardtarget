@@ -1,3 +1,4 @@
+from matplotlib.pyplot import cla
 import numpy as np
 import scipy.constants as sc
 import os
@@ -16,6 +17,45 @@ import os
 # 
 class gmf_opts(Config):
     
+    @classmethod
+    def from_default(cls, data_dir, output_dir, rx_channel, tx_channel):
+        #Set default paramaters in a dictionary
+        default_params = {
+                     "n_ipp":'5',
+                     "data_dirs": data_dir,
+                     "sample_rate":'1000000',
+                     "n_range_gates":'10000',
+                     "range_gate_0":'200',
+                     "range_gate_step":'1',
+                     "frequency_decimation":'25',
+                     "ipp":'10000',                   # microseconds 
+                     "tx_pulse_length":'445',  
+                     "tx_bit_length":'20',
+                     "ground_clutter_length":'1500',
+                     "min_acceleration":'-400.0',
+                     "max_acceleration":'400.0',
+                     "acceleration_resolution":"0.2",
+                     "snr_thresh":"10.0",                     
+                     "save_parameters":'true',
+                     "doppler_sign":'1.0',
+                     "rx_channel": rx_channel,
+                     "tx_channel": tx_channel,
+                     "radar_frequency":'500e6',
+                     "reanalyze":"true",
+                     "output_dir": output_dir,
+                     "debug_plot":'true',
+                     "debug_plot_acc":'true',
+                     "debug_print":'true',
+                     "round_trip_range":'true',
+                     "num_cohints_per_file":'100',
+                     "use_gpu":'false',
+                     "use_python":'false',
+                     "use_cpu":'true'
+                     }
+
+        #Return object based on default params
+        return cls(default_params)
+
     def __str__(self):
         out="Configuration\n"
         for e in dir(self):
@@ -38,46 +78,15 @@ class gmf_opts(Config):
         # total propagation range
         self.ranges=self.rgs*sc.c/1e3/self.sample_rate
 
-    def __init__(self,fname=None):
-        c=configparser.ConfigParser()
-        # initialize with default values
-        c["config"]={"n_ipp":'5',
-                     "data_dirs":'["/data0/2020.10.15/test1e6_4.04e6","/data1/2020.10.15/test1e6_4.04e6"]', # Data options, should not have default
-                     "sample_rate":'1000000',
-                     "n_range_gates":'10000',
-                     "range_gate_0":'200',
-                     "range_gate_step":'1',
-                     "frequency_decimation":'25',
-                     "ipp":'10000',                   # microseconds 
-                     "tx_pulse_length":'445',  
-                     "tx_bit_length":'20',
-                     "ground_clutter_length":'1500',
-                     "min_acceleration":'-400.0',
-                     "max_acceleration":'400.0',
-                     "acceleration_resolution":"0.2",
-                     "snr_thresh":"10.0",                     
-                     "save_parameters":'true',
-                     "doppler_sign":'1.0',
-                     "rx_channel":'"ch"', # Data options, should not have default
-                     "tx_channel":'"ch"', # Data options, should not have default
-                     "radar_frequency":'500e6',
-                     "reanalyze":"true",
-                     "output_dir":'"./spade_det"', # Data options, should not have default
-                     "debug_plot":'true',
-                     "debug_plot_acc":'true',
-                     "debug_print":'true',
-                     "round_trip_range":'true',
-                     "num_cohints_per_file":'100',
-                     "use_gpu":'false',
-                     "use_python":'false',
-                     "use_cpu":'true'}
+    def __init__(self,paramaters):
 
-        if fname != None:
-            if os.path.exists(fname):
-                print("reading configuration from %s"%(fname))
-                c.read(fname)
-            else:
-                print("configuration file %s doesn't exist. using default values"%(fname))
+        super().__init__(dict)
+        # if fname != None:
+        #     if os.path.exists(fname):
+        #         print("reading configuration from %s"%(fname))
+        #         c.read(fname)
+        #     else:
+        #         print("configuration file %s doesn't exist. using default values"%(fname))
 
         print(c.sections())
         print(c.keys())
@@ -137,28 +146,28 @@ class gmf_opts(Config):
         self.range_rates=self.doppler_sign*self.wavelength*self.fvec
         
         # time vector 
-        times=self.frequency_decimation*n.arange(int(self.n_fft/self.frequency_decimation))/self.sample_rate
+        times=self.frequency_decimation*np.arange(int(self.n_fft/self.frequency_decimation))/self.sample_rate
         times2=times**2.0
 
         # radar frequency in radians per second
-        om=2.0*n.pi*self.radar_frequency
+        om=2.0*np.pi*self.radar_frequency
 
         # these are the accelerations we'll try out
         tau = self.n_ipp*self.ipp/self.sample_rate
         
         # acceleration sampled with 0.2 radian steps at the end of the coherent integration window
         delta_a = self.max_acceleration - self.min_acceleration
-        self.n_accelerations = int(n.ceil( delta_a*(n.pi/self.wavelength)*tau**2.0 / self.acceleration_resolution))
+        self.n_accelerations = int(np.ceil( delta_a*(np.pi/self.wavelength)*tau**2.0 / self.acceleration_resolution))
         
         self.accs=np.linspace(self.min_acceleration,self.max_acceleration,num=self.n_accelerations) # m/s**2
         self.acc_phasors=np.zeros([self.n_accelerations,int(self.n_fft/self.frequency_decimation)],dtype=np.complex64)
 
         # precalculate phasors corresponding to different accelerations
         for ai,a in enumerate(self.accs):
-            self.acc_phasors[ai,:]=np.exp(-1j*2.0*n.pi*(self.doppler_sign*0.5*self.accs[ai]/self.wavelength)*times2)
+            self.acc_phasors[ai,:]=np.exp(-1j*2.0*np.pi*(self.doppler_sign*0.5*self.accs[ai]/self.wavelength)*times2)
             
         # how many extra ipps do we need to read for coherent integration
-        self.n_extra=int(n.ceil(n.max(self.rgs)/self.ipp))+1
+        self.n_extra=int(np.ceil(np.max(self.rgs)/self.ipp))+1
 
         # this stencil is used to block tx pulses and ground clutter
         self.read_length=self.n_fft+self.n_extra*self.ipp
@@ -196,8 +205,8 @@ class gmf_opts(Config):
             plt.title("Acceleration phasors (Im component)")
             plt.show()
 
-            plt.plot(n.arange(self.read_length),self.tx_stencil,label="tx stencil")
-            plt.plot(n.arange(self.read_length),self.rx_stencil,label="rx stencil")
+            plt.plot(np.arange(self.read_length),self.tx_stencil,label="tx stencil")
+            plt.plot(np.arange(self.read_length),self.rx_stencil,label="rx stencil")
             plt.title("TX and RX stencils")
             plt.legend()
             plt.xlabel("Samples")
