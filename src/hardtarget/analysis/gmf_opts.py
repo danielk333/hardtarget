@@ -78,60 +78,56 @@ class gmf_opts(Config):
         # total propagation range
         self.ranges=self.rgs*sc.c/1e3/self.sample_rate
 
-    def __init__(self,paramaters):
-
-        super().__init__(dict)
-        # if fname != None:
-        #     if os.path.exists(fname):
-        #         print("reading configuration from %s"%(fname))
-        #         c.read(fname)
-        #     else:
-        #         print("configuration file %s doesn't exist. using default values"%(fname))
-
-        print(c.sections())
-        print(c.keys())
-        print(fname)
-        self.fname=fname
-
+    def set_values(self):
         self.t0=None
         self.t1=None
 
-        self.n_ipp=int(json.loads(c["config"]["n_ipp"]))
-        self.data_dirs=json.loads(c["config"]["data_dirs"])
+        #Try to bypass header title if ini file is used
+        try:
+            self._params = self._params["config"]
+        except KeyError:
+            pass
+
+        self.n_ipp=int(self._params["n_ipp"])
+        self.data_dirs=self._params["data_dirs"]
         print(self.data_dirs)
-        self.sample_rate=float(json.loads(c["config"]["sample_rate"]))
-        self.n_range_gates=int(json.loads(c["config"]["n_range_gates"]))
-        self.range_gate_0=int(json.loads(c["config"]["range_gate_0"]))
-        self.range_gate_step=int(json.loads(c["config"]["range_gate_step"]))
-        self.frequency_decimation=int(json.loads(c["config"]["frequency_decimation"]))
-        self.ipp=int(json.loads(c["config"]["ipp"]))
-        self.tx_pulse_length=int(json.loads(c["config"]["tx_pulse_length"]))
-        self.ground_clutter_length=int(json.loads(c["config"]["ground_clutter_length"]))
-        self.min_acceleration=float(json.loads(c["config"]["min_acceleration"]))
-        self.max_acceleration=float(json.loads(c["config"]["max_acceleration"]))
-        self.acceleration_resolution=float(json.loads(c["config"]["acceleration_resolution"]))
-        self.snr_thresh=float(json.loads(c["config"]["snr_thresh"]))
-        self.save_parameters=bool(json.loads(c["config"]["save_parameters"]))
-        self.doppler_sign=float(json.loads(c["config"]["doppler_sign"]))
-        self.rx_channel=json.loads(c["config"]["rx_channel"])
-        self.tx_channel=json.loads(c["config"]["tx_channel"])
-        self.radar_frequency=float(json.loads(c["config"]["radar_frequency"]))
-        self.output_dir=json.loads(c["config"]["output_dir"])
-        self.debug_plot=bool(json.loads(c["config"]["debug_plot"]))
-        self.debug_plot_acc=bool(json.loads(c["config"]["debug_plot_acc"]))
-        self.debug_print=bool(json.loads(c["config"]["debug_print"]))
+        self.sample_rate=float(self._params["sample_rate"])
+        self.n_range_gates=int(self._params["n_range_gates"])
+        self.range_gate_0=int(self._params["range_gate_0"])
+        self.range_gate_step=int(self._params["range_gate_step"])
+        self.frequency_decimation=int(self._params["frequency_decimation"])
+        self.ipp=int(self._params["ipp"])
+        self.tx_pulse_length=int(self._params["tx_pulse_length"])
+        self.ground_clutter_length=int(self._params["ground_clutter_length"])
+        self.min_acceleration=float(self._params["min_acceleration"])
+        self.max_acceleration=float(self._params["max_acceleration"])
+        self.acceleration_resolution=float(self._params["acceleration_resolution"])
+        self.snr_thresh=float(self._params["snr_thresh"])
+        self.save_parameters=bool(self._params["save_parameters"])
+        self.doppler_sign=float(self._params["doppler_sign"])
+        self.rx_channel=self._params["rx_channel"]
+        self.tx_channel=self._params["tx_channel"]
+        self.radar_frequency=float(self._params["radar_frequency"])
+        self.output_dir=self._params["output_dir"]
+        self.debug_plot=bool(self._params["debug_plot"])
+        self.debug_plot_acc=bool(self._params["debug_plot_acc"])
+        self.debug_print=bool(self._params["debug_print"])
         self.debug_plot_data_read=False
-        self.num_cohints_per_file=int(json.loads(c["config"]["num_cohints_per_file"]))
-        self.use_gpu=bool(json.loads(c["config"]["use_gpu"]))
-        self.use_python=bool(json.loads(c["config"]["use_python"]))
-        self.reanalyze=bool(json.loads(c["config"]["reanalyze"]))        
-        self.round_trip_range=bool(json.loads(c["config"]["round_trip_range"]))
+        self.num_cohints_per_file=int(self._params["num_cohints_per_file"])
+        self.use_gpu=bool(self._params["use_gpu"])
+        self.use_python=bool(self._params["use_python"])
+        self.reanalyze=bool(self._params["reanalyze"])       
+        self.round_trip_range=bool(self._params["round_trip_range"])
         self.debug_gmf_output=True
 
+    def __init__(self,paramaters):
 
+        super().__init__(paramaters)
+
+        print(self.get_keys())
+        self.set_values()
         if self.save_parameters:
-            os.system("mkdir -p %s"%(self.output_dir))
-            print("mkdir -p %s"%(self.output_dir))
+            self.save_param('config',output_dir=self.output_dir, ini=self.values_as_strings)
         
         # length of coherent integration
         self.n_fft=self.n_ipp*self.ipp
