@@ -56,7 +56,7 @@ class test_Config(unittest.TestCase):
     def test_config_as_dict(self):
 
         #Create config object
-        c = Config(self.expected_json_dict)
+        c = Config.from_dict(self.expected_json_dict)
 
         #Assert that that the config object equalls the test dictionary
         self.assertEqual(c['test_int'], self.expected_json_dict['test_int'])
@@ -169,6 +169,42 @@ class test_Config(unittest.TestCase):
         keys = c.get_keys()
         #Assert that the keys are as expected
         self.assertEqual(keys, list(self.expected_json_dict.keys()))        
+
+    def test_error_when_using_default_values_without_implementing_default(self):
+        #Ensure that not implemented error is raised
+        with self.assertRaises(NotImplementedError):
+            c = Config.from_default()
+    
+    def test_config_as_default_values(self):
+        #Create test class with default values
+        class Default_test(Config):
+            @classmethod
+            def get_default(cls) -> dict:
+                return self.expected_json_dict
+        
+        #Create instance of default test from default values
+        c = Default_test.from_default()
+        #Assert that that the config object equalls the test dictionary
+        self.assertEqual(c['test_int'], self.expected_json_dict['test_int'])
+        self.assertEqual(c['test_string'], self.expected_json_dict['test_string'])
+        self.assertEqual(c['test_list'], self.expected_json_dict['test_list'])
+        self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
+    
+    def test_config_as_dict_with_default_values(self):
+        #Create test class with default values
+        class Default_test(Config):
+            @classmethod
+            def get_default(cls) -> dict:
+                return self.expected_json_dict
+        #Create expected dict
+        expectedDict = {'test_int': 500}
+        #Create instance of default test from default values
+        c = Default_test.from_dict(expectedDict, True)
+        #Assert that that the config object equalls the test dictionary
+        self.assertEqual(c['test_int'], expectedDict['test_int'])
+        self.assertEqual(c['test_string'], self.expected_json_dict['test_string'])
+        self.assertEqual(c['test_list'], self.expected_json_dict['test_list'])
+        self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
 
     def tearDown(self):
         #remove files from setup
