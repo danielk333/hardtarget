@@ -1,4 +1,6 @@
+from logging import debug
 from matplotlib.pyplot import cla
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy.constants as sc
 import os
@@ -18,43 +20,38 @@ import os
 class gmf_opts(Config):
     
     @classmethod
-    def from_default(cls, data_dir, output_dir, rx_channel, tx_channel):
+    def get_default(cls):
         #Set default paramaters in a dictionary
-        default_params = {
-                     "n_ipp":'5',
-                     "data_dirs": data_dir,
-                     "sample_rate":'1000000',
-                     "n_range_gates":'10000',
-                     "range_gate_0":'200',
-                     "range_gate_step":'1',
-                     "frequency_decimation":'25',
-                     "ipp":'10000',                   # microseconds 
-                     "tx_pulse_length":'445',  
-                     "tx_bit_length":'20',
-                     "ground_clutter_length":'1500',
-                     "min_acceleration":'-400.0',
-                     "max_acceleration":'400.0',
-                     "acceleration_resolution":"0.2",
-                     "snr_thresh":"10.0",                     
-                     "save_parameters":'true',
-                     "doppler_sign":'1.0',
-                     "rx_channel": rx_channel,
-                     "tx_channel": tx_channel,
-                     "radar_frequency":'500e6',
-                     "reanalyze":"true",
-                     "output_dir": output_dir,
-                     "debug_plot":'true',
-                     "debug_plot_acc":'true',
-                     "debug_print":'true',
-                     "round_trip_range":'true',
-                     "num_cohints_per_file":'100',
-                     "use_gpu":'false',
-                     "use_python":'false',
-                     "use_cpu":'true'
-                     }
-
         #Return object based on default params
-        return cls(default_params)
+        print("Setting default values")
+        return {
+                "n_ipp":5,
+                "sample_rate":1000000,
+                "n_range_gates":10000,
+                "range_gate_0":200,
+                "range_gate_step":1,
+                "frequency_decimation":25,
+                "ipp":10000, 
+                "tx_pulse_length":445,  
+                "tx_bit_length":20,
+                "ground_clutter_length":1500,
+                "min_acceleration":-400.0,
+                "max_acceleration":400.0,
+                "acceleration_resolution":0.2,
+                "snr_thresh":10.0,                     
+                "save_parameters":True,
+                "doppler_sign":1.0,
+                "radar_frequency":500e6,
+                "reanalyze":True,
+                "debug_plot":True,
+                "debug_plot_acc":True,
+                "debug_print":True,
+                "round_trip_range":True,
+                "num_cohints_per_file":100,
+                "use_gpu":False,
+                "use_python":False,
+                "use_cpu":True,
+                }
 
     def __str__(self):
         out="Configuration\n"
@@ -87,44 +84,51 @@ class gmf_opts(Config):
             self._params = self._params["config"]
         except KeyError:
             pass
+        
+        #Non default paramaters
+        try:
+            self.data_dirs=self["data_dirs"]
+            self.rx_channel=self["rx_channel"]
+            self.tx_channel=self["tx_channel"]
+            self.output_dir=self["output_dir"]
+            self.n_ipp=int(self["n_ipp"])
+            print(self.data_dirs)
+            self.sample_rate=float(self["sample_rate"])
+            self.n_range_gates=int(self["n_range_gates"])
+            self.range_gate_0=int(self["range_gate_0"])
+            self.range_gate_step=int(self["range_gate_step"])
+            self.frequency_decimation=int(self["frequency_decimation"])
+            self.ipp=int(self["ipp"])
+            self.tx_pulse_length=int(self["tx_pulse_length"])
+            self.ground_clutter_length=int(self["ground_clutter_length"])
+            self.min_acceleration=float(self["min_acceleration"])
+            self.max_acceleration=float(self["max_acceleration"])
+            self.acceleration_resolution=float(self["acceleration_resolution"])
+            self.snr_thresh=float(self["snr_thresh"])
+            self.save_parameters=bool(self["save_parameters"])
+            self.doppler_sign=float(self["doppler_sign"])
+            self.radar_frequency=float(self["radar_frequency"])
+            self.debug_plot=bool(self["debug_plot"])
+            self.debug_plot_acc=bool(self["debug_plot_acc"])
+            self.debug_print=bool(self["debug_print"])
+            self.debug_plot_data_read=False
+            self.num_cohints_per_file=int(self["num_cohints_per_file"])
+            self.use_gpu=bool(self["use_gpu"])
+            self.use_python=bool(self["use_python"])
+            self.reanalyze=bool(self["reanalyze"])       
+            self.round_trip_range=bool(self["round_trip_range"])
+            self.debug_gmf_output=True
+        except KeyError as e:
+            #Raise valuerror instead of KeyError if some values are missing
+            raise ValueError("Missing Value: " + str(e))
 
-        self.n_ipp=int(self._params["n_ipp"])
-        self.data_dirs=self._params["data_dirs"]
-        print(self.data_dirs)
-        self.sample_rate=float(self._params["sample_rate"])
-        self.n_range_gates=int(self._params["n_range_gates"])
-        self.range_gate_0=int(self._params["range_gate_0"])
-        self.range_gate_step=int(self._params["range_gate_step"])
-        self.frequency_decimation=int(self._params["frequency_decimation"])
-        self.ipp=int(self._params["ipp"])
-        self.tx_pulse_length=int(self._params["tx_pulse_length"])
-        self.ground_clutter_length=int(self._params["ground_clutter_length"])
-        self.min_acceleration=float(self._params["min_acceleration"])
-        self.max_acceleration=float(self._params["max_acceleration"])
-        self.acceleration_resolution=float(self._params["acceleration_resolution"])
-        self.snr_thresh=float(self._params["snr_thresh"])
-        self.save_parameters=bool(self._params["save_parameters"])
-        self.doppler_sign=float(self._params["doppler_sign"])
-        self.rx_channel=self._params["rx_channel"]
-        self.tx_channel=self._params["tx_channel"]
-        self.radar_frequency=float(self._params["radar_frequency"])
-        self.output_dir=self._params["output_dir"]
-        self.debug_plot=bool(self._params["debug_plot"])
-        self.debug_plot_acc=bool(self._params["debug_plot_acc"])
-        self.debug_print=bool(self._params["debug_print"])
-        self.debug_plot_data_read=False
-        self.num_cohints_per_file=int(self._params["num_cohints_per_file"])
-        self.use_gpu=bool(self._params["use_gpu"])
-        self.use_python=bool(self._params["use_python"])
-        self.reanalyze=bool(self._params["reanalyze"])       
-        self.round_trip_range=bool(self._params["round_trip_range"])
-        self.debug_gmf_output=True
 
-    def __init__(self,paramaters):
+    def __init__(self,paramaters, values_as_strings = False):
 
-        super().__init__(paramaters)
+        super().__init__(paramaters,values_as_strings)
 
-        print(self.get_keys())
+        print("\n\n")
+        print(self['use_python'])
         self.set_values()
         if self.save_parameters:
             self.save_param('config',output_dir=self.output_dir, ini=self.values_as_strings)
@@ -141,7 +145,7 @@ class gmf_opts(Config):
         self.wavelength = sc.c/self.radar_frequency
         self.range_rates=self.doppler_sign*self.wavelength*self.fvec
         
-        # time vector 
+        #Time vector
         times=self.frequency_decimation*np.arange(int(self.n_fft/self.frequency_decimation))/self.sample_rate
         times2=times**2.0
 
@@ -176,38 +180,68 @@ class gmf_opts(Config):
             self.tx_stencil[(k*self.ipp+self.tx_pulse_length):(k*self.ipp+self.ipp)]=0.0        
             # pad zeros to rx
             self.rx_stencil[(k*self.ipp):(k*self.ipp+self.tx_pulse_length+self.ground_clutter_length)]=0.0
-
+        
         if self.debug_plot_acc:
-            import matplotlib.pyplot as plt
-            plt.plot(self.accs,self.acc_phasors.real[:,int(self.n_fft/self.frequency_decimation)-1])
-            plt.plot(self.accs,self.acc_phasors.imag[:,int(self.n_fft/self.frequency_decimation)-1])
-            plt.plot(self.accs,self.acc_phasors.real[:,int(self.n_fft/self.frequency_decimation)-1],"*")
-            plt.plot(self.accs,self.acc_phasors.imag[:,int(self.n_fft/self.frequency_decimation)-1],"*")
-            plt.xlabel("Accelerations (m/s^2)")
-            plt.title("Acceleration phasors at maximum coherent integration")
-            plt.show()
-            # plot acceleration phasors
-            plt.subplot(121)
-            plt.pcolormesh(times/1e-3,self.accs,self.acc_phasors.real)
-            plt.ylabel("Acceleration ($m/s^2$)")
-            plt.xlabel("Time (ms)")
-            plt.colorbar()
-            plt.title("Acceleration phasors (Real component)")
-            plt.subplot(122)
-            plt.pcolormesh(times/1e-3,self.accs,self.acc_phasors.imag)
-            plt.ylabel("Acceleration ($m/s^2$)")
-            plt.xlabel("Time (ms)")
-            plt.colorbar()
-            plt.title("Acceleration phasors (Im component)")
+            self.plot_debug(show=True)
+    
+    def plot_debug(self, show=False, save=False):
+        # time vector 
+        times=self.frequency_decimation*np.arange(int(self.n_fft/self.frequency_decimation))/self.sample_rate
+        times2=times**2.0
+
+        if save:
+            os.system("mkdir -p %s/debug_plots"%(self.output_dir))
+            path = self.output_dir + '/debug_plots/'
+
+        plt.plot(self.accs,self.acc_phasors.real[:,int(self.n_fft/self.frequency_decimation)-1])
+        plt.plot(self.accs,self.acc_phasors.imag[:,int(self.n_fft/self.frequency_decimation)-1])
+        plt.plot(self.accs,self.acc_phasors.real[:,int(self.n_fft/self.frequency_decimation)-1],"*")
+        plt.plot(self.accs,self.acc_phasors.imag[:,int(self.n_fft/self.frequency_decimation)-1],"*")
+        plt.xlabel("Accelerations (m/s^2)")
+        plt.title("Acceleration phasors at maximum coherent integration")
+
+        if save:
+            plt.savefig(path + '/acc_phasor_01.pdf')
+        if show:
             plt.show()
 
-            plt.plot(np.arange(self.read_length),self.tx_stencil,label="tx stencil")
-            plt.plot(np.arange(self.read_length),self.rx_stencil,label="rx stencil")
-            plt.title("TX and RX stencils")
-            plt.legend()
-            plt.xlabel("Samples")
+        # plot acceleration phasors
+        plt.subplot(121)
+        plt.pcolormesh(times/1e-3,self.accs,self.acc_phasors.real)
+        plt.ylabel("Acceleration ($m/s^2$)")
+        plt.xlabel("Time (ms)")
+        plt.colorbar()
+        plt.title("Acceleration phasors (Real component)")
+        plt.subplot(122)
+        plt.pcolormesh(times/1e-3,self.accs,self.acc_phasors.imag)
+        plt.ylabel("Acceleration ($m/s^2$)")
+        plt.xlabel("Time (ms)")
+        plt.colorbar()
+        plt.title("Acceleration phasors (Im component)")
+
+        if save:
+            plt.savefig(path + '/acc_phasor_02.pdf')
+        if show:
+            plt.show()
+
+        plt.plot(np.arange(self.read_length),self.tx_stencil,label="tx stencil")
+        plt.plot(np.arange(self.read_length),self.rx_stencil,label="rx stencil")
+        plt.title("TX and RX stencils")
+        plt.legend()
+        plt.xlabel("Samples")
+        
+        if save:
+            plt.savefig(path + '/stencils.pdf')
+        if show:
             plt.show()
 
 if __name__ == "__main__":
-    o=gmf_opts("cfg/esr_2018.ini")
+    dirs = {
+        "data_dirs": '/tmp',
+        "rx_channel": '/tmp',
+        "tx_channel": '/tmp',
+        "output_dir": '/tmp',
+    }
+    # o=gmf_opts.from_dict(dirs, True)
+    o=gmf_opts.from_file('./cfg/sim.ini', True)
     print(o)
