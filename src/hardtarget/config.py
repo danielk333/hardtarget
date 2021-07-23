@@ -21,23 +21,8 @@ class Config():
         Returns:
             Config object
         """
-        #If default values read them
-        params = cls.get_default() if from_default else {}
-        try:
-            #Update default values based on json string
-            params.update(json.loads(string))
-            #Values as strings is false for json strings
-            vas = False
-        except json.decoder.JSONDecodeError:
-            #Initialize configparser object
-            config = configparser.ConfigParser()
-            #Read config from string
-            config.read_string(string)
-            #Update default values based on INI string
-            params.update(config._sections)
-            #Values as strings is true for ini strings
-            vas = True
-        return cls(params, values_as_strings = vas)
+        #Make string into IO stream and parse as stream instead
+        return cls.from_stream(io.StringIO(string), from_default)
 
     @classmethod
     def from_file(cls,path,from_default=False) -> object:
@@ -51,28 +36,9 @@ class Config():
         Returns:
             Config object
         """
-        #If default values read them
-        params = cls.get_default() if from_default else {}
-        
-        #Open file from path
-        try:
-            with open(path,'r') as buf:
-                #Updated default values based on json file
-                params.update(json.load(buf))
-                #Values as strings is false for json files
-                vas = False
-        except json.decoder.JSONDecodeError:
-            #Initialize configparser object
-            config = configparser.ConfigParser()
-            #Read config from file
-            config.read(path)
-            #Update default values based on INI string
-            print(params)
-            params.update(config._sections)
-            #Values as strings is true for ini files
-            vas = True
-        #Create config object
-        return cls(params, values_as_strings = vas)
+        #Open file as stream and parse as stream instead
+        with open(path,'r') as buf:
+            return cls.from_stream(buf, from_default)
 
     @classmethod
     def from_stream(cls,stream,from_default=False) -> object:
@@ -101,8 +67,10 @@ class Config():
             config = configparser.ConfigParser()
             #Read config from stream
             config.read_file(stream)
+            #Get header title
+            header = config.sections()[0]
             #Update default values based on INI string
-            params.update(config._sections)
+            params.update(config._sections[header])
             #Values as strings is true for ini streams
             vas = True
             #Create config from INI stream
