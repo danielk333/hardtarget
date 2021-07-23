@@ -26,7 +26,8 @@ class Config():
         try:
             #Update default values based on json string
             params.update(json.loads(string))
-            return cls(params)
+            #Values as strings is false for json strings
+            vas = False
         except json.decoder.JSONDecodeError:
             #Initialize configparser object
             config = configparser.ConfigParser()
@@ -34,8 +35,9 @@ class Config():
             config.read_string(string)
             #Update default values based on INI string
             params.update(config._sections)
-            #Create config from INI string
-            return cls(params, values_as_strings = True)
+            #Values as strings is true for ini strings
+            vas = True
+        return cls(params, values_as_strings = vas)
 
     @classmethod
     def from_file(cls,path,from_default=False) -> object:
@@ -57,17 +59,20 @@ class Config():
             with open(path,'r') as buf:
                 #Updated default values based on json file
                 params.update(json.load(buf))
-                #Create object from json file
-                return cls(params)
+                #Values as strings is false for json files
+                vas = False
         except json.decoder.JSONDecodeError:
             #Initialize configparser object
             config = configparser.ConfigParser()
             #Read config from file
             config.read(path)
             #Update default values based on INI string
+            print(params)
             params.update(config._sections)
-            #Create config from INI file
-            return cls(params, values_as_strings = True)
+            #Values as strings is true for ini files
+            vas = True
+        #Create config object
+        return cls(params, values_as_strings = vas)
 
     @classmethod
     def from_stream(cls,stream,from_default=False) -> object:
@@ -87,7 +92,8 @@ class Config():
         try:
             #Create object from json stream
             params.update(json.load(stream))
-            return cls(params)
+            #Values as strings is false for json streams
+            vas = False
         #If not json file parse as INI file
         except json.decoder.JSONDecodeError:
             stream.seek(0)
@@ -97,8 +103,10 @@ class Config():
             config.read_file(stream)
             #Update default values based on INI string
             params.update(config._sections)
+            #Values as strings is true for ini streams
+            vas = True
             #Create config from INI stream
-            return cls(params, values_as_strings = True)
+        return cls(params, values_as_strings = vas)
     
     @classmethod
     def from_dict(cls, dictionary, from_default = False) -> object:
