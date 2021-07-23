@@ -1,5 +1,4 @@
 import configparser, json, io, os
-from json.decoder import JSONDecodeError
 
 class Config():
     """
