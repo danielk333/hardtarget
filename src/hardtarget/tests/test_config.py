@@ -74,6 +74,7 @@ class test_Config(unittest.TestCase):
         self.assertEqual(c['test_string'], self.expected_json_dict['test_string'])
         self.assertEqual(c['test_list'], self.expected_json_dict['test_list'])
         self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
+        self.assertFalse(c.values_as_strings)
 
     def test_config_as_ini_string(self):
 
@@ -82,6 +83,7 @@ class test_Config(unittest.TestCase):
 #        print(c.get_keys())
         #Assert that that the config object equalls the test dictionary
         self.assertEqual(c['test_header']['test_string'], self.expected_ini_dict['test_header']['test_string'])
+        self.assertTrue(c.values_as_strings)
 
     def test_config_as_json_file(self):
         
@@ -93,6 +95,8 @@ class test_Config(unittest.TestCase):
         self.assertEqual(c['test_string'], self.expected_json_dict['test_string'])
         self.assertEqual(c['test_list'], self.expected_json_dict['test_list'])
         self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
+        self.assertFalse(c.values_as_strings)
+
 
     def test_config_as_ini_file(self):
 
@@ -101,6 +105,7 @@ class test_Config(unittest.TestCase):
 
         #Assert that that the config object equalls the test dictionary
         self.assertEqual(c['test_header']['test_string'], self.expected_ini_dict['test_header']['test_string'])
+        self.assertTrue(c.values_as_strings)
 
     def test_config_as_json_stream(self):
         with open(self.test_json_file) as file:
@@ -112,6 +117,8 @@ class test_Config(unittest.TestCase):
             self.assertEqual(c['test_string'], self.expected_json_dict['test_string'])
             self.assertEqual(c['test_list'], self.expected_json_dict['test_list'])
             self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
+            self.assertFalse(c.values_as_strings)
+
 
     def test_config_as_ini_stream(self):
         with open(self.test_ini_file, 'r') as file:
@@ -120,6 +127,7 @@ class test_Config(unittest.TestCase):
 
             #Assert that that the config object equalls the test dictionary
             self.assertEqual(c['test_header']['test_string'], self.expected_ini_dict['test_header']['test_string'])
+            self.assertTrue(c.values_as_strings)
 
     def test_change_config_value(self):
         test_new_int = 5
