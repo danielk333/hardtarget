@@ -172,7 +172,8 @@ class Config():
             path += '.ini'
             #Parse directory into inifile using configparser
             c = configparser.ConfigParser()
-            c.read_dict(self._params)
+            headerdict = {'config': self._params}
+            c.read_dict(headerdict)
             with open(path, 'w') as file:
                 c.write(file)
         else:
@@ -189,4 +190,10 @@ class Config():
             param: str object with the name of the paramater to get
         """
         return self._params[param]
+    
+    def __str__(self) -> str:
+        return "Config object:\n" + json.dumps(self._params, indent=2)
+
+    def __repr__(self) -> str:
+        return "Config" + json.dumps(self._params)
 
