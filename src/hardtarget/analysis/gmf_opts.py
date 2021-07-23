@@ -43,9 +43,9 @@ class gmf_opts(Config):
                 "doppler_sign":1.0,
                 "radar_frequency":500e6,
                 "reanalyze":True,
-                "debug_plot":True,
-                "debug_plot_acc":True,
-                "debug_print":True,
+                "debug_plot":False,
+                "debug_plot_acc":False,
+                "debug_print":False,
                 "round_trip_range":True,
                 "num_cohints_per_file":100,
                 "use_gpu":False,
@@ -78,12 +78,6 @@ class gmf_opts(Config):
     def set_values(self):
         self.t0=None
         self.t1=None
-
-        #Try to bypass header title if ini file is used
-        try:
-            self._params = self._params["config"]
-        except KeyError:
-            pass
         
         #Non default paramaters
         try:
@@ -105,30 +99,39 @@ class gmf_opts(Config):
             self.max_acceleration=float(self["max_acceleration"])
             self.acceleration_resolution=float(self["acceleration_resolution"])
             self.snr_thresh=float(self["snr_thresh"])
-            self.save_parameters=bool(self["save_parameters"])
             self.doppler_sign=float(self["doppler_sign"])
             self.radar_frequency=float(self["radar_frequency"])
-            self.debug_plot=bool(self["debug_plot"])
-            self.debug_plot_acc=bool(self["debug_plot_acc"])
-            self.debug_print=bool(self["debug_print"])
+            print(self["debug_plot_acc"])
             self.debug_plot_data_read=False
             self.num_cohints_per_file=int(self["num_cohints_per_file"])
-            self.use_gpu=bool(self["use_gpu"])
-            self.use_python=bool(self["use_python"])
-            self.reanalyze=bool(self["reanalyze"])       
-            self.round_trip_range=bool(self["round_trip_range"])
+
+            self.save_parameters=self._parse_bool(self["save_parameters"])
+            self.debug_plot=self._parse_bool(self["debug_plot"])
+            self.debug_plot_acc=self._parse_bool(self["debug_plot_acc"])
+            self.debug_print=self._parse_bool(self["debug_print"])
+            self.use_gpu=self._parse_bool(self["use_gpu"])
+            self.use_python=self._parse_bool(self["use_python"])
+            self.reanalyze=self._parse_bool(self["reanalyze"])       
+            self.round_trip_range=self._parse_bool(self["round_trip_range"])
             self.debug_gmf_output=True
         except KeyError as e:
             #Raise valuerror instead of KeyError if some values are missing
             raise ValueError("Missing Value: " + str(e))
 
+    def _parse_bool(self, string) -> bool:
+        if isinstance(string, bool):
+            return string
+        elif string.lower() in ['true', 't']:
+            return True
+        elif string.lower() in ["false", 'f']:
+            return False
+        else:
+            raise ValueError(f"Unknown boolean operator: {string}")
 
     def __init__(self,paramaters, values_as_strings = False):
 
         super().__init__(paramaters,values_as_strings)
 
-        print("\n\n")
-        print(self['use_python'])
         self.set_values()
         if self.save_parameters:
             self.save_param('config',output_dir=self.output_dir, ini=self.values_as_strings)
