@@ -12,11 +12,13 @@ class Config():
     def from_string(cls,string,from_default=False) -> object:
         """
         Create config object from string
+
         Paramaters:
             string: str object in either json or ini format 
             from_default: Use default values for values not specified
                           (requires an implementation of the abstract 
                           set_default method). Default False.
+
         Returns:
             Config object
         """
@@ -27,11 +29,13 @@ class Config():
     def from_file(cls,path,from_default=False) -> object:
         """
         Create config object from file
+
         Paramaters:
             path: str object, path to either json or ini file 
             from_default: Use default values for values not specified
                           (requires an implementation of the abstract 
                           set_default method). Default False.
+
         Returns:
             Config object
         """
@@ -43,11 +47,13 @@ class Config():
     def from_stream(cls,stream,from_default=False) -> object:
         """
         Create config object from IO stream
+
         Paramaters:
             stream: file like object in either json or ini format
             from_default: Use default values for values not specified
                           (requires an implementation of the abstract 
                           set_default method). Default False.
+
         Returns:
             Config object
         """
@@ -79,6 +85,7 @@ class Config():
     def from_dict(cls, dictionary, from_default = False) -> object:
         """
         Create config from dictionary
+
         Paramaters:
             dictionary: dict type object with names of paramaters as keys and 
                         values as values
@@ -142,6 +149,7 @@ class Config():
     def set_param(self, param, value) -> None:
         """
         Setter for paramters, allow editing paramaters after initilization
+
         Paramaters:
             param: str object with the name of the paramater to change
             value: new value of paramater
@@ -152,6 +160,7 @@ class Config():
     def save_param(self, filename, output_dir=None, ini=False) -> None:
         """
         Save paramaters to file.
+
         Paramaters:
             filename: Name of file to store paramaters in
             outputdir: Optional, specify directory to store paramaterfile in.
@@ -185,6 +194,7 @@ class Config():
     def __getitem__(self, param) -> any:
         """
         Overide getitem such that class behaves as a dictionary
+        
         Paramaters:
             param: str object with the name of the paramater to get
         """
