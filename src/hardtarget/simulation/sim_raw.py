@@ -8,6 +8,8 @@ import os
 import scipy.interpolate as sint
 import scipy.constants as c
 
+from ..config import Config
+
 class interp_fun:
     def __init__(self,t0,t1,pfs,mints):
         self.t0=t0
@@ -239,41 +241,48 @@ class raw_sim:
         for rxi in range(n_rx):
             dwos[rxi].close()
 
-class simple_sim:
+class Simulator(Config):
     """
     Simulate some raw voltage
     """
-    def __init__(self,
-                 dirname="/media/j/ebd77b41-7efd-4238-b6f8-2b17bc33c84c/debsim",
-                 r0=1000e3,
-                 v0=2e3,
-                 a0=80.0,
-                 ipp=10000,
-                 tx_len=2000,
-                 bit_len=100,
-                 n_ipp=100,
-                 freq=230e6,
-                 sr=1000000,
-                 snr=30):
-
-
-        self.dirname=dirname
-        self.r0=r0
-        self.v0=v0
-        self.a0=a0
-        self.sr=sr
-        self.ipp=ipp
-        self.tx_len=tx_len
-        self.n_ipp=n_ipp
+    @classmethod
+    def get_default(cls):
+        return {
+            'r0' : 1000e3,
+            'v0' : 2e3,
+            'a0' : 80.0,
+            'ipp' : 10000,
+            'tx_len' : 2000,
+            'bit_len' : 100,
+            'n_ipp' : 100,
+            'freq' : 230e6,
+            'sr' : 1000000,
+            'snr' : 30
+            }
         
-        self.n_bits=int(tx_len/bit_len)
-        self.tx_len=tx_len
-        self.bit_len=bit_len
-        self.wavelength = c.c/freq
-        self.snr=snr
+    def _set_values(self):
+        self.dirname=self['dirname']
+        self.r0=float(self['r0'])
+        self.v0=float(self['v0'])
+        self.a0=float(self['a0'])
+        self.sr=int(self['sr'])
+        self.ipp=int(self['ipp'])
+        self.tx_len=int(self['tx_len'])
+        self.n_ipp=int(self['n_ipp'])
         
+        self.tx_len=int(self['tx_len'])
+        self.bit_len=int(self['bit_len'])
+        self.snr=float(self['snr'])
+        self.wavelength =c.c/float(self['freq'])
+        self.n_bits=int(self.tx_len / self.bit_len) #self['int(tx_len/bit_len)']
+
+    def __init__(self, dir):
+        super().__init__(dir)
+        self._set_values()
+        
+    def run(self):
         # create tx channel
-        tx_chdir="%s/tx"%(dirname)
+        tx_chdir="%s/tx"%(self.dirname)
         os.system("rm -rf %s"%(tx_chdir))        
         os.system("mkdir -p %s"%(tx_chdir))
 
@@ -298,7 +307,7 @@ class simple_sim:
         txz = n.zeros(self.ipp,dtype=n.complex64)
 
         rxi=0
-        chdir="%s/ch%03d"%(dirname,rxi)
+        chdir="%s/ch%03d"%(self.dirname,rxi)
         os.system("rm -rf %s"%(chdir))                    
         os.system("mkdir -p %s"%(chdir))
         
@@ -352,7 +361,11 @@ class simple_sim:
         
 
 if __name__ == "__main__":
-    simple_sim()
+    dir = {
+        'dirname': '/tmp/test'
+    }
+    sim = Simulator.from_dict(dir, from_default=True)
+    sim.run()
     exit(0)
     
     # pulse length, number pulses integrated coherently, 
