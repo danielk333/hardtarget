@@ -14,6 +14,7 @@ import time
 import h5py
 import scipy.constants as c
 import digital_rf as drf
+import sys
 
 
 try:
@@ -29,7 +30,7 @@ SIMDIR = '/tmp/hardtarget'
 
 class sim_conf:
     def __init__(self,
-                 dirname=SIMDIR,
+                 dirname,
                  sr_mhz=1,
                  tx_len_us=2000,
                  ipp_us=10000,
@@ -55,88 +56,72 @@ class sim_conf:
         self.freq_dec = n.round(self.sr_mhz*1e6/self.max_dop_shift/2.0)
         print("freq_dec %d"%(self.freq_dec))
         
-        
         # configuration for course search
-        cfg ="""
-        [config]
-        n_range_gates=2000
-        ground_clutter_length=0
-        min_acceleration=0.0
-        max_acceleration=200.0
-        acceleration_resolution=0.2
-        save_parameters=false
-        doppler_sign=1.0
-        rx_channel="ch000"
-        tx_channel="tx"
-        radar_frequency=230e6
-        output_dir="./spade_det"
-        debug_plot=false
-        debug_plot_acc=false
-        debug_print=false
-        round_trip_range=false
-        reanalyze=true
-        num_cohints_per_file=1
-        snr_thresh=10.0
-        """
-        with open(SIMDIR + "/sim-%d.ini"%(comm.rank),"w") as f:
-            f.writelines(cfg)
-            # sample-rate specific configuration options
-            f.write("data_dirs=[\"%s\"]\n"%(self.dirname))
-            f.write("ipp=%d\n"%(self.ipp))
-            f.write("tx_pulse_length=%d\n"%(self.tx_len))
-            f.write("sample_rate=%d\n"%(self.sr_mhz*1000000))
-            f.write("range_gate_0=%d\n"%(100*self.sr_mhz))
-            f.write("range_gate_step=%d\n"%(5*self.sr_mhz))
-            f.write("frequency_decimation=%d\n"%(self.freq_dec))
-            f.write("n_ipp=%d\n"%(n_ipp))
-            if use_gpu:
-                f.write("use_gpu=true")
-            else:
-                f.write("use_gpu=false")
+        cfg ={
+            'n_range_gates' : 2000,
+            'ground_clutter_length' : 0,
+            'min_acceleration' : 0.0,
+            'max_acceleration' : 200.0,
+            'acceleration_resolution' : 0.2,
+            'save_parameters' : False,
+            'doppler_sign' : 1.0,
+            'rx_channel' : 'ch000',
+            'tx_channel' : 'tx',
+            'radar_frequency' : 230e6,
+            'output_dir' : f'{self.dirname}/spade_det',
+            'debug_plot' : False,
+            'debug_plot_acc' : False,
+            'debug_print' : False,
+            'round_trip_range' : False,
+            'reanalyze' : True,
+            'num_cohints_per_file' : 1,
+            'snr_thresh' : 10.0,
+            #sample-rate specific configuration options
+            'data_dirs' : self.dirname,
+            'ipp':self.ipp,
+            'tx_pulse_length':self.tx_len,
+            'sample_rate':self.sr_mhz*1000000,
+            'range_gate_0':100*self.sr_mhz,
+            'frequency_decimation':self.freq_dec,
+            'n_ipp':self.n_ipp,
+            'use_gpu' : use_gpu,
+        }
                 
-            
         # another configuration for fine-tuning the result
-        fine_tune_cfg ="""
-        [config]
-        n_range_gates=100
-        ground_clutter_length=0
-        min_acceleration=0.0
-        max_acceleration=200.0
-        acceleration_resolution=0.02
-        save_parameters=false
-        doppler_sign=1.0
-        rx_channel="ch000"
-        tx_channel="tx"
-        radar_frequency=230e6
-        output_dir="./spade_fine"
-        debug_plot=false
-        debug_plot_acc=false
-        debug_print=false
-        round_trip_range=false
-        reanalyze=true
-        num_cohints_per_file=1
-        snr_thresh=10.0
-        range_gate_step=1
-        """
-        
-        with open(SIMDIR + "/sim_fine-%d.ini"%(comm.rank),"w") as f:
-            f.writelines(fine_tune_cfg)
+        fine_tune_cfg = {
+            'n_range_gates' : 100,
+            'ground_clutter_length' : 0,
+            'min_acceleration' : 0.0,
+            'max_acceleration' : 200.0,
+            'acceleration_resolution' : 0.02,
+            'save_parameters' : 'false',
+            'doppler_sign' : 1.0,
+            'rx_channel' : 'ch000',
+            'tx_channel' : 'tx',
+            'radar_frequency' : 230e6,
+            'output_dir' : f'{self.dirname}/spade_fine',
+            'debug_plot' : False,
+            'debug_plot_acc' : False,
+            'debug_print' : False,
+            'round_trip_range' : False,
+            'reanalyze' : True,
+            'num_cohints_per_file' : 1,
+            'snr_thresh' : 10.0,
+            'range_gate_step' : 1,
             # sample-rate specific configuration options
-            f.write("data_dirs=[\"%s\"]\n"%(self.dirname))
-            f.write("ipp=%d\n"%(self.ipp))
-            f.write("tx_pulse_length=%d\n"%(self.tx_len))
-            f.write("sample_rate=%d\n"%(self.sr_mhz*1000000))
-            f.write("range_gate_0=%d\n"%(100*self.sr_mhz))
-            f.write("frequency_decimation=%d\n"%(self.freq_dec))
-            f.write("n_ipp=%d\n"%(self.n_ipp))
-            if use_gpu:
-                f.write("use_gpu=true")
-            else:
-                f.write("use_gpu=false")
+            'data_dirs' : self.dirname,
+            'ipp':self.ipp,
+            'tx_pulse_length':self.tx_len,
+            'sample_rate':self.sr_mhz*1000000,
+            'range_gate_0':100*self.sr_mhz,
+            'frequency_decimation':self.freq_dec,
+            'n_ipp':self.n_ipp,
+            'use_gpu' : use_gpu,
+        }
             
         
-        self.conf=go.gmf_opts(SIMDIR + "/sim-%d.ini"%(comm.rank))
-        self.conf_fine=go.gmf_opts(SIMDIR + "/sim_fine-%d.ini"%(comm.rank))
+        self.conf=go.gmf_opts.from_dict(cfg, from_default=True)
+        self.conf_fine=go.gmf_opts.from_dict(fine_tune_cfg, from_default=True)
 
 def run_cohint(d,conf,i0,r0):
     """
@@ -183,20 +168,24 @@ def one_cohint(conf,
     print("snr %1.2f (dB) noise_amp %1.2f"%(snr_per_sample,n.sqrt(noise_pwr)))
 
     
-
+    #Simulator options
+    sim_opts = {
+        "dirname" : conf.dirname,
+        "r0" : r0,            # m
+        "v0" : v0,            # m/s
+        "a0" : a0,            # m/s^2
+        "ipp" : conf.ipp,          # samples
+        "tx_len" : conf.tx_len,    # samples
+        "bit_len" : conf.bit_len,  # samples
+        "n_ipp" : conf.n_ipp+1,    # pad one ipp
+        "freq" : conf.radar_frequency,
+        "sr" : 1000000*conf.sr_mhz,
+        "snr" : snr_per_sample
+    }
     # simulate a measurement with range, range-rate and acceleration.
-    sr.simple_sim(dirname=conf.dirname,
-                  r0=r0,            # m
-                  v0=v0,            # m/s
-                  a0=a0,            # m/s^2
-                  ipp=conf.ipp,          # samples
-                  tx_len=conf.tx_len,    # samples
-                  bit_len=conf.bit_len,  # samples
-                  n_ipp=conf.n_ipp+1,    # pad one ipp
-                  freq=conf.radar_frequency,
-                  sr=1000000*conf.sr_mhz,
-                  snr=snr_per_sample)     # one sample snr
-
+    sim = sr.Simulator(sim_opts)     # one sample snr
+    sim.run()
+    
     d=drf.DigitalRFReader(conf.dirname)
 
     # coarse grained first step analysis
@@ -252,7 +241,7 @@ def one_cohint(conf,
 
 def snr_sweep():
 
-    sconf=sim_conf(dirname="/scratch/data/juha/debsim",
+    sconf=sim_conf(dirname=SIMDIR,
                   sr_mhz=1,
                   tx_len_us=2000,
                   ipp_us=10000,
@@ -309,7 +298,7 @@ def n_ipp_sweep():
         
         dt=0.01*n_ipp
         print("n_ipp %d"%(n_ipp))
-        sconf=sim_conf(dirname="/scratch/data/juha/debsim",
+        sconf=sim_conf(dirname=SIMDIR,
                        sr_mhz=1,
                        tx_len_us=2000,
                        ipp_us=10000,
@@ -348,6 +337,7 @@ def start_sim(gpu):
         pass
     
     sconf=sim_conf(
+                  dirname=SIMDIR,
                   sr_mhz=4,
                   tx_len_us=2000,
                   ipp_us=10000,
@@ -378,6 +368,14 @@ def start_sim(gpu):
     print(f'sn_std = {stds[0]}, r_std={stds[1]} m, v_std={stds[2]} m/s, a_std={stds[3]} m/s^2')
     
 if __name__ == "__main__":
-    start_sim()
+
+    if len(sys.argv) == 1 or sys.argv[1].lower() == "nogpu":
+        gpu = False
+    elif sys.argv[1].lower() == 'gpu':
+        gpu = True
+    else:
+        print('Unknown command: either use "gpu" or "nogpu"')
+        exit(1)
+    start_sim(gpu)
     
     
