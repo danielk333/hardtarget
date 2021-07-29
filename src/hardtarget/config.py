@@ -1,4 +1,5 @@
 import configparser, json, io, os
+import collections.abc as abc
 
 class Config():
     """
@@ -122,7 +123,35 @@ class Config():
         """
         raise NotImplementedError('Abstract method ment to be overidden by subclass')
         
+    def _update_default(self, dict1, dict2) -> None:
+        """
+        Recursive dictionary update function. The keys in dictionary 1 is updated with 
+        the values from the same keys in dictionary 2. If a key points to a dict like 
+        object, then the function will recursively update sub dictionaries.
 
+        Paramaters:
+            dict1: Dict like object to be overwritten
+            dict2: Dict like object
+        """
+        #Store keys from dict 1 before loop to save time
+        dict1keys = dict1.keys()
+        for key in dict2:
+            #If key leads to dict in dict1 recurisvely update dict
+            if key in dict1keys and isinstance[dict1[key], abc.Mapping]:
+                #If key does not lead to dict in dict2 raise a value error
+                if not isinstance(dict2[key], abc.Mapping):
+                    raise ValueError(f'Expected dict like object in dictionary 2 on key {key}')
+                try:
+                    #Recursive call
+                    self._update_default(dict1[key], dict2[key])
+                except ValueError as e:
+                    #If error happend update error message with path to error
+                    e.message += 'from dict on key {key}'
+                    raise
+            else:
+                #If key does not lead to dict like object update its value directly
+                dict1[key] = dict2[key]
+            
     def __init__(self, paramaters, values_as_strings = False) -> None:
         """
         A config object that can be created in four diffrent manners. Paramaters 
@@ -194,7 +223,7 @@ class Config():
     def __getitem__(self, param) -> any:
         """
         Overide getitem such that class behaves as a dictionary
-        
+
         Paramaters:
             param: str object with the name of the paramater to get
         """

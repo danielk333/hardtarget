@@ -17,7 +17,9 @@ class test_Config(unittest.TestCase):
         #Create a directory to compare the ini tests against
         self.expected_ini_dict = {
                 #INI files only reads values as strings
-                'test_string' : 'test123',
+                'test_header':{
+                    'test_string' : 'test123',
+                }
         }
         
         #Create a test json string
@@ -78,7 +80,7 @@ class test_Config(unittest.TestCase):
         #Create config object
         c = Config.from_string(self.test_ini_string)
         #Assert that that the config object equalls the test dictionary
-        self.assertEqual(c['test_string'], self.expected_ini_dict['test_string'])
+        self.assertEqual(c['test_header']['test_string'], self.expected_ini_dict['test_header']['test_string'])
         self.assertTrue(c.values_as_strings)
 
     def test_config_as_json_file(self):
@@ -100,7 +102,7 @@ class test_Config(unittest.TestCase):
         c = Config.from_file(self.test_ini_file)
 
         #Assert that that the config object equalls the test dictionary
-        self.assertEqual(c['test_string'], self.expected_ini_dict['test_string'])
+        self.assertEqual(c['test_header']['test_string'], self.expected_ini_dict['test_header']['test_string'])
         self.assertTrue(c.values_as_strings)
 
     def test_config_as_json_stream(self):
