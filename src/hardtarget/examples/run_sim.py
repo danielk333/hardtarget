@@ -58,65 +58,69 @@ class sim_conf:
         
         # configuration for course search
         cfg ={
-            'n_range_gates' : 2000,
-            'ground_clutter_length' : 0,
-            'min_acceleration' : 0.0,
-            'max_acceleration' : 200.0,
-            'acceleration_resolution' : 0.2,
-            'save_parameters' : False,
-            'doppler_sign' : 1.0,
-            'rx_channel' : 'ch000',
-            'tx_channel' : 'tx',
-            'radar_frequency' : 230e6,
-            'output_dir' : f'{self.dirname}/spade_det',
-            'debug_plot' : False,
-            'debug_plot_acc' : False,
-            'debug_print' : False,
-            'round_trip_range' : False,
-            'reanalyze' : True,
-            'num_cohints_per_file' : 1,
-            'snr_thresh' : 10.0,
-            #sample-rate specific configuration options
-            'data_dirs' : self.dirname,
-            'ipp':self.ipp,
-            'tx_pulse_length':self.tx_len,
-            'sample_rate':self.sr_mhz*1000000,
-            'range_gate_0':100*self.sr_mhz,
-            'frequency_decimation':self.freq_dec,
-            'n_ipp':self.n_ipp,
-            'use_gpu' : use_gpu,
+            'gmf_opts': {
+                'n_range_gates' : 2000,
+                'ground_clutter_length' : 0,
+                'min_acceleration' : 0.0,
+                'max_acceleration' : 200.0,
+                'acceleration_resolution' : 0.2,
+                'save_parameters' : False,
+                'doppler_sign' : 1.0,
+                'rx_channel' : 'ch000',
+                'tx_channel' : 'tx',
+                'radar_frequency' : 230e6,
+                'output_dir' : f'{self.dirname}/spade_det',
+                'debug_plot' : False,
+                'debug_plot_acc' : False,
+                'debug_print' : False,
+                'round_trip_range' : False,
+                'reanalyze' : True,
+                'num_cohints_per_file' : 1,
+                'snr_thresh' : 10.0,
+                #sample-rate specific configuration options
+                'data_dirs' : self.dirname,
+                'ipp':self.ipp,
+                'tx_pulse_length':self.tx_len,
+                'sample_rate':self.sr_mhz*1000000,
+                'range_gate_0':100*self.sr_mhz,
+                'frequency_decimation':self.freq_dec,
+                'n_ipp':self.n_ipp,
+                'use_gpu' : use_gpu,
+            },
         }
                 
         # another configuration for fine-tuning the result
         fine_tune_cfg = {
-            'n_range_gates' : 100,
-            'ground_clutter_length' : 0,
-            'min_acceleration' : 0.0,
-            'max_acceleration' : 200.0,
-            'acceleration_resolution' : 0.02,
-            'save_parameters' : 'false',
-            'doppler_sign' : 1.0,
-            'rx_channel' : 'ch000',
-            'tx_channel' : 'tx',
-            'radar_frequency' : 230e6,
-            'output_dir' : f'{self.dirname}/spade_fine',
-            'debug_plot' : False,
-            'debug_plot_acc' : False,
-            'debug_print' : False,
-            'round_trip_range' : False,
-            'reanalyze' : True,
-            'num_cohints_per_file' : 1,
-            'snr_thresh' : 10.0,
-            'range_gate_step' : 1,
-            # sample-rate specific configuration options
-            'data_dirs' : self.dirname,
-            'ipp':self.ipp,
-            'tx_pulse_length':self.tx_len,
-            'sample_rate':self.sr_mhz*1000000,
-            'range_gate_0':100*self.sr_mhz,
-            'frequency_decimation':self.freq_dec,
-            'n_ipp':self.n_ipp,
-            'use_gpu' : use_gpu,
+            'gmf_opts' : {
+                'n_range_gates' : 100,
+                'ground_clutter_length' : 0,
+                'min_acceleration' : 0.0,
+                'max_acceleration' : 200.0,
+                'acceleration_resolution' : 0.02,
+                'save_parameters' : 'false',
+                'doppler_sign' : 1.0,
+                'rx_channel' : 'ch000',
+                'tx_channel' : 'tx',
+                'radar_frequency' : 230e6,
+                'output_dir' : f'{self.dirname}/spade_fine',
+                'debug_plot' : False,
+                'debug_plot_acc' : False,
+                'debug_print' : False,
+                'round_trip_range' : False,
+                'reanalyze' : True,
+                'num_cohints_per_file' : 1,
+                'snr_thresh' : 10.0,
+                'range_gate_step' : 1,
+                # sample-rate specific configuration options
+                'data_dirs' : self.dirname,
+                'ipp':self.ipp,
+                'tx_pulse_length':self.tx_len,
+                'sample_rate':self.sr_mhz*1000000,
+                'range_gate_0':100*self.sr_mhz,
+                'frequency_decimation':self.freq_dec,
+                'n_ipp':self.n_ipp,
+                'use_gpu' : use_gpu,
+            },
         }
             
         
@@ -170,17 +174,19 @@ def one_cohint(conf,
     
     #Simulator options
     sim_opts = {
-        "dirname" : conf.dirname,
-        "r0" : r0,            # m
-        "v0" : v0,            # m/s
-        "a0" : a0,            # m/s^2
-        "ipp" : conf.ipp,          # samples
-        "tx_len" : conf.tx_len,    # samples
-        "bit_len" : conf.bit_len,  # samples
-        "n_ipp" : conf.n_ipp+1,    # pad one ipp
-        "freq" : conf.radar_frequency,
-        "sr" : 1000000*conf.sr_mhz,
-        "snr" : snr_per_sample
+        'sim_opts': {
+            "dirname" : conf.dirname,
+            "r0" : r0,            # m
+            "v0" : v0,            # m/s
+            "a0" : a0,            # m/s^2
+            "ipp" : conf.ipp,          # samples
+            "tx_len" : conf.tx_len,    # samples
+            "bit_len" : conf.bit_len,  # samples
+            "n_ipp" : conf.n_ipp+1,    # pad one ipp
+            "freq" : conf.radar_frequency,
+            "sr" : 1000000*conf.sr_mhz,
+            "snr" : snr_per_sample
+        },
     }
     # simulate a measurement with range, range-rate and acceleration.
     sim = sr.Simulator(sim_opts)     # one sample snr

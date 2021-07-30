@@ -248,32 +248,34 @@ class Simulator(Config):
     @classmethod
     def get_default(cls):
         return {
-            'r0' : 1000e3,
-            'v0' : 2e3,
-            'a0' : 80.0,
-            'ipp' : 10000,
-            'tx_len' : 2000,
-            'bit_len' : 100,
-            'n_ipp' : 100,
-            'freq' : 230e6,
-            'sr' : 1000000,
-            'snr' : 30
+            'sim_opts': {
+                'r0' : 1000e3,
+                'v0' : 2e3,
+                'a0' : 80.0,
+                'ipp' : 10000,
+                'tx_len' : 2000,
+                'bit_len' : 100,
+                'n_ipp' : 100,
+                'freq' : 230e6,
+                'sr' : 1000000,
+                'snr' : 30,
+                }
             }
         
     def _set_values(self):
-        self.dirname=self['dirname']
-        self.r0=float(self['r0'])
-        self.v0=float(self['v0'])
-        self.a0=float(self['a0'])
-        self.sr=int(self['sr'])
-        self.ipp=int(self['ipp'])
-        self.tx_len=int(self['tx_len'])
-        self.n_ipp=int(self['n_ipp'])
+        self.dirname=self['sim_opts']['dirname']
+        self.r0=float(self['sim_opts']['r0'])
+        self.v0=float(self['sim_opts']['v0'])
+        self.a0=float(self['sim_opts']['a0'])
+        self.sr=int(self['sim_opts']['sr'])
+        self.ipp=int(self['sim_opts']['ipp'])
+        self.tx_len=int(self['sim_opts']['tx_len'])
+        self.n_ipp=int(self['sim_opts']['n_ipp'])
         
-        self.tx_len=int(self['tx_len'])
-        self.bit_len=int(self['bit_len'])
-        self.snr=float(self['snr'])
-        self.wavelength =c.c/float(self['freq'])
+        self.tx_len=int(self['sim_opts']['tx_len'])
+        self.bit_len=int(self['sim_opts']['bit_len'])
+        self.snr=float(self['sim_opts']['snr'])
+        self.wavelength =c.c/float(self['sim_opts']['freq'])
         self.n_bits=int(self.tx_len / self.bit_len) #self['int(tx_len/bit_len)']
 
     def __init__(self, dir):
@@ -362,7 +364,9 @@ class Simulator(Config):
 
 if __name__ == "__main__":
     dir = {
-        'dirname': '/tmp/test'
+        'sim_opts' : {
+            'dirname': '/tmp/test',
+        }
     }
     sim = Simulator.from_dict(dir, from_default=True)
     sim.run()

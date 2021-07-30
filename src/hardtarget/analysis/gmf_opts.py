@@ -25,32 +25,35 @@ class gmf_opts(Config):
         #Return object based on default params
         print("Setting default values")
         return {
-                "n_ipp":5,
-                "sample_rate":1000000,
-                "n_range_gates":10000,
-                "range_gate_0":200,
-                "range_gate_step":1,
-                "frequency_decimation":25,
-                "ipp":10000, 
-                "tx_pulse_length":445,  
-                "tx_bit_length":20,
-                "ground_clutter_length":1500,
-                "min_acceleration":-400.0,
-                "max_acceleration":400.0,
-                "acceleration_resolution":0.2,
-                "snr_thresh":10.0,                     
-                "save_parameters":True,
-                "doppler_sign":1.0,
-                "radar_frequency":500e6,
-                "reanalyze":True,
-                "debug_plot":False,
-                "debug_plot_acc":False,
-                "debug_print":False,
-                "round_trip_range":True,
-                "num_cohints_per_file":100,
-                "use_gpu":False,
-                "use_python":False,
-                "use_cpu":True,
+                'gmf_opts': 
+                    {
+                    "n_ipp":5,
+                    "sample_rate":1000000,
+                    "n_range_gates":10000,
+                    "range_gate_0":200,
+                    "range_gate_step":1,
+                    "frequency_decimation":25,
+                    "ipp":10000, 
+                    "tx_pulse_length":445,  
+                    "tx_bit_length":20,
+                    "ground_clutter_length":1500,
+                    "min_acceleration":-400.0,
+                    "max_acceleration":400.0,
+                    "acceleration_resolution":0.2,
+                    "snr_thresh":10.0,                     
+                    "save_parameters":True,
+                    "doppler_sign":1.0,
+                    "radar_frequency":500e6,
+                    "reanalyze":True,
+                    "debug_plot":False,
+                    "debug_plot_acc":False,
+                    "debug_print":False,
+                    "round_trip_range":True,
+                    "num_cohints_per_file":100,
+                    "use_gpu":False,
+                    "use_python":False,
+                    "use_cpu":True,
+                    },
                 }
 
     def __str__(self):
@@ -81,44 +84,53 @@ class gmf_opts(Config):
         
         #Non default paramaters
         try:
-            self.data_dirs=self["data_dirs"]
-            self.rx_channel=self["rx_channel"]
-            self.tx_channel=self["tx_channel"]
-            self.output_dir=self["output_dir"]
-            self.n_ipp=int(self["n_ipp"])
+            self.data_dirs=self['gmf_opts']["data_dirs"]
+            self.rx_channel=self['gmf_opts']["rx_channel"]
+            self.tx_channel=self['gmf_opts']["tx_channel"]
+            self.output_dir=self['gmf_opts']["output_dir"]
+            self.n_ipp=int(self['gmf_opts']["n_ipp"])
             print(self.data_dirs)
-            self.sample_rate=float(self["sample_rate"])
-            self.n_range_gates=int(self["n_range_gates"])
-            self.range_gate_0=int(self["range_gate_0"])
-            self.range_gate_step=int(self["range_gate_step"])
-            self.frequency_decimation=int(self["frequency_decimation"])
-            self.ipp=int(self["ipp"])
-            self.tx_pulse_length=int(self["tx_pulse_length"])
-            self.ground_clutter_length=int(self["ground_clutter_length"])
-            self.min_acceleration=float(self["min_acceleration"])
-            self.max_acceleration=float(self["max_acceleration"])
-            self.acceleration_resolution=float(self["acceleration_resolution"])
-            self.snr_thresh=float(self["snr_thresh"])
-            self.doppler_sign=float(self["doppler_sign"])
-            self.radar_frequency=float(self["radar_frequency"])
-            print(self["debug_plot_acc"])
+            self.sample_rate=float(self['gmf_opts']["sample_rate"])
+            self.n_range_gates=int(self['gmf_opts']["n_range_gates"])
+            self.range_gate_0=int(self['gmf_opts']["range_gate_0"])
+            self.range_gate_step=int(self['gmf_opts']["range_gate_step"])
+            self.frequency_decimation=int(self['gmf_opts']["frequency_decimation"])
+            self.ipp=int(self['gmf_opts']["ipp"])
+            self.tx_pulse_length=int(self['gmf_opts']["tx_pulse_length"])
+            self.ground_clutter_length=int(self['gmf_opts']["ground_clutter_length"])
+            self.min_acceleration=float(self['gmf_opts']["min_acceleration"])
+            self.max_acceleration=float(self['gmf_opts']["max_acceleration"])
+            self.acceleration_resolution=float(self['gmf_opts']["acceleration_resolution"])
+            self.snr_thresh=float(self['gmf_opts']["snr_thresh"])
+            self.doppler_sign=float(self['gmf_opts']["doppler_sign"])
+            self.radar_frequency=float(self['gmf_opts']["radar_frequency"])
+            print(self['gmf_opts']["debug_plot_acc"])
             self.debug_plot_data_read=False
-            self.num_cohints_per_file=int(self["num_cohints_per_file"])
+            self.num_cohints_per_file=int(self['gmf_opts']["num_cohints_per_file"])
 
-            self.save_parameters=self._parse_bool(self["save_parameters"])
-            self.debug_plot=self._parse_bool(self["debug_plot"])
-            self.debug_plot_acc=self._parse_bool(self["debug_plot_acc"])
-            self.debug_print=self._parse_bool(self["debug_print"])
-            self.use_gpu=self._parse_bool(self["use_gpu"])
-            self.use_python=self._parse_bool(self["use_python"])
-            self.reanalyze=self._parse_bool(self["reanalyze"])       
-            self.round_trip_range=self._parse_bool(self["round_trip_range"])
+            self.save_parameters=self._parse_bool(self['gmf_opts']["save_parameters"])
+            self.debug_plot=self._parse_bool(self['gmf_opts']["debug_plot"])
+            self.debug_plot_acc=self._parse_bool(self['gmf_opts']["debug_plot_acc"])
+            self.debug_print=self._parse_bool(self['gmf_opts']["debug_print"])
+            self.use_gpu=self._parse_bool(self['gmf_opts']["use_gpu"])
+            self.use_python=self._parse_bool(self['gmf_opts']["use_python"])
+            self.reanalyze=self._parse_bool(self['gmf_opts']["reanalyze"])       
+            self.round_trip_range=self._parse_bool(self['gmf_opts']["round_trip_range"])
             self.debug_gmf_output=True
         except KeyError as e:
             #Raise valuerror instead of KeyError if some values are missing
             raise ValueError("Missing Value: " + str(e))
 
     def _parse_bool(self, string) -> bool:
+        """
+        Method to parse string into boolean
+
+        Paramaters:
+            string: Any type.
+        
+        Returns:
+            Boolean
+        """
         if isinstance(string, bool):
             return string
         elif string.lower() in ['true', 't']:
@@ -240,10 +252,12 @@ class gmf_opts(Config):
 
 if __name__ == "__main__":
     dirs = {
-        "data_dirs": '/tmp',
-        "rx_channel": '/tmp',
-        "tx_channel": '/tmp',
-        "output_dir": '/tmp',
+        "gmf_opts": {
+            "data_dirs": '/tmp',
+            "rx_channel": '/tmp',
+            "tx_channel": '/tmp',
+            "output_dir": '/tmp',
+        },
     }
     # o=gmf_opts.from_dict(dirs, True)
     o=gmf_opts.from_file('./cfg/sim.ini', True)
