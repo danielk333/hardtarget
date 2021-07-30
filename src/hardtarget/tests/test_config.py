@@ -38,7 +38,7 @@ class test_Config(unittest.TestCase):
 
         #Create a test INI string and remove whitespace
         self.test_ini_string = \
-        """[config]\ntest_string = test123\n\n"""
+        """[test_header]\ntest_string = test123\n\n"""
 
         #Test file names
         self.test_json_file = "/tmp/test_config_json.json"
@@ -124,7 +124,7 @@ class test_Config(unittest.TestCase):
             c = Config.from_stream(file)
 
             #Assert that that the config object equalls the test dictionary
-            self.assertEqual(c['test_string'], self.expected_ini_dict['test_string'])
+            self.assertEqual(c['test_header']['test_string'], self.expected_ini_dict['test_header']['test_string'])
             self.assertTrue(c.values_as_strings)
 
     def test_change_config_value(self):
@@ -228,17 +228,20 @@ class test_Config(unittest.TestCase):
         self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
     
     def test_config_as_ini_string_with_default_values(self):
+        default_string = '123test'
         #Create test class with default values
         class Default_test(Config):
             @classmethod
             def get_default(cls) -> dict:
                 newDict = self.expected_ini_dict.copy()
-                newDict['test_string'] = '123test'
+                newDict['test_header']['test_string'] = default_string
+                newDict['test_header']['test_string2'] = default_string
                 return newDict
         #Create instance of default test from default values
         c = Default_test.from_string(self.test_ini_string, True)
         #Assert that that the config object equalls the test dictionary
-        self.assertEqual(c['test_string'], self.expected_ini_dict['test_string'])
+        self.assertEqual(c['test_header']['test_string'], self.expected_ini_dict['test_header']['test_string'])
+        self.assertEqual(c['test_header']['test_string2'], default_string)
 
     def tearDown(self):
         #remove files from setup

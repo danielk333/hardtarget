@@ -1,6 +1,35 @@
 import configparser, json, io, os
 import collections.abc as abc
 
+def _update_default(dict1, dict2) -> None:
+        """
+        Recursive dictionary update function. The keys in dictionary 1 is updated with 
+        the values from the same keys in dictionary 2. If a key points to a dict like 
+        object, then the function will recursively update sub dictionaries.
+
+        Paramaters:
+            dict1: Dict like object to be overwritten
+            dict2: Dict like object
+        """
+        #Store keys from dict 1 before loop to save time
+        dict1keys = dict1.keys()
+        for key in dict2:
+            #If key leads to dict in dict1 recurisvely update dict
+            if key in dict1keys and isinstance(dict1[key], abc.Mapping):
+                #If key does not lead to dict in dict2 raise a value error
+                if not isinstance(dict2[key], abc.Mapping):
+                    raise ValueError(f'Expected dict like object in dictionary 2 on key {key}')
+                try:
+                    #Recursive call
+                    _update_default(dict1[key], dict2[key])
+                except ValueError as e:
+                    #If error happend update error message with path to error
+                    e.message += 'from dict on key {key}'
+                    raise
+            else:
+                #If key does not lead to dict like object update its value directly
+                dict1[key] = dict2[key]
+
 class Config():
     """
     A config object that can be created in four diffrent manners. Paramaters 
@@ -63,7 +92,7 @@ class Config():
         #Try to load json file
         try:
             #Create object from json stream
-            params.update(json.load(stream))
+            _update_default(params, json.load(stream))
             #Values as strings is false for json streams
             vas = False
         #If not json file parse as INI file
@@ -73,10 +102,8 @@ class Config():
             config = configparser.ConfigParser()
             #Read config from stream
             config.read_file(stream)
-            #Get header title
-            header = config.sections()[0]
             #Update default values based on INI string
-            params.update(config._sections[header])
+            _update_default(params, config._sections)
             #Values as strings is true for ini streams
             vas = True
             #Create config from INI stream
@@ -95,7 +122,7 @@ class Config():
                           set_default method). Default False.
         """
         params = cls.get_default() if from_default else {}
-        params.update(dictionary)
+        _update_default(params, dictionary)
         return cls(params)
     
     @classmethod
@@ -122,35 +149,6 @@ class Config():
             Dictionary with default values
         """
         raise NotImplementedError('Abstract method ment to be overidden by subclass')
-        
-    def _update_default(self, dict1, dict2) -> None:
-        """
-        Recursive dictionary update function. The keys in dictionary 1 is updated with 
-        the values from the same keys in dictionary 2. If a key points to a dict like 
-        object, then the function will recursively update sub dictionaries.
-
-        Paramaters:
-            dict1: Dict like object to be overwritten
-            dict2: Dict like object
-        """
-        #Store keys from dict 1 before loop to save time
-        dict1keys = dict1.keys()
-        for key in dict2:
-            #If key leads to dict in dict1 recurisvely update dict
-            if key in dict1keys and isinstance[dict1[key], abc.Mapping]:
-                #If key does not lead to dict in dict2 raise a value error
-                if not isinstance(dict2[key], abc.Mapping):
-                    raise ValueError(f'Expected dict like object in dictionary 2 on key {key}')
-                try:
-                    #Recursive call
-                    self._update_default(dict1[key], dict2[key])
-                except ValueError as e:
-                    #If error happend update error message with path to error
-                    e.message += 'from dict on key {key}'
-                    raise
-            else:
-                #If key does not lead to dict like object update its value directly
-                dict1[key] = dict2[key]
             
     def __init__(self, paramaters, values_as_strings = False) -> None:
         """
@@ -209,8 +207,7 @@ class Config():
             path += '.ini'
             #Parse directory into inifile using configparser
             c = configparser.ConfigParser()
-            headerdict = {'config': self._params}
-            c.read_dict(headerdict)
+            c.read_dict(self._params)
             with open(path, 'w') as file:
                 c.write(file)
         else:
