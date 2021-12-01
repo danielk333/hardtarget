@@ -162,6 +162,12 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/jvierine/hard_target",
+    entry_points={
+        'console_scripts': [
+            'convert_eiscat2drf = hardtarget.io.convert_eiscat2drf:main'
+        ],
+        
+    },
     project_urls={
         "Bug Tracker": "https://github.com/jvierine/hard_target/issues",
     },
