@@ -13,25 +13,29 @@
 #rg0=8145+10000
 
 
-import digital_rf as drf
-import matplotlib.pyplot as plt
-import numpy as n
-import h5py
-import stuffr
-import scipy.fftpack as fft
+import os
 import time
+
+import h5py
+
+import numpy as n
+import matplotlib.pyplot as plt
+import scipy.fftpack as fft
 import scipy.constants as c
 import scipy.optimize as sio
+
+import digital_rf as drf
+import stuffr
 #import pyfftw
 
-import os
+from ..utilities import read_vector_c81d
 
 
 def analyze_ipps(d,i0,o,mode=0,plott=False):
     print("Using numpy")
     # read data vector with n_ipps, and a little extra
-    z_tx=d.read_vector_c81d(i0,(o.n_ipp+o.n_extra)*o.ipp,o.tx_channel)
-    z_rx=d.read_vector_c81d(i0,(o.n_ipp+o.n_extra)*o.ipp,o.rx_channel)    
+    z_tx=read_vector_c81d(d,i0,(o.n_ipp+o.n_extra)*o.ipp,o.tx_channel)
+    z_rx=read_vector_c81d(d,i0,(o.n_ipp+o.n_extra)*o.ipp,o.rx_channel)
 
     if plott:
         # plot echo
@@ -60,7 +64,7 @@ def analyze_ipps(d,i0,o,mode=0,plott=False):
         plt.plot(z_tx.imag)
         plt.title("Only tx")
         plt.show()
-        
+
         # plot echo
         plt.plot(z_rx.real)
         plt.plot(z_rx.imag)
@@ -74,18 +78,18 @@ def analyze_ipps(d,i0,o,mode=0,plott=False):
     max_mf=0
     gmf_vec=n.zeros(o.n_range_gates,dtype=n.float32)
     v_vec=n.zeros(o.n_range_gates,dtype=n.float32)
-    a_vec=n.zeros(o.n_range_gates,dtype=n.float32)        
+    a_vec=n.zeros(o.n_range_gates,dtype=n.float32)
     gmf_dc_vec=n.zeros(o.n_range_gates,dtype=n.float32)
 
     # implement this in C
     #
     # gmf.mf(z_tx, o.n_fft, z_rx,len(z_rx), o.acc_phasors, o.n_accs, o.rgs,o.fdec,gmf_vec,gmf_dc_vec,v_vec,a_vec)
     GA=n.zeros([len(o.accs),len(o.rgs)])
-    GV=n.zeros([int(o.n_fft/o.frequency_decimation),len(o.rgs)])    
+    GV=n.zeros([int(o.n_fft/o.frequency_decimation),len(o.rgs)])
     for ri,rg in enumerate(o.rgs):
         # range matching echo*conj(tx)
         echo=stuffr.decimate(z_rx[rg:(rg+o.n_fft)]*z_tx,dec=o.frequency_decimation)
-        
+
         # go through all accelerations
         for ai,a in enumerate(o.accs):
             # go through all doppler shifts with FFT (this is a grid search of
@@ -93,11 +97,11 @@ def analyze_ipps(d,i0,o,mode=0,plott=False):
             gmf=n.abs(fft.fft(o.acc_phasors[ai,:]*echo,len(echo)))**2.0
             mi=n.argmax(gmf)
             GA[ai,ri]=gmf[mi]
-            
+
             if ai==0:
                 gmf_dc_vec[ri]=gmf[0]
-            
-            if gmf[mi]>gmf_vec[ri]: 
+
+            if gmf[mi]>gmf_vec[ri]:
                 gmf_vec[ri]=gmf[mi]
                 v_vec[ri]=o.range_rates[mi]
                 a_vec[ri]=a
@@ -128,10 +132,10 @@ def analyze_ipps_fine(d,
                       n_a=40,
                       noise_pwr=1.0,
                       plott=False):
-    
+
     # read data vector with n_ipps, and a little extra
-    z_tx=d.read_vector_c81d(i0,(o.n_ipp+o.n_extra)*o.ipp,o.tx_channel)
-    z_rx=d.read_vector_c81d(i0,(o.n_ipp+o.n_extra)*o.ipp,o.rx_channel)    
+    z_tx=read_vector_c81d(d,i0,(o.n_ipp+o.n_extra)*o.ipp,o.tx_channel)
+    z_rx=read_vector_c81d(d,i0,(o.n_ipp+o.n_extra)*o.ipp,o.rx_channel)
 
     # make a separate copy to hold transmit pulse, and the echo
     z_tx=n.copy(z_tx)
@@ -153,7 +157,7 @@ def analyze_ipps_fine(d,
         plt.plot(z_tx.imag)
         plt.title("Only tx")
         plt.show()
-        
+
         # plot echo
         plt.plot(z_rx.real)
         plt.plot(z_rx.imag)
@@ -161,7 +165,7 @@ def analyze_ipps_fine(d,
         plt.show()
 
     tau = n.arange(o.n_ipp*o.ipp)/o.sample_rate
-    
+
     def gmf(x):
         r0=x[0]
         v0=x[1]
@@ -173,10 +177,10 @@ def analyze_ipps_fine(d,
         mf = z_rx[rng_samples + idx]*phase*z_tx
         s=n.abs(n.sum(mf))
         return(-s)
-    
+
     drs=n.linspace(r0+rlim[0],r0+rlim[1],num=n_r)
     dvs=n.linspace(v0+vlim[0],v0+vlim[1],num=n_v)
-    das=n.linspace(alim[0],alim[1],num=n_a)    
+    das=n.linspace(alim[0],alim[1],num=n_a)
     best=0.0
     xhat=[0,0,0]
     for ri in range(n_r):
@@ -190,8 +194,8 @@ def analyze_ipps_fine(d,
                     best=test
                     xhat=[r0t,v0t,a0t]
                     print("snr %1.2f (dB) r %1.5f v %1.5f a %1.5f"%(10.0*n.log10((best-n.sqrt(noise_pwr))**2.0/noise_pwr),r0t,v0t,a0t))
-    
-    print("fmin")    
+
+    print("fmin")
     xhat=sio.fmin(gmf,xhat)
     xhat=sio.fmin(gmf,xhat)
     xhat=sio.fmin(gmf,xhat)
