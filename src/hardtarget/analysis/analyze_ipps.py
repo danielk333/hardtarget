@@ -1,7 +1,7 @@
 import numpy as n
 import time
 
-from ..utilities import read_vector_c81d
+from hardtarget.utilities import read_vector_c81d
 
 try:
     from mpi4py import MPI

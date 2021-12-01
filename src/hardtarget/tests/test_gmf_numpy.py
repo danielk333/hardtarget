@@ -1,6 +1,6 @@
 import unittest
 import numpy as n
-from hardtarget.analysis.gmf.gmf_c import gmf
+from hardtarget.analysis.gmf.gmf_cpu_numpy import gmf
 
 class Test_Gmf_C(unittest.TestCase):
 
@@ -21,7 +21,12 @@ class Test_Gmf_C(unittest.TestCase):
         dec=10
         acc_phasors=n.zeros([20,1000],dtype=n.complex64)
         acc_phasors[0,:]=1.0
-        rgs = n.arange(1000, dtype=n.float32)
+
+        #rgs=n.zeros(1000,dtype=n.float32)#arange(700,dtype=n.int64)
+
+        #for ri in range(len(rgs)):
+        #    rgs[ri]=ri
+        rgs = n.arange(1000, dtype=int)
 
         n_r=len(rgs)
         gmf_vec=n.zeros(n_r,dtype=n.float32);
@@ -43,3 +48,4 @@ class Test_Gmf_C(unittest.TestCase):
 
 if __name__=='__main__':
     unittest.main()
+

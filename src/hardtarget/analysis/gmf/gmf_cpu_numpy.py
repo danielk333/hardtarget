@@ -28,10 +28,80 @@ import digital_rf as drf
 import stuffr
 #import pyfftw
 
-from ..utilities import read_vector_c81d
+from hardtarget.utilities import read_vector_c81d
+
+# g.gmf(z_tx, z_rx, o.acc_phasors, o.rgs_float, o.frequency_decimation, gmf_vec, gmf_dc_vec, v_vec, a_vec, comm.rank)
+def gmf(z_tx, z_rx, a_phasors, rgs, dec, 
+            gmf_vec, gmf_dc_vec, v_vec, a_vec, rank=None):
+    """
+    Compute the output of the Generalized Matched Filter GMF
+
+    Parameters:
+    z_tx: complex vector [n_fft] of transmitter samples
+    z_rx: complex vector [n_fft + n_extra*ipp] of receiver samples
+    a_phasors: array [n_acc, n_fft//dec]  of phase for acceleration grid
+
+    rank: MPI rank (not used)
+
+    Here, n_fft is the length of the coherent integration in samples
+
+    rgs: integer vector [n_rngs], start index of each range gate
+    dec: integer, boxcar decimation factor to apply after accel matching
+
+    Output parameters:
+        gmf_vec: real vector [n_rngs] max value of gmf (power) across vel/acc
+        gmf_dc_vec: real vector [shape??] output of gmf (power) at zero frequency
+        a_vec: integer vector [n_rngs] index of a_phasors that produced max output at each range
+        v_vec: integer vector [n_rngs] index of velocity that produced max output at each range
+    """
+
+    # TODO:
+    # defaults for acc_phasors
+    # defaults for rgs
+    # defaults for dec
 
 
-def analyze_ipps(d,i0,o,mode=0,plott=False):
+    # Stencil and CC tx waveform here, or on the outside?
+    # => on the outside
+
+    # n_range_gates = (len(z_rx) -len(z_tx)) // dec    # ??
+    # number of range gates is input from user
+    n_acc = a_phasors.shape[0]
+
+    # misnamed parameter: n_fft is length of coherent integration
+    n_fft = len(z_tx)
+
+    # number of frequency bins is length of coherent integration after boxcar decimation
+    n_vel = n_fft//dec
+
+    # GA = n.zeros((n_acc, n_range_gates))
+    # GV = n.zeros((n_vel, n_range_gates))
+
+    for ri, rg in enumerate(rgs):
+        zr = z_rx[rg:(rg+n_fft)]
+        echo = stuffr.decimate(zr * z_tx, dec=dec)     # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter)
+
+        # for ai, a in enumerate (accels):
+        for ai in range(n_acc):
+            _gmfo = n.abs(fft.fft(a_phasors[ai] * echo, len(echo)))**2
+            mi = n.argmax(_gmfo)
+            # GA[ai, ri] = _gmfo[mi]
+
+            if ai == 0:
+                gmf_dc_vec[ri] = _gmfo[0]       # gmf_dc_vec is the range-dependent noise floor
+
+            if _gmfo[mi] > gmf_vec[ri]:
+                gmf_vec[ri] = _gmfo[mi]
+                v_vec[ri]   = mi        # index of doppler that gives highest integrated energy at this range gate
+                a_vec[ri]   = ai        # index of acceleration that gives highest integrated energy at this range gate
+
+    # return gmf_vec, gmf_dc_vec, a_vec, v_vec
+    # Finished!
+
+
+
+
+def analyze_ipps(d,i0,o,mode=-1,plott=False):
     print("Using numpy")
     # read data vector with n_ipps, and a little extra
     z_tx=read_vector_c81d(d,i0,(o.n_ipp+o.n_extra)*o.ipp,o.tx_channel)
@@ -84,27 +154,35 @@ def analyze_ipps(d,i0,o,mode=0,plott=False):
     # implement this in C
     #
     # gmf.mf(z_tx, o.n_fft, z_rx,len(z_rx), o.acc_phasors, o.n_accs, o.rgs,o.fdec,gmf_vec,gmf_dc_vec,v_vec,a_vec)
-    GA=n.zeros([len(o.accs),len(o.rgs)])
-    GV=n.zeros([int(o.n_fft/o.frequency_decimation),len(o.rgs)])
-    for ri,rg in enumerate(o.rgs):
-        # range matching echo*conj(tx)
-        echo=stuffr.decimate(z_rx[rg:(rg+o.n_fft)]*z_tx,dec=o.frequency_decimation)
 
-        # go through all accelerations
-        for ai,a in enumerate(o.accs):
-            # go through all doppler shifts with FFT (this is a grid search of
-            # all possible doppler velocities)
-            gmf=n.abs(fft.fft(o.acc_phasors[ai,:]*echo,len(echo)))**2.0
-            mi=n.argmax(gmf)
-            GA[ai,ri]=gmf[mi]
+    if 0:
+        GA=n.zeros([len(o.accs),len(o.rgs)])
+        GV=n.zeros([int(o.n_fft/o.frequency_decimation),len(o.rgs)])
+        for ri,rg in enumerate(o.rgs):
+            # range matching echo*conj(tx)
+            echo=stuffr.decimate(z_rx[rg:(rg+o.n_fft)]*z_tx,dec=o.frequency_decimation)
 
-            if ai==0:
-                gmf_dc_vec[ri]=gmf[0]
+            # go through all accelerations
+            for ai,a in enumerate(o.accs):
+                # go through all doppler shifts with FFT (this is a grid search of
+                # all possible doppler velocities)
+                gmf=n.abs(fft.fft(o.acc_phasors[ai,:]*echo,len(echo)))**2.0
+                mi=n.argmax(gmf)
+                GA[ai,ri]=gmf[mi]
 
-            if gmf[mi]>gmf_vec[ri]:
-                gmf_vec[ri]=gmf[mi]
-                v_vec[ri]=o.range_rates[mi]
-                a_vec[ri]=a
+                if ai==0:
+                    gmf_dc_vec[ri]=gmf[0]
+
+                if gmf[mi]>gmf_vec[ri]:
+                    gmf_vec[ri]=gmf[mi]
+                    v_vec[ri]=o.range_rates[mi]
+                    a_vec[ri]=a
+    else:
+        # gmf(z_tx, z_rx, rgs, dec, options, gmf_vec, gmf_dc_vec, a_vec, v_vec)
+        gmf(z_tx, z_rx, o.acc_phasors, o.rgs_float, o.frequency_decimation,
+            gmf_vec, gmf_dc_vec, v_vec, a_vec, comm.rank)                                                               
+
+
 #    plt.pcolormesh(o.rgs,o.accs,GA)
 #    plt.show()
 
