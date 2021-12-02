@@ -25,8 +25,8 @@ import scipy.constants as c
 import scipy.optimize as sio
 
 import digital_rf as drf
-import stuffr
-#import pyfftw
+# import stuffr
+# import pyfftw
 
 from hardtarget.utilities import read_vector_c81d
 
@@ -79,7 +79,8 @@ def gmf(z_tx, z_rx, a_phasors, rgs, dec,
 
     for ri, rg in enumerate(rgs):
         zr = z_rx[rg:(rg+n_fft)]
-        echo = stuffr.decimate(zr * z_tx, dec=dec)     # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter)
+        # echo = stuffr.decimate(zr * z_tx, dec=dec)     # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter)
+        echo = n.sum((zr * z_tx).reshape(-1, dec), axis=-1)
 
         # for ai, a in enumerate (accels):
         for ai in range(n_acc):
@@ -160,7 +161,8 @@ def analyze_ipps(d,i0,o,mode=-1,plott=False):
         GV=n.zeros([int(o.n_fft/o.frequency_decimation),len(o.rgs)])
         for ri,rg in enumerate(o.rgs):
             # range matching echo*conj(tx)
-            echo=stuffr.decimate(z_rx[rg:(rg+o.n_fft)]*z_tx,dec=o.frequency_decimation)
+            # echo=stuffr.decimate(z_rx[rg:(rg+o.n_fft)]*z_tx,dec=o.frequency_decimation)
+            echo = n.sum((z_rx[rg:(rg+o.n_fft)]*z_tx).reshape(-1, o.frequency_decimation), axis=-1)
 
             # go through all accelerations
             for ai,a in enumerate(o.accs):

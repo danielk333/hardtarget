@@ -2,9 +2,9 @@ import unittest
 import numpy as n
 from hardtarget.analysis.gmf.gmf_cpu_numpy import gmf
 
-class Test_Gmf_C(unittest.TestCase):
+class Test_Gmf_Numpy(unittest.TestCase):
 
-    def test_gmf_c(self):
+    def test_gmf_numpy(self):
         #This is what we expect as an output from this test
         expected = {'ri': 500, 
                     'gmf_vec': 1e04, 
