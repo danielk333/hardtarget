@@ -1,12 +1,7 @@
 import os
-import setuptools
 from os.path import join as pjoin
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
-
-#Genrate long description using readme file
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
 
 
 def find_in_path(name, path):
@@ -53,24 +48,24 @@ def locate_cuda():
     return cudaconfig
 
 
-cudasources = ['cudafiles/gmfgpu.cu']
+cudasources = ['src/gmf_cuda_lib/gmfgpu.cu']
 cudalibraries = ['cufft']
 
-csources = ['cfiles/gmf.c']
+csources = ['src/gmf_c_lib/gmf.c']
 clibraries = ['fftw3f']
 
 #Build C module
 gmfcmodule = Extension(
-            #Where to store the .so file
-            name='hardtarget.analysis.gmf.libgmf',
-            #Libraries used
-            libraries=clibraries,
-            extra_compile_args= {
-                'gcc': [],
-            },
-            #Path to cuda source files, relative to repo root
-            sources=csources,
-            )
+    #Where to store the .so file
+    name='hardtarget.analysis.gmf.gmfclib',
+    #Libraries used
+    libraries=clibraries,
+    extra_compile_args= {
+        'gcc': [],
+    },
+    #Path to cuda source files, relative to repo root
+    sources=csources,
+)
 
 #Try to build Cuda module
 try:
@@ -79,21 +74,21 @@ try:
     print("Cuda compiler detected, compiling GPU optimized code")
 
     gmfgpumodule = Extension(
-            #Where to store the .so file
-            name='hardtarget.analysis.gmf.libgmfgpu',
-            library_dirs=[CUDA['lib64']],
-            #Libraries used
-            libraries=cudalibraries,
-            extra_compile_args= {
-                'gcc': [],
-                'nvcc': [
-                    '-O3','--compiler-options', "'-fPIC'",
-                    ]
-            },
-            include_dirs = [CUDA['include']],
-            #Path to cuda source files, relative to repo root
-            sources=cudasources,
-            )
+        #Where to store the .so file
+        name='hardtarget.analysis.gmf.gmfcudalib',
+        library_dirs=[CUDA['lib64']],
+        #Libraries used
+        libraries=cudalibraries,
+        extra_compile_args= {
+            'gcc': [],
+            'nvcc': [
+                '-O3','--compiler-options', "'-fPIC'",
+                ]
+        },
+        include_dirs = [CUDA['include']],
+        #Path to cuda source files, relative to repo root
+        sources=cudasources,
+    )
     #Specify that we want both C and Cuda module to be compiled
     #The C module has to be built first because of the way we inject 
     #a new linker without cleaning up afterwards
@@ -154,46 +149,6 @@ class custom_build_ext(build_ext):
 
 
 setup(
-    name="hardtarget",
-    version="0.1.8",
-    author="Juha Vierinen",
-    author_email="juha-pekka.vierinen@uit.no",
-    description="Hard target processing of radar data",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
-    url="https://github.com/jvierine/hard_target",
-    entry_points={
-        'console_scripts': [
-            'convert_eiscat2drf = hardtarget.io.convert_eiscat2drf:main'
-        ],
-        
-    },
-    project_urls={
-        "Bug Tracker": "https://github.com/jvierine/hard_target/issues",
-    },
-    classifiers=[
-        "Development Status :: 3 - Alpha",
-        "Environment :: GPU :: NVIDIA CUDA",
-        "Intended Audience :: Science/Research",
-        "Natural Language :: English",
-        "Operating System :: POSIX :: Linux",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: C",
-    ],
-    install_requires=[
-        'h5py>=2.10.0',
-        'digital_rf>=2.6.6',
-        'numpy>=1.19.5',
-        'scipy>=1.4.1',
-        'matplotlib>=3.3.4',
-        'stuffr>=1.0.0',
-    ],
-    package_dir={"": "src"},
-    packages=setuptools.find_packages(where="src"),
-    package_data={"": ["cSources/*","cudaSources/*"]},
-    include_package_data=True,
-    #Change the build class to our new custom build class
     cmdclass={'build_ext': custom_build_ext},
-    python_requires=">=3.6",
-    ext_modules=extmodules
+    ext_modules=extmodules,
 )
