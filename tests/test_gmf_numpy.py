@@ -1,6 +1,6 @@
 import unittest
 import numpy as n
-from hardtarget.analysis.gmf.gmf_cpu_numpy import gmf
+from hardtarget.analysis.gmf.gmf_numpy import gmf_numpy as gmf
 
 class Test_Gmf_Numpy(unittest.TestCase):
 
