@@ -2,26 +2,13 @@
 
 These are extended installation instructions.
 
-### Clone repo
-
-```bash
-git clone git@github.com:jvierine/hard_target.git
-```
-
-Make sure you are on the right branch. It should probably be _main_ or _develop_.
-
-Check active branch
-```bash
-git branch
-```
-
-Switch to branch develop
-```bash
-git checkout develop
-```
+- [Check prerequisites](#prerequisites)
+- [Make virtual environment](#virtual-environment-cheatsheet)
+- [Install PyPi](#install-pypi)
+- [Install Local Repository](#install-local-repository)
 
 
-### Check pre-requisites
+### Prerequisites
 
 The package depends on _gcc_ and _libfftw3-dev_.
 These may for instance be installed using apt.
@@ -36,15 +23,10 @@ In addition, if cuda acceleration is needed, this requires nvidia GPU hardware a
 sudo apt install nvidia-cuda-toolkit
 ```
 
-You may test you setup using with a script
 
-```bash
-python3 src/gmf_cuda_lib/testcuda.py
-```
+### Virtual Environment Cheatsheet
 
-### Create virtual environment
-
-Create environment in folder _venv_.
+Create environment in folder _venv_. This requires _python3.*-venv_ to be installed on the system.
 
 ```bash
 cd hard_target
@@ -67,6 +49,47 @@ Deactivate the environment
 
 ```bash
 deactivate
+```
+
+Delete the environment
+
+```bash
+rm -rf venv
+```
+
+### Install PyPi
+
+Hardtarget can be installed from _PyPi_. (CURRENTLY NOT WORKING)
+
+```bash
+pip install hardtarget
+```
+
+### Install Local Repository
+
+Hardtarget can be installed from source code in git repository.
+
+Clone repository
+```bash
+git clone git@github.com:jvierine/hard_target.git
+cd hard-target
+```
+
+Make sure you are on the intended branch. It should probably be _main_ or _develop_.
+
+Check active branch
+```bash
+git branch
+```
+
+Switch to other branch if needed
+```bash
+git checkout develop
+```
+
+Install from repository
+```bash
+pip install .
 ```
 
 
