@@ -1,5 +1,5 @@
 import unittest, os, io, json, shutil
-from ..config import Config
+from hardtarget.config import Config
 
 
 class test_Config(unittest.TestCase):
