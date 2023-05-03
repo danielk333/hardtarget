@@ -14,9 +14,6 @@ def main():
     subprocess.run(["nvcc", srcfile, "-o", "/tmp/hello"])
     result = subprocess.run(["/tmp/hello"], stdout=subprocess.PIPE, text=True)
     subprocess.run(["rm", "/tmp/hello"])
-
-    print(result.stdout)
-
     if result.stdout == "Hello World!\n":
         print("Cuda is running!")
     else:
