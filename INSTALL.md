@@ -20,13 +20,22 @@ Cuda acceleration requires nvidia GPU hardware and a working cuda environment.
 sudo apt install nvidia-cuda-toolkit
 ```
 
+Python > 3.7 installed on system.
 
 ### Virtual Environment Cheatsheet
 
 Create environment in folder _venv_. 
+
 ```bash
 python3 -m venv venv
 ```
+
+Alternatively specify Python version.
+```bash
+python3.8 -m venv venv
+```
+
+
 
 Activate the environment.
 ```bash

@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import digital_rf as drf
 import os
 import numpy as n
-import h5py
 import sys
 
 # import from this directory. this is needed if this is a package

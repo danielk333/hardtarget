@@ -3,9 +3,9 @@ import numpy as n
 from hardtarget.analysis.gmf.gmf_cuda import gmf_cuda as gmf
 
 
-class Test_Gmf_Gpu(unittest.TestCase):
+class Test_Gmf_Cuda(unittest.TestCase):
 
-    def test_gmf_gpu(self):
+    def test_gmf_cuda(self):
         #This is what we expect as an output from this test
         expected = {'ri': 500, 
                     'gmf_vec': 1e04, 
