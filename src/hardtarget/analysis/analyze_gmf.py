@@ -15,7 +15,7 @@ try:
     comm = MPI.COMM_WORLD
 except ImportError:
     class COMM_WORLD:
-        rank = 1
+        rank = 0
         size = 1
     comm = COMM_WORLD()
 

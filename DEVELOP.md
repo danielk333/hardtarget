@@ -1,35 +1,29 @@
-### Run Tests with Python Unittest Module
 
-Run all tests in directory
+### linting with flake8
+
+TODO
+
+### formatting with black
+
+TODO
+
+### pytest
+
+To run entire suite
 ```bash
-python -m unittest discover tests
+pytest
+```
+To run specific file
+```bash
+pytest tests/test_gmf.py
 ```
 
-Run all tests from specific file.
+To run specific TestCase, within file
 ```bash
-python -m unittest tests.test_gmf_c
+pytest tests/test_gmf.py::TestGMF
 ```
 
-Run all tests in specific TestCase.
+To run specific test, within TestCase, within file.
 ```bash
-python -m unittest tests.test_gmf_c.Test_Gmf_C
+pytest tests/test_gmf.py::TestGMF::test_gmf
 ```
-
-Run specific tests from TestCase.
-```bash
-python -m unittest tests.test_gmf_c.Test_Gmf_C.test_gmf.c
-```
-
-### Run testfile as Python script
-
-Run all tests in directory
-```bash
-python tests
-```
-
-Run all tests from specific file.
-```bash
-python tests/test_gmf_c.py
-```
-
-

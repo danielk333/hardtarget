@@ -76,7 +76,9 @@ def gmf_numpy(z_tx, z_rx, a_phasors, rgs, dec,
     # GV = np.zeros((n_vel, n_range_gates))
 
     for ri, rg in enumerate(rgs):
-        zr = z_rx[rg:(rg+n_fft)]
+
+        rg_idx = rg.astype(np.int32)
+        zr = z_rx[rg_idx:(rg_idx+n_fft)]
         # echo = stuffr.decimate(zr * z_tx, dec=dec)     # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter)
         echo = np.sum((zr * z_tx).reshape(-1, dec), axis=-1)
 
