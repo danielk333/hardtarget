@@ -2,11 +2,27 @@ import pytest
 import numpy as np
 from hardtarget.analysis.gmf import GMF_LIBS
 
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "cuda: mark test as cuda dependent")
+
 class TestGMF:
 
-    @pytest.mark.parametrize("gmf_key", GMF_LIBS.keys())
+    """
+    It is possible that CUDA support is compilet, yet still non-functional.
+    """
+
+    @pytest.mark.parametrize("gmf_key", ["c", "numpy"])
     def test_gmf(self, gmf_key):
-        """Testing the basic gmf function."""
+        self.run_gmf(gmf_key)
+
+    @pytest.mark.cuda
+    def test_gmf_cuda(self):
+        self.run_gmf("cuda")
+
+
+    def run_gmf(self, gmf_key):
+        """Run the basic gmf function."""
 
         gmf = GMF_LIBS[gmf_key]
 

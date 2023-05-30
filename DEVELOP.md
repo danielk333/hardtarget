@@ -27,3 +27,8 @@ To run specific test, within TestCase, within file.
 ```bash
 pytest tests/test_gmf.py::TestGMF::test_gmf
 ```
+
+To run cuda tests (skipped by default).
+```bash
+pytest -m cuda
+```

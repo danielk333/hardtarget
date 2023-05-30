@@ -1,34 +1,6 @@
-#!/usr/bin/env pyth
-#
-# Example of range-Doppler-acceleration matched filter (Generalized Match Function)
-#
-# # example1
-#i0=1463100914401305
-#rg0=2000#4400
-## example 2
-##i0=1463106122981305
-#rg0=5425
-# example 3 (range aliased echo!)
-#i0=1463107264431305
-#rg0=8145+10000
-
-
-import os
-import time
-
-import h5py
-
 import numpy as np
 import scipy.fftpack as fft
-import scipy.constants as c
-import scipy.optimize as sio
 
-import digital_rf as drf
-
-
-from hardtarget.utilities import read_vector_c81d
-
-# g.gmf(z_tx, z_rx, o.acc_phasors, o.rgs_float, o.frequency_decimation, gmf_vec, gmf_dc_vec, v_vec, a_vec, comm.rank)
 def gmf_numpy(z_tx, z_rx, a_phasors, rgs, dec, 
             gmf_vec, gmf_dc_vec, v_vec, a_vec, rank=None):
     """
@@ -51,13 +23,13 @@ def gmf_numpy(z_tx, z_rx, a_phasors, rgs, dec,
         gmf_dc_vec: real vector [shape??] output of gmf (power) at zero frequency
         a_vec: integer vector [n_rngs] index of a_phasors that produced max output at each range
         v_vec: integer vector [n_rngs] index of velocity that produced max output at each range
+
     """
 
     # TODO:
     # defaults for acc_phasors
     # defaults for rgs
     # defaults for dec
-
 
     # Stencil and CC tx waveform here, or on the outside?
     # => on the outside
@@ -70,7 +42,7 @@ def gmf_numpy(z_tx, z_rx, a_phasors, rgs, dec,
     n_fft = len(z_tx)
 
     # number of frequency bins is length of coherent integration after boxcar decimation
-    n_vel = n_fft//dec
+    # n_vel = n_fft//dec
 
     # GA = np.zeros((n_acc, n_range_gates))
     # GV = np.zeros((n_vel, n_range_gates))
@@ -87,14 +59,16 @@ def gmf_numpy(z_tx, z_rx, a_phasors, rgs, dec,
             _gmfo = np.abs(fft.fft(a_phasors[ai] * echo, len(echo)))**2
             mi = np.argmax(_gmfo)
             # GA[ai, ri] = _gmfo[mi]
-
             if ai == 0:
-                gmf_dc_vec[ri] = _gmfo[0]       # gmf_dc_vec is the range-dependent noise floor
+                # gmf_dc_vec is the range-dependent noise floor
+                gmf_dc_vec[ri] = _gmfo[0]
 
             if _gmfo[mi] > gmf_vec[ri]:
                 gmf_vec[ri] = _gmfo[mi]
-                v_vec[ri]   = mi        # index of doppler that gives highest integrated energy at this range gate
-                a_vec[ri]   = ai        # index of acceleration that gives highest integrated energy at this range gate
+                # index of doppler that gives highest integrated energy at this range gate
+                v_vec[ri]   = mi
+                # index of acceleration that gives highest integrated energy at this range gate
+                a_vec[ri]   = ai
 
     # return gmf_vec, gmf_dc_vec, a_vec, v_vec
     # Finished!
