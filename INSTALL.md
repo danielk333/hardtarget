@@ -40,6 +40,7 @@ sudo apt-get install python3.8-dev
 Then install MPI package
 
 ```bash
+sudo apt-get install libopenmpi-dev
 sudo apt install python3-mpi4py
 ```
 
