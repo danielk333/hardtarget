@@ -7,8 +7,8 @@ import sys
 
 import digital_rf as drf
 from . import gmf_opts as go
-import stuffr
 from . import analyze_ipps as g
+from hardtarget.utilities import unix2datestr, sec2dirname
 
 try:
     from mpi4py import MPI
@@ -32,10 +32,10 @@ def analyze_gmf(conf,
     b_tx=d.get_bounds(conf.tx_channel)
     
     print("RX bounds %d-%d TX bounds %d-%d"%(b_rx[0],b_rx[1],b_tx[0],b_tx[1]))
-    print("RX bounds %s-%s TX bounds %s-%s"%(stuffr.unix2datestr(b_rx[0]/conf.sample_rate),
-                                             stuffr.unix2datestr(b_rx[1]/conf.sample_rate),
-                                             stuffr.unix2datestr(b_tx[0]/conf.sample_rate),
-                                             stuffr.unix2datestr(b_tx[1]/conf.sample_rate)))
+    print("RX bounds %s-%s TX bounds %s-%s"%(unix2datestr(b_rx[0]/conf.sample_rate),
+                                             unix2datestr(b_rx[1]/conf.sample_rate),
+                                             unix2datestr(b_tx[0]/conf.sample_rate),
+                                             unix2datestr(b_tx[1]/conf.sample_rate)))
     
     print("Number of parallel processes %d"%(comm.size))
 
@@ -52,8 +52,8 @@ def analyze_gmf(conf,
     # parallel
     for ni in range(comm.rank,n_ints,comm.size):
         fi=ni*conf.ipp*conf.n_ipp*conf.num_cohints_per_file + b[0]        
-        print("rank %d %s"%(comm.rank,stuffr.unix2datestr(fi/conf.sample_rate)))
-        hdname="%s/%s"%(conf.output_dir,stuffr.sec2dirname(fi/conf.sample_rate))
+        print("rank %d %s"%(comm.rank,unix2datestr(fi/conf.sample_rate)))
+        hdname="%s/%s"%(conf.output_dir,sec2dirname(fi/conf.sample_rate))
         fname="%s/gmf-%08d.h5"%(hdname,fi)
 
         gmf_max=n.zeros([conf.num_cohints_per_file,conf.n_range_gates],dtype=n.float32)
