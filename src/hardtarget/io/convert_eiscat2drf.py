@@ -8,6 +8,7 @@ import digital_rf as drf
 import os
 import numpy as n
 import sys
+import bz2
 
 # import from this directory. this is needed if this is a package
 from . import parbl
@@ -30,6 +31,19 @@ def main():
 
     # how many samples in file. 640 ipps. eiscat leo experiment specific number!
     L = 640 * 20000
+
+    # unzip
+    fl = glob.glob("%s/2*/*.mat.bz2" % (idir))
+
+
+    # choose one file for now
+    input_file = fl[0]
+    output_file, ext = os.path.splitext(input_file)
+    print(output_file)
+
+    with bz2.open(input_file, "rb") as f_in, open(output_file, "wb") as f_out:
+        content = f_in.read()
+        f_out.write(content)
 
     # look for all data files
     # warning not Y3K compatible code
