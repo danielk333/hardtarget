@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -fPIC -shared
 LIBS = -lfftw3f
-INSTALL = ../hardtarget/analysis/gmf
+INSTALL = ../hardtarget/gmf
 
 SOURCES=gmf.c
 EXT=$(shell python -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))")

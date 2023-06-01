@@ -9,31 +9,30 @@ if suffix is None:
 
 # We start by making a path to the current directory.
 pymodule_dir = pathlib.Path(__file__).resolve().parent 
-__libpath__ = pymodule_dir / ('gmfcudalib' + suffix)
+__libpath__ = pymodule_dir / ('gmfclib' + suffix)
 
 if __libpath__.is_file():
     # Then we open the created shared lib file
-    gmfcudalib = C.cdll.LoadLibrary(__libpath__)
+    gmfclib = C.cdll.LoadLibrary(__libpath__)
 
-    gmfcudalib.gmf.restype = C.c_int
-    gmfcudalib.gmf.argtypes = [
+    gmfclib.gmf.restype = C.c_int
+    gmfclib.gmf.argtypes = [
         C.POINTER(C.c_float), C.c_int, 
         C.POINTER(C.c_float), C.c_int, 
         C.POINTER(C.c_float), C.c_int, 
         C.POINTER(C.c_float), C.c_int, C.c_int, 
         C.POINTER(C.c_float), C.POINTER(C.c_float), 
-        C.POINTER(C.c_float), C.POINTER(C.c_float), 
-        C.c_int,
+        C.POINTER(C.c_float), C.POINTER(C.c_float),
     ]
 else:
-    raise ImportError(f'{__libpath__} GMF Cuda Library not found')
+    raise ImportError(f'{__libpath__} GMF C Library not found')
 
 
-def gmf_cuda(z_tx, z_rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_vec, rank=0):
-    # print("Using GPU")
-    txlen=int(len(z_tx))
-    rxlen=len(z_rx)
-    a=gmfcudalib.gmf(
+def gmf_c(z_tx, z_rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_vec, rank=0):
+    # This should be pythonified
+    txlen = int(len(z_tx))
+    rxlen = len(z_rx)
+    a = gmfclib.gmf(
         z_tx.ctypes.data_as(C.POINTER(C.c_float)),
         txlen,
         z_rx.ctypes.data_as(C.POINTER(C.c_float)),
@@ -47,5 +46,4 @@ def gmf_cuda(z_tx, z_rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_ve
         gmf_dc_vec.ctypes.data_as(C.POINTER(C.c_float)),
         v_vec.ctypes.data_as(C.POINTER(C.c_float)),
         a_vec.ctypes.data_as(C.POINTER(C.c_float)),
-        rank,
     )

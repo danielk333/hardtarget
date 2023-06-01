@@ -1,5 +1,4 @@
 import pytest
-import numpy
 
 try:
     from mpi4py import MPI

@@ -1,7 +1,7 @@
 CC = nvcc
 CFLAGS = --compiler-options '-fPIC' -shared
 LIBS = -lcufft
-INSTALL = ../hardtarget/analysis/gmf
+INSTALL = ../hardtarget/gmf
 
 SOURCES=gmfgpu.cu
 EXT=$(shell python -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))")

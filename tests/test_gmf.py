@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from hardtarget.analysis.gmf import GMF_LIBS
+from hardtarget.gmf import GMF_LIBS
 
 
 def pytest_configure(config):
