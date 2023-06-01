@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-
+import argparse
+import logging
 import h5py
 import numpy as np
 import os
@@ -11,19 +12,11 @@ from hardtarget.analysis import analyze_ipps as g
 from hardtarget.utilities import unix2datestr, sec2dirname
 import configparser
         
-
-try:
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-except ImportError:
-    class COMM_WORLD:
-        rank = 0
-        size = 1
-    comm = COMM_WORLD()
+LOGGER_NAME = "analyse_gmf"
 
 
 ####################################################################
-# GMF ARGS
+# UTIL
 ####################################################################
 
 def get_gmf_args(config_file):
@@ -51,11 +44,7 @@ def get_gmf_args(config_file):
     return d
             
 
-####################################################################
-# TASKS
-####################################################################
-
-def get_tasks (worker_idx, n_workers, n_tasks):
+def get_tasks (worker, n_tasks):
     """
     returns a list of task_idx for worker_idx
 
@@ -67,24 +56,22 @@ def get_tasks (worker_idx, n_workers, n_tasks):
 
     tasks are divided equally (or close to equally) among workers
     """
-    return list(range(worker_idx, n_tasks, n_workers))
+    return list(range(worker["idx"], n_tasks, worker["N"]))
 
 
 
-
-def filepath(dir, fi, sample_rate):
-    dt = datetime.datetime.utcfromtimestamp(fi/sample_rate)
+def get_filepath(dir, file_idx, sample_rate):
+    """
+    create a file path for output
+    """
+    dt = datetime.datetime.utcfromtimestamp(file_idx/sample_rate)
     time_string = dt.strftime("%Y-%m-%dT%H-00-00")
     return os.path.join([
         dir,
         time_string,
-        f"gmf-{fi:08d}.h5"
+        f"gmf-{file_idx:08d}.h5"
         ])
 
-
-        #print("rank %d %s"%(comm.rank, unix2datestr(fi/sample_rate)))
-        #hdname="%s/%s"%(output_dir,sec2dirname(fi/sample_rate))
-        #fname="%s/
 
 
 ####################################################################
@@ -92,9 +79,9 @@ def filepath(dir, fi, sample_rate):
 ####################################################################
 
 
-def analyze_gmf(drf_data, output_dir, gmf_args,
-                n_ints=0,
-                reanalyze=True):
+def analyze_gmf(input, cfgfile, output,
+                worker=None,
+                logger=None):
     """
     Analyze data using gmf.
         - tx_channel: transmit channel
@@ -109,96 +96,166 @@ def analyze_gmf(drf_data, output_dir, gmf_args,
         - reanalyze: if True - clear previous results 
         - n_ints: number of integrations?
     """
-    tx_channel = gmf_args["tx_channel"]
-    rx_channel = gmf_args["rx_channel"]
+
+    if worker is None:
+        worker = {"idx": 0, "N": 1}
+
+    # logging
+    if logger is None:
+        logger = logging.getLogger(LOGGER_NAME)
+
+    # check args
+    if input is None or not os.path.isdir(input):
+        logger.warning(f"input folder does not exist: {input}")
+        return
+    if output is None or not os.path.isdir(output):
+        logger.warning(f"output folder does not exist: {output}")
+        return
+    if cfgfile is None or not os.path.isfile(cfgfile):
+        logger.warning(f"config file does not exist: {cfgfile}")
+        return
+
+
+    # read drf data
+    drf_data = drf.DigitalRFReader(input)
+    # read config
+    gmf_args = get_gmf_args(cfgfile)  
+
+    # access args
+    # n_range_gates = gmf_args["n_range_gates"]
     t0 = gmf_args["t0"]
     sample_rate = gmf_args["sample_rate"]
     ipp = gmf_args["ipp"]
     n_ipp = gmf_args["n_ipp"]
-    n_range_gates = gmf_args["n_range_gates"]
     num_cohints_per_file = gmf_args["num_cohints_per_file"]
 
-    # clear result if already exists
-    #if reanalyze:
-    #    os.system("rm -f %s/*/*.h5"%(output_dir))
-
-    # RX and TX bounds
-    bounds_rx = drf_data.get_bounds(rx_channel)
-    bounds_tx = drf_data.get_bounds(tx_channel)
-    
-    #print("RX bounds %d-%d TX bounds %d-%d"%(b_rx[0],b_rx[1],b_tx[0],b_tx[1]))
-    #print("RX bounds %s-%s TX bounds %s-%s"%(unix2datestr(b_rx[0]/conf.sample_rate),
-    #                                         unix2datestr(b_rx[1]/conf.sample_rate),
-    #                                         unix2datestr(b_tx[0]/conf.sample_rate),
-    #                                         unix2datestr(b_tx[1]/conf.sample_rate)))
-    
-    print("Number of parallel processes %d"%(comm.size))
+    # gmf_max=np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
+    # gmf_dc=np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
+    # gmf_v=np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
+    # gmf_a=np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
+    # gmf_txp=np.zeros(num_cohints_per_file, dtype=np.float32)
 
 
-    bounds = bounds_rx
-    bounds = [bounds_rx[0],bounds_rx[1]]
+    # rx, tx
+    tx_bounds = list(drf_data.get_bounds(gmf_args["tx_channel"]))
+    rx_bounds = list(drf_data.get_bounds(gmf_args["rx_channel"]))
+
+    def to_str(value):
+        return unix2datestr(value/sample_rate)
+
+    tx_str = str([to_str(e) for e in tx_bounds])
+    rx_str = str([to_str(e) for e in rx_bounds])
+
+    logger.info(f"TX bounds: {tx_str}")
+    logger.info(f"RX bounds: {rx_str}")
+
+    # TODO - sanity check bounds
+
+    # bounds
+    bounds = list(drf_data.get_bounds(gmf_args["rx_channel"]))
     if t0 != None:
         bounds[0] = int(t0*sample_rate)
+    logger.info(f"bounds {bounds}")
+
+    # process tasks
+    n_tasks = int(np.floor((bounds[1]-bounds[0])/(ipp*n_ipp))/num_cohints_per_file)
+    logger.info(f"n_tasks {n_tasks}")
+
+    # TODO - sanity check n_tasks
+
+    #for task_idx in get_tasks(worker, n_tasks):
+        #logger.info(f"process {task_idx}")
+        ##file_idx = task_idx*ipp*n_ipp*num_cohints_per_file + bounds[0]        
+        #outfile = get_filepath(output, file_idx, sample_rate)
         
-
-    # adjust n_ints
-    if n_ints == 0:
-        n_ints=int(np.floor((bounds[1]-bounds[0])/(ipp*n_ipp))/num_cohints_per_file)
-
-    worker_idx = comm.rank
-    n_workers = comm.size
-
-    # process
-    for task_idx in get_tasks(worker_idx, n_workers, n_ints):
-        fi=task_idx*ipp*n_ipp*num_cohints_per_file + bounds[0]        
-        #print("rank %d %s"%(comm.rank, unix2datestr(fi/sample_rate)))
-        hdname="%s/%s"%(output_dir,sec2dirname(fi/sample_rate))
-        fname="%s/gmf-%08d.h5"%(hdname,fi)
-
-        gmf_max=np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-        gmf_dc=np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-        gmf_v=np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-        gmf_a=np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-        gmf_txp=np.zeros(num_cohints_per_file, dtype=np.float32)
-    
-        if os.path.exists(fname):
-            print("skipping %d, file already exists"%(fi))
-        else:
-            for i in range(num_cohints_per_file):
-                i0=fi + i*ipp*n_ipp
-                
+        #if not os.path.isfile(outfile):
+        #    logger.info(f"write {outfile}")
+        
+            #for i in range(num_cohints_per_file):
+            #    i0 = file_idx + i*ipp*n_ipp
+                # process gmf
                 #gmf_max[i,:], gmf_dc[i,:], gmf_v[i,:], gmf_a[i,:], gmf_txp[i] = g.analyze_ipps(drf_data,i0,conf)
                 #rgi=np.argmax(gmf_max[i,:])
 
-            path = filepath(output_dir, fi, sample_rate)
+            # """ 
+            # """ ho=h5py.File(fname,"w")
+            # ho["gmf"]=gmf_max
+            # ho["gmf_dc"]=gmf_dc
+            # ho["a"]=gmf_a
+            # ho["v"]=gmf_v
+            # ho["tx_pwr"]=gmf_txp
+            # ho["i0"]=i0
+            # ho.close() """
+ #"""
 
-            os.system("mkdir -p %s"%(hdname))
-            print("writing %s"%(fname))
-            
-            """ ho=h5py.File(fname,"w")
-            ho["gmf"]=gmf_max
-            ho["gmf_dc"]=gmf_dc
-            ho["a"]=gmf_a
-            ho["v"]=gmf_v
-            ho["tx_pwr"]=gmf_txp
-            ho["i0"]=i0
-            ho.close() """
+    
+
+####################################################################
+# SCRIPT ENTRY POINT
+####################################################################
+
+def main():
+
+    # Create the argument parser
+    parser = argparse.ArgumentParser(
+        description="Script analyzing eiscat drf data.",
+        usage= """
+        %(prog)s [options] input config -o output_folder
+        
+        EXAMPLE:
+
+        %(prog)s leo_bpark_2.1u_NO@uhf/drf/ cfg/myconfig.ini
+        
+        """
+    )
+
+    # Add the arguments
+    parser.add_argument("input", help="Path to source directory")
+    parser.add_argument("cfgfile", help="Path to config file")
+    parser.add_argument("output", help="Path to output directory")
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="INFO",
+        help="Set the log level (default: INFO)"
+    )
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    # logging
+    logger = logging.getLogger(LOGGER_NAME)
+    logger.setLevel(getattr(logging, args.log_level))
+
+    # worker
+
+    try:
+        from mpi4py import MPI
+        comm = MPI.COMM_WORLD
+    except ImportError:
+        class COMM_WORLD:
+            rank = 0
+            size = 1
+        comm = COMM_WORLD()
+
+    worker = {
+        "idx": comm.rank,
+        "N": comm.size
+    }
+
+    analyze_gmf(
+        args.input, 
+        args.cfgfile,
+        args.output,
+        worker = worker,
+        logger = logger
+    )
+
+
+
+####################################################################
+# MAIN
+####################################################################
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2:
-        config_file = sys.argv[1]
-        print("config file", config_file)
-
-        HOME = os.path.expanduser("~")
-        SRCDIR = os.path.join(HOME, "Data/hard_target/leo_bpark_2.1u_NO@uhf/drf/")
-        DSTDIR = "."
-        drf_data = drf.DigitalRFReader(SRCDIR)
-        gmf_args = get_gmf_args(config_file)    
-        analyze_gmf(drf_data, DSTDIR, gmf_args)
-
-        # conf=go.gmf_opts(sys.argv[1])
-    else:
-        print("Provide configuration file as command line option")
-        exit(0)
-    # print(conf)
-    #analyze_gmf(conf)
+    main()
