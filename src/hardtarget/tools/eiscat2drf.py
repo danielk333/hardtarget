@@ -73,9 +73,6 @@ def eiscat2drf(input_dirpath,
 
     # find zipped files
     zipped_files = glob.glob(f'{input_dirpath}/2*/*.mat.bz2')
-    # limit to one for now
-    # TODO: remove this
-    zipped_files = zipped_files[:2]
     # map to zip pairs
     def tup(f_in):
         f_out, ext = os.path.splitext(f_in)
@@ -86,11 +83,14 @@ def eiscat2drf(input_dirpath,
         return not os.path.isfile(f_out)
     # unzip
     zip_tuples = [t for t in zip_tuples if keep(t[1])]
-    logger.info(f"unzip {len(zip_tuples)} bz2 files")
-    for in_file, out_file  in zip_tuples:
-            with bz2.open(in_file, "rb") as f_in:
-                with open(out_file, "wb") as f_out:
-                    f_out.write(f_in.read())
+    n_tuples = len(zip_tuples)
+    logger.info(f"unzip {n_tuples} bz2 files")
+    for idx, (in_file, out_file)  in enumerate(zip_tuples):
+        if idx + 1 == n_tuples or idx % 10 == 0:
+            logger.info(f"unzip progress {idx+1}/{n_tuples}")
+        with bz2.open(in_file, "rb") as f_in:
+            with open(out_file, "wb") as f_out:
+                f_out.write(f_in.read())
 
     # find matlab files
     files = glob.glob(f'{input_dirpath}/2*/*.mat')
@@ -120,8 +120,11 @@ def eiscat2drf(input_dirpath,
 
     # write drf files
     t_prev = t0
-    logger.info(f"write {len(files)} rdf files")
-    for file in files:
+    n_files = len(files)
+    logger.info(f"write {n_files} rdf files")
+    for idx, file in enumerate(files):
+        if idx + 1 == n_files or idx % 10 == 0:
+            logger.info(f"write progress {idx+1}/{n_files}")
         mat = sio.loadmat(file)
         # load start time from parameter block
         t0 = determine_t0(mat)
