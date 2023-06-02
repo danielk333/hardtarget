@@ -1,15 +1,12 @@
 #!/usr/bin/env python
+
 import argparse
 import logging
-import h5py
 import numpy as np
 import os
-import sys
 import datetime
 import digital_rf as drf
-from hardtarget.analysis import gmf_opts as go
-from hardtarget.analysis import analyze_ipps as g
-from hardtarget.utilities import unix2datestr, sec2dirname
+from hardtarget.analysis import analyze_ipps
 import configparser
         
 LOGGER_NAME = "analyse_gmf"
@@ -66,12 +63,11 @@ def get_filepath(dir, file_idx, sample_rate):
     """
     dt = datetime.datetime.utcfromtimestamp(file_idx/sample_rate)
     time_string = dt.strftime("%Y-%m-%dT%H-00-00")
-    return os.path.join([
+    return os.path.join(*[
         dir,
         time_string,
         f"gmf-{file_idx:08d}.h5"
         ])
-
 
 
 ####################################################################
@@ -117,65 +113,69 @@ def analyze_gmf(input, cfgfile, output,
 
 
     # read drf data
-    drf_data = drf.DigitalRFReader(input)
+    rd = drf.DigitalRFReader([input])
+
+    # TODO sanity check channels
+    chnl = rd.get_channels()[0]
+    bounds = rd.get_bounds(chnl)
+    props = rd.get_properties(chnl)
+    sample_rate = props["samples_per_second"].astype(int)
+    blocks = rd.get_continuous_blocks(bounds[0], bounds[1], chnl)
+
     # read config
     gmf_args = get_gmf_args(cfgfile)  
 
-    # access args
-    # n_range_gates = gmf_args["n_range_gates"]
-    t0 = gmf_args["t0"]
-    sample_rate = gmf_args["sample_rate"]
+    # adjust bounds bounds
+    t0 = gmf_args.get("t0", None)
+    if t0 != None:
+        bounds[0] = int(t0*sample_rate)
+        # TODO sanity check bounds
+
+    # tasks
     ipp = gmf_args["ipp"]
     n_ipp = gmf_args["n_ipp"]
     num_cohints_per_file = gmf_args["num_cohints_per_file"]
+    n_tasks = int(np.floor((bounds[1]-bounds[0])/(ipp*n_ipp))/num_cohints_per_file)
+    worker_tasks = get_tasks(worker, n_tasks)[:40]
+    n_worker_tasks = len(worker_tasks)
 
-    # gmf_max=np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-    # gmf_dc=np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-    # gmf_v=np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-    # gmf_a=np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-    # gmf_txp=np.zeros(num_cohints_per_file, dtype=np.float32)
-
-
-    # rx, tx
-    tx_bounds = list(drf_data.get_bounds(gmf_args["tx_channel"]))
-    rx_bounds = list(drf_data.get_bounds(gmf_args["rx_channel"]))
+    # log
+    logger.debug(f"channel: {chnl}")
 
     def to_str(value):
-        return unix2datestr(value/sample_rate)
+        dt = datetime.datetime.utcfromtimestamp(value/sample_rate)
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
 
-    tx_str = str([to_str(e) for e in tx_bounds])
-    rx_str = str([to_str(e) for e in rx_bounds])
+    bounds_str = str([to_str(e) for e in bounds])
 
-    logger.info(f"TX bounds: {tx_str}")
-    logger.info(f"RX bounds: {rx_str}")
+    logger.debug(f"bounds: {bounds_str}")
+    logger.debug(f"sample rate: {sample_rate}")
+    logger.debug(f"continuous blocks: {len(blocks)}")
+    logger.debug(f"total_tasks: {n_tasks}")
+    logger.debug(f"worker_tasks: {n_worker_tasks}")
 
-    # TODO - sanity check bounds
 
-    # bounds
-    bounds = list(drf_data.get_bounds(gmf_args["rx_channel"]))
-    if t0 != None:
-        bounds[0] = int(t0*sample_rate)
-    logger.info(f"bounds {bounds}")
+    # initialise
+    n_range_gates = gmf_args["n_range_gates"]
+    gmf_max = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
+    gmf_dc = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
+    gmf_v = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
+    gmf_a = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
+    gmf_txp = np.zeros(num_cohints_per_file, dtype=np.float32)
 
-    # process tasks
-    n_tasks = int(np.floor((bounds[1]-bounds[0])/(ipp*n_ipp))/num_cohints_per_file)
-    logger.info(f"n_tasks {n_tasks}")
-
-    # TODO - sanity check n_tasks
-
-    #for task_idx in get_tasks(worker, n_tasks):
-        #logger.info(f"process {task_idx}")
-        ##file_idx = task_idx*ipp*n_ipp*num_cohints_per_file + bounds[0]        
-        #outfile = get_filepath(output, file_idx, sample_rate)
-        
-        #if not os.path.isfile(outfile):
-        #    logger.info(f"write {outfile}")
-        
-            #for i in range(num_cohints_per_file):
-            #    i0 = file_idx + i*ipp*n_ipp
-                # process gmf
-                #gmf_max[i,:], gmf_dc[i,:], gmf_v[i,:], gmf_a[i,:], gmf_txp[i] = g.analyze_ipps(drf_data,i0,conf)
-                #rgi=np.argmax(gmf_max[i,:])
+    # process
+    for idx, task_idx in enumerate(worker_tasks):
+        # progress
+        if idx == n_worker_tasks-1 or idx % 10 == 0:
+            logger.info(f"write progress {idx+1}/{n_worker_tasks}")
+        file_idx = task_idx*ipp*n_ipp*num_cohints_per_file + bounds[0]        
+        outfile = get_filepath(output, file_idx, sample_rate)        
+        if not os.path.isfile(outfile):
+            for i in range(num_cohints_per_file):
+                i0 = file_idx + i*ipp*n_ipp
+                # result = analyze_ipps.analyze_ipps(rd, i0, conf)
+                # gmf_max[i,:], gmf_dc[i,:], gmf_v[i,:], gmf_a[i,:], gmf_txp[i] = result
+                # rgi = np.argmax(gmf_max[i,:])
 
             # """ 
             # """ ho=h5py.File(fname,"w")

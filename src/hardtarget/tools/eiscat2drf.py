@@ -16,6 +16,20 @@ LOGGER_NAME = "eiscat2drf"
 
 
 ####################################################################
+# ISSUES
+####################################################################
+
+"""
+DigitalRFWriter
+- no control over output file names. this makes it difficult
+  to gracefully detect that work is done
+- algorithm does not appear to support resuming of a previously
+  interupted/partial job
+- for this reason - output directory must be empty
+- internal exceptions and progress printed to stdout
+"""
+
+####################################################################
 # MATLAB PARAMETER BLOCK
 ####################################################################
 
