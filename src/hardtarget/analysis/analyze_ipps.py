@@ -1,96 +1,106 @@
-import numpy as n
+import numpy as np
 import time
-
 from hardtarget.utilities import read_vector_c81d
+from hardtarget.gmf import GMF_LIBS
 
-try:
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-except ImportError:
-    class COMM_WORLD:
-        rank = 0
-        size = 1
-    comm = COMM_WORLD()
 
-def analyze_ipps(d,i0,o):
+####################################################################
+# ANALYSE IPPS
+####################################################################
 
-    if o.debug_plot_data_read:
-        import matplotlib.pyplot as plt
 
-    # we can use one of several implementations
-    if o.use_gpu:
-        from .gmf import gmfgpu as g
-    elif o.use_python:
-        from .gmf import gmf_cpu_numpy as g
-    else:
-        from .gmf import gmf_c as g
+def analyze_ipps(drf_reader, i0, args):
+    """
+    This runs the gmf function 
+    """
 
-    cput0=time.time()
+    # gmf lib
+    gmf_lib = args.get("gmflib", None)
+    if gmf_lib is None or gmf_lib not in GMF_LIBS:
+        gmf_lib = "c"
+    gmf = GMF_LIBS[gmf_lib]
+
+    # logger
+    logger = args["logger"]
+    job = args["job"]
+
+    # parameters
+    ipp = args["ipp"]
+    n_ipp = args["n_ipp"]
+    n_extra = args["n_extra"]
+    rx_channel = args["rx_channel"]
+    tx_channel = args["tx_channel"]
+    rx_stencil = args["rx_stencil"]
+    tx_stencil = args["tx_stencil"]
+    n_range_gates = args["n_range_gates"]
+    acc_phasors = args["acc_phasors"]
+    rgs_float = args["rgs_float"]
+    frequency_decimation = args["frequency_decimation"]
+    ranges = args["ranges"]
+    range_rates = args["range_rates"]
+    accs = args["accs"]
+    sample_rate = args["sample_rate"]
+
+    # timestamp
+    cput0 = time.time()
 
     # read data vector with n_ipps, and a little extra
-    z=read_vector_c81d(d,i0,(o.n_ipp+o.n_extra)*o.ipp,o.rx_channel)
-
-    if o.debug_plot_data_read:
-        plt.plot(z.real)
-        plt.plot(z.imag)
-        plt.show()
+    z = read_vector_c81d (drf_reader, i0, (n_ipp + n_extra) * ipp, rx_channel)
 
     # make a separate copy to hold transmit pulse, and the echo
-    z_rx=n.copy(z)
+    z_rx = np.copy(z)
 
-    if o.tx_channel != o.rx_channel:
-        z=read_vector_c81d(d,i0,(o.n_ipp+o.n_extra)*o.ipp,o.tx_channel)
-    z_tx=n.copy(z)
+    if tx_channel != rx_channel:
+        z = read_vector_c81d (drf_reader, i0, (n_ipp + n_extra) * ipp, tx_channel)
+    z_tx = np.copy(z)
 
     # clean ground clutter, get separate transmit waveform and echo vectors
-    z_tx=z_tx*o.tx_stencil
-    z_rx=z_rx*o.rx_stencil
+    z_tx = z_tx*tx_stencil
+    z_rx = z_rx*rx_stencil
 
     # truncate the tx vector to be exactly the length of n_ipp
-    z_tx=z_tx[0:(o.n_ipp*o.ipp)]
+    z_tx = z_tx[0:(n_ipp * ipp)]
 
     # conjugate, so that when matched filtering, it will cancel out phase of transmit waveform.
     # scale transmit waveform to unity power
-    tx_amp=n.sqrt(n.sum(n.abs(z_tx)**2.0))
-    z_tx=n.conj(z_tx)/tx_amp
-
-    if o.debug_plot_data_read:
-        # import matplotlib.pyplot as plt
-        plt.plot(z_tx.real)
-        plt.plot(z_tx.imag)
-        plt.title("tx")
-        plt.show()
-        plt.plot(z_rx.real)
-        plt.plot(z_rx.imag)
-        plt.title("rx")
-        plt.show()
+    tx_amp = np.sqrt(np.sum(np.abs(z_tx)**2.0))
+    z_tx = np.conj(z_tx)/tx_amp
 
     # maximum match function value
-    gmf_vec=n.zeros(o.n_range_gates,dtype=n.float32)
+    gmf_vec = np.zeros(n_range_gates, dtype=np.float32)
     # best fitting range-rate
-    v_vec=n.zeros(o.n_range_gates,dtype=n.float32)
+    v_vec = np.zeros(n_range_gates, dtype=np.float32)
     # best fitting range-rate change
-    a_vec=n.zeros(o.n_range_gates,dtype=n.float32)
+    a_vec = np.zeros(n_range_gates, dtype=np.float32)
     # 0-frequency gmf output
-    gmf_dc_vec=n.zeros(o.n_range_gates,dtype=n.float32)
+    gmf_dc_vec = np.zeros(n_range_gates, dtype=np.float32)
 
     if tx_amp > 1.0:
-        g.gmf(z_tx, z_rx, o.acc_phasors, o.rgs_float, o.frequency_decimation, gmf_vec, gmf_dc_vec, v_vec, a_vec, comm.rank)
+        gmf(z_tx, z_rx, acc_phasors, rgs_float, frequency_decimation, gmf_vec, gmf_dc_vec, v_vec, a_vec)
 
-    if o.debug_plot_data_read:
-        plt.plot(gmf_vec)
-        plt.show()
+    mri = np.argmax(gmf_vec)
 
-    mri=n.argmax(gmf_vec)
-    if o.debug_gmf_output:
-        print("rank %d GMF=%1.2g r_max=%1.2f (km) vel_max=%1.2f (km/s) a_max=%1.2f (m/s**2)"%(comm.rank,n.max(gmf_vec),o.ranges[mri],o.range_rates[int(v_vec[mri])]/1e3,o.accs[int(a_vec[mri])]))
+    # timestamp
+    cput1 = time.time()
 
-    cput1=time.time()
-    if o.debug_gmf_output:
-        print("time %1.2f cpu/real %1.2f"%(cput1-cput0,
-                                           (cput1-cput0)/(o.n_ipp*o.ipp/o.sample_rate)))
+    # logging
+    info = {
+        "job": job["idx"],
+        "GMF": np.max(gmf_vec),
+        "r_max": ranges[mri],
+        "vel_max": range_rates[int(v_vec[mri])]/1e3,
+        "a_max": accs[int(a_vec[mri])]
+    }
+    msg = "job {job} GMF={GMF:1.2g} r_max={r_max:1.2f} (km) vel_max={vel_max:1.2f} (km/s) a_max={a_max:1.2f} (m/s**2)"
+    logger.debug(msg.format(**info))
+    info = {
+        "time": cput1-cput0,
+        "real": (cput1-cput0)/(n_ipp*ipp/sample_rate)
+    }
+    msg = "time {time:1.2f} cpu/real {real:1.2f}"
+    logger.debug(msg.format(**info))
 
-    avec=o.accs[n.array(a_vec,dtype=n.int)]
-    vvec=o.range_rates[n.array(v_vec,dtype=n.int)]
+    avec = accs[np.array(a_vec, dtype=np.int)]
+    vvec = range_rates[np.array(v_vec, dtype=np.int)]
 
-    return(gmf_vec,gmf_dc_vec,vvec,avec,tx_amp**2.0)
+    return (gmf_vec, gmf_dc_vec, vvec, avec, tx_amp**2.0)
