@@ -56,8 +56,8 @@ def main():
 
     # Add the arguments
     parser.add_argument("input", help="Path to source directory")
-    parser.add_argument("cfgfile", help="Path to config file")
-    parser.add_argument("output", help="Path to output directory")
+    parser.add_argument("-c", "--config", help="Path to config file")
+    parser.add_argument("-o", "--output", help="Path to output directory")
     parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
@@ -87,18 +87,30 @@ def main():
         "N": comm.size
     }
 
+    # output
+    output = args.output
+    if output is None:
+        output = "."
+    output = os.path.abspath(output)
+
+
+
     # read config file
-    if args.cfgfile is None or not os.path.isfile(args.cfgfile):
-        logger.warning(f"config file does not exist: {args.cfgfile}")
-        return    
-    gmf_params = load_gmf_params(args.cfgfile)  
+    if args.config is None:
+        # guess uhf
+        gmf_params = {"rx_channel": "uhf", "tx_channel": "uhf"}
+    else:
+        if not os.path.isfile(args.config):
+            logger.warning(f"config file does not exist: {args.config}")
+            return    
+        gmf_params = load_gmf_params(args.config)  
 
     # create task
     task = {
         "job": job,
         "logger": logger,
         "input": args.input,
-        "output": os.path.abspath(args.output),
+        "output": output,
         "gmf_params": gmf_params 
     }
 

@@ -8,6 +8,7 @@ import h5py
 from hardtarget.analysis import analyze_params
 from hardtarget.analysis import analyze_ipps
 
+MODULO_PROGRESS = 1
 
 def get_tasks (job, n_tasks):
     """
@@ -53,13 +54,19 @@ def process(task):
     # path to directory for writing output
     output = task.get("output", None)
 
+    # process
+    results = {
+        "dir": output,
+        "files": []
+    }
+
     # check paths
     if input is None or not os.path.isdir(input):
         logger.warning(f"input folder does not exist: {input}")
-        return 0, {}
+        return 0, results
     if output is None or not os.path.isdir(output):
         logger.warning(f"output folder does not exist: {output}")
-        return 0, {}
+        return 0, results
 
     # gmf params
     gmf_params = {**analyze_params.DEFAULT_PARAMS, **task.get("gmf_params", {})}
@@ -67,7 +74,7 @@ def process(task):
     ok, msg = analyze_params.check_params(gmf_params)
     if not ok:
         logger.error(msg)
-        return 0, {}
+        return 0, results
 
     analyze_params.process_params(gmf_params)
 
@@ -88,17 +95,16 @@ def process(task):
     # optional lower bound
     t0 = gmf_params.get("t0", None)
 
-
     # channel
     tx_channel = gmf_params["tx_channel"]
     rx_channel = gmf_params["rx_channel"]
     chnls = rdf_reader.get_channels()
     if not tx_channel in chnls:
         logger.error(f"rdf data does not support tx_channel: {tx_channel}")
-        return 0, {}
+        return 0, results
     if not rx_channel in chnls:
         logger.error(f"rdf data does not support rx_channel: {rx_channel}")
-        return 0, {}
+        return 0, results
     chnl = rx_channel
 
     # bounds
@@ -113,7 +119,7 @@ def process(task):
     sample_rate = props["samples_per_second"].astype(int)
     if sample_rate != gmf_params["sample_rate"]:
         logger.warning(f"rdf data only supports sample rate: {sample_rate}")
-        return 0, {}
+        return 0, results
 
     # blocks
     blocks = rdf_reader.get_continuous_blocks(bounds[0], bounds[1], chnl)
@@ -142,16 +148,11 @@ def process(task):
     logger.info(f"total_tasks: {n_tasks}")
     logger.debug(f"job_tasks: {n_job_tasks}")
 
-    # process
-    results = {
-        "dir": output,
-        "files": []
-    }
 
     for idx, task_idx in enumerate(job_tasks):
 
         # progress
-        if idx == n_job_tasks-1 or idx % 10 == 0:
+        if idx == n_job_tasks-1 or idx % MODULO_PROGRESS == 0:
             logger.info(f"write progress {idx}/{n_job_tasks}")
 
         # initialise 
