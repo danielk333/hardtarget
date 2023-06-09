@@ -65,8 +65,6 @@ FLOAT_PARAM_KEYS = [
     'radar_frequency' 
 ]
 
-
-
 DEFAULT_PARAM_KEYS = [key for key, _ in DEFAULT_PARAMS.items()]
 
 DERIVED_PARAM_KEYS = [
@@ -87,7 +85,7 @@ DERIVED_PARAM_KEYS = [
     "tx_stencil"
 ]
 
-REQUIRED_PARAM_KEYS = DEFAULT_PARAM_KEYS + DERIVED_PARAM_KEYS + [
+REQUIRED_PARAM_KEYS = DEFAULT_PARAM_KEYS + [
     "rx_channel", 
     "tx_channel"
 ]

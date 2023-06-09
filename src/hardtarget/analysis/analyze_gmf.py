@@ -63,43 +63,17 @@ def process(task):
     # gmf params
     gmf_params = {**analyze_params.DEFAULT_PARAMS, **task.get("gmf_params", {})}
     # computing derived parameters
-    analyze_params.process_params(gmf_params)
     ok, msg = analyze_params.check_params(gmf_params)
     if not ok:
         logger.error(msg)
         return 0, {}
 
+    analyze_params.process_params(gmf_params)
+
     logger.info(f"starting job {job['idx']}/{job['N']}")
 
     # read drf data
-    rd = drf.DigitalRFReader([input])
-
-    # channel
-    tx_channel = gmf_params["tx_channel"]
-    rx_channel = gmf_params["rx_channel"]
-    chnls = rd.get_channels()
-    if not tx_channel in chnls:
-        logger.error(f"rdf data does not support tx_channel: {tx_channel}")
-        return 0, {}
-    if not rx_channel in chnls:
-        logger.error(f"rdf data does not support rx_channel: {rx_channel}")
-        return 0, {}
-    chnl = rx_channel
-
-    # bounds
-    bounds = rd.get_bounds(chnl)
-
-    # sample rate
-    props = rd.get_properties(chnl)
-    sample_rate = props["samples_per_second"].astype(int)
-    if sample_rate != gmf_params["sample_rate"]:
-        logger.warning(f"rdf data only supports sample rate: {sample_rate}")
-        return 0, {}
-
-    # blocks
-    blocks = rd.get_continuous_blocks(bounds[0], bounds[1], chnl)
-    if len(blocks) > 1:
-        logger.warning(f"multiple continuous blocks: {len(blocks)}")
+    rdf_reader = drf.DigitalRFReader([input])
 
     # inter-pulse period length in samples
     ipp = gmf_params["ipp"]
@@ -113,11 +87,36 @@ def process(task):
     # optional lower bound
     t0 = gmf_params.get("t0", None)
 
-    
+    # bounds
+    bounds = rdf_reader.get_bounds(chnl)
     # adjust lower bound
     if t0 != None:
         bounds[0] = int(t0*sample_rate)
         # TODO sanity check bounds
+
+    # channel
+    tx_channel = gmf_params["tx_channel"]
+    rx_channel = gmf_params["rx_channel"]
+    chnls = rdf_reader.get_channels()
+    if not tx_channel in chnls:
+        logger.error(f"rdf data does not support tx_channel: {tx_channel}")
+        return 0, {}
+    if not rx_channel in chnls:
+        logger.error(f"rdf data does not support rx_channel: {rx_channel}")
+        return 0, {}
+    chnl = rx_channel
+
+    # sample rate
+    props = rdf_reader.get_properties(chnl)
+    sample_rate = props["samples_per_second"].astype(int)
+    if sample_rate != gmf_params["sample_rate"]:
+        logger.warning(f"rdf data only supports sample rate: {sample_rate}")
+        return 0, {}
+
+    # blocks
+    blocks = rdf_reader.get_continuous_blocks(bounds[0], bounds[1], chnl)
+    if len(blocks) > 1:
+        logger.warning(f"multiple continuous blocks: {len(blocks)}")
 
     # tasks
     n_tasks = int(np.floor((bounds[1]-bounds[0])/(ipp*n_ipp))/num_cohints_per_file)
@@ -158,9 +157,10 @@ def process(task):
         if not os.path.isfile(outfile):
             for i in range(num_cohints_per_file):
                 i0 = file_idx + i*ipp*n_ipp
-                # result = analyze_ipps.analyze_ipps(rd, i0, conf)
-                # gmf_max[i,:], gmf_dc[i,:], gmf_v[i,:], gmf_a[i,:], gmf_txp[i] = result
-                # rgi = np.argmax(gmf_max[i,:])
+                result = analyze_ipps.analyze_ipps(rdf_reader, i0, gmf_params)
+                gmf_max[i,:], gmf_dc[i,:], gmf_v[i,:], gmf_a[i,:], gmf_txp[i] = result
+                rgi = np.argmax(gmf_max[i,:])
+                print(rgi)
 
             # """ 
             # """ ho=h5py.File(fname,"w")
