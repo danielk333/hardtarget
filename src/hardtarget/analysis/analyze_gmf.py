@@ -3,8 +3,9 @@ import numpy as np
 import os
 import datetime
 import digital_rf as drf
+from hardtarget.analysis import analyze_params
 from hardtarget.analysis import analyze_ipps
-        
+
 
 def get_tasks (job, n_tasks):
     """
@@ -59,30 +60,60 @@ def process(task):
         logger.warning(f"output folder does not exist: {output}")
         return 0, {}
 
-    # inter-pulse period length in samples
-    ipp = task["ipp"]
-    # number of interpulse periods to coherently integrate
-    n_ipp = task["n_ipp"]
-    # number of coherent integration periods to include in one output file
-    # smaller means that lower latency can be achieved
-    num_cohints_per_file = task["num_cohints_per_file"]
-    # number of range-gates to analyze
-    n_range_gates = task["n_range_gates"]
-    # optional lower bound
-    t0 = task.get("t0", None)
+    # gmf params
+    gmf_params = {**analyze_params.DEFAULT_PARAMS, **task.get("gmf_params", {})}
+    # computing derived parameters
+    analyze_params.process_params(gmf_params)
+    ok, msg = analyze_params.check_params(gmf_params)
+    if not ok:
+        logger.error(msg)
+        return 0, {}
 
     logger.info(f"starting job {job['idx']}/{job['N']}")
 
     # read drf data
     rd = drf.DigitalRFReader([input])
 
-    # TODO sanity check channel - should there be more than one?
-    chnl = rd.get_channels()[0]
+    # channel
+    tx_channel = gmf_params["tx_channel"]
+    rx_channel = gmf_params["rx_channel"]
+    chnls = rd.get_channels()
+    if not tx_channel in chnls:
+        logger.error(f"rdf data does not support tx_channel: {tx_channel}")
+        return 0, {}
+    if not rx_channel in chnls:
+        logger.error(f"rdf data does not support rx_channel: {rx_channel}")
+        return 0, {}
+    chnl = rx_channel
+
+    # bounds
     bounds = rd.get_bounds(chnl)
+
+    # sample rate
     props = rd.get_properties(chnl)
     sample_rate = props["samples_per_second"].astype(int)
-    blocks = rd.get_continuous_blocks(bounds[0], bounds[1], chnl)
+    if sample_rate != gmf_params["sample_rate"]:
+        logger.warning(f"rdf data only supports sample rate: {sample_rate}")
+        return 0, {}
 
+    # blocks
+    blocks = rd.get_continuous_blocks(bounds[0], bounds[1], chnl)
+    if len(blocks) > 1:
+        logger.warning(f"multiple continuous blocks: {len(blocks)}")
+
+    # inter-pulse period length in samples
+    ipp = gmf_params["ipp"]
+    # number of interpulse periods to coherently integrate
+    n_ipp = gmf_params["n_ipp"]
+    # number of coherent integration periods to include in one output file
+    # smaller means that lower latency can be achieved
+    num_cohints_per_file = gmf_params["num_cohints_per_file"]
+    # number of range-gates to analyze
+    n_range_gates = gmf_params["n_range_gates"]
+    # optional lower bound
+    t0 = gmf_params.get("t0", None)
+
+    
     # adjust lower bound
     if t0 != None:
         bounds[0] = int(t0*sample_rate)

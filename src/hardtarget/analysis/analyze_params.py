@@ -11,7 +11,7 @@ DEFAULT_PARAMS = {
     "frequency_decimation": 25,
     "ipp": 10000,
     "tx_pulse_length": 445,
-    "tx_bit_length": 20,
+    # "tx_bit_length": 20,
     "ground_clutter_length": 1500,
     "min_acceleration": -400.0,
     "max_acceleration": 400.0,
@@ -31,7 +31,8 @@ DEFAULT_PARAMS = {
     # "use_cpu": True,
 }
 
-INT_PARAMS = [
+
+INT_PARAM_KEYS = [
     'n_ipp', 
     'n_range_gates', 
     'range_gate_step',
@@ -44,7 +45,7 @@ INT_PARAMS = [
     't0'
 ]
 
-BOOL_PARAMS = [
+BOOL_PARAM_KEYS = [
     # 'save_parameters',    
     # 'debug_plot',
     # 'debug_plot_acc',
@@ -54,11 +55,11 @@ BOOL_PARAMS = [
     'round_trip_range'
 ]
 
-FLOAT_PARAMS = [
+FLOAT_PARAM_KEYS = [
     'sample_rate', 
     'min_acceleration',
     'max_acceleration',
-    'acceleration_resolution'
+    'acceleration_resolution',
     'snr_thresh',
     'doppler_sign', 
     'radar_frequency' 
@@ -66,32 +67,30 @@ FLOAT_PARAMS = [
 
 
 
-####################################################################
-# LOAD GMF CONFIG
-####################################################################
+DEFAULT_PARAM_KEYS = [key for key, _ in DEFAULT_PARAMS.items()]
 
-def load_gmf_config(config_file):
-    """
-    Load a gmf config file into to a dictionary
-    """
-    config = configparser.ConfigParser()
-    config.read(config_file)
-    d = {}
-    if 'config' in config:
-        for key, value in config['config'].items():
-            # Convert values to specific types
-            if key in INT_PARAMS:
-                d[key] = int(value)
-            elif key in BOOL_PARAMS:
-                d[key] = config.getboolean('config', key)
-            elif key in ['rx_channel', 'tx_channel', 'output_dir']:
-                d[key] = value.strip('"')       
-            elif key in FLOAT_PARAMS:
-                d[key] = float(value)
-            else:                
-                pass
-    return d
+DERIVED_PARAM_KEYS = [
+    "rgs",
+    "rgs_float",
+    "ranges",
+    "fvec",
+    "n_fft",
+    "fvec",
+    "wavelength",
+    "range_rates",
+    "n_accelerations",
+    "accs",
+    "acc_phasors",
+    "n_extra",
+    "read_length",
+    "rx_stencil",
+    "tx_stencil"
+]
 
+REQUIRED_PARAM_KEYS = DEFAULT_PARAM_KEYS + DERIVED_PARAM_KEYS + [
+    "rx_channel", 
+    "tx_channel"
+]
 
 
 def set_n_ranges(params):
@@ -113,19 +112,33 @@ def set_n_ranges(params):
     # total propagation range
     ranges = rgs * scipy.constants.c / 1e3 / sample_rate
 
-    params["range_gate_0"] = range_gate_0
-    params["n_range_gates"] = n_range_gates
     params["rgs"] = rgs
     params["rgs_float"] = rgs_float
     params["ranges"] = ranges
 
 
+####################################################################
+# CHECK GMF PARAMS
+####################################################################
+
+def check_params(params):
+    for key in REQUIRED_PARAM_KEYS:
+        if key not in params:
+            return False, f"missing parameter: {key}"
+    return True, "ok"
 
 ####################################################################
 # PROCESS GMF PARAMS
 ####################################################################
 
-def process_gmf_params(params):
+def process_params(params):
+    """
+    Process gmf params
+    Updates given params dictionary in place.
+    """
+
+    # range gates
+    set_n_ranges(params)
 
     n_ipp = params["n_ipp"]
     ipp = params["ipp"]
@@ -136,9 +149,9 @@ def process_gmf_params(params):
     max_acceleration = params["max_acceleration"]
     min_acceleration = params["min_acceleration"]
     acceleration_resolution = params["acceleration_resolution"]
-    rgs = params["rgs"]
     tx_pulse_length = params["tx_pulse_length"]
     ground_clutter_length = params["ground_clutter_length"]
+    rgs = params["rgs"]
 
     # length of coherent integration
     params["n_fft"] = n_fft = n_ipp * ipp
@@ -148,9 +161,6 @@ def process_gmf_params(params):
         int(n_fft / frequency_decimation),
         d=frequency_decimation / sample_rate,
     )
-
-    # range gates
-    set_n_ranges(params)
 
     # range-rate is doppler-shift in hertz multiplied with wavelength
     params["wavelength"] = wavelength = scipy.constants.c / radar_frequency
@@ -220,20 +230,3 @@ def process_gmf_params(params):
                 k * ipp + tx_pulse_length + ground_clutter_length
             )
         ] = 0.0
-
-
-
-
-
-####################################################################
-# LOAD GMF OPTONS
-####################################################################
-
-def load_gmf_params(config_file):
-    d = {}.update(DEFAULT_params, load_gmf_config(config_file))
-    return d
-
-
-
-
-

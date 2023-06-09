@@ -9,37 +9,37 @@ from hardtarget.gmf import GMF_LIBS
 ####################################################################
 
 
-def analyze_ipps(drf_reader, i0, args):
+def analyze_ipps(drf_reader, i0, params):
     """
     This runs the gmf function 
     """
 
     # gmf lib
-    gmf_lib = args.get("gmflib", None)
+    gmf_lib = params.get("gmflib", None)
     if gmf_lib is None or gmf_lib not in GMF_LIBS:
         gmf_lib = "c"
     gmf = GMF_LIBS[gmf_lib]
 
     # logger
-    logger = args["logger"]
-    job = args["job"]
+    logger = params["logger"]
+    job = params["job"]
 
     # parameters
-    ipp = args["ipp"]
-    n_ipp = args["n_ipp"]
-    n_extra = args["n_extra"]
-    rx_channel = args["rx_channel"]
-    tx_channel = args["tx_channel"]
-    rx_stencil = args["rx_stencil"]
-    tx_stencil = args["tx_stencil"]
-    n_range_gates = args["n_range_gates"]
-    acc_phasors = args["acc_phasors"]
-    rgs_float = args["rgs_float"]
-    frequency_decimation = args["frequency_decimation"]
-    ranges = args["ranges"]
-    range_rates = args["range_rates"]
-    accs = args["accs"]
-    sample_rate = args["sample_rate"]
+    ipp = params["ipp"]
+    n_ipp = params["n_ipp"]
+    n_extra = params["n_extra"]
+    rx_channel = params["rx_channel"]
+    tx_channel = params["tx_channel"]
+    rx_stencil = params["rx_stencil"]
+    tx_stencil = params["tx_stencil"]
+    n_range_gates = params["n_range_gates"]
+    acc_phasors = params["acc_phasors"]
+    rgs_float = params["rgs_float"]
+    frequency_decimation = params["frequency_decimation"]
+    ranges = params["ranges"]
+    range_rates = params["range_rates"]
+    accs = params["accs"]
+    sample_rate = params["sample_rate"]
 
     # timestamp
     cput0 = time.time()

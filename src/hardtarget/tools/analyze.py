@@ -5,16 +5,17 @@ import argparse
 import logging
 import configparser
 from hardtarget.analysis import analyze_gmf
+from hardtarget.analysis import analyze_params
 
 LOGGER_NAME = "analyse_gmf"
 
 ####################################################################
-# UTIL
+# LOAD GMF PARAMS FROM CONFIG
 ####################################################################
 
-def get_gmf_args(config_file):
+def load_gmf_params(config_file):
     """
-    Converts a config file to a dictionary
+    Load a gmf config file into to a dictionary
     """
     config = configparser.ConfigParser()
     config.read(config_file)
@@ -22,22 +23,16 @@ def get_gmf_args(config_file):
     if 'config' in config:
         for key, value in config['config'].items():
             # Convert values to specific types
-            if key in ['n_ipp', 't0', 'sample_rate', 'n_range_gates', 'range_gate_0', 'range_gate_step',
-                    'ipp', 'tx_pulse_length', 'ground_clutter_length', 'num_cohints_per_file']:
+            if key in analyze_params.INT_PARAM_KEYS:
                 d[key] = int(value)
-            elif key in ['reanalyze', 'round_trip_range']:
+            elif key in analyze_params.BOOL_PARAM_KEYS:
                 d[key] = config.getboolean('config', key)
-            elif key in ['rx_channel', 'tx_channel', 'output_dir']:
-                d[key] = value.strip('"')       
-            elif key in ['radar_frequency', 'doppler_sign', 'min_acceleration',
-                    'max_acceleration', 'acceleration_resolution']:
+            elif key in analyze_params.FLOAT_PARAM_KEYS:
                 d[key] = float(value)
             else:                
-                pass
+                # string
+                d[key] = value.strip('"')
     return d
-
-
-
 
 
 ####################################################################
@@ -96,19 +91,15 @@ def main():
     if args.cfgfile is None or not os.path.isfile(args.cfgfile):
         logger.warning(f"config file does not exist: {args.cfgfile}")
         return    
-    gmf_args = get_gmf_args(args.cfgfile)  
+    gmf_params = load_gmf_params(args.cfgfile)  
 
     # create task
     task = {
         "job": job,
         "logger": logger,
-        "ipp": gmf_args["ipp"],
-        "n_ipp": gmf_args["n_ipp"],
-        "num_cohints_per_file": gmf_args["num_cohints_per_file"],
-        "t0":  gmf_args.get("t0", None),
-        "n_range_gates": gmf_args["n_range_gates"],
         "input": args.input,
-        "output": args.output 
+        "output": args.output,
+        "gmf_params": gmf_params 
     }
 
     # process
