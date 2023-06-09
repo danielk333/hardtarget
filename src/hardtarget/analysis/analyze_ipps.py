@@ -1,15 +1,14 @@
 import numpy as np
-import time
 from hardtarget.utilities import read_vector_c81d
 from hardtarget.gmf import GMF_LIBS
+import logging
 
 
 ####################################################################
 # ANALYSE IPPS
 ####################################################################
 
-
-def analyze_ipps(drf_reader, i0, params):
+def analyze_ipps(drf_reader, i0, params, logger=None):
     """
     This runs the gmf function 
     """
@@ -21,8 +20,8 @@ def analyze_ipps(drf_reader, i0, params):
     gmf = GMF_LIBS[gmf_lib]
 
     # logger
-    logger = params["logger"]
-    job = params["job"]
+    if logger is None:
+        logger = logging.getLogger(__name__)
 
     # parameters
     ipp = params["ipp"]
@@ -36,13 +35,8 @@ def analyze_ipps(drf_reader, i0, params):
     acc_phasors = params["acc_phasors"]
     rgs_float = params["rgs_float"]
     frequency_decimation = params["frequency_decimation"]
-    ranges = params["ranges"]
     range_rates = params["range_rates"]
     accs = params["accs"]
-    sample_rate = params["sample_rate"]
-
-    # timestamp
-    cput0 = time.time()
 
     # read data vector with n_ipps, and a little extra
     z = read_vector_c81d (drf_reader, i0, (n_ipp + n_extra) * ipp, rx_channel)
@@ -78,29 +72,19 @@ def analyze_ipps(drf_reader, i0, params):
     if tx_amp > 1.0:
         gmf(z_tx, z_rx, acc_phasors, rgs_float, frequency_decimation, gmf_vec, gmf_dc_vec, v_vec, a_vec)
 
-    mri = np.argmax(gmf_vec)
-
-    # timestamp
-    cput1 = time.time()
-
     # logging
-    info = {
-        "job": job["idx"],
-        "GMF": np.max(gmf_vec),
-        "r_max": ranges[mri],
-        "vel_max": range_rates[int(v_vec[mri])]/1e3,
-        "a_max": accs[int(a_vec[mri])]
-    }
-    msg = "job {job} GMF={GMF:1.2g} r_max={r_max:1.2f} (km) vel_max={vel_max:1.2f} (km/s) a_max={a_max:1.2f} (m/s**2)"
-    logger.debug(msg.format(**info))
-    info = {
-        "time": cput1-cput0,
-        "real": (cput1-cput0)/(n_ipp*ipp/sample_rate)
-    }
-    msg = "time {time:1.2f} cpu/real {real:1.2f}"
-    logger.debug(msg.format(**info))
+    # ranges = params["ranges"]
+    # mri = np.argmax(gmf_vec)
+    # info = {
+    #     "GMF": np.max(gmf_vec),
+    #     "r_max": ranges[mri],
+    #     "vel_max": range_rates[int(v_vec[mri])]/1e3,
+    #     "a_max": accs[int(a_vec[mri])]
+    # }
+    # msg = "GMF={GMF:1.2g} r_max={r_max:1.2f} (km) vel_max={vel_max:1.2f} (km/s) a_max={a_max:1.2f} (m/s**2)"
+    # logger.debug(msg.format(**info))
 
-    avec = accs[np.array(a_vec, dtype=np.int)]
-    vvec = range_rates[np.array(v_vec, dtype=np.int)]
+    avec = accs[np.array(a_vec, dtype=np.int32)]
+    vvec = range_rates[np.array(v_vec, dtype=np.int32)]
 
     return (gmf_vec, gmf_dc_vec, vvec, avec, tx_amp**2.0)

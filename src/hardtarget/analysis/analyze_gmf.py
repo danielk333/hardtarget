@@ -1,8 +1,10 @@
 import logging
 import numpy as np
 import os
+import time
 import datetime
 import digital_rf as drf
+import h5py
 from hardtarget.analysis import analyze_params
 from hardtarget.analysis import analyze_ipps
 
@@ -22,14 +24,13 @@ def get_tasks (job, n_tasks):
 
 
 
-def get_filepath(dir, file_idx, sample_rate):
+def get_filepath(file_idx, sample_rate):
     """
     create a file path for output
     """
     dt = datetime.datetime.utcfromtimestamp(file_idx/sample_rate)
     time_string = dt.strftime("%Y-%m-%dT%H-00-00")
     return os.path.join(*[
-        dir,
         time_string,
         f"gmf-{file_idx:08d}.h5"
         ])
@@ -87,12 +88,6 @@ def process(task):
     # optional lower bound
     t0 = gmf_params.get("t0", None)
 
-    # bounds
-    bounds = rdf_reader.get_bounds(chnl)
-    # adjust lower bound
-    if t0 != None:
-        bounds[0] = int(t0*sample_rate)
-        # TODO sanity check bounds
 
     # channel
     tx_channel = gmf_params["tx_channel"]
@@ -105,6 +100,13 @@ def process(task):
         logger.error(f"rdf data does not support rx_channel: {rx_channel}")
         return 0, {}
     chnl = rx_channel
+
+    # bounds
+    bounds = rdf_reader.get_bounds(chnl)
+    # adjust lower bound
+    if t0 != None:
+        bounds[0] = int(t0*sample_rate)
+        # TODO sanity check bounds
 
     # sample rate
     props = rdf_reader.get_properties(chnl)
@@ -122,7 +124,7 @@ def process(task):
     n_tasks = int(np.floor((bounds[1]-bounds[0])/(ipp*n_ipp))/num_cohints_per_file)
 
     # subset of tasks for this job
-    job_tasks = get_tasks(job, n_tasks)[:40]
+    job_tasks = get_tasks(job, n_tasks)
     n_job_tasks = len(job_tasks)
 
     # logging 
@@ -137,41 +139,66 @@ def process(task):
     logger.debug(f"bounds: {bounds_str}")
     logger.debug(f"sample rate: {sample_rate}")
     logger.debug(f"continuous blocks: {len(blocks)}")
-    logger.debug(f"total_tasks: {n_tasks}")
+    logger.info(f"total_tasks: {n_tasks}")
     logger.debug(f"job_tasks: {n_job_tasks}")
 
-    # initialise 
-    gmf_max = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-    gmf_dc = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-    gmf_v = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-    gmf_a = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-    gmf_txp = np.zeros(num_cohints_per_file, dtype=np.float32)
-
     # process
+    results = {
+        "dir": output,
+        "files": []
+    }
+
     for idx, task_idx in enumerate(job_tasks):
+
         # progress
         if idx == n_job_tasks-1 or idx % 10 == 0:
             logger.info(f"write progress {idx}/{n_job_tasks}")
+
+        # initialise 
+        gmf_max = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
+        gmf_dc = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
+        gmf_v = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
+        gmf_a = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
+        gmf_txp = np.zeros(num_cohints_per_file, dtype=np.float32)
+
+        # filename outfile
         file_idx = task_idx*ipp*n_ipp*num_cohints_per_file + bounds[0]        
-        outfile = get_filepath(output, file_idx, sample_rate)        
+        filepath = get_filepath(file_idx, sample_rate)        
+        results["files"].append(filepath)
+        outfile = os.path.join(output, filepath)
+        # crate directory
+        dirname, _ = os.path.split(outfile)
+        os.makedirs(dirname, exist_ok=True)
+
         if not os.path.isfile(outfile):
+            ts0 = time.time()
+
+            # process
             for i in range(num_cohints_per_file):
                 i0 = file_idx + i*ipp*n_ipp
                 result = analyze_ipps.analyze_ipps(rdf_reader, i0, gmf_params)
                 gmf_max[i,:], gmf_dc[i,:], gmf_v[i,:], gmf_a[i,:], gmf_txp[i] = result
                 rgi = np.argmax(gmf_max[i,:])
-                print(rgi)
+            
+            # log
+            ts1 = time.time()
+            info = {
+                "task": task_idx,
+                "time": ts1-ts0,
+                "real": (ts1-ts0)/(n_ipp*ipp/sample_rate)
+            }
+            msg = "task_idx {task:4} time {time:1.2f} cpu/real {real:1.2f}"
+            logger.info(msg.format(**info))
 
-            # """ 
-            # """ ho=h5py.File(fname,"w")
-            # ho["gmf"]=gmf_max
-            # ho["gmf_dc"]=gmf_dc
-            # ho["a"]=gmf_a
-            # ho["v"]=gmf_v
-            # ho["tx_pwr"]=gmf_txp
-            # ho["i0"]=i0
-            # ho.close() """
-            # """
-
+            # write result
+            out = h5py.File(outfile,"w")
+            out["gmf"]=gmf_max
+            out["gmf_dc"]=gmf_dc
+            out["a"]=gmf_a
+            out["v"]=gmf_v
+            out["tx_pwr"]=gmf_txp
+            out["i0"]=i0
+            out.close()
+    
     logger.info(f"finishing job {job['idx']}/{job['N']}")
-    return 100, {"outfile": outfile}
+    return 100, results

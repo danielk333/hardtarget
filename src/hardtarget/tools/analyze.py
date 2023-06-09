@@ -98,14 +98,13 @@ def main():
         "job": job,
         "logger": logger,
         "input": args.input,
-        "output": args.output,
+        "output": os.path.abspath(args.output),
         "gmf_params": gmf_params 
     }
 
     # process
-    result = analyze_gmf.process(task)
-
-
+    ok, results = analyze_gmf.process(task)
+    logger.info(f"produced {len(results['files'])} files")
 
 
 ####################################################################
