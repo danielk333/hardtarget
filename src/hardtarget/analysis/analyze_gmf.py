@@ -50,7 +50,7 @@ def process(task):
     logger = task.get("logger", logging.getLogger(__name__))
     
     # path to directory with drf data
-    input = task.get("input", None)
+    input_path = task.get("input", None)
     # path to directory for writing output
     output = task.get("output", None)
 
@@ -61,8 +61,8 @@ def process(task):
     }
 
     # check paths
-    if input is None or not os.path.isdir(input):
-        logger.warning(f"input folder does not exist: {input}")
+    if input_path is None or not os.path.isdir(input_path):
+        logger.warning(f"input folder does not exist: {input_path}")
         return 0, results
     if output is None or not os.path.isdir(output):
         logger.warning(f"output folder does not exist: {output}")
@@ -81,7 +81,7 @@ def process(task):
     logger.info(f"starting job {job['idx']}/{job['N']}")
 
     # read drf data
-    rdf_reader = drf.DigitalRFReader([input])
+    rdf_reader = drf.DigitalRFReader([input_path])
 
     # inter-pulse period length in samples
     ipp = gmf_params["ipp"]
