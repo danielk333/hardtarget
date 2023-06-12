@@ -52,11 +52,11 @@ def process(task):
     # path to directory with drf data
     input_path = task.get("input", None)
     # path to directory for writing output
-    output = task.get("output", None)
+    output_path = task.get("output", None)
 
     # process
     results = {
-        "dir": output,
+        "dir": output_path,
         "files": []
     }
 
@@ -64,8 +64,8 @@ def process(task):
     if input_path is None or not os.path.isdir(input_path):
         logger.warning(f"input folder does not exist: {input_path}")
         return 0, results
-    if output is None or not os.path.isdir(output):
-        logger.warning(f"output folder does not exist: {output}")
+    if output_path is None or not os.path.isdir(output_path):
+        logger.warning(f"output folder does not exist: {output_path}")
         return 0, results
 
     # gmf params
@@ -166,7 +166,7 @@ def process(task):
         file_idx = task_idx*ipp*n_ipp*num_cohints_per_file + bounds[0]        
         filepath = get_filepath(file_idx, sample_rate)        
         results["files"].append(filepath)
-        outfile = os.path.join(output, filepath)
+        outfile = os.path.join(output_path, filepath)
         # crate directory
         dirname, _ = os.path.split(outfile)
         os.makedirs(dirname, exist_ok=True)
