@@ -33,20 +33,19 @@ DigitalRFWriter
 # MATLAB PARAMETER BLOCK
 ####################################################################
 
+
 def determine_t0(mat):
-    t0=int(mat["d_parbl"][0][42]*1000000)
-    dt=NUM_SAMPLES
-    return t0+int(np.round((1e6*mat["d_parbl"][0][10]-t0)/dt)-1)*dt
+    t0 = int(mat["d_parbl"][0][42] * 1000000)
+    dt = NUM_SAMPLES
+    return t0 + int(np.round((1e6 * mat["d_parbl"][0][10] - t0) / dt) - 1) * dt
 
 
 ####################################################################
 # EISCAT 2 DRF
 ####################################################################
 
-def eiscat2drf(input_dirpath, 
-               output_dirpath=None, 
-               logger=None):
 
+def eiscat2drf(input_dirpath, output_dirpath=None, logger=None):
     """
     Converts folder with eiscat measurements to drf files.
 
@@ -66,15 +65,15 @@ def eiscat2drf(input_dirpath,
 
     # Check input dirpat
     if not os.path.isdir(input_dirpath):
-        logger.warning(f'input folder does not exist: {input_dirpath}')
+        logger.warning(f"input folder does not exist: {input_dirpath}")
         return
-    
+
     # Default output dirpath == input dirpath
     if output_dirpath is None:
         output_dirpath = input_dirpath
     # Check output dirpath
     if not os.path.isdir(output_dirpath):
-        logger.warning(f'output folder does not exists: {output_dirpath}')
+        logger.warning(f"output folder does not exists: {output_dirpath}")
         return
     # Create folder structure
     write_dirpath = os.path.join(output_dirpath, "drf/uhf")
@@ -86,20 +85,24 @@ def eiscat2drf(input_dirpath,
         return
 
     # find zipped files
-    zipped_files = glob.glob(f'{input_dirpath}/2*/*.mat.bz2')
+    zipped_files = glob.glob(f"{input_dirpath}/2*/*.mat.bz2")
+
     # map to zip pairs
     def tup(f_in):
         f_out, ext = os.path.splitext(f_in)
         return f_in, f_out
+
     zip_tuples = [tup(f) for f in zipped_files]
+
     # filter zip pairs
     def keep(f_out):
         return not os.path.isfile(f_out)
+
     # unzip
     zip_tuples = [t for t in zip_tuples if keep(t[1])]
     n_tuples = len(zip_tuples)
     logger.info(f"unzip {n_tuples} bz2 files")
-    for idx, (in_file, out_file)  in enumerate(zip_tuples):
+    for idx, (in_file, out_file) in enumerate(zip_tuples):
         if idx + 1 == n_tuples or idx % 10 == 0:
             logger.info(f"unzip progress {idx+1}/{n_tuples}")
         with bz2.open(in_file, "rb") as f_in:
@@ -107,7 +110,7 @@ def eiscat2drf(input_dirpath,
                 f_out.write(f_in.read())
 
     # find matlab files
-    files = glob.glob(f'{input_dirpath}/2*/*.mat')
+    files = glob.glob(f"{input_dirpath}/2*/*.mat")
     files.sort()
 
     # load start time from parameter block of first matlab file
@@ -116,20 +119,20 @@ def eiscat2drf(input_dirpath,
 
     # create digital rf writer
     rf_writer = drf.DigitalRFWriter(
-        write_dirpath, # directory
-        np.complex64, # dtype
-        3600, # subdir cadence secs
-        1000, # file candence millisecs
-        t0, # start global index
-        1000000, # sample rate numerator
-        1, # sample rate denominator
+        write_dirpath,  # directory
+        np.complex64,  # dtype
+        3600,  # subdir cadence secs
+        1000,  # file candence millisecs
+        t0,  # start global index
+        1000000,  # sample rate numerator
+        1,  # sample rate denominator
         uuid_str="uhf",
         compression_level=0,
         checksum=False,
         is_complex=True,
         num_subchannels=1,
         is_continuous=True,
-        marching_periods=True 
+        marching_periods=True,
     )
 
     # write drf files
@@ -152,7 +155,7 @@ def eiscat2drf(input_dirpath,
             zz = np.zeros(n_samp, dtype=np.complex64)
             try:
                 rf_writer.rf_write(zz)
-            except Exception as e:
+            except Exception:
                 pass
 
         # write data file
@@ -160,7 +163,7 @@ def eiscat2drf(input_dirpath,
         if len(z) == NUM_SAMPLES:
             try:
                 rf_writer.rf_write(z)
-            except Exception as e:
+            except Exception:
                 pass
         # save t0 as t_prev
         t_prev = t0
@@ -170,25 +173,30 @@ def eiscat2drf(input_dirpath,
 # SCRIPT ENTRY POINT
 ####################################################################
 
-def main():
 
+def main():
     # Create the argument parser
     parser = argparse.ArgumentParser(
         description="Script converting eiscat data to drf format",
-        usage= "%(prog)s [options] input -o output_folder"
+        usage="%(prog)s [options] input -o output_folder",
     )
 
     # Add the arguments
-    parser.add_argument("input", help="Path to source directory, assumes folder structure 'input/2*/*.mat or *.mat.bz2'")
     parser.add_argument(
-        "-o", "--output", 
+        "input",
+        help="Path to source directory, assumes folder structure 'input/2*/*.mat or *.mat.bz2'",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
         help="Path to output directory, default output folder 'input/drf/uhf/'",
-        default=None)
+        default=None,
+    )
     parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="INFO",
-        help="Set the log level (default: INFO)"
+        help="Set the log level (default: INFO)",
     )
 
     # Parse the arguments
@@ -198,12 +206,9 @@ def main():
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(getattr(logging, args.log_level))
 
-    eiscat2drf(
-        args.input, 
-        output_dirpath=args.output,
-        logger = logger
-    )
+    eiscat2drf(args.input, output_dirpath=args.output, logger=logger)
     print()
+
 
 ####################################################################
 # MAIN

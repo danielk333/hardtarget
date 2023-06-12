@@ -8,9 +8,10 @@ import logging
 # ANALYSE IPPS
 ####################################################################
 
+
 def analyze_ipps(drf_reader, i0, params, logger=None):
     """
-    This runs the gmf function 
+    This runs the gmf function
     """
 
     # gmf lib
@@ -39,26 +40,26 @@ def analyze_ipps(drf_reader, i0, params, logger=None):
     accs = params["accs"]
 
     # read data vector with n_ipps, and a little extra
-    z = read_vector_c81d (drf_reader, i0, (n_ipp + n_extra) * ipp, rx_channel)
+    z = read_vector_c81d(drf_reader, i0, (n_ipp + n_extra) * ipp, rx_channel)
 
     # make a separate copy to hold transmit pulse, and the echo
     z_rx = np.copy(z)
 
     if tx_channel != rx_channel:
-        z = read_vector_c81d (drf_reader, i0, (n_ipp + n_extra) * ipp, tx_channel)
+        z = read_vector_c81d(drf_reader, i0, (n_ipp + n_extra) * ipp, tx_channel)
     z_tx = np.copy(z)
 
     # clean ground clutter, get separate transmit waveform and echo vectors
-    z_tx = z_tx*tx_stencil
-    z_rx = z_rx*rx_stencil
+    z_tx = z_tx * tx_stencil
+    z_rx = z_rx * rx_stencil
 
     # truncate the tx vector to be exactly the length of n_ipp
-    z_tx = z_tx[0:(n_ipp * ipp)]
+    z_tx = z_tx[0: (n_ipp * ipp)]
 
     # conjugate, so that when matched filtering, it will cancel out phase of transmit waveform.
     # scale transmit waveform to unity power
-    tx_amp = np.sqrt(np.sum(np.abs(z_tx)**2.0))
-    z_tx = np.conj(z_tx)/tx_amp
+    tx_amp = np.sqrt(np.sum(np.abs(z_tx) ** 2.0))
+    z_tx = np.conj(z_tx) / tx_amp
 
     # maximum match function value
     gmf_vec = np.zeros(n_range_gates, dtype=np.float32)
@@ -70,7 +71,17 @@ def analyze_ipps(drf_reader, i0, params, logger=None):
     gmf_dc_vec = np.zeros(n_range_gates, dtype=np.float32)
 
     if tx_amp > 1.0:
-        gmf(z_tx, z_rx, acc_phasors, rgs_float, frequency_decimation, gmf_vec, gmf_dc_vec, v_vec, a_vec)
+        gmf(
+            z_tx,
+            z_rx,
+            acc_phasors,
+            rgs_float,
+            frequency_decimation,
+            gmf_vec,
+            gmf_dc_vec,
+            v_vec,
+            a_vec,
+        )
 
     # logging
     # ranges = params["ranges"]
@@ -87,4 +98,4 @@ def analyze_ipps(drf_reader, i0, params, logger=None):
     avec = accs[np.array(a_vec, dtype=np.int32)]
     vvec = range_rates[np.array(v_vec, dtype=np.int32)]
 
-    return (gmf_vec, gmf_dc_vec, vvec, avec, tx_amp**2.0)
+    return gmf_vec, gmf_dc_vec, vvec, avec, tx_amp**2.0
