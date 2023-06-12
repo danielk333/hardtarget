@@ -1,5 +1,4 @@
 
-from . import gmf_opts as go
 import glob
 import sys
 import h5py
@@ -64,7 +63,7 @@ def plot_gmfs(conf,nf):
 if __name__ == "__main__":
     if len(sys.argv) == 2:
         print(sys.argv[1])
-        conf=go.gmf_opts(sys.argv[1])
+        conf=None
     else:
         print("Provide configuration file as command line option")
         exit(0)
