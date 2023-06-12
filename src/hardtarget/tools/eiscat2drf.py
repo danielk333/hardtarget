@@ -51,7 +51,7 @@ def eiscat2drf(input_dirpath,
     Converts folder with eiscat measurements to drf files.
 
     Assume folder structure
-    - dirpath/S*/
+    - dirpath/2*/
 
     Files within this folder will either be zipped (.b2z),
     or matlab files (.mat). Zipped files are expected to
@@ -179,10 +179,10 @@ def main():
     )
 
     # Add the arguments
-    parser.add_argument("input", help="Path to source directory")
+    parser.add_argument("input", help="Path to source directory, assumes folder structure 'input/2*/*.mat or *.mat.bz2'")
     parser.add_argument(
         "-o", "--output", 
-        help="Path to output directory", 
+        help="Path to output directory, default output folder 'input/drf/uhf/'",
         default=None)
     parser.add_argument(
         "--log-level",
