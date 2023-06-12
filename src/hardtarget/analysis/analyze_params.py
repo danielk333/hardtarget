@@ -1,6 +1,10 @@
-import configparser
 import numpy as np
 import scipy.constants
+
+CONFIG_SECTIONS = [
+    "radar-experiment",
+    "signal-processing",
+]
 
 DEFAULT_PARAMS = {
     "n_ipp": 5,
@@ -11,58 +15,41 @@ DEFAULT_PARAMS = {
     "frequency_decimation": 25,
     "ipp": 10000,
     "tx_pulse_length": 445,
-    # "tx_bit_length": 20,
     "ground_clutter_length": 1500,
     "min_acceleration": -400.0,
     "max_acceleration": 400.0,
     "acceleration_resolution": 0.2,
     "snr_thresh": 10.0,
-    # "save_parameters": True,
     "doppler_sign": 1.0,
     "radar_frequency": 500e6,
-    # "reanalyze": True,
-    # "debug_plot": False,
-    # "debug_plot_acc": False,
-    # "debug_print": False,
     "round_trip_range": True,
     "num_cohints_per_file": 100,
-    # "use_gpu": False,
-    # "use_python": False,
-    # "use_cpu": True,
 }
 
-
 INT_PARAM_KEYS = [
-    'n_ipp', 
-    'n_range_gates', 
-    'range_gate_step',
-    'range_gate_0', 
-    'frequency_decimation',
-    'ipp', 
-    'tx_pulse_length',
-    'ground_clutter_length',
-    'num_cohints_per_file',
-    't0'
+    "n_ipp",
+    "n_range_gates",
+    "range_gate_step",
+    "range_gate_0",
+    "frequency_decimation",
+    "ipp",
+    "tx_pulse_length",
+    "ground_clutter_length",
+    "num_cohints_per_file",
+    "start_time",
+    "end_time",
 ]
 
-BOOL_PARAM_KEYS = [
-    # 'save_parameters',    
-    # 'debug_plot',
-    # 'debug_plot_acc',
-    # 'debug_print',
-    # 'use_gpu',
-    # 'reanalyze', 
-    'round_trip_range'
-]
+BOOL_PARAM_KEYS = ["round_trip_range"]
 
 FLOAT_PARAM_KEYS = [
-    'sample_rate', 
-    'min_acceleration',
-    'max_acceleration',
-    'acceleration_resolution',
-    'snr_thresh',
-    'doppler_sign', 
-    'radar_frequency' 
+    "sample_rate",
+    "min_acceleration",
+    "max_acceleration",
+    "acceleration_resolution",
+    "snr_thresh",
+    "doppler_sign",
+    "radar_frequency",
 ]
 
 DEFAULT_PARAM_KEYS = [key for key, _ in DEFAULT_PARAMS.items()]
@@ -82,13 +69,10 @@ DERIVED_PARAM_KEYS = [
     "n_extra",
     "read_length",
     "rx_stencil",
-    "tx_stencil"
+    "tx_stencil",
 ]
 
-REQUIRED_PARAM_KEYS = DEFAULT_PARAM_KEYS + [
-    "rx_channel", 
-    "tx_channel"
-]
+REQUIRED_PARAM_KEYS = DEFAULT_PARAM_KEYS + ["rx_channel", "tx_channel"]
 
 
 def set_n_ranges(params):
@@ -102,9 +86,7 @@ def set_n_ranges(params):
     sample_rate = params["sample_rate"]
 
     # range gates to search through
-    rgs = (
-        np.arange(n_range_gates) * range_gate_step + range_gate_0
-    )
+    rgs = np.arange(n_range_gates) * range_gate_step + range_gate_0
     rgs_float = np.array(rgs, dtype=np.float32)
 
     # total propagation range
@@ -119,15 +101,18 @@ def set_n_ranges(params):
 # CHECK GMF PARAMS
 ####################################################################
 
+
 def check_params(params):
     for key in REQUIRED_PARAM_KEYS:
         if key not in params:
             return False, f"missing parameter: {key}"
     return True, "ok"
 
+
 ####################################################################
 # PROCESS GMF PARAMS
 ####################################################################
+
 
 def process_params(params):
     """
@@ -161,19 +146,18 @@ def process_params(params):
     )
 
     # range-rate is doppler-shift in hertz multiplied with wavelength
-    params["wavelength"] = wavelength = scipy.constants.c / radar_frequency
-    params["range_rates"] = range_rates = doppler_sign * wavelength * fvec
+    wavelength = scipy.constants.c / radar_frequency
+    params["wavelength"] = wavelength
+
+    range_rates = doppler_sign * wavelength * fvec
+    params["range_rates"] = range_rates
 
     # Time vector
-    times = (
-        frequency_decimation
-        * np.arange(int(n_fft / frequency_decimation))
-        / sample_rate
-    )
+    times = frequency_decimation * np.arange(int(n_fft / frequency_decimation)) / sample_rate
     times2 = times**2.0
 
     # radar frequency in radians per second
-    om = 2.0 * np.pi * radar_frequency
+    # om = 2.0 * np.pi * radar_frequency
 
     # these are the accelerations we'll try out
     tau = n_ipp * ipp / sample_rate
@@ -181,12 +165,7 @@ def process_params(params):
     # acceleration sampled with 0.2 radian steps at the end of the coherent integration window
     delta_a = max_acceleration - min_acceleration
     params["n_accelerations"] = n_accelerations = int(
-        np.ceil(
-            delta_a
-            * (np.pi / wavelength)
-            * tau**2.0
-            / acceleration_resolution
-        )
+        np.ceil(delta_a * (np.pi / wavelength) * tau**2.0 / acceleration_resolution)
     )
 
     params["accs"] = accs = np.linspace(
@@ -201,11 +180,7 @@ def process_params(params):
     # precalculate phasors corresponding to different accelerations
     for ai, a in enumerate(accs):
         acc_phasors[ai, :] = np.exp(
-            -1j
-            * 2.0
-            * np.pi
-            * (doppler_sign * 0.5 * accs[ai] / wavelength)
-            * times2
+            -1j * 2.0 * np.pi * (doppler_sign * 0.5 * accs[ai] / wavelength) * times2
         )
 
     # how many extra ipps do we need to read for coherent integration
@@ -219,12 +194,6 @@ def process_params(params):
 
     # for each coherently integrated IPP, create stencils
     for k in range(n_ipp + n_extra):
-        tx_stencil[
-            (k * ipp + tx_pulse_length) : (k * ipp + ipp)
-        ] = 0.0
+        tx_stencil[(k * ipp + tx_pulse_length): (k * ipp + ipp)] = 0.0
         # pad zeros to rx
-        rx_stencil[
-            (k * ipp) : (
-                k * ipp + tx_pulse_length + ground_clutter_length
-            )
-        ] = 0.0
+        rx_stencil[(k * ipp): (k * ipp + tx_pulse_length + ground_clutter_length)] = 0.0

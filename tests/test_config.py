@@ -1,258 +1,91 @@
-import unittest, os, io, json, shutil
-from hardtarget.config import Config
+import unittest
+import configparser
+from hardtarget.config import unpack_config
+from hardtarget.analysis import analyze_params
+
+
+TEST_GMF_CONFIG = """
+[radar-experiment]
+sample_rate=100000
+ipp=2000
+tx_pulse_length=202
+doppler_sign=-1.0
+radar_frequency=500e6
+round_trip_range=false
+rx_channel='32m'
+tx_channel='32m'
+
+[signal-processing]
+n_ipp=5
+frequency_decimation=2
+n_range_gates=1800
+range_gate_0=100
+range_gate_step=1
+ground_clutter_length=50
+min_acceleration=0.0
+max_acceleration=250.0
+acceleration_resolution=0.2
+snr_thresh=10.0
+num_cohints_per_file=100
+start_time=1515067356
+end_time=1515067956
+gmflib='c'
+
+[bogus]
+test=False
+"""
+
+CONFIG_KEYS = [
+    "sample_rate",
+    "ipp",
+    "tx_pulse_length",
+    "doppler_sign",
+    "radar_frequency",
+    "round_trip_range",
+    "rx_channel",
+    "tx_channel",
+    "n_ipp",
+    "frequency_decimation",
+    "n_range_gates",
+    "range_gate_0",
+    "range_gate_step",
+    "ground_clutter_length",
+    "min_acceleration",
+    "max_acceleration",
+    "acceleration_resolution",
+    "snr_thresh",
+    "num_cohints_per_file",
+    "start_time",
+    "end_time",
+    "gmflib",
+]
 
 
 class test_Config(unittest.TestCase):
-    def setUp(self):
-        
-        #Create a test dictionary to supply to config class, and to 
-        #compare the json tests against
-        self.expected_json_dict = {
-            'test_dict' : {'test' : 'test'},
-            'test_int' : 2,
-            'test_list' : ['test1', 'test2'],
-            'test_string' : 'test',
-        }
+    def test_unpack_config(self):
+        config = configparser.ConfigParser()
+        config.read_string(TEST_GMF_CONFIG)
 
-        #Create a directory to compare the ini tests against
-        self.expected_ini_dict = {
-                #INI files only reads values as strings
-                'test_header':{
-                    'test_string' : 'test123',
-                }
-        }
-        
-        #Create a test json string
-        self.test_json_string = \
-        """{
-            "test_dict" : {
-                "test" : "test"
-            },
-            "test_int" : 2,
-            "test_list" : [
-                "test1", 
-                "test2"
-            ],
-            "test_string" : "test"
-        }"""
+        assert "bogus" in config
+        assert config.getboolean("bogus", "test") is False
 
-        #Create a test INI string and remove whitespace
-        self.test_ini_string = \
-        """[test_header]\ntest_string = test123\n\n"""
+        params = unpack_config(config)
 
-        #Test file names
-        self.test_json_file = "/tmp/test_config_json.json"
-        self.test_ini_file = "/tmp/test_config_INI.ini"
-        self.test_output_dir = "/tmp/test_config_folder"
-        #Create test file to read json from
-        with open(self.test_json_file, 'w') as test_jsonfile:
-            test_jsonfile.write(self.test_json_string)
+        for key in CONFIG_KEYS:
+            assert key in params
+        assert "test" not in params
 
-        #Create test file to read ini from
-        with open(self.test_ini_file, 'w') as test_inifile:
-            test_inifile.write(self.test_ini_string)     
+        # a few samples
+        assert isinstance(params["n_ipp"], int)
+        assert isinstance(params["gmflib"], str)
+        assert isinstance(params["radar_frequency"], float)
 
-    def test_config_as_dict(self):
-
-        #Create config object
-        c = Config.from_dict(self.expected_json_dict)
-
-        #Assert that that the config object equalls the test dictionary
-        self.assertEqual(c['test_int'], self.expected_json_dict['test_int'])
-        self.assertEqual(c['test_string'], self.expected_json_dict['test_string'])
-        self.assertEqual(c['test_list'], self.expected_json_dict['test_list'])
-        self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
-    
-    def test_config_as_json_string(self):
-
-        #Create config object
-        c = Config.from_string(self.test_json_string)
-
-        #Assert that that the config object equalls the test dictionary
-        self.assertEqual(c['test_int'], self.expected_json_dict['test_int'])
-        self.assertEqual(c['test_string'], self.expected_json_dict['test_string'])
-        self.assertEqual(c['test_list'], self.expected_json_dict['test_list'])
-        self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
-        self.assertFalse(c.values_as_strings)
-
-    def test_config_as_ini_string(self):
-
-        #Create config object
-        c = Config.from_string(self.test_ini_string)
-        #Assert that that the config object equalls the test dictionary
-        self.assertEqual(c['test_header']['test_string'], self.expected_ini_dict['test_header']['test_string'])
-        self.assertTrue(c.values_as_strings)
-
-    def test_config_as_json_file(self):
-        
-        #Create config object
-        c = Config.from_file(self.test_json_file)
-
-        #Assert that that the config object equalls the test dictionary
-        self.assertEqual(c['test_int'], self.expected_json_dict['test_int'])
-        self.assertEqual(c['test_string'], self.expected_json_dict['test_string'])
-        self.assertEqual(c['test_list'], self.expected_json_dict['test_list'])
-        self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
-        self.assertFalse(c.values_as_strings)
+    def test_check_params(self):
+        config = configparser.ConfigParser()
+        config.read_string(TEST_GMF_CONFIG)
+        params = unpack_config(config)
+        assert analyze_params.check_params(params)
 
 
-    def test_config_as_ini_file(self):
-
-        #Create config object
-        c = Config.from_file(self.test_ini_file)
-
-        #Assert that that the config object equalls the test dictionary
-        self.assertEqual(c['test_header']['test_string'], self.expected_ini_dict['test_header']['test_string'])
-        self.assertTrue(c.values_as_strings)
-
-    def test_config_as_json_stream(self):
-        with open(self.test_json_file) as file:
-            #Create config object
-            c = Config.from_stream(file)
-
-            #Assert that that the config object equalls the test dictionary
-            self.assertEqual(c['test_int'], self.expected_json_dict['test_int'])
-            self.assertEqual(c['test_string'], self.expected_json_dict['test_string'])
-            self.assertEqual(c['test_list'], self.expected_json_dict['test_list'])
-            self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
-            self.assertFalse(c.values_as_strings)
-
-
-    def test_config_as_ini_stream(self):
-        with open(self.test_ini_file, 'r') as file:
-            #Create config object
-            c = Config.from_stream(file)
-
-            #Assert that that the config object equalls the test dictionary
-            self.assertEqual(c['test_header']['test_string'], self.expected_ini_dict['test_header']['test_string'])
-            self.assertTrue(c.values_as_strings)
-
-    def test_change_config_value(self):
-        test_new_int = 5
-        #Create config object
-        c = Config(self.expected_json_dict)
-        
-        c.set_param('test_int', test_new_int)
-        #Assert that that the config object equalls the test dictionary
-        self.assertEqual(c['test_int'], test_new_int)
-        self.assertEqual(c['test_string'], self.expected_json_dict['test_string'])
-        self.assertEqual(c['test_list'], self.expected_json_dict['test_list'])
-        self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
-    
-    def test_write_config_to_json_file(self):
-        #Create config object based on json dict
-        c = Config(self.expected_json_dict)
-        #Save paramaters to json file
-        c.save_param('test', output_dir=self.test_output_dir)
-
-        #Create expected json string from json dict
-        expectedString = json.dumps(self.expected_json_dict, sort_keys=True, indent=4)
-        expectedString = io.StringIO(expectedString)
-
-        #Check generated file against expected string
-        with open(self.test_output_dir + '/test.json') as file:
-            for line in file:
-                expectedLine = expectedString.readline()
-                self.assertEqual(line, expectedLine, f'Expected "{expectedLine}" got {line}')
-        
-    def test_write_config_to_ini_file(self):
-        c = Config(self.expected_ini_dict)
-        c.save_param('test', output_dir=self.test_output_dir, ini=True)
-
-        teststring = io.StringIO(self.test_ini_string)
-        with open(self.test_output_dir + '/test.ini') as file:
-            for line in file:
-                expectedLine = teststring.readline()
-                self.assertEqual(line, expectedLine, f'Expected "{expectedLine}" got {line}')
-    
-    def test_get_keys(self):
-        #Create config object
-        c = Config(self.expected_json_dict)
-
-        #Get list of keys
-        keys = c.get_keys()
-        #Assert that the keys are as expected
-        self.assertEqual(keys, list(self.expected_json_dict.keys()))        
-
-    def test_error_when_using_default_values_without_implementing_default(self):
-        #Ensure that not implemented error is raised
-        with self.assertRaises(NotImplementedError):
-            c = Config.from_default()
-    
-    def test_config_as_default_values(self):
-        #Create test class with default values
-        class Default_test(Config):
-            @classmethod
-            def get_default(cls) -> dict:
-                return self.expected_json_dict
-        
-        #Create instance of default test from default values
-        c = Default_test.from_default()
-        #Assert that that the config object equalls the test dictionary
-        self.assertEqual(c['test_int'], self.expected_json_dict['test_int'])
-        self.assertEqual(c['test_string'], self.expected_json_dict['test_string'])
-        self.assertEqual(c['test_list'], self.expected_json_dict['test_list'])
-        self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
-    
-    def test_config_as_dict_with_default_values(self):
-        #Create test class with default values
-        class Default_test(Config):
-            @classmethod
-            def get_default(cls) -> dict:
-                return self.expected_json_dict
-        #Create expected dict
-        expectedDict = {'test_int': 500}
-        #Create instance of default test from default values
-        c = Default_test.from_dict(expectedDict, True)
-        #Assert that that the config object equalls the test dictionary
-        self.assertEqual(c['test_int'], expectedDict['test_int'])
-        self.assertEqual(c['test_string'], self.expected_json_dict['test_string'])
-        self.assertEqual(c['test_list'], self.expected_json_dict['test_list'])
-        self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
-    
-    def test_config_as_json_string_with_default_values(self):
-        #Create test class with default values
-        class Default_test(Config):
-            @classmethod
-            def get_default(cls) -> dict:
-                newDict = self.expected_json_dict.copy()
-                newDict['test_int'] = 500
-                return newDict
-
-        #Create instance of default test from default values
-        c = Default_test.from_string(self.test_json_string, True)
-        #Assert that that the config object equalls the test dictionary
-        self.assertEqual(c['test_int'], self.expected_json_dict['test_int'])
-        self.assertEqual(c['test_string'], self.expected_json_dict['test_string'])
-        self.assertEqual(c['test_list'], self.expected_json_dict['test_list'])
-        self.assertEqual(c['test_dict'], self.expected_json_dict['test_dict'])
-    
-    def test_config_as_ini_string_with_default_values(self):
-        default_string = '123test'
-        #Create test class with default values
-        class Default_test(Config):
-            @classmethod
-            def get_default(cls) -> dict:
-                newDict = self.expected_ini_dict.copy()
-                newDict['test_header']['test_string'] = default_string
-                newDict['test_header']['test_string2'] = default_string
-                return newDict
-        #Create instance of default test from default values
-        c = Default_test.from_string(self.test_ini_string, True)
-        #Assert that that the config object equalls the test dictionary
-        self.assertEqual(c['test_header']['test_string'], self.expected_ini_dict['test_header']['test_string'])
-        self.assertEqual(c['test_header']['test_string2'], default_string)
-
-    def tearDown(self):
-        #remove files from setup
-        os.remove(self.test_json_file)
-        os.remove(self.test_ini_file)
-        #remove test output dir folder if created
-        try:
-            shutil.rmtree(self.test_output_dir)
-        except FileNotFoundError:
-            #If the file does not exist then the tests will notify about any errors
-            pass
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
