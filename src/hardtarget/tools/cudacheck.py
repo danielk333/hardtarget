@@ -15,7 +15,7 @@ def main():
     result = subprocess.run(["/tmp/hello"], stdout=subprocess.PIPE, text=True)
     subprocess.run(["rm", "/tmp/hello"])
     if result.stdout == "Hello World!\n":
-        print("Cuda is running!")
+        print("Cuda is running! (and compatible hardware detected)")
     else:
         print("Cuda is NOT running!")
 
