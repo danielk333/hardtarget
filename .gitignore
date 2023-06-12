@@ -8,6 +8,9 @@
 #Sublime
 *.sublime*
 
+#vs-code
+.vscode
+
 #vi/vim
 *~
 .*.swo
