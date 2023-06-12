@@ -16,7 +16,7 @@ def analyze_ipps(drf_reader, i0, params, logger=None):
     # gmf lib
     gmf_lib = params.get("gmflib", None)
     if gmf_lib is None or gmf_lib not in GMF_LIBS:
-        gmf_lib = "c"
+        gmf_lib = "c" if "c" in GMF_LIBS else "numpy"
     gmf = GMF_LIBS[gmf_lib]
 
     # logger
