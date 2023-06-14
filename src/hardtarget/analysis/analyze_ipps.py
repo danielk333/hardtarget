@@ -11,7 +11,30 @@ import logging
 
 def analyze_ipps(drf_reader, i0, params, logger=None):
     """
-    This runs the gmf function
+    Analyse ipps runs the gmf function.
+
+    Parameters
+    ----------
+    drf_reader: object
+        file reader object for drf file
+    i0: int
+        ?
+    params: dict
+        gmf parameters
+    logger: object, optional
+        external logger object
+
+    Returns
+        gmf_vec: numpy array
+            ?
+        gmf_dc_vec: numpy array
+            ?
+        vvec: numpy array
+            ?
+        avec: numpy array
+            ?
+        tx_amp: numpy array
+            ?
     """
 
     # gmf lib

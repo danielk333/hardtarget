@@ -21,12 +21,13 @@ LOGGER_NAME = "eiscat2drf"
 
 """
 DigitalRFWriter
-- no control over output file names. this makes it difficult
+- no control over output file names. This makes it difficult
   to gracefully detect that work is done
-- algorithm does not appear to support resuming of a previously
+- Algorithm does not appear to support resuming of a previously
   interupted/partial job
-- for this reason - output directory must be empty
-- internal exceptions and progress printed to stdout
+- For this reason - output directory must be empty
+- Internal exceptions and progress printed to stdout. Possibly
+  there could be an option for keeping it silent.
 """
 
 ####################################################################
@@ -45,38 +46,51 @@ def determine_t0(mat):
 ####################################################################
 
 
-def eiscat2drf(input_dirpath, output_dirpath=None, logger=None):
+def eiscat2drf(input, output=None, logger=None):
     """
     Converts folder with eiscat measurements to drf files.
 
-    Assume folder structure
-    - dirpath/2*/
+    Parameters
+    ----------
+    input: string
+        path to input directory
+    output: string, optional
+        path ot output direction (default input)
+
+    Returns
+    -------
+
+
+    Notes
+    -----
+    Assumes folder structure
+    - input/2*/
 
     Files within this folder will either be zipped (.b2z),
     or matlab files (.mat). Zipped files are expected to
     produce (.mat) files when extracted.
 
-    Default output folder
-    - dirpath/drf/uhf/
+    Result is put in subfolder within output folder.
+    - output/drf/uhf/
     """
 
     if logger is None:
         logger = logging.getLogger(LOGGER_NAME)
 
     # Check input dirpat
-    if not os.path.isdir(input_dirpath):
-        logger.warning(f"input folder does not exist: {input_dirpath}")
+    if not os.path.isdir(input):
+        logger.warning(f"input folder does not exist: {input}")
         return
 
     # Default output dirpath == input dirpath
-    if output_dirpath is None:
-        output_dirpath = input_dirpath
+    if output is None:
+        output = input
     # Check output dirpath
-    if not os.path.isdir(output_dirpath):
-        logger.warning(f"output folder does not exists: {output_dirpath}")
+    if not os.path.isdir(output):
+        logger.warning(f"output folder does not exists: {output}")
         return
     # Create folder structure
-    write_dirpath = os.path.join(output_dirpath, "drf/uhf")
+    write_dirpath = os.path.join(output, "drf/uhf")
     if not os.path.isdir(write_dirpath):
         os.makedirs(write_dirpath, exist_ok=True)
     # Verify that folder is empty
@@ -85,7 +99,7 @@ def eiscat2drf(input_dirpath, output_dirpath=None, logger=None):
         return
 
     # find zipped files
-    zipped_files = glob.glob(f"{input_dirpath}/2*/*.mat.bz2")
+    zipped_files = glob.glob(f"{input}/2*/*.mat.bz2")
 
     # map to zip pairs
     def tup(f_in):
@@ -110,7 +124,7 @@ def eiscat2drf(input_dirpath, output_dirpath=None, logger=None):
                 f_out.write(f_in.read())
 
     # find matlab files
-    files = glob.glob(f"{input_dirpath}/2*/*.mat")
+    files = glob.glob(f"{input}/2*/*.mat")
     files.sort()
 
     # load start time from parameter block of first matlab file
@@ -206,7 +220,7 @@ def main():
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(getattr(logging, args.log_level))
 
-    eiscat2drf(args.input, output_dirpath=args.output, logger=logger)
+    eiscat2drf(args.input, output=args.output, logger=logger)
     print()
 
 

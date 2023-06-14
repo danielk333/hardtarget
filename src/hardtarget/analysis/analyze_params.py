@@ -77,7 +77,17 @@ REQUIRED_PARAM_KEYS = DEFAULT_PARAM_KEYS + ["rx_channel", "tx_channel"]
 
 def set_n_ranges(params):
     """
-    Reset the number of range-gates. This is useful when reanalyzing with better resolution
+    Reset the number of range-gates in params. 
+    
+    Parameters
+    ----------
+    params: dict
+        Dictionary with gmf parameters
+
+    
+    Notes
+    -----    
+    This is useful when reanalyzing with better resolution
     to fine-tune the result
     """
     range_gate_0 = params["range_gate_0"]
@@ -116,8 +126,12 @@ def check_params(params):
 
 def process_params(params):
     """
-    Process gmf params
-    Updates given params dictionary in place.
+    Updates given params dictionary in place, with computed values.
+
+    Parameters
+    ----------
+    params: dict
+        Dictionary with gmf parameters
     """
 
     # range gates

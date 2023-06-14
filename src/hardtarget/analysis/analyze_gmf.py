@@ -13,21 +13,47 @@ MODULO_PROGRESS = 1
 
 def get_tasks(job, n_tasks):
     """
-    returns a list of task indexes for given job
+    Generates a list of task indexes for given job.
 
-    n_tasks: (int) total number of tasks
+    Parameters
+    ----------
+    job : dict
+        job["N"] : int
+            total number of jobs
+        job["idx"] : int
+            index of this job (idx < N)
 
-    job["N"] : total number of jobs
-    job["idx"] : index of this job (idx < N)
+    n_tasks: int
+        total number of tasks
 
-    compute tasks for given job
+    Returns
+    -------
+    list
+        List of task indexes
+
+    Examples
+    --------
+    >>> get_tasks({"idx":1, "N:2"}, 8)
+    [1,3,5,7]
     """
     return list(range(job["idx"], n_tasks, job["N"]))
 
 
 def get_filepath(file_idx, sample_rate):
     """
-    create a file path for output
+    Generates a file path for h5 file to be written.
+
+    Parameters
+    ----------
+    file_idx : int
+        index associate with output file
+    sample_rate: int
+        sample rate for processed data
+
+    Returns
+    -------
+    string
+        filepath
     """
     dt = datetime.datetime.utcfromtimestamp(file_idx / sample_rate)
     time_string = dt.strftime("%Y-%m-%dT%H-00-00")
@@ -42,6 +68,24 @@ def get_filepath(file_idx, sample_rate):
 def process(task, clobber=False):
     """
     Analyze data using gmf.
+
+    Parameters
+    ----------
+    task: dict
+        Dictionary containing a variety of parameters.
+    clobber: bool, optional
+        If True, overwrite pre-existing files (defalt False)
+
+    Returns
+    -------
+    progress: int
+        progress in percent [0,100]
+
+    result: dict
+        dir: string
+            path to directory with files
+        files: list
+            paths to each generated file
     """
 
     job = task.get("job", {"idx": 0, "N": 1})
@@ -87,7 +131,7 @@ def process(task, clobber=False):
     num_cohints_per_file = gmf_params["num_cohints_per_file"]
     # number of range-gates to analyze
     n_range_gates = gmf_params["n_range_gates"]
-    # optional lower bound
+    # optional bounds
     start_time = gmf_params.get("start_time", None)
     end_time = gmf_params.get("end_time", None)
 
