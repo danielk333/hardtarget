@@ -149,7 +149,7 @@ def process(task, clobber=False):
 
     # sample rate
     props = rdf_reader.get_properties(chnl)
-    sample_rate = props["samples_per_second"].astype(int)
+    sample_rate = props["samples_per_second"].astype(np.int128)
     if sample_rate != gmf_params["sample_rate"]:
         logger.warning(f"rdf data only supports sample rate: {sample_rate}")
         return 0, results
