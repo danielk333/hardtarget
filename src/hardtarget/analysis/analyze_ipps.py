@@ -25,16 +25,17 @@ def analyze_ipps(drf_reader, i0, params, logger=None):
         external logger object
 
     Returns
-        gmf_vec: numpy array
-            ?
-        gmf_dc_vec: numpy array
-            ?
-        vvec: numpy array
-            ?
-        avec: numpy array
-            ?
-        tx_amp: numpy array
-            ?
+    -------
+    gmf_vec: numpy array
+        ?
+    gmf_dc_vec: numpy array
+        ?
+    vvec: numpy array
+        ?
+    avec: numpy array
+        ?
+    tx_amp: numpy array
+        ?
     """
 
     # gmf lib
