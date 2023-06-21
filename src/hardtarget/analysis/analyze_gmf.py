@@ -113,7 +113,7 @@ def process(task):
     output_path = task.get("output", None)
 
     # process
-    results = {"dir": output_path, "files": []}
+    results = {"dir": output_path, "files": [], "out":{}}
 
     # check paths
     if input_path is None or not Path(input_path).is_dir():
@@ -218,12 +218,12 @@ def process(task):
         gmf_a = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
         gmf_txp = np.zeros(num_cohints_per_file, dtype=np.float32)
 
+        # filename outfile
+        file_idx = task_idx * ipp * n_ipp * num_cohints_per_file + bounds[0]
+        filepath = get_filepath(file_idx, sample_rate)
+
         # write to file if output_path is defined
         if output_path is not None:
-            # filename outfile
-            file_idx = task_idx * ipp * n_ipp * num_cohints_per_file + bounds[0]
-            filepath = get_filepath(file_idx, sample_rate)
-            results["files"].append(filepath)
             outfile = Path(output_path) / filepath
             # crate directory
             dirname = Path(outfile).parent
@@ -268,6 +268,7 @@ def process(task):
 
         if output_path is not None:
             out.close()
+            results["files"].append(filepath)
         else:
-            results["out"] = out
-        return 100, results
+            results["out"][filepath] = out
+    return 100, results
