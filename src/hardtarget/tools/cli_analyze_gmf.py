@@ -84,6 +84,8 @@ def main():
         "clobber": args.clobber
     }
 
+    print(args.clobber)
+
     # process
     ok, results = analyze_gmf.process(task)
     logger.info(f"produced {len(results['files'])} files")
