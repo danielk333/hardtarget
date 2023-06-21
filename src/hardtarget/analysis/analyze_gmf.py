@@ -1,12 +1,12 @@
 import logging
 import numpy as np
-import os
 import time
 import datetime
 import digital_rf as drf
 import h5py
 from hardtarget.analysis import analyze_params
 from hardtarget.analysis import analyze_ipps
+from pathlib import Path
 
 MODULO_PROGRESS = 1
 
@@ -57,7 +57,16 @@ def get_filepath(file_idx, sample_rate):
     """
     dt = datetime.datetime.utcfromtimestamp(file_idx / sample_rate)
     time_string = dt.strftime("%Y-%m-%dT%H-00-00")
-    return os.path.join(*[time_string, f"gmf-{file_idx:08d}.h5"])
+    return Path(time_string) / f"gmf-{file_idx:08d}.h5"
+
+
+def bounds_to_str(bounds, sample_rate):
+    """Create human readable representation of bounds, for logging."""
+    _bounds = []
+    for sample_number in bounds:
+        dt = datetime.datetime.utcfromtimestamp(sample_number / sample_rate)
+        _bounds.append(dt.strftime("%Y-%m-%dT%H:%M:%S"))
+    return str(_bounds)
 
 
 ####################################################################
@@ -65,7 +74,7 @@ def get_filepath(file_idx, sample_rate):
 ####################################################################
 
 
-def process(task, clobber=False):
+def process(task):
     """
     Analyze data using gmf.
 
@@ -73,8 +82,13 @@ def process(task, clobber=False):
     ----------
     task: dict
         Dictionary containing a variety of parameters.
-    clobber: bool, optional
-        If True, overwrite pre-existing files (defalt False)
+
+        output: string, optional, default None
+            String path to directory for result files.
+            If None, no files - return results as dictionary 
+
+        clobber: bool, optional
+            If True, overwrite pre-existing files (defalt False)
 
     Returns
     -------
@@ -86,10 +100,12 @@ def process(task, clobber=False):
             path to directory with files
         files: list
             paths to each generated file
+        out: dictionary with in-memory results
     """
 
     job = task.get("job", {"idx": 0, "N": 1})
     logger = task.get("logger", logging.getLogger(__name__))
+    clobber = task.get("clobber", False)
 
     # path to directory with drf data
     input_path = task.get("input", None)
@@ -100,10 +116,10 @@ def process(task, clobber=False):
     results = {"dir": output_path, "files": []}
 
     # check paths
-    if input_path is None or not os.path.isdir(input_path):
+    if input_path is None or not Path(input_path).is_dir():
         logger.warning(f"input folder does not exist: {input_path}")
         return 0, results
-    if output_path is None or not os.path.isdir(output_path):
+    if output_path is not None and not Path(output_path).is_dir():
         logger.warning(f"output folder does not exist: {output_path}")
         return 0, results
 
@@ -149,7 +165,9 @@ def process(task, clobber=False):
 
     # sample rate
     props = rdf_reader.get_properties(chnl)
-    sample_rate = props["samples_per_second"].astype(np.int128)
+    # sample_rate = props["samples_per_second"].astype(np.int128)
+    sample_rate = props["samples_per_second"].astype(np.int64)
+    
     if sample_rate != gmf_params["sample_rate"]:
         logger.warning(f"rdf data only supports sample rate: {sample_rate}")
         return 0, results
@@ -181,15 +199,8 @@ def process(task, clobber=False):
     n_job_tasks = len(job_tasks)
 
     # logging
-
-    def to_str(value):
-        dt = datetime.datetime.utcfromtimestamp(value / sample_rate)
-        return dt.strftime("%Y-%m-%d %H:%M:%S")
-
-    bounds_str = str([to_str(e) for e in bounds])
-
     logger.debug(f"channel: {chnl}")
-    logger.debug(f"bounds: {bounds_str}")
+    logger.debug(f"bounds: {bounds_to_str(bounds, sample_rate)}")
     logger.debug(f"sample rate: {sample_rate}")
     logger.debug(f"continuous blocks: {len(blocks)}")
     logger.info(f"total_tasks: {n_tasks}")
@@ -207,45 +218,56 @@ def process(task, clobber=False):
         gmf_a = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
         gmf_txp = np.zeros(num_cohints_per_file, dtype=np.float32)
 
-        # filename outfile
-        file_idx = task_idx * ipp * n_ipp * num_cohints_per_file + bounds[0]
-        filepath = get_filepath(file_idx, sample_rate)
-        results["files"].append(filepath)
-        outfile = os.path.join(output_path, filepath)
-        # crate directory
-        dirname, _ = os.path.split(outfile)
-        os.makedirs(dirname, exist_ok=True)
+        # write to file if output_path is defined
+        if output_path is not None:
+            # filename outfile
+            file_idx = task_idx * ipp * n_ipp * num_cohints_per_file + bounds[0]
+            filepath = get_filepath(file_idx, sample_rate)
+            results["files"].append(filepath)
+            outfile = Path(output_path) / filepath
+            # crate directory
+            dirname = Path(outfile).parent
+            dirname.mkdir(parents=True, exist_ok=True)
 
-        if not os.path.isfile(outfile) or clobber:
-            ts0 = time.time()
-
-            # process
-            for i in range(num_cohints_per_file):
-                i0 = file_idx + i * ipp * n_ipp
-                result = analyze_ipps.analyze_ipps(rdf_reader, i0, gmf_params)
-                gmf_max[i, :], gmf_dc[i, :], gmf_v[i, :], gmf_a[i, :], gmf_txp[i] = result
-                # rgi = np.argmax(gmf_max[i, :])
-
-            # log
-            ts1 = time.time()
-            info = {
-                "task": task_idx,
-                "time": ts1 - ts0,
-                "real": (ts1 - ts0) / (n_ipp * ipp / sample_rate),
-            }
-            msg = "task_idx {task:4} time {time:1.2f} cpu/real {real:1.2f}"
-            logger.info(msg.format(**info))
+            if outfile.is_file() and not clobber:
+                logger.info(f"job already done {job['idx']}/{job['N']}")
+                return 100, results
 
             # write result
             out = h5py.File(outfile, "w")
-            out["gmf"] = gmf_max
-            out["gmf_dc"] = gmf_dc
-            out["r"] = gmf_params["ranges"].copy()
-            out["a"] = gmf_a
-            out["v"] = gmf_v
-            out["tx_pwr"] = gmf_txp
-            out["i0"] = i0
-            out.close()
+        else:
+            out = {}
 
-    logger.info(f"finishing job {job['idx']}/{job['N']}")
-    return 100, results
+        # process
+        ts0 = time.time()
+        for i in range(num_cohints_per_file):
+            i0 = file_idx + i * ipp * n_ipp
+            result = analyze_ipps.analyze_ipps(rdf_reader, i0, gmf_params)
+            gmf_max[i, :], gmf_dc[i, :], gmf_v[i, :], gmf_a[i, :], gmf_txp[i] = result
+            # rgi = np.argmax(gmf_max[i, :])
+        ts1 = time.time()
+
+        # log
+        info = {
+            "task": task_idx,
+            "time": ts1 - ts0,
+            "real": (ts1 - ts0) / (n_ipp * ipp / sample_rate),
+        }
+        msg = "task_idx {task:4} time {time:1.2f} cpu/real {real:1.2f}"
+        logger.info(msg.format(**info))
+        logger.info(f"finishing job {job['idx']}/{job['N']}")
+
+        # output
+        out["gmf"] = gmf_max
+        out["gmf_dc"] = gmf_dc
+        out["r"] = gmf_params["ranges"].copy()
+        out["a"] = gmf_a
+        out["v"] = gmf_v
+        out["tx_pwr"] = gmf_txp
+        out["i0"] = i0
+
+        if output_path is not None:
+            out.close()
+        else:
+            results["out"] = out
+        return 100, results

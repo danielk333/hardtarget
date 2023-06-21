@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
-import os
 import argparse
 import logging
+from pathlib import Path
 
-from ..analysis import analyze_gmf
-from ..config import load_gmf_params
+from hardtarget.analysis import analyze_gmf
+from hardtarget.config import load_gmf_params
 
 LOGGER_NAME = "analyse_gmf"
 
@@ -66,10 +66,10 @@ def main():
     output = args.output
     if output is None:
         output = "."
-    output = os.path.abspath(output)
+    output = Path(output)
 
     # read config file
-    if not os.path.isfile(args.config):
+    if not Path(args.config).is_file():
         logger.warning(f"config file does not exist: {args.config}")
         return
     gmf_params = load_gmf_params(args.config)
@@ -81,10 +81,11 @@ def main():
         "input": args.input,
         "output": output,
         "gmf_params": gmf_params,
+        "clobber": args.clobber
     }
 
     # process
-    ok, results = analyze_gmf.process(task, clobber=args.clobber)
+    ok, results = analyze_gmf.process(task)
     logger.info(f"produced {len(results['files'])} files")
 
 

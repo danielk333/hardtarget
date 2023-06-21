@@ -3,7 +3,6 @@ from hardtarget.utilities import read_vector_c81d
 from hardtarget.gmf import GMF_LIBS
 import logging
 
-
 ####################################################################
 # ANALYSE IPPS
 ####################################################################
