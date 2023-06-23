@@ -35,5 +35,5 @@ Assuming also that an output folder exists at _tmp/_
 Then use script analyzegmf to perform the analysis. Processing might be time-consuming.
 
 ```bash
-analyzegmf ~/Data/leo_bpark_2.1u_NO@uhf/drf/ ~/Git/hard_target_cfg/test.ini -o tmp/ --log-level INFO
+analyzegmf ~/Data/leo_bpark_2.1u_NO@uhf/drf/ ~/Git/hard_target/cfg/test.ini -o tmp/ --log-level INFO
 ```

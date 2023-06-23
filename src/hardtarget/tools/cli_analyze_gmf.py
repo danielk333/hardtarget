@@ -2,12 +2,14 @@
 
 import argparse
 import logging
+from progress.bar import Bar
 from pathlib import Path
 
 from hardtarget.analysis import analyze_gmf
 from hardtarget.config import load_gmf_params
 
 LOGGER_NAME = "analyse_gmf"
+
 
 ####################################################################
 # SCRIPT ENTRY POINT
@@ -32,6 +34,7 @@ def main():
     parser.add_argument("input", help="Path to source directory")
     parser.add_argument("config", help="Path to config file")
     parser.add_argument("-o", "--output", help="Path to output directory")
+    parser.add_argument("--progress", action="store_true", help="Progress bar")
     parser.add_argument("--clobber", action="store_true", help="Override outputs")
     parser.add_argument(
         "--log-level",
@@ -50,7 +53,6 @@ def main():
     # job
     try:
         from mpi4py import MPI
-
         comm = MPI.COMM_WORLD
     except ImportError:
 
@@ -84,9 +86,25 @@ def main():
         "clobber": args.clobber
     }
 
-    # process
-    ok, results = analyze_gmf.process(task)
-    logger.info(f"produced {len(results['files'])} files")
+    # preprocess
+    ok = analyze_gmf.preprocess(task)
+    if (ok):
+
+        # progress
+        if args.progress:
+            progress_bar = Bar('Processing', max=len(task["job_tasks"]))
+
+            def progress_callback(numerator, divisor):
+                progress_bar.goto(numerator)
+
+            task["progress"] = progress_callback
+
+        # process
+        ok, results = analyze_gmf.process(task)
+        logger.info(f"produced {len(results['files'])} files")
+
+        if args.process:
+            progress_bar.finish()
 
 
 ####################################################################
