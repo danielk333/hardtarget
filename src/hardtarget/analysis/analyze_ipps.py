@@ -2,13 +2,25 @@ import numpy as np
 from hardtarget.utilities import read_vector_c81d
 from hardtarget.gmf import GMF_LIBS
 import logging
+import digital_rf as drf
+
+_DRF_READERS = {}
+
+
+def get_drf_reader(path):
+    """Returns cached DRF reader instance."""
+    reader = _DRF_READERS.get(path, None)
+    if reader is None:
+        _DRF_READERS[path] = reader = drf.DigitalRFReader([path])
+    return reader
+
 
 ####################################################################
 # ANALYSE IPPS
 ####################################################################
 
 
-def analyze_ipps(drf_reader, i0, params, logger=None):
+def analyze_ipps(rx, tx, i0, params, logger=None):
     """
     Analyse ipps runs the gmf function.
 
@@ -51,8 +63,6 @@ def analyze_ipps(drf_reader, i0, params, logger=None):
     ipp = params["ipp"]
     n_ipp = params["n_ipp"]
     n_extra = params["n_extra"]
-    rx_channel = params["rx_channel"]
-    tx_channel = params["tx_channel"]
     rx_stencil = params["rx_stencil"]
     tx_stencil = params["tx_stencil"]
     n_range_gates = params["n_range_gates"]
@@ -62,14 +72,19 @@ def analyze_ipps(drf_reader, i0, params, logger=None):
     range_rates = params["range_rates"]
     accs = params["accs"]
 
+    rx_path, rx_channel = rx
+    tx_path, tx_channel = tx
+    rx_reader = get_drf_reader(rx_path)
+    tx_reader = get_drf_reader(tx_path)
+
     # read data vector with n_ipps, and a little extra
-    z = read_vector_c81d(drf_reader, i0, (n_ipp + n_extra) * ipp, rx_channel)
+    z = read_vector_c81d(rx_reader, i0, (n_ipp + n_extra) * ipp, rx_channel)
 
     # make a separate copy to hold transmit pulse, and the echo
     z_rx = np.copy(z)
 
-    if tx_channel != rx_channel:
-        z = read_vector_c81d(drf_reader, i0, (n_ipp + n_extra) * ipp, tx_channel)
+    if tx_channel != rx_channel or tx_path != rx_path:
+        z = read_vector_c81d(tx_reader, i0, (n_ipp + n_extra) * ipp, tx_channel)
     z_tx = np.copy(z)
 
     # clean ground clutter, get separate transmit waveform and echo vectors

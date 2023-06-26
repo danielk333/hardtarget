@@ -67,6 +67,11 @@ def bounds_to_str(bounds, sample_rate):
     return str(_bounds)
 
 
+def pair_unpackable(a):
+    """Returns true if a can be unpacked to a pair of variables."""
+    return True if isinstance(a, (tuple, list)) and len(a) == 2 else False
+
+
 ####################################################################
 # PRE-PROCESS
 ####################################################################
@@ -102,22 +107,10 @@ def preprocess(task):
 
     # logger
     logger = task.get("logger", logging.getLogger(__name__))
-    # path to directory with drf data
-    input_path = task.get("input", None)
-    # path to directory for writing output
-    output_path = task.get("output", None)
-
-    # check paths
-    if input_path is None or not Path(input_path).is_dir():
-        logger.warning(f"input folder does not exist: {input_path}")
-        return False
-    if output_path is not None and not Path(output_path).is_dir():
-        logger.warning(f"output folder does not exist: {output_path}")
-        return False
 
     # check and compute gmf params
     task["gmf_params"] = gmf_params = {
-        **analyze_params.DEFAULT_PARAMS, 
+        **analyze_params.DEFAULT_PARAMS,
         **task.get("gmf_params", {})
     }
     ok, msg = analyze_params.check_params(gmf_params)
@@ -126,23 +119,53 @@ def preprocess(task):
         return False
     analyze_params.process_params(gmf_params)
 
-    # get meta-data from drf data reader
-    rdf_reader = drf.DigitalRFReader([input_path])
-
-    # check channel
-    tx_channel = gmf_params["tx_channel"]
-    rx_channel = gmf_params["rx_channel"]
-    chnls = rdf_reader.get_channels()
-    if tx_channel not in chnls:
-        logger.error(f"rdf data does not support tx_channel: {tx_channel}")
+    # rx source
+    rx = task.get("rx", None)
+    if rx is None:
+        logger.warning("missing rx")
         return False
-    if rx_channel not in chnls:
+    if not pair_unpackable(rx):
+        logger.warning(f"rx must be tuple pair: {rx}")
+        return False
+    rx_path, rx_channel = rx
+    if rx_path is None or not Path(rx_path).is_dir():
+        logger.warning(f"rx src path does not exist: {rx_path}")
+        return False
+    rx_reader = drf.DigitalRFReader([rx_path])
+    rx_channels = rx_reader.get_channels()
+    if rx_channel not in rx_channels:
         logger.error(f"rdf data does not support rx_channel: {rx_channel}")
         return False
-    chnl = rx_channel
+    task["rx"] = (rx_path, rx_channel)
+
+    # tx source
+    tx = task.get("tx", None)
+    if tx is None:
+        tx = rx
+    if not pair_unpackable(tx):
+        logger.warning(f"tx must be tuple pair: {tx}")
+    tx_path, tx_channel = tx
+    if tx_path is None:
+        tx_path = rx_path
+    if tx_channel is None:
+        tx_channel = rx_channel
+    if tx_path is None or not Path(tx_path).is_dir():
+        logger.warning(f"tx src path does not exist: {tx_path}")
+    tx_reader = drf.DigitalRFReader([tx_path])
+    tx_channels = tx_reader.get_channels()
+    if tx_channel not in tx_channels:
+        logger.error(f"rdf data does not support tx_channel: {tx_channel}")
+        return False
+    task["tx"] = (tx_path, tx_channel)
+
+    # output path
+    output_path = task.get("output", None)
+    if output_path is not None and not Path(output_path).is_dir():
+        logger.warning(f"output folder does not exist: {output_path}")
+        return False
 
     # check sample rate
-    props = rdf_reader.get_properties(chnl)
+    props = rx_reader.get_properties(rx_channel)
     # sample_rate = props["samples_per_second"].astype(np.int128)
     sample_rate = props["samples_per_second"].astype(np.int64)
     if sample_rate != gmf_params["sample_rate"]:
@@ -150,8 +173,8 @@ def preprocess(task):
         return False
     gmf_params["sample_rate"] = sample_rate
 
-    # check bounds
-    bounds = list(rdf_reader.get_bounds(chnl))
+    # check bounds rx channel
+    bounds = list(rx_reader.get_bounds(rx_channel))
     start_time = gmf_params.get("start_time", None)
     end_time = gmf_params.get("end_time", None)
     if start_time is not None:
@@ -164,8 +187,8 @@ def preprocess(task):
         bounds[1] = _b1
     gmf_params["bounds"] = bounds = tuple(bounds)
 
-    # check blocks
-    blocks = rdf_reader.get_continuous_blocks(bounds[0], bounds[1], chnl)
+    # check blocks rx channel
+    blocks = rx_reader.get_continuous_blocks(bounds[0], bounds[1], rx_channel)
     if len(blocks) > 1:
         logger.warning(f"multiple continuous blocks: {len(blocks)}")
 
@@ -184,7 +207,7 @@ def preprocess(task):
     task["job_tasks"] = job_tasks = get_tasks(job, n_tasks)
 
     # logging
-    logger.debug(f"channel: {gmf_params['rx_channel']}")
+    logger.debug(f"channel: {rx_channel}")
     logger.debug(f"bounds: {bounds_to_str(bounds, sample_rate)}")
     logger.debug(f"sample rate: {sample_rate}")
     logger.debug(f"continuous blocks: {len(blocks)}")
@@ -227,13 +250,12 @@ def process(task):
     logger = task.get("logger", logging.getLogger(__name__))
     progress = task.get("progress", None)
     clobber = task.get("clobber", False)
-    input_path = task.get("input", None)
+
+    rx = task["rx"]
+    tx = task["tx"]
     output_path = task.get("output", None)
     gmf_params = task["gmf_params"]
-
-    # drf data reader
-    rdf_reader = drf.DigitalRFReader([input_path])
-
+    
     # number of range-gates to analyze
     n_range_gates = gmf_params["n_range_gates"]
     # inter-pulse period length in samples
@@ -290,7 +312,7 @@ def process(task):
         ts0 = time.time()
         for i in range(num_cohints_per_file):
             i0 = file_idx + i * ipp * n_ipp
-            result = analyze_ipps.analyze_ipps(rdf_reader, i0, gmf_params)
+            result = analyze_ipps.analyze_ipps(rx, tx, i0, gmf_params)
             gmf_max[i, :], gmf_dc[i, :], gmf_v[i, :], gmf_a[i, :], gmf_txp[i] = result
             # rgi = np.argmax(gmf_max[i, :])
         ts1 = time.time()
@@ -322,6 +344,6 @@ def process(task):
         # progress
         if progress is not None:
             progress(idx+1, n_job_tasks)
-    
+
     logger.info(f"finishing job {job['idx']}/{job['N']} with {n_job_tasks} tasks")
     return 100, results

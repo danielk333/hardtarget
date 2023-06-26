@@ -21,18 +21,21 @@ def main():
     parser = argparse.ArgumentParser(
         description="Script analyzing eiscat drf data.",
         usage="""
-        %(prog)s [options] input config -o output_folder
+        %(prog)s [options] config rx rxchnl -o output_folder
 
         EXAMPLE:
 
-        %(prog)s leo_bpark_2.1u_NO@uhf/drf/ cfg/myconfig.ini
+        %(prog)s cfg/myconfig.ini leo_bpark_2.1u_NO@uhf/drf/ uhf 
 
         """,
     )
 
     # Add the arguments
-    parser.add_argument("input", help="Path to source directory")
     parser.add_argument("config", help="Path to config file")
+    parser.add_argument("rx", help="Path to source directory with rx data")
+    parser.add_argument("rxchnl", help="RX channel")
+    parser.add_argument("--tx", help="Path to source directory with tx data")
+    parser.add_argument("--txchnl", help="TX channel")
     parser.add_argument("-o", "--output", help="Path to output directory")
     parser.add_argument("--progress", action="store_true", help="Progress bar")
     parser.add_argument("--clobber", action="store_true", help="Override outputs")
@@ -70,7 +73,7 @@ def main():
         output = "."
     output = Path(output)
 
-    # read config file
+    # config file
     if not Path(args.config).is_file():
         logger.warning(f"config file does not exist: {args.config}")
         return
@@ -80,7 +83,8 @@ def main():
     task = {
         "job": job,
         "logger": logger,
-        "input": args.input,
+        "rx": (args.rx, args.rxchnl),
+        "tx": (args.tx, args.txchnl),
         "output": output,
         "gmf_params": gmf_params,
         "clobber": args.clobber

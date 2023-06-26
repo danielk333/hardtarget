@@ -72,7 +72,7 @@ DERIVED_PARAM_KEYS = [
     "tx_stencil",
 ]
 
-REQUIRED_PARAM_KEYS = DEFAULT_PARAM_KEYS + ["rx_channel", "tx_channel"]
+REQUIRED_PARAM_KEYS = DEFAULT_PARAM_KEYS
 
 
 def set_n_ranges(params):
