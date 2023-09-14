@@ -131,6 +131,7 @@ def preprocess(task):
     if rx_path is None or not Path(rx_path).is_dir():
         logger.warning(f"rx src path does not exist: {rx_path}")
         return False
+    
     rx_reader = drf.DigitalRFReader([rx_path])
     rx_channels = rx_reader.get_channels()
     if rx_channel not in rx_channels:
@@ -179,6 +180,7 @@ def preprocess(task):
     end_time = gmf_params.get("end_time", None)
     if start_time is not None:
         _b0 = int(start_time * sample_rate)
+        print(_b0, bounds[0])
         assert _b0 >= bounds[0], "Given start time is before input data start"
         bounds[0] = _b0
     if end_time is not None:
@@ -274,7 +276,7 @@ def process(task):
     n_job_tasks = len(job_tasks)
 
     # logging
-    job = task["job"]
+    job = task.get("job", {"idx":1, "N":1})
     logger.info(f"starting job {job['idx']}/{job['N']} with {n_job_tasks} tasks")
 
     # process
@@ -337,9 +339,9 @@ def process(task):
 
         if output_path is not None:
             out.close()
-            results["files"].append(filepath)
+            results["files"].append(filepath.name)
         else:
-            results["out"][filepath] = out
+            results["out"][filepath.name] = out
 
         # progress
         if progress is not None:
