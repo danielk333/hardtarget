@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 
-import argparse
 import logging
 from progress.bar import Bar
 from pathlib import Path
 
 from hardtarget.analysis import analyze_gmf
 from hardtarget.config import load_gmf_params
+
+from .commands import add_command
+
 
 LOGGER_NAME = "analyse_gmf"
 
@@ -15,21 +17,7 @@ LOGGER_NAME = "analyse_gmf"
 # SCRIPT ENTRY POINT
 ####################################################################
 
-
-def main():
-    # Create the argument parser
-    parser = argparse.ArgumentParser(
-        description="Script analyzing eiscat drf data.",
-        usage="""
-        %(prog)s [options] config rx rxchnl -o output_folder
-
-        EXAMPLE:
-
-        %(prog)s cfg/myconfig.ini leo_bpark_2.1u_NO@uhf/drf/ uhf 
-
-        """,
-    )
-
+def parser_build(parser):
     # Add the arguments
     parser.add_argument("config", help="Path to config file")
     parser.add_argument("rx", help="Path to source directory with rx data")
@@ -45,9 +33,10 @@ def main():
         default="INFO",
         help="Set the log level (default: INFO)",
     )
+    return parser
 
-    # Parse the arguments
-    args = parser.parse_args()
+
+def main(args, cli_logger):
 
     # logging
     logger = logging.getLogger(LOGGER_NAME)
@@ -110,6 +99,23 @@ def main():
         if args.process:
             progress_bar.finish()
 
+
+add_command(
+    name="analyze",
+    function=main,
+    parser_build=parser_build,
+    add_parser_args=dict(
+        description="Script analyzing eiscat drf data.",
+        usage="""
+        %(prog)s [options] config rx rxchnl -o output_folder
+
+        EXAMPLE:
+
+        %(prog)s cfg/myconfig.ini leo_bpark_2.1u_NO@uhf/drf/ uhf
+
+        """,
+    ),
+)
 
 ####################################################################
 # MAIN

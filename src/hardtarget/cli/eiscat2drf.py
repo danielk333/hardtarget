@@ -399,14 +399,7 @@ def old_eiscat2drf_dont_use(input, output=None, logger=None):
 # SCRIPT ENTRY POINT
 ####################################################################
 
-
-def main():
-    # Create the argument parser
-    parser = argparse.ArgumentParser(
-        description="Script converting eiscat data to drf format",
-        usage="%(prog)s [options] input -o output_folder",
-    )
-
+def parser_build(parser):
     # Add the arguments
     parser.add_argument(
         "input",
@@ -424,16 +417,15 @@ def main():
         default="INFO",
         help="Set the log level (default: INFO)",
     )
+    return parser
 
-    # Parse the arguments
-    args = parser.parse_args()
 
+def main(args, cli_logger):
     # Logging
-    logger = logging.getLogger(LOGGER_NAME)
+    logger = logging.getLogger(eiscat2drf.LOGGER_NAME)
     logger.setLevel(getattr(logging, args.log_level))
 
-    eiscat2drf(args.input, dstdir=args.output, logger=logger)
-    print()
+    eiscat2drf.eiscat2drf(args.input, dstdir=args.output, logger=logger)
 
 
 ####################################################################
@@ -441,4 +433,12 @@ def main():
 ####################################################################
 
 if __name__ == "__main__":
-    main()
+    # Create the argument parser
+    parser = argparse.ArgumentParser(
+        description="Script converting eiscat data to drf format",
+        usage="%(prog)s [options] input -o output_folder",
+    )
+    parser = parser_build(parser)
+    # Parse the arguments
+    args = parser.parse_args()
+    main(args, None)
