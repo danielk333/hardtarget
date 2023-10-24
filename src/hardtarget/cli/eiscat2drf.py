@@ -259,7 +259,7 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
             # zero padding
             n_pad = (n0 - n_prev) - n_samples
             try:
-                rf_writer.rf_write(np.zeros(n_pad, dtype=np.complex64))
+                rf_writer.rf_write(np.zeros(n_pad*2, dtype=np.int16))
             except:
                 logging.warning("unable to pad out for missing files ... continuing")
 
