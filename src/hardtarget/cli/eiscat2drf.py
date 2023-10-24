@@ -11,6 +11,7 @@ import numpy as np
 import bz2
 import logging
 import configparser
+from pathlib import Path
 
 # Number of samples in file. 640 ipps. eiscat leo experiment specific number!
 NUM_SAMPLES = 640 * 20000
@@ -165,6 +166,20 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
         except Exception as e:
             raise ValueError(f"Couldn't open config file for {xpname}:" + str(e))
 
+        return
+
+    # support single file or folder with files
+    print(srcdir)
+
+    if Path(srcdir).is_file():
+        files = [srcdir]
+        if dstdir is None:
+            dstdir = Path(srcdir).parent / "drf"
+
+    else:
+        files = list(all_files(srcdir))
+
+    # output
     if dstdir is None:
         dstdir = os.path.join(srcdir, "drf")
 
@@ -173,9 +188,9 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
     # Verify that folder is empty
     if len(os.listdir(dstdir)) > 0:
         logger.warning(f"output folder is not empty: {dstdir}")
-        return
 
-    files = list(all_files(srcdir))
+
+
 
     pth = files[0]
 
@@ -187,7 +202,7 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
     # Find experiment info from first file
     host, expname, expvers, owner = expinfo_split(str(mat["d_ExpInfo"][0]))
 
-    cfg = load_expconfig(expname, expvers)
+    cfg = load_expconfig(expname)
     cfv = cfg[expvers]  # config for this version of the experiment (mode)
     sample_rate = int(cfv.get("sample_rate"))  # assuming integral # samples per second
     file_secs = float(cfv.get("file_secs"))
@@ -197,7 +212,7 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
 
     # create digital rf writer
     rf_writer = drf.DigitalRFWriter(
-        dstdir,  # directory
+        str(dstdir),  # directory
         np.complex64,  # dtype
         3600,  # subdir cadence secs    => one dir per hour
         1000,  # file cadence millisecs => one file per second
