@@ -96,7 +96,7 @@ def main(args, cli_logger):
         ok, results = analyze_gmf.process(task)
         logger.info(f"produced {len(results['files'])} files")
 
-        if args.process:
+        if args.progress:
             progress_bar.finish()
 
 
