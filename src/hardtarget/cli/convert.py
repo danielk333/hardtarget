@@ -3,42 +3,44 @@ import logging
 from . import eiscat2drf
 from .commands import add_command
 
+logger = logging.getLogger(__name__)
+
+SOURCES = {
+    "eiscat": {
+        "main": eiscat2drf.main,
+        "parser_build": eiscat2drf.parser_build,
+        "add_parser_args": {
+            "description": "Script converting eiscat data to drf format",
+            "usage": "%(prog)s [options] input -o output_folder",
+        },
+    },
+}
+
 
 def parser_build(parser):
-    # Add the arguments
-    parser.add_argument(
-        "input",
-        help="Path to source directory, assumes folder structure 'input/2*/*.mat or *.mat.bz2'",
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        help="Path to output directory, default output folder 'input/drf/uhf/'",
-        default=None,
-    )
-    parser.add_argument(
-        "--log-level",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        default="INFO",
-        help="Set the log level (default: INFO)",
-    )
+    subparsers = parser.add_subparsers(help="Available source formats", dest="source")
+    subparsers.required = True
+
+    for source in SOURCES:
+        cmd_parser = subparsers.add_parser(source, **SOURCES[source]["add_parser_args"])
+        parser_builder = SOURCES[source]["parser_build"]
+        parser_builder(cmd_parser)
+
     return parser
 
 
 def main(args, cli_logger):
-    # Logging
-    logger = logging.getLogger(eiscat2drf.LOGGER_NAME)
-    logger.setLevel(getattr(logging, args.log_level))
+    function = SOURCES[args.source]["main"]
+    logger.info(f"Executing command {args.command}")
 
-    eiscat2drf.eiscat2drf(args.input, dstdir=args.output, logger=logger)
+    function(args, logger)
 
 
 add_command(
-    name="eiscat2drf",
+    name="convert",
     function=main,
     parser_build=parser_build,
     add_parser_args=dict(
-        description="Script converting eiscat data to drf format",
-        usage="%(prog)s [options] input -o output_folder",
+        description="Tool to convert different radar output formats to a unified digital RF definition",
     ),
 )
