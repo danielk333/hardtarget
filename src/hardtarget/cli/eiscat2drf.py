@@ -230,6 +230,8 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
             dstdir = Path(srcdir).parent / "drf"
         else:
             dstdir = Path(srcdir) / "drf"
+    else:
+        dstdir = Path(dstdir)
 
     # add channel subdirectory
     chnl = cfv.get("rx_channel", "tbd")
