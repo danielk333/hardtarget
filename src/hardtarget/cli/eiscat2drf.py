@@ -185,36 +185,29 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
 
         return
 
+    #######################################################################
+    # SOURCE DIR
+    #
     # support single file or folder with files
-    print(srcdir)
+    #######################################################################
 
     if Path(srcdir).is_file():
         files = [srcdir]
-        if dstdir is None:
-            dstdir = Path(srcdir).parent / "drf"
-
     else:
         files = list(all_files(srcdir))
 
-    # output
-    if dstdir is None:
-        dstdir = os.path.join(srcdir, "drf")
-
-    if not os.path.isdir(dstdir):
-        os.makedirs(dstdir, exist_ok=True)
-    # Verify that folder is empty
-    if len(os.listdir(dstdir)) > 0:
-        logger.warning(f"output folder is not empty: {dstdir}")
-        return
-
-
+    #######################################################################
+    # EXTRACT META DATA
+    #
+    # from one file
+    #######################################################################
 
     pth = files[0]
 
     # load start time from parameter block of first matlab file
     mat = loadmat(pth)
-    upar = mat["d_parbl"][0, 41:62]
-    radar_frequency = upar[13]
+    # upar = mat["d_parbl"][0, 41:62]
+    # radar_frequency = upar[13]
 
     # Find experiment info from first file
     host, expname, expvers, owner = expinfo_split(str(mat["d_ExpInfo"][0]))
@@ -226,6 +219,24 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
     n_samples = round(file_secs * sample_rate)
 
     n0 = determine_n0(mat, cfv)
+
+    #######################################################################
+    # DESTINATION DIR
+    #
+    #######################################################################
+
+    if dstdir is None:
+        if Path(srcdir).is_file():
+            dstdir = Path(srcdir).parent / "drf"
+        else:
+            dstdir = Path(srcdir) / "drf"
+
+    # add channel subdirectory
+    chnl = cfv.get("rx_channel", "tbd")
+    dstdir = dstdir / chnl
+    # make sure dstdir exists
+    if not dstdir.is_dir():
+        os.makedirs(dstdir, exist_ok=True)
 
     # create digital rf writer
     rf_writer = drf.DigitalRFWriter(
@@ -259,8 +270,8 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
             # zero padding
             n_pad = (n0 - n_prev) - n_samples
             try:
-                rf_writer.rf_write(np.zeros(n_pad, dtype=np.complex64))
-            except:
+                rf_writer.rf_write(np.zeros(n_pad*2, dtype=np.int16))
+            except Exception:
                 logging.warning("unable to pad out for missing files ... continuing")
 
         zz = to_i2x16(mat["d_raw"][:, 0])
