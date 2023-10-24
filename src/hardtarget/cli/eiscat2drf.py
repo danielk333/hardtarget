@@ -88,6 +88,23 @@ def determine_t0(mat):
     return t0 + int(np.round((1e6 * mat["d_parbl"][0][10] - t0) / dt) - 1) * dt
 
 
+icomplex32 = np.dtype([
+    ('real', np.int16),
+    ('imag', np.int16)])
+
+def to_icomplex32(zz):
+    zz32 = np.empty(zz.shape, dtype=icomplex32)
+    zz32['real'] = zz.real.astype(np.int16)
+    zz32['imag'] = zz.imag.astype(np.int16)
+    return zz32
+
+def to_i2x16(zz):
+    zz2x16 = np.empty((len(zz), 2), dtype=np.int16)
+    zz2x16[:,0] = zz.real.astype(np.int16)
+    zz2x16[:,1] = zz.imag.astype(np.int16)
+    return zz2x16
+
+
 ####################################################################
 # EISCAT 2 DRF
 ####################################################################
@@ -224,7 +241,7 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
     # create digital rf writer
     rf_writer = drf.DigitalRFWriter(
         str(dstdir),  # directory
-        np.complex64,  # dtype
+        np.int16,  # dtype
         3600,  # subdir cadence secs    => one dir per hour
         1000,  # file cadence millisecs => one file per second
         n0,  # start global index
@@ -253,17 +270,18 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
             # zero padding
             n_pad = (n0 - n_prev) - n_samples
             try:
-                rf_writer.rf_write(np.zeros(n_pad, dtype=np.complex64))
-            except (Exception):
+                rf_writer.rf_write(np.zeros(n_pad*2, dtype=np.int16))
+            except Exception:
                 logging.warning("unable to pad out for missing files ... continuing")
 
-        zz = np.array(mat["d_raw"][:, 0], dtype=np.complex64)
+        zz = to_i2x16(mat["d_raw"][:, 0])
         if len(zz) != n_samples:
             logging.warning(f"found {len(zz)} samples in {pth}['d_raw'], expected {n_samples}")
         try:
             rf_writer.rf_write(zz)
-        except (Exception):
+        except Exception as e:
             logging.warning(f"unable to write samples from {pth} to file ... continuing")
+            raise e
         n_prev = n0
 
     logging.info("Done writing DRF files")
