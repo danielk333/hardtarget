@@ -188,7 +188,7 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
     # Verify that folder is empty
     if len(os.listdir(dstdir)) > 0:
         logger.warning(f"output folder is not empty: {dstdir}")
-
+        return
 
 
 
