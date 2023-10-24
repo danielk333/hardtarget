@@ -22,6 +22,7 @@ def main(args, cli_logger):
         pprint.pprint(props)
         bounds = list(reader.get_bounds(chnl))
         print(f"bounds: {bounds}")
+        print(f"Total mega-samples: {(bounds[1] - bounds[0])*1e-6}")
         sample_rate = props["samples_per_second"].astype(np.int64)
         dt0 = datetime.datetime.utcfromtimestamp(bounds[0]/sample_rate)
         print(f"start: {dt0}")
