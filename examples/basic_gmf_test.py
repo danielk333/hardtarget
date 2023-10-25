@@ -9,7 +9,7 @@ gmf = GMF_LIBS['c']
 z_tx = np.zeros(10000, dtype=np.complex64)
 z_rx = np.zeros(12000, dtype=np.complex64)
 for i in range(10):
-    z_tx[(i*1000):(i*1000+20)]=1.0
+    z_tx[(i*1000):(i*1000+20)] = 1.0
     z_rx[(i*1000+500):(i*1000+(500+20))] = 0.5  # simulated "echo"
 
 dec = 10

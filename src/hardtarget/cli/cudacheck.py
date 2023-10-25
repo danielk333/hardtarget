@@ -10,7 +10,7 @@ def parser_build(parser):
     return parser
 
 
-def main(*args):
+def main(args, cli_logger):
 
     dirpath = os.path.dirname(os.path.realpath(__file__))
     srcfile = os.path.join(dirpath, "cudacheck.cu")

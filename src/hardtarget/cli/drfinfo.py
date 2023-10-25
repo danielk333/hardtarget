@@ -6,7 +6,7 @@ from .commands import add_command
 
 
 def parser_build(parser):
-    parser.add_argument("path", help="the path")
+    parser.add_argument("path", help="Path to source directory with Digital_RF data")
     return parser
 
 

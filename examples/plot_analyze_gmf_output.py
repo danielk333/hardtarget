@@ -1,6 +1,10 @@
 """
 Plot GMF results
 =================
+
+hardtarget convert eiscat ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf -o ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf
+
+
 """
 
 from pathlib import Path
@@ -18,7 +22,7 @@ parser.add_argument("data_folder")
 args = parser.parse_args()
 
 config = configparser.ConfigParser()
-config.read("./cfg/eiscat_uhf_2021_example.ini")
+config.read("./examples/cfg/test.ini")
 
 n_ranges = config.getint("signal-processing", "n_range_gates")
 n_cohints = config.getint("signal-processing", "num_cohints_per_file")
@@ -30,6 +34,7 @@ print(f"{len(h5_files)} files found")
 
 # The target event
 dt = datetime.datetime(2021, 4, 12, 12, 1, 33, 600000)
+# dt = datetime.datetime(2021, 4, 12, 12, 15, 57, 400000)
 time_stamp = dt.replace(tzinfo=datetime.timezone.utc).timestamp()
 print(f"Event should be located at {time_stamp}...")
 sample_stamp = time_stamp * sample_rate
