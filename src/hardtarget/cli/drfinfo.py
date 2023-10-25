@@ -2,7 +2,6 @@ import digital_rf as drf
 import datetime
 import numpy as np
 import pprint
-
 from .commands import add_command
 
 
