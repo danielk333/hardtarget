@@ -12,6 +12,7 @@ def rti(
     channel,
     start_time=None,
     end_time=None,
+    relative_time=False,
     axis_font_size=15,
     title_font_size=11,
     tick_font_size=11,
@@ -23,6 +24,12 @@ def rti(
 ):
     """
     Simple function to plot the range-time intensity information of complex raw voltage data.
+
+    The start and stop times can be in format of:
+    absolute time: (np.datetime64, datetime.datetime, string [ISOT])
+    time relative lower bound: (float [seconds])
+    if None, use drf-bound. To use relative time, toggle the flag `relative_time`
+
     """
 
     channels = drf_reader.get_channels()
@@ -53,22 +60,28 @@ def rti(
 
     # TODO: refactor good drf functionality to separate functions later and replace usage throughout code
     if start_time is not None:
-        if not isinstance(start_time, np.datetime64):
-            dt64_t0 = np.datetime64(start_time)
+        if relative_time:
+            _b0 = bounds[0] + start_time * sample_rate
         else:
-            dt64_t0 = start_time
-        unix_t0 = dt64_t0.astype("datetime64[s]").astype("int64")
-        _b0 = unix_t0 * sample_rate
+            if not isinstance(start_time, np.datetime64):
+                dt64_t0 = np.datetime64(start_time)
+            else:
+                dt64_t0 = start_time
+            unix_t0 = dt64_t0.astype("datetime64[s]").astype("int64")
+            _b0 = unix_t0 * sample_rate
         assert _b0 >= bounds[0], "Given start time is before input data start"
         bounds[0] = _b0
 
     if end_time is not None:
-        if not isinstance(end_time, np.datetime64):
-            dt64_t1 = np.datetime64(end_time)
+        if relative_time:
+            _b1 = bounds[0] + end_time * sample_rate
         else:
-            dt64_t1 = end_time
-        unix_t1 = dt64_t1.astype("datetime64[s]").astype("int64")
-        _b1 = int(unix_t1 * sample_rate)
+            if not isinstance(end_time, np.datetime64):
+                dt64_t1 = np.datetime64(end_time)
+            else:
+                dt64_t1 = end_time
+            unix_t1 = dt64_t1.astype("datetime64[s]").astype("int64")
+            _b1 = int(unix_t1 * sample_rate)
         assert _b1 <= bounds[1], "Given end time is after input data end"
         bounds[1] = _b1
 
