@@ -13,22 +13,16 @@ import logging
 import configparser
 from pathlib import Path
 
+from hardtarget.experiments import EXP_FILES
+
 # Number of samples in file. 640 ipps. eiscat leo experiment specific number!
 NUM_SAMPLES = 640 * 20000
 
 LOGGER_NAME = "eiscat2drf"
 
-
-def find_configfile(name, ext=".ini"):
-    """
-    Trying to find config file.
-    """
-    # print(__file__)
-    pth = __file__
-    cfgdir = pth[: pth.rindex("src/hardtarget")] + "cfg/"
-    cfile = cfgdir + name + ext
-    assert os.path.isfile(cfile), f"Config file {cfile} for {name} not found"
-    return cfile
+icomplex32 = np.dtype([
+    ('real', np.int16),
+    ('imag', np.int16)])
 
 
 ####################################################################
@@ -88,21 +82,67 @@ def determine_t0(mat):
     return t0 + int(np.round((1e6 * mat["d_parbl"][0][10] - t0) / dt) - 1) * dt
 
 
-icomplex32 = np.dtype([
-    ('real', np.int16),
-    ('imag', np.int16)])
-
 def to_icomplex32(zz):
     zz32 = np.empty(zz.shape, dtype=icomplex32)
     zz32['real'] = zz.real.astype(np.int16)
     zz32['imag'] = zz.imag.astype(np.int16)
     return zz32
 
+
 def to_i2x16(zz):
     zz2x16 = np.empty((len(zz), 2), dtype=np.int16)
-    zz2x16[:,0] = zz.real.astype(np.int16)
-    zz2x16[:,1] = zz.imag.astype(np.int16)
+    zz2x16[:, 0] = zz.real.astype(np.int16)
+    zz2x16[:, 1] = zz.imag.astype(np.int16)
     return zz2x16
+
+
+def all_files(top):
+    """generate all files matching 'dddddddd_dd/dddddddd.mat' or '.mat.bz2'
+    in sorted order
+    """
+    d = "[0-9]"
+
+    def filter_func(pth):
+        return pth.endswith(".mat") or pth.endswith("mat.bz2")
+
+    dirs = sorted(glob.glob(f"{top}/{8*d}_{2*d}"))
+    return it.chain(*(sorted(filter(filter_func, glob.glob(f"{dir}/{8*d}.mat*"))) for dir in dirs))
+
+
+def loadmat(pth):
+    """A version of loadmat which transparently unzips files on the fly (not in the filesystem)
+    """
+    if pth.endswith(".mat.bz2"):
+        pth = bz2.open(pth, "rb")
+    return sio.loadmat(pth)
+
+
+def expinfo_split(xpinf):
+    """Move from hard coded constants to loading config based on exp name/version
+
+    'kst0 leo_bpark_2.1u_NO' -> ('kst0', 'leo_bpark', '2.1u', 'NO')
+    """
+    try:
+        # host, name, versi, owner = \
+        match = re.match(r"(\w+) +(\w+)_(\d+(?:\.\d+)?[vu])_([A-Z]{2})", xpinf)
+        # return host, name, '_'.join(ver.spl, [site]), owner
+        return match.groups()
+    except Exception as e:
+        raise ValueError(f"d_ExpInfo: {xpinf} not understood: {e}")
+
+
+def load_expconfig(xpname):
+    cfg_name = xpname + ".ini"
+    assert cfg_name in EXP_FILES, "experiment not found in pre-defined configurations"
+    cfg_file = EXP_FILES[cfg_name]
+    try:
+        cfg = configparser.ConfigParser()
+        cfg.read_file(open(cfg_file, "r"))
+        return cfg
+    except Exception as e:
+        raise ValueError(f"Couldn't open config file for {xpname}:" + str(e))
+
+    return
 
 
 ####################################################################
@@ -141,49 +181,6 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
 
     if logger is None:
         logger = logging.getLogger(LOGGER_NAME)
-
-    # Helper functions
-
-    # generate all files matching 'dddddddd_dd/dddddddd.mat' or '.mat.bz2'
-    # in sorted order
-    def all_files(top):
-        d = "[0-9]"
-        f = lambda pth: pth.endswith(".mat") or pth.endswith("mat.bz2")
-
-        dirs = sorted(glob.glob(f"{top}/{8*d}_{2*d}"))
-        return it.chain(*(sorted(filter(f, glob.glob(f"{dir}/{8*d}.mat*"))) for dir in dirs))
-
-    # A version of loadmat which transparently unzips files on the fly (not in the filesystem)
-    def loadmat(pth):
-        if pth.endswith(".mat.bz2"):
-            pth = bz2.open(pth, "rb")
-        return sio.loadmat(pth)
-
-    # Move from hard coded constants to loading config based on exp name/version
-    def expinfo_split(xpinf):
-        """
-
-        'kst0 leo_bpark_2.1u_NO' -> ('kst0', 'leo_bpark', '2.1u', 'NO')
-
-        """
-        try:
-            # host, name, versi, owner = \
-            match = re.match(r"(\w+) +(\w+)_(\d+(?:\.\d+)?[vu])_([A-Z]{2})", xpinf)
-            # return host, name, '_'.join(ver.spl, [site]), owner
-            return match.groups()
-        except:
-            raise ValueError(f"d_ExpInfo: {xpinf} not understood")
-
-    def load_expconfig(xpname):
-        try:
-            cfg_file = find_configfile(xpname)
-            cfg = configparser.ConfigParser()
-            cfg.read_file(open(cfg_file, "r"))
-            return cfg
-        except Exception as e:
-            raise ValueError(f"Couldn't open config file for {xpname}:" + str(e))
-
-        return
 
     #######################################################################
     # SOURCE DIR
@@ -287,143 +284,6 @@ def eiscat2drf(srcdir, dstdir=None, logger=None):
         n_prev = n0
 
     logging.info("Done writing DRF files")
-
-
-def old_eiscat2drf_dont_use(input, output=None, logger=None):
-    """
-    Converts folder with eiscat measurements to drf files.
-
-    Parameters
-    ----------
-    input: string
-        path to input directory
-    output: string, optional
-        path ot output direction (default input)
-
-    Returns
-    -------
-
-
-    Notes
-    -----
-    Assumes folder structure
-    - input/2*/
-
-    Files within this folder will either be zipped (.b2z),
-    or matlab files (.mat). Zipped files are expected to
-    produce (.mat) files when extracted.
-
-    Result is put in subfolder within output folder.
-    - output/drf/uhf/
-    """
-
-    if logger is None:
-        logger = logging.getLogger(LOGGER_NAME)
-
-    # Check input dirpat
-    if not os.path.isdir(input):
-        logger.warning(f"input folder does not exist: {input}")
-        return
-
-    # Default output dirpath == input dirpath
-    if output is None:
-        output = input
-    # Check output dirpath
-    if not os.path.isdir(output):
-        logger.warning(f"output folder does not exists: {output}")
-        return
-    # Create folder structure
-    write_dirpath = os.path.join(output, "drf/uhf")
-    if not os.path.isdir(write_dirpath):
-        os.makedirs(write_dirpath, exist_ok=True)
-    # Verify that folder is empty
-    if len(os.listdir(write_dirpath)) > 0:
-        logger.warning(f"output folder is not empty: {write_dirpath}")
-        return
-
-    # find zipped files
-    zipped_files = glob.glob(f"{input}/2*/*.mat.bz2")
-
-    # map to zip pairs
-    def tup(f_in):
-        f_out, ext = os.path.splitext(f_in)
-        return f_in, f_out
-
-    zip_tuples = [tup(f) for f in zipped_files]
-
-    # filter zip pairs
-    def keep(f_out):
-        return not os.path.isfile(f_out)
-
-    # unzip
-    zip_tuples = [t for t in zip_tuples if keep(t[1])]
-    n_tuples = len(zip_tuples)
-    logger.info(f"unzip {n_tuples} bz2 files")
-    for idx, (in_file, out_file) in enumerate(zip_tuples):
-        if idx + 1 == n_tuples or idx % 10 == 0:
-            logger.info(f"unzip progress {idx+1}/{n_tuples}")
-        with bz2.open(in_file, "rb") as f_in:
-            with open(out_file, "wb") as f_out:
-                f_out.write(f_in.read())
-
-    # find matlab files
-    files = glob.glob(f"{input}/2*/*.mat")
-    files.sort()
-
-    # load start time from parameter block of first matlab file
-    mat = sio.loadmat(files[0])
-    t0 = determine_t0(mat)
-
-    # create digital rf writer
-    rf_writer = drf.DigitalRFWriter(
-        write_dirpath,  # directory
-        np.complex64,  # dtype
-        3600,  # subdir cadence secs
-        1000,  # file candence millisecs
-        t0,  # start global index
-        1000000,  # sample rate numerator
-        1,  # sample rate denominator
-        uuid_str="uhf",
-        compression_level=0,
-        checksum=False,
-        is_complex=True,
-        num_subchannels=1,
-        is_continuous=True,
-        marching_periods=True,
-    )
-
-    # write drf files
-    t_prev = t0
-    n_files = len(files)
-    logger.info(f"write {n_files} rdf files")
-    for idx, file in enumerate(files):
-        if idx + 1 == n_files or idx % 10 == 0:
-            logger.info(f"write progress {idx+1}/{n_files}")
-        mat = sio.loadmat(file)
-        # load start time from parameter block
-        t0 = determine_t0(mat)
-        logger.debug(f"n_samp {t0 - t_prev}")
-
-        # if start time is not 12800000 samples more than previous one, we
-        # have a missing data file. we must pad zeros into the data
-        if t0 - t_prev != 12800000 and t0 - t_prev != 0:
-            n_samp = (t0 - t_prev) - NUM_SAMPLES
-            logger.debug(f"padding zeros {n_samp}")
-            zz = np.zeros(n_samp, dtype=np.complex64)
-            try:
-                rf_writer.rf_write(zz)
-            except Exception:
-                pass
-
-        # write data file
-        z = np.array(mat["d_raw"][:, 0], dtype=np.complex64)
-        if len(z) == NUM_SAMPLES:
-            try:
-                rf_writer.rf_write(z)
-            except Exception:
-                pass
-        # save t0 as t_prev
-        t_prev = t0
 
 
 ####################################################################

@@ -1,5 +1,4 @@
 import numpy as np
-from hardtarget.utilities import read_vector_c81d
 from hardtarget.gmf import GMF_LIBS
 import logging
 import digital_rf as drf
@@ -78,13 +77,13 @@ def analyze_ipps(rx, tx, i0, params, logger=None):
     tx_reader = get_drf_reader(tx_path)
 
     # read data vector with n_ipps, and a little extra
-    z = read_vector_c81d(rx_reader, i0, (n_ipp + n_extra) * ipp, rx_channel)
+    z = rx_reader.read_vector_1d(i0, (n_ipp + n_extra) * ipp, rx_channel)
 
     # make a separate copy to hold transmit pulse, and the echo
     z_rx = np.copy(z)
 
     if tx_channel != rx_channel or tx_path != rx_path:
-        z = read_vector_c81d(tx_reader, i0, (n_ipp + n_extra) * ipp, tx_channel)
+        z = tx_reader.read_vector_1d(i0, (n_ipp + n_extra) * ipp, tx_channel)
     z_tx = np.copy(z)
 
     # clean ground clutter, get separate transmit waveform and echo vectors
