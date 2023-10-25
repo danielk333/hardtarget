@@ -4,7 +4,6 @@ import re
 import itertools as it
 import scipy.io as sio
 import digital_rf as drf
-import os
 import numpy as np
 import bz2
 import logging
@@ -134,8 +133,6 @@ def load_expconfig(xpname):
     except Exception as e:
         raise ValueError(f"Couldn't open config file for {xpname}:" + str(e))
 
-    return
-
 
 ####################################################################
 # EISCAT CONVERT
@@ -224,10 +221,10 @@ def eiscat_convert(srcdir, logger, dstdir=None):
     dstdir = dstdir / chnl
     # make sure dstdir exists
     if not dstdir.is_dir():
-        os.makedirs(dstdir, exist_ok=True)
+        dstdir.mkdir(parents=True, exist_ok=True)
     # make sure dstdir is empty
     if any(dstdir.iterdir()):
-        logging.info(f"Abort, destination directory is not empty: {str(dstdir)}")
+        logger.warning(f"Abort, destination directory is not empty: {str(dstdir)}")
         return
 
     # create digital rf writer
