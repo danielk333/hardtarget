@@ -76,6 +76,7 @@ def pair_unpackable(a):
 # PRE-PROCESS
 ####################################################################
 
+
 def preprocess(task):
     """
     Preprocess task.
@@ -90,7 +91,7 @@ def preprocess(task):
 
         output: string, optional, default None
             String path to directory for result files.
-            If None, no files - return results as dictionary 
+            If None, no files - return results as dictionary
 
     Returns
     -------
@@ -111,7 +112,7 @@ def preprocess(task):
     # check and compute gmf params
     task["gmf_params"] = gmf_params = {
         **analyze_params.DEFAULT_PARAMS,
-        **task.get("gmf_params", {})
+        **task.get("gmf_params", {}),
     }
     ok, msg = analyze_params.check_params(gmf_params)
     if not ok:
@@ -131,7 +132,7 @@ def preprocess(task):
     if rx_path is None or not Path(rx_path).is_dir():
         logger.warning(f"rx src path does not exist: {rx_path}")
         return False
-    
+
     rx_reader = drf.DigitalRFReader([rx_path])
     rx_channels = rx_reader.get_channels()
     if rx_channel not in rx_channels:
@@ -235,7 +236,7 @@ def process(task):
 
         output: string, optional, default None
             String path to directory for result files.
-            If None, no files - return results as dictionary 
+            If None, no files - return results as dictionary
 
     Returns
     -------
@@ -257,7 +258,7 @@ def process(task):
     tx = task["tx"]
     output_path = task.get("output", None)
     gmf_params = task["gmf_params"]
-    
+
     # number of range-gates to analyze
     n_range_gates = gmf_params["n_range_gates"]
     # inter-pulse period length in samples
@@ -271,18 +272,17 @@ def process(task):
     bounds = gmf_params["bounds"]
     # sample rate
     sample_rate = gmf_params["sample_rate"]
-    # subtasks    
+    # subtasks
     job_tasks = task["job_tasks"]
     n_job_tasks = len(job_tasks)
 
     # logging
-    job = task.get("job", {"idx":1, "N":1})
+    job = task.get("job", {"idx": 1, "N": 1})
     logger.info(f"starting job {job['idx']}/{job['N']} with {n_job_tasks} tasks")
 
     # process
     results = {"dir": output_path, "files": [], "out": {}}
     for idx, task_idx in enumerate(job_tasks):
-
         # initialise
         gmf_max = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
         gmf_dc = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
@@ -345,7 +345,7 @@ def process(task):
 
         # progress
         if progress is not None:
-            progress(idx+1, n_job_tasks)
+            progress(idx + 1, n_job_tasks)
 
     logger.info(f"finishing job {job['idx']}/{job['N']} with {n_job_tasks} tasks")
     return 100, results

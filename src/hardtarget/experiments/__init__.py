@@ -1,7 +1,7 @@
 import pathlib
 import importlib.resources
 
-DATA = {}
+EXP_FILES = {}
 
 # To be compatible with 3.7-8
 # as resources.files was introduced in 3.9
@@ -13,7 +13,7 @@ if hasattr(importlib.resources, "files"):
         if file.name.endswith(".py"):
             continue
 
-        DATA[file.name] = file
+        EXP_FILES[file.name] = file
 
 else:
     _data_folder = importlib.resources.contents("hardtarget.experiments")
@@ -24,4 +24,4 @@ else:
             if file.name.endswith(".py"):
                 continue
 
-            DATA[file.name] = pathlib.Path(str(file))
+            EXP_FILES[file.name] = pathlib.Path(str(file))
