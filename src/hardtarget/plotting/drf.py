@@ -3,6 +3,8 @@ import logging
 import numpy as np
 import scipy.constants as constants
 
+from hardtarget.drf_utils import time_interval_to_samples
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,34 +58,10 @@ def rti(
     T_rx_end_samp = int(T_rx_end * sample_rate)
 
     drf_bounds = drf_reader.get_bounds(channel)
-    bounds = list(drf_bounds)
 
-    # TODO: refactor good drf functionality to separate functions later and replace usage throughout code
-    if start_time is not None:
-        if relative_time:
-            _b0 = bounds[0] + start_time * sample_rate
-        else:
-            if not isinstance(start_time, np.datetime64):
-                dt64_t0 = np.datetime64(start_time)
-            else:
-                dt64_t0 = start_time
-            unix_t0 = dt64_t0.astype("datetime64[s]").astype("int64")
-            _b0 = unix_t0 * sample_rate
-        assert _b0 >= bounds[0], "Given start time is before input data start"
-        bounds[0] = _b0
-
-    if end_time is not None:
-        if relative_time:
-            _b1 = bounds[0] + end_time * sample_rate
-        else:
-            if not isinstance(end_time, np.datetime64):
-                dt64_t1 = np.datetime64(end_time)
-            else:
-                dt64_t1 = end_time
-            unix_t1 = dt64_t1.astype("datetime64[s]").astype("int64")
-            _b1 = int(unix_t1 * sample_rate)
-        assert _b1 <= bounds[1], "Given end time is after input data end"
-        bounds[1] = _b1
+    bounds = time_interval_to_samples(
+        start_time, end_time, drf_bounds, sample_rate, relative_time=relative_time
+    )
 
     ipp_n0 = (bounds[0] - drf_bounds[0] + exp_start_samp) // ipp_samps
     bounds[0] = ipp_n0 * ipp_samps + drf_bounds[0] + exp_start_samp

@@ -1,0 +1,2 @@
+hardtarget convert eiscat ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf -o ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf 
+mpirun -np 4 hardtarget analyze examples/cfg/test.ini ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/ uhf -o ~/data/spade/beamparks_analyzed/leo_bpark_2.1u_NO@uhf/ --progress -g c

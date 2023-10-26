@@ -9,6 +9,8 @@ from hardtarget.analysis import analyze_params
 from hardtarget.analysis import analyze_ipps
 from pathlib import Path
 
+from hardtarget.drf_utils import time_interval_to_samples
+
 
 def get_tasks(job, n_tasks):
     """
@@ -177,19 +179,18 @@ def preprocess(task):
     gmf_params["sample_rate"] = sample_rate
 
     # check bounds rx channel
-    bounds = list(rx_reader.get_bounds(rx_channel))
+    drf_bounds = rx_reader.get_bounds(rx_channel)
+
     start_time = gmf_params.get("start_time", None)
     end_time = gmf_params.get("end_time", None)
-    if start_time is not None:
-        _b0 = int(start_time * sample_rate)
-        print(_b0, bounds[0])
-        assert _b0 >= bounds[0], "Given start time is before input data start"
-        bounds[0] = _b0
-    if end_time is not None:
-        _b1 = int(end_time * sample_rate)
-        assert _b1 <= bounds[1], "Given end time is after input data end"
-        bounds[1] = _b1
-    gmf_params["bounds"] = bounds = tuple(bounds)
+    relative_time = gmf_params.get("relative_time", False)
+    if relative_time:
+        start_time = float(start_time)
+        end_time = float(end_time)
+    bounds = time_interval_to_samples(
+        start_time, end_time, drf_bounds, sample_rate, relative_time=relative_time
+    )
+    gmf_params["bounds"] = bounds
 
     # check blocks rx channel
     blocks = rx_reader.get_continuous_blocks(bounds[0], bounds[1], rx_channel)

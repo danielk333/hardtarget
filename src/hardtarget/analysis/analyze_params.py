@@ -36,8 +36,6 @@ INT_PARAM_KEYS = [
     "tx_pulse_length",
     "ground_clutter_length",
     "num_cohints_per_file",
-    "start_time",
-    "end_time",
 ]
 
 BOOL_PARAM_KEYS = ["round_trip_range"]
