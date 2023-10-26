@@ -1,7 +1,7 @@
 import digital_rf as drf
 import datetime
 import numpy as np
-import pprint
+# import pprint
 from .commands import add_command
 
 
@@ -17,8 +17,8 @@ def main(args, cli_logger):
     for chnl in channels:
         print(f"CHANNEL: {chnl}")
         props = reader.get_properties(chnl)
-        print("props:")
-        pprint.pprint(props)
+        # print("props:")
+        # pprint.pprint(props)
         bounds = list(reader.get_bounds(chnl))
         print(f"bounds: {bounds}")
         print(f"Total mega-samples: {(bounds[1] - bounds[0])*1e-6}")
@@ -28,9 +28,8 @@ def main(args, cli_logger):
         dt1 = datetime.datetime.utcfromtimestamp(bounds[1]/sample_rate)
         print(f"end: {dt1}")
         blocks = reader.get_continuous_blocks(bounds[0], bounds[1], chnl)
+        blocks = [(k, v) for k, v in blocks.items()]
         print(f"blocks: {blocks}")
-        data = reader.read_vector(bounds[0], 10, chnl)
-        print(f"data: {data}")
 
 
 add_command(
