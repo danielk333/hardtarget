@@ -33,8 +33,8 @@ h5_files.sort()
 print(f"{len(h5_files)} files found")
 
 # The target event
-dt = datetime.datetime(2021, 4, 12, 12, 1, 33, 600000)
-# dt = datetime.datetime(2021, 4, 12, 12, 15, 57, 400000)
+# dt = datetime.datetime(2021, 4, 12, 12, 1, 33, 600000)
+dt = datetime.datetime(2021, 4, 12, 12, 15, 57, 400000)
 time_stamp = dt.replace(tzinfo=datetime.timezone.utc).timestamp()
 print(f"Event should be located at {time_stamp}...")
 sample_stamp = time_stamp * sample_rate
