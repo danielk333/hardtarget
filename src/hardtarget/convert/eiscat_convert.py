@@ -8,7 +8,6 @@ import numpy as np
 import bz2
 import logging
 import configparser
-import datetime
 from pathlib import Path
 from hardtarget.experiments import EXP_FILES
 
