@@ -8,6 +8,7 @@ import numpy as np
 import bz2
 import logging
 import configparser
+import datetime
 from pathlib import Path
 from hardtarget.experiments import EXP_FILES
 
@@ -189,8 +190,8 @@ def eiscat_convert(srcdir, logger, dstdir=None):
 
     # load start time from parameter block of first matlab file
     mat = loadmat(pth)
-    # upar = mat["d_parbl"][0, 41:62]
-    # radar_frequency = upar[13]
+    upar = mat["d_parbl"][0, 41:62]
+    radar_frequency = upar[13]
 
     # Find experiment info from first file
     host, expname, expvers, owner = expinfo_split(str(mat["d_ExpInfo"][0]))
@@ -274,3 +275,47 @@ def eiscat_convert(srcdir, logger, dstdir=None):
 
     logging.info("Done writing DRF files")
 
+    #######################################################################
+    # META DATA FILE
+    #######################################################################
+
+    EXP_SECTION = "Experiment"
+    meta = configparser.ConfigParser()  
+    meta.add_section(EXP_SECTION)
+    exp = meta["Experiment"]
+    exp["name"] = expname
+    exp["version"] = expvers
+
+    # forward values from experiment config file
+    exp["sample_rate"] = cfv.get("sample_rate")
+    exp["ipp"] = cfv.get("ipp")
+    exp["file_secs"] = cfv.get("file_secs")
+    exp["pulse_length"] = cfv.get("pulse_length")
+    exp["doppler_sign"] = cfv.get("doppler_sign")
+    exp["round_trip_range"] = cfv.get("round_trip_range")
+    exp["frequency"] = str(radar_frequency)
+
+    # read selected meta info from written drf file
+    reader = drf.DigitalRFReader(str(dstdir.parent))
+    available_channels = reader.get_channels()
+    chnl_map = {"tx": cfv.get("tx_channel"), "rx": cfv.get("rx_channel")}
+    for chnl_type, chnl in chnl_map.items():
+        if chnl not in available_channels:
+            continue
+        bounds = list(reader.get_bounds(chnl))
+        _sample_rate = sample_rate  # .astype(np.int64)
+        dt0 = datetime.datetime.utcfromtimestamp(bounds[0]/_sample_rate)
+        dt1 = datetime.datetime.utcfromtimestamp(bounds[1]/_sample_rate)
+        chnl_section = f"{EXP_SECTION}.{chnl_type}"
+        if not meta.has_section(chnl_section):
+            meta.add_section(chnl_section)
+        meta[chnl_section]["channel"] = chnl
+        meta[chnl_section]["bounds_start"] = str(bounds[0])
+        meta[chnl_section]["bounds_end"] = str(bounds[1])
+        meta[chnl_section]["start"] = str(dt0)
+        meta[chnl_section]["end"] = str(dt1)
+
+    # write metadata file
+    metafile = dstdir.parent / "metadata.ini"
+    with open(metafile, 'w') as f:
+        meta.write(f)
