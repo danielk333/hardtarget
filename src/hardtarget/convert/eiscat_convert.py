@@ -287,33 +287,18 @@ def eiscat_convert(srcdir, logger, dstdir=None):
     exp["version"] = expvers
 
     # forward values from experiment config file
-    exp["sample_rate"] = cfv.get("sample_rate")
-    exp["ipp"] = cfv.get("ipp")
-    exp["file_secs"] = cfv.get("file_secs")
-    exp["pulse_length"] = cfv.get("pulse_length")
-    exp["doppler_sign"] = cfv.get("doppler_sign")
-    exp["round_trip_range"] = cfv.get("round_trip_range")
-    exp["frequency"] = str(radar_frequency)
+    props = [
+        "sample_rate", "ipp", "file_secs", "pulse_length",
+        "doppler_sign", "round_trip_range",
+        "rx_channel", "rx_start", "rx_end",
+        "tx_channel", "tx_start", "tx_end",
+        "cal_on", "cal_off"
+    ]
+    for prop in props:
+        exp[prop] = cfv.get(prop)
 
-    # read selected meta info from written drf file
-    reader = drf.DigitalRFReader(str(dstdir.parent))
-    available_channels = reader.get_channels()
-    chnl_map = {"tx": cfv.get("tx_channel"), "rx": cfv.get("rx_channel")}
-    for chnl_type, chnl in chnl_map.items():
-        if chnl not in available_channels:
-            continue
-        bounds = list(reader.get_bounds(chnl))
-        _sample_rate = sample_rate  # .astype(np.int64)
-        dt0 = datetime.datetime.utcfromtimestamp(bounds[0]/_sample_rate)
-        dt1 = datetime.datetime.utcfromtimestamp(bounds[1]/_sample_rate)
-        chnl_section = f"{EXP_SECTION}.{chnl_type}"
-        if not meta.has_section(chnl_section):
-            meta.add_section(chnl_section)
-        meta[chnl_section]["channel"] = chnl
-        meta[chnl_section]["bounds_start"] = str(bounds[0])
-        meta[chnl_section]["bounds_end"] = str(bounds[1])
-        meta[chnl_section]["start"] = str(dt0)
-        meta[chnl_section]["end"] = str(dt1)
+    # add
+    exp["frequency"] = str(radar_frequency)
 
     # write metadata file
     metafile = dstdir.parent / "metadata.ini"
