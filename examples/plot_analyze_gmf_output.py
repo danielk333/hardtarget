@@ -2,8 +2,8 @@
 Plot GMF results
 =================
 
-hardtarget convert eiscat ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf -o ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf
-
+hardtarget convert eiscat ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf \
+    -o ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf
 
 """
 

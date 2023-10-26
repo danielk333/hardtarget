@@ -302,8 +302,8 @@ def process(task):
             dirname.mkdir(parents=True, exist_ok=True)
 
             if outfile.is_file() and not clobber:
-                logger.info(f"job already done {job['idx']}/{job['N']}")
-                return 100, results
+                logger.info(f"job {job['idx']}/{job['N']} already done task {idx}/{n_job_tasks}")
+                continue
 
             # write result
             out = h5py.File(outfile, "w")
