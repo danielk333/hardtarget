@@ -4,6 +4,7 @@ import time
 import datetime
 import digital_rf as drf
 import h5py
+from tqdm import tqdm
 from hardtarget.analysis import analyze_params
 from hardtarget.analysis import analyze_ipps
 from pathlib import Path
@@ -251,7 +252,8 @@ def process(task):
         out: dictionary with in-memory results
     """
     logger = task.get("logger", logging.getLogger(__name__))
-    progress = task.get("progress", None)
+    progress = task.get("progress", False)
+    progress_position = task.get("progress_position", 0)
     clobber = task.get("clobber", False)
 
     rx = task["rx"]
@@ -275,10 +277,18 @@ def process(task):
     # subtasks
     job_tasks = task["job_tasks"]
     n_job_tasks = len(job_tasks)
+    tasks_skipped = 0
 
     # logging
     job = task.get("job", {"idx": 1, "N": 1})
     logger.info(f"starting job {job['idx']}/{job['N']} with {n_job_tasks} tasks")
+
+    if progress:
+        progress_bar = tqdm(
+            position=progress_position,
+            desc="Processing",
+            total=n_job_tasks,
+        )
 
     # process
     results = {"dir": output_path, "files": [], "out": {}}
@@ -302,13 +312,9 @@ def process(task):
             dirname.mkdir(parents=True, exist_ok=True)
 
             if outfile.is_file() and not clobber:
-                logger.info(f"job {job['idx']}/{job['N']} already done task {idx}/{n_job_tasks}")
+                logger.debug(f"job {job['idx']}/{job['N']} already done task {idx}/{n_job_tasks}")
+                tasks_skipped += 1
                 continue
-
-            # write result
-            out = h5py.File(outfile, "w")
-        else:
-            out = {}
 
         # process
         ts0 = time.time()
@@ -328,6 +334,12 @@ def process(task):
         msg = "task_idx {task:4} time {time:1.2f} cpu/real {real:1.2f}"
         logger.debug(msg.format(**info))
 
+        if output_path is not None:
+            # write result
+            out = h5py.File(outfile, "w")
+        else:
+            out = {}
+
         # output
         out["gmf"] = gmf_max
         out["gmf_dc"] = gmf_dc
@@ -344,8 +356,11 @@ def process(task):
             results["out"][filepath.name] = out
 
         # progress
-        if progress is not None:
-            progress(idx + 1, n_job_tasks)
+        if progress:
+            progress_bar.update(1 + tasks_skipped)
+            tasks_skipped = 0
+    if progress:
+        progress_bar.close()
 
     logger.info(f"finishing job {job['idx']}/{job['N']} with {n_job_tasks} tasks")
     return 100, results
