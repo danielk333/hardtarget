@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import logging
-from progress.bar import Bar
 from pathlib import Path
 
 from hardtarget.analysis import analyze_gmf
@@ -17,6 +16,7 @@ LOGGER_NAME = "analyse_gmf"
 # SCRIPT ENTRY POINT
 ####################################################################
 
+
 def parser_build(parser):
     # Add the arguments
     parser.add_argument("config", help="Path to config file")
@@ -28,6 +28,12 @@ def parser_build(parser):
     parser.add_argument("--progress", action="store_true", help="Progress bar")
     parser.add_argument("--clobber", action="store_true", help="Override outputs")
     parser.add_argument(
+        "-g", "--gmflib",
+        choices=["numpy", "c", "cuda"],
+        help="GMF implementation",
+        default=None,
+    )
+    parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="INFO",
@@ -37,7 +43,6 @@ def parser_build(parser):
 
 
 def main(args, cli_logger):
-
     # logging
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(getattr(logging, args.log_level))
@@ -45,6 +50,7 @@ def main(args, cli_logger):
     # job
     try:
         from mpi4py import MPI
+
         comm = MPI.COMM_WORLD
     except ImportError:
 
@@ -68,6 +74,12 @@ def main(args, cli_logger):
         return
     gmf_params = load_gmf_params(args.config)
 
+    if args.gmflib is not None:
+        gmf_params["gmflib"] = args.gmflib
+    if "gmflib" not in gmf_params:
+        gmf_params["gmflib"] = "c"
+
+    logger.info("Using GMF backend: " + gmf_params["gmflib"])
     # create task
     task = {
         "job": job,
@@ -76,28 +88,20 @@ def main(args, cli_logger):
         "tx": (args.tx, args.txchnl),
         "output": output,
         "gmf_params": gmf_params,
-        "clobber": args.clobber
+        "clobber": args.clobber,
     }
 
     # preprocess
     ok = analyze_gmf.preprocess(task)
-    if (ok):
-
+    if ok:
         # progress
         if args.progress:
-            progress_bar = Bar('Processing', max=len(task["job_tasks"]))
-
-            def progress_callback(numerator, divisor):
-                progress_bar.goto(numerator)
-
-            task["progress"] = progress_callback
+            task["progress"] = True
+            task["progress_position"] = comm.rank
 
         # process
         ok, results = analyze_gmf.process(task)
         logger.info(f"produced {len(results['files'])} files")
-
-        if args.progress:
-            progress_bar.finish()
 
 
 add_command(
