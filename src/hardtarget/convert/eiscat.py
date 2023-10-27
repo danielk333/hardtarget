@@ -281,13 +281,13 @@ def eiscat_convert(srcdir, logger, dstdir=None):
     EXP_SECTION = "Experiment"
     meta = configparser.ConfigParser()  
     meta.add_section(EXP_SECTION)
-    exp = meta["Experiment"]
+    exp = meta[EXP_SECTION]
     exp["name"] = expname
     exp["version"] = expvers
 
     # forward values from experiment config file
     props = [
-        "sample_rate", "ipp", "file_secs", "pulse_length",
+        "sample_rate", "ipp", "file_secs", "tx_pulse_length",
         "doppler_sign", "round_trip_range",
         "rx_channel", "rx_start", "rx_end",
         "tx_channel", "tx_start", "tx_end",
@@ -297,7 +297,7 @@ def eiscat_convert(srcdir, logger, dstdir=None):
         exp[prop] = cfv.get(prop)
 
     # add
-    exp["frequency"] = str(radar_frequency)
+    exp["radar_frequency"] = str(radar_frequency)
 
     # write metadata file
     metafile = dstdir.parent / "metadata.ini"

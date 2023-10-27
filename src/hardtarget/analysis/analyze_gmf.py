@@ -5,14 +5,44 @@ import datetime
 import digital_rf as drf
 import h5py
 from tqdm import tqdm
-from hardtarget.analysis import analyze_params
-from hardtarget.analysis import analyze_ipps
 from pathlib import Path
+from hardtarget.analysis import analyze_ipps
+import hardtarget.analysis.gmf_utils as gmf_utils
+import hardtarget.drf_utils as drf_utils
 
-from hardtarget.drf_utils import time_interval_to_samples
+
+####################################################################
+# DIGITAL RF READERS
+####################################################################
+
+def is_pair_unpackable(a):
+    """Returns true if a can be unpacked to a pair of variables."""
+    return True if isinstance(a, (tuple, list)) and len(a) == 2 else False
 
 
-def get_tasks(job, n_tasks):
+def load_source(src):
+    """
+    Load Digital_rf reader object from (srcdir, chnl) 
+    """
+    if type(src) is not tuple:
+        raise ValueError(f"tuple (path, chnl) expected, {src}")
+    if not is_pair_unpackable(src):
+        raise ValueError(f"tuple (path, chnl) expected, {src}")
+    path, chnl = src
+    if path is None or not Path(path).is_dir():
+        raise ValueError(f"path must be directory, {path}")
+    reader = drf.DigitalRFReader([path])
+    channels = reader.get_channels()
+    if chnl not in channels:
+        raise ValueError(f"reader does not support channel, {chnl}")
+    return path, reader, chnl
+
+
+####################################################################
+# CALCULATE TASKS
+####################################################################
+
+def compute_job_tasks(job, n_tasks):
     """
     Generates a list of task indexes for given job.
 
@@ -40,6 +70,51 @@ def get_tasks(job, n_tasks):
     return list(range(job["idx"], n_tasks, job["N"]))
 
 
+def compute_total_tasks(gmf_params, bounds):
+    """
+    Compute the total number of tasks, associated with sample bounds.
+    """
+    # inter-pulse period length in samples
+    ipp = gmf_params["ipp"]
+    # number of interpulse periods to coherently integrate
+    n_ipp = gmf_params["n_ipp"]
+    # number of coherent integration periods to include in one output file
+    # smaller means that lower latency can be achieved
+    num_cohints_per_file = gmf_params["num_cohints_per_file"]
+    n_tasks = int(np.floor((bounds[1] - bounds[0]) / (ipp * n_ipp)) / num_cohints_per_file)
+    return n_tasks
+
+
+####################################################################
+# BOUNDS
+####################################################################
+
+# def bounds_to_str(bounds, sample_rate):
+#     """Create human readable representation of bounds, for logging."""
+#     _bounds = []
+#     for sample_number in bounds:
+#         dt = datetime.datetime.utcfromtimestamp(sample_number / sample_rate)
+#         _bounds.append(dt.strftime("%Y-%m-%dT%H:%M:%S"))
+#     return str(_bounds)
+
+
+def compute_bounds(reader, chnl, sample_rate,
+                   start_time=None,
+                   end_time=None,
+                   relative_time=False):
+    """
+    optionally restrict sample bounds given timestamps 
+    """
+    drf_bounds = reader.get_bounds(chnl)
+    return drf_utils.time_interval_to_samples(
+        start_time, end_time, drf_bounds, sample_rate, relative_time=relative_time
+    )
+
+
+####################################################################
+# OUTPUT FILE PATH
+####################################################################
+
 def get_filepath(file_idx, sample_rate):
     """
     Generates a file path for h5 file to be written.
@@ -61,189 +136,36 @@ def get_filepath(file_idx, sample_rate):
     return Path(time_string) / f"gmf-{file_idx:08d}.h5"
 
 
-def bounds_to_str(bounds, sample_rate):
-    """Create human readable representation of bounds, for logging."""
-    _bounds = []
-    for sample_number in bounds:
-        dt = datetime.datetime.utcfromtimestamp(sample_number / sample_rate)
-        _bounds.append(dt.strftime("%Y-%m-%dT%H:%M:%S"))
-    return str(_bounds)
-
-
-def pair_unpackable(a):
-    """Returns true if a can be unpacked to a pair of variables."""
-    return True if isinstance(a, (tuple, list)) and len(a) == 2 else False
-
-
 ####################################################################
-# PRE-PROCESS
+# ANALYZE GMF
 ####################################################################
 
 
-def preprocess(task):
-    """
-    Preprocess task.
-    - checking parameters
-    - generating derived parameters
-    - compute a batch of processing subtasks
-
-    Parameters
-    ----------
-    task: dict
-        Dictionary containing a variety of parameters.
-
-        output: string, optional, default None
-            String path to directory for result files.
-            If None, no files - return results as dictionary
-
-    Returns
-    -------
-    progress: int
-        progress in percent [0,100]
-
-    result: dict
-        dir: string
-            path to directory with files
-        files: list
-            paths to each generated file
-        out: dictionary with in-memory results
-    """
-
-    # logger
-    logger = task.get("logger", logging.getLogger(__name__))
-
-    # check and compute gmf params
-    task["gmf_params"] = gmf_params = {
-        **analyze_params.DEFAULT_PARAMS,
-        **task.get("gmf_params", {}),
-    }
-    ok, msg = analyze_params.check_params(gmf_params)
-    if not ok:
-        logger.error(msg)
-        return False
-    analyze_params.process_params(gmf_params)
-
-    # rx source
-    rx = task.get("rx", None)
-    if rx is None:
-        logger.warning("missing rx")
-        return False
-    if not pair_unpackable(rx):
-        logger.warning(f"rx must be tuple pair: {rx}")
-        return False
-    rx_path, rx_channel = rx
-    if rx_path is None or not Path(rx_path).is_dir():
-        logger.warning(f"rx src path does not exist: {rx_path}")
-        return False
-
-    rx_reader = drf.DigitalRFReader([rx_path])
-    rx_channels = rx_reader.get_channels()
-    if rx_channel not in rx_channels:
-        logger.error(f"rdf data does not support rx_channel: {rx_channel}")
-        return False
-    task["rx"] = (rx_path, rx_channel)
-
-    # tx source
-    tx = task.get("tx", None)
-    if tx is None:
-        tx = rx
-    if not pair_unpackable(tx):
-        logger.warning(f"tx must be tuple pair: {tx}")
-    tx_path, tx_channel = tx
-    if tx_path is None:
-        tx_path = rx_path
-    if tx_channel is None:
-        tx_channel = rx_channel
-    if tx_path is None or not Path(tx_path).is_dir():
-        logger.warning(f"tx src path does not exist: {tx_path}")
-    tx_reader = drf.DigitalRFReader([tx_path])
-    tx_channels = tx_reader.get_channels()
-    if tx_channel not in tx_channels:
-        logger.error(f"rdf data does not support tx_channel: {tx_channel}")
-        return False
-    task["tx"] = (tx_path, tx_channel)
-
-    # output path
-    output_path = task.get("output", None)
-    if output_path is not None and not Path(output_path).is_dir():
-        logger.warning(f"output folder does not exist: {output_path}")
-        return False
-
-    # check sample rate
-    props = rx_reader.get_properties(rx_channel)
-    # sample_rate = props["samples_per_second"].astype(np.int128)
-    sample_rate = props["samples_per_second"].astype(np.int64)
-    if sample_rate != gmf_params["sample_rate"]:
-        logger.warning(f"rdf data only supports sample rate: {sample_rate}")
-        return False
-    gmf_params["sample_rate"] = sample_rate
-
-    # check bounds rx channel
-    drf_bounds = rx_reader.get_bounds(rx_channel)
-
-    start_time = gmf_params.get("start_time", None)
-    end_time = gmf_params.get("end_time", None)
-    relative_time = gmf_params.get("relative_time", False)
-    if relative_time:
-        start_time = float(start_time)
-        end_time = float(end_time)
-    bounds = time_interval_to_samples(
-        start_time, end_time, drf_bounds, sample_rate, relative_time=relative_time
-    )
-    gmf_params["bounds"] = bounds
-
-    # check blocks rx channel
-    blocks = rx_reader.get_continuous_blocks(bounds[0], bounds[1], rx_channel)
-    if len(blocks) > 1:
-        logger.warning(f"multiple continuous blocks: {len(blocks)}")
-
-    # compute tasks
-    # inter-pulse period length in samples
-    ipp = gmf_params["ipp"]
-    # number of interpulse periods to coherently integrate
-    n_ipp = gmf_params["n_ipp"]
-    # number of coherent integration periods to include in one output file
-    # smaller means that lower latency can be achieved
-    num_cohints_per_file = gmf_params["num_cohints_per_file"]
-    n_tasks = int(np.floor((bounds[1] - bounds[0]) / (ipp * n_ipp)) / num_cohints_per_file)
-
-    # compute subset of tasks for this job
-    job = task.get("job", {"idx": 0, "N": 1})
-    task["job_tasks"] = job_tasks = get_tasks(job, n_tasks)
-
-    # logging
-    logger.debug(f"channel: {rx_channel}")
-    logger.debug(f"bounds: {bounds_to_str(bounds, sample_rate)}")
-    logger.debug(f"sample rate: {sample_rate}")
-    logger.debug(f"continuous blocks: {len(blocks)}")
-    logger.info(f"total_tasks: {n_tasks}")
-    logger.debug(f"job_tasks: {len(job_tasks)}")
-
-    return True
-
-
-####################################################################
-# PROCESS
-####################################################################
-
-
-def process(task):
+def analyze_gmf(rx, tx, 
+                config=None,
+                start_time=None,
+                end_time=None,
+                relative_time=False,
+                job={"idx": 1, "N": 1},
+                logger=None,
+                progress=False,
+                progress_position = 0,
+                clobber = False,
+                output=None,
+                gmflib=None
+                ):
     """
     Analyze data using gmf.
 
     Parameters
     ----------
-    task: dict
-        Dictionary containing a variety of parameters.
-
-        output: string, optional, default None
-            String path to directory for result files.
-            If None, no files - return results as dictionary
-
+    rx: Digital_rf reader
+    tx: Digital_rf reader
+    gmf_config: path gfm config file
+    job: used to identify subset of task indexes for this job
+ 
     Returns
     -------
-    progress: int
-        progress in percent [0,100]
 
     result: dict
         dir: string
@@ -252,47 +174,51 @@ def process(task):
             paths to each generated file
         out: dictionary with in-memory results
     """
-    logger = task.get("logger", logging.getLogger(__name__))
-    progress = task.get("progress", False)
-    progress_position = task.get("progress_position", 0)
-    clobber = task.get("clobber", False)
+    
+    # load data sources
+    rx_srcdir, rx_reader, rx_chnl = load_source(rx)
+    tx_srcdir, tx_reader, tx_chnl = load_source(tx)
 
-    rx = task["rx"]
-    tx = task["tx"]
-    output_path = task.get("output", None)
-    gmf_params = task["gmf_params"]
+    # gmf params
+    gmf_params = gmf_utils.load_gmf_params(rx_srcdir, config)
+    # override config file
+    if gmflib is not None:
+        gmf_params['gmflib'] = gmflib
+    logger.info("Using GMF backend: " + gmf_params["gmflib"])
 
-    # number of range-gates to analyze
-    n_range_gates = gmf_params["n_range_gates"]
-    # inter-pulse period length in samples
-    ipp = gmf_params["ipp"]
-    # number of interpulse periods to coherently integrate
-    n_ipp = gmf_params["n_ipp"]
-    # number of coherent integration periods to include in one output file
-    # smaller means that lower latency can be achieved
-    num_cohints_per_file = gmf_params["num_cohints_per_file"]
     # bounds
-    bounds = gmf_params["bounds"]
-    # sample rate
-    sample_rate = gmf_params["sample_rate"]
-    # subtasks
-    job_tasks = task["job_tasks"]
-    n_job_tasks = len(job_tasks)
+    bounds = compute_bounds(rx_reader, rx_chnl, gmf_params["sample_rate"],
+                            start_time=start_time,
+                            end_time=end_time,
+                            relative_time=relative_time)
+
+    # tasks
+    total_tasks = compute_total_tasks(gmf_params, bounds)
+    job_tasks = compute_job_tasks(job, total_tasks)
     tasks_skipped = 0
 
     # logging
-    job = task.get("job", {"idx": 1, "N": 1})
-    logger.info(f"starting job {job['idx']}/{job['N']} with {n_job_tasks} tasks")
+    if logger is None:
+        logger = logging.getLogger(__name__)
+    logger.info(f"starting job {job['idx']}/{job['N']} with {len(job_tasks)} tasks")
 
+    # progress
     if progress:
         progress_bar = tqdm(
             position=progress_position,
             desc="Processing",
-            total=n_job_tasks,
+            total=len(job_tasks),
         )
 
+    # variable access
+    n_range_gates = gmf_params["n_range_gates"]
+    ipp = gmf_params["ipp"]
+    n_ipp = gmf_params["n_ipp"]
+    num_cohints_per_file = gmf_params["num_cohints_per_file"]
+    sample_rate = gmf_params["sample_rate"]
+
     # process
-    results = {"dir": output_path, "files": [], "out": {}}
+    results = {"dir": output, "files": [], "out": {}}
     for idx, task_idx in enumerate(job_tasks):
         # initialise
         gmf_max = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
@@ -305,15 +231,15 @@ def process(task):
         file_idx = task_idx * ipp * n_ipp * num_cohints_per_file + bounds[0]
         filepath = get_filepath(file_idx, sample_rate)
 
-        # write to file if output_path is defined
-        if output_path is not None:
-            outfile = Path(output_path) / filepath
+        # write to file if output is defined
+        if output is not None:
+            outfile = Path(output) / filepath
             # crate directory
             dirname = Path(outfile).parent
             dirname.mkdir(parents=True, exist_ok=True)
 
             if outfile.is_file() and not clobber:
-                logger.debug(f"job {job['idx']}/{job['N']} already done task {idx}/{n_job_tasks}")
+                logger.debug(f"job {job['idx']}/{job['N']} already done task {idx}/{len(job_tasks)}")
                 tasks_skipped += 1
                 continue
 
@@ -335,7 +261,7 @@ def process(task):
         msg = "task_idx {task:4} time {time:1.2f} cpu/real {real:1.2f}"
         logger.debug(msg.format(**info))
 
-        if output_path is not None:
+        if output is not None:
             # write result
             out = h5py.File(outfile, "w")
         else:
@@ -350,7 +276,7 @@ def process(task):
         out["tx_pwr"] = gmf_txp
         out["i0"] = i0
 
-        if output_path is not None:
+        if output is not None:
             out.close()
             results["files"].append(filepath.name)
         else:
@@ -363,5 +289,5 @@ def process(task):
     if progress:
         progress_bar.close()
 
-    logger.info(f"finishing job {job['idx']}/{job['N']} with {n_job_tasks} tasks")
-    return 100, results
+    logger.info(f"finishing job {job['idx']}/{job['N']} with {len(job_tasks)} tasks")
+    return results

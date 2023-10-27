@@ -140,3 +140,7 @@ It is also possible to install in developer mode, to avoid repeated reinstalling
 ```bash
 pip install -e .
 ```
+
+```bash
+pip uninstall hardtarget
+```

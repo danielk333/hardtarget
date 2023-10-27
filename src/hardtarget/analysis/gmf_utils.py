@@ -1,27 +1,26 @@
+import configparser
 import numpy as np
 import scipy.constants
+from hardtarget import drf_utils
 
-CONFIG_SECTIONS = [
-    "radar-experiment",
-    "signal-processing",
-]
+
+####################################################################
+# GET GMF PROCESSING PARAMS
+####################################################################
 
 DEFAULT_PARAMS = {
+    "gmflib": "c",
     "n_ipp": 5,
-    "sample_rate": 1000000,
     "n_range_gates": 10000,
     "range_gate_0": 200,
     "range_gate_step": 1,
     "frequency_decimation": 25,
-    "ipp": 10000,
-    "tx_pulse_length": 445,
     "ground_clutter_length": 1500,
     "min_acceleration": -400.0,
     "max_acceleration": 400.0,
     "acceleration_resolution": 0.2,
     "snr_thresh": 10.0,
     "doppler_sign": 1.0,
-    "radar_frequency": 500e6,
     "round_trip_range": True,
     "num_cohints_per_file": 100,
 }
@@ -29,11 +28,9 @@ DEFAULT_PARAMS = {
 INT_PARAM_KEYS = [
     "n_ipp",
     "n_range_gates",
-    "range_gate_step",
     "range_gate_0",
+    "range_gate_step",
     "frequency_decimation",
-    "ipp",
-    "tx_pulse_length",
     "ground_clutter_length",
     "num_cohints_per_file",
 ]
@@ -41,104 +38,64 @@ INT_PARAM_KEYS = [
 BOOL_PARAM_KEYS = ["round_trip_range"]
 
 FLOAT_PARAM_KEYS = [
-    "sample_rate",
     "min_acceleration",
     "max_acceleration",
     "acceleration_resolution",
-    "snr_thresh",
-    "doppler_sign",
-    "radar_frequency",
 ]
 
-DEFAULT_PARAM_KEYS = [key for key, _ in DEFAULT_PARAMS.items()]
 
-DERIVED_PARAM_KEYS = [
-    "rgs",
-    "rgs_float",
-    "ranges",
-    "fvec",
-    "n_fft",
-    "fvec",
-    "wavelength",
-    "range_rates",
-    "n_accelerations",
-    "accs",
-    "acc_phasors",
-    "n_extra",
-    "read_length",
-    "rx_stencil",
-    "tx_stencil",
-]
+####################################################################
+# LOAD GMF PROCESSING PARAMS FROM CONFIG
+####################################################################
 
-REQUIRED_PARAM_KEYS = DEFAULT_PARAM_KEYS
+def load_gmf_processing_params(configfile=None):
+
+    d = {**DEFAULT_PARAMS}
+
+    if configfile is not None:
+        config = configparser.ConfigParser()
+        config.read(configfile)
+        SECTION = "signal-processing"
+        for key in config[SECTION].keys():
+            # Convert values to specific types
+            if key in INT_PARAM_KEYS:
+                d[key] = config.getint(SECTION, key)
+            elif key in BOOL_PARAM_KEYS:
+                d[key] = config.getboolean(SECTION, key)
+            elif key in FLOAT_PARAM_KEYS:
+                d[key] = config.getfloat(SECTION, key)
+            else:
+                # string
+                d[key] = config.get(SECTION, key).strip("'").strip('"')
+    return d
 
 
-def set_n_ranges(params):
+####################################################################
+# LOAD ALL GMF PARAMS
+####################################################################
+
+
+def load_gmf_params(drf_srcdir, gmf_configfile):
     """
-    Reset the number of range-gates in params. 
-
-    Parameters
-    ----------
-    params: dict
-        Dictionary with gmf parameters
-
-
-    Notes
-    -----
-    This is useful when reanalyzing with better resolution
-    to fine-tune the result
+        initalise params from 
+        - experiment (hardtarget_drf)
+        - signal processing config (gmf_config)
+        calculate additional derived params
     """
+
+    params = {
+        **drf_utils.load_hardtarget_drf_params(drf_srcdir),
+        **load_gmf_processing_params(gmf_configfile)
+    }
+
+    # variable access
     range_gate_0 = params["range_gate_0"]
     n_range_gates = params["n_range_gates"]
     range_gate_step = params["range_gate_step"]
     sample_rate = params["sample_rate"]
-
-    # range gates to search through
-    rgs = np.arange(n_range_gates) * range_gate_step + range_gate_0
-    rgs_float = np.array(rgs, dtype=np.float32)
-
-    # total propagation range
-    ranges = rgs * scipy.constants.c / 1e3 / sample_rate
-
-    params["rgs"] = rgs
-    params["rgs_float"] = rgs_float
-    params["ranges"] = ranges
-
-
-####################################################################
-# CHECK GMF PARAMS
-####################################################################
-
-
-def check_params(params):
-    for key in REQUIRED_PARAM_KEYS:
-        if key not in params:
-            return False, f"missing parameter: {key}"
-    return True, "ok"
-
-
-####################################################################
-# PROCESS GMF PARAMS
-####################################################################
-
-
-def process_params(params):
-    """
-    Updates given params dictionary in place, with computed values.
-
-    Parameters
-    ----------
-    params: dict
-        Dictionary with gmf parameters
-    """
-
-    # range gates
-    set_n_ranges(params)
-
     n_ipp = params["n_ipp"]
     ipp = params["ipp"]
     frequency_decimation = params["frequency_decimation"]
-    sample_rate = params["sample_rate"]
     radar_frequency = params["radar_frequency"]
     doppler_sign = params["doppler_sign"]
     max_acceleration = params["max_acceleration"]
@@ -146,7 +103,16 @@ def process_params(params):
     acceleration_resolution = params["acceleration_resolution"]
     tx_pulse_length = params["tx_pulse_length"]
     ground_clutter_length = params["ground_clutter_length"]
-    rgs = params["rgs"]
+
+    # reset range gates
+    # range gates to search through
+    rgs = np.arange(n_range_gates) * range_gate_step + range_gate_0
+    rgs_float = np.array(rgs, dtype=np.float32)
+    # total propagation range
+    ranges = rgs * scipy.constants.c / 1e3 / sample_rate
+    params["rgs"] = rgs
+    params["rgs_float"] = rgs_float
+    params["ranges"] = ranges
 
     # length of coherent integration
     params["n_fft"] = n_fft = n_ipp * ipp
@@ -205,7 +171,10 @@ def process_params(params):
     params["tx_stencil"] = tx_stencil = np.ones(read_length, dtype=np.float32)
 
     # for each coherently integrated IPP, create stencils
+    tx_pulse_length = np.array(tx_pulse_length).astype(int)
     for k in range(n_ipp + n_extra):
         tx_stencil[(k * ipp + tx_pulse_length): (k * ipp + ipp)] = 0.0
         # pad zeros to rx
         rx_stencil[(k * ipp): (k * ipp + tx_pulse_length + ground_clutter_length)] = 0.0
+
+    return params

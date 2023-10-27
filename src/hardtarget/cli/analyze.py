@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 
 import logging
-from pathlib import Path
-
 from hardtarget.analysis import analyze_gmf
-from hardtarget.config import load_gmf_params
 
 from .commands import add_command
 
@@ -19,12 +16,12 @@ LOGGER_NAME = "analyse_gmf"
 
 def parser_build(parser):
     # Add the arguments
-    parser.add_argument("config", help="Path to config file")
     parser.add_argument("rx", help="Path to source directory with rx data")
     parser.add_argument("rxchnl", help="RX channel")
     parser.add_argument("--tx", help="Path to source directory with tx data")
     parser.add_argument("--txchnl", help="TX channel")
-    parser.add_argument("-o", "--output", help="Path to output directory")
+    parser.add_argument("--config", help="Path to config file for GMF processing")
+    parser.add_argument("-o", "--output", default=".", help="Path to output directory")
     parser.add_argument("--progress", action="store_true", help="Progress bar")
     parser.add_argument("--clobber", action="store_true", help="Override outputs")
     parser.add_argument(
@@ -50,7 +47,6 @@ def main(args, cli_logger):
     # job
     try:
         from mpi4py import MPI
-
         comm = MPI.COMM_WORLD
     except ImportError:
 
@@ -62,60 +58,39 @@ def main(args, cli_logger):
 
     job = {"idx": comm.rank, "N": comm.size}
 
-    # output
-    output = args.output
-    if output is None:
-        output = "."
-    output = Path(output)
+    # rx and tx
+    rx = (args.rx, args.rxchnl)
+    if args.tx is None:
+        args.tx = args.rx
+    if args.txchnl is None:
+        args.txchnl = args.rxchnl
+    tx = (args.tx, args.txchnl)
 
-    # config file
-    if not Path(args.config).is_file():
-        logger.warning(f"config file does not exist: {args.config}")
-        return
-    gmf_params = load_gmf_params(args.config)
+    # process
+    results = analyze_gmf.analyze_gmf(rx, tx,
+                                      config=args.config,
+                                      job=job,
+                                      logger=cli_logger,
+                                      gmflib=args.gmflib,
+                                      clobber=args.clobber,
+                                      output=args.output
+                                      )
 
-    if args.gmflib is not None:
-        gmf_params["gmflib"] = args.gmflib
-    if "gmflib" not in gmf_params:
-        gmf_params["gmflib"] = "c"
-
-    logger.info("Using GMF backend: " + gmf_params["gmflib"])
-    # create task
-    task = {
-        "job": job,
-        "logger": logger,
-        "rx": (args.rx, args.rxchnl),
-        "tx": (args.tx, args.txchnl),
-        "output": output,
-        "gmf_params": gmf_params,
-        "clobber": args.clobber,
-    }
-
-    # preprocess
-    ok = analyze_gmf.preprocess(task)
-    if ok:
-        # progress
-        if args.progress:
-            task["progress"] = True
-            task["progress_position"] = comm.rank
-
-        # process
-        ok, results = analyze_gmf.process(task)
-        logger.info(f"produced {len(results['files'])} files")
+    logger.info(f"produced {len(results['files'])} files")
 
 
 add_command(
-    name="analyze",
+    name="gmf",
     function=main,
     parser_build=parser_build,
     add_parser_args=dict(
         description="Script analyzing eiscat drf data.",
         usage="""
-        %(prog)s [options] config rx rxchnl -o output_folder
+        %(prog)s rx rxchnl --config config_file -o output_folder
 
         EXAMPLE:
 
-        %(prog)s cfg/myconfig.ini leo_bpark_2.1u_NO@uhf/drf/ uhf
+        %(prog)s  leo_bpark_2.1u_NO@uhf/drf/ uhf
 
         """,
     ),

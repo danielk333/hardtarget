@@ -9,8 +9,8 @@ Utility function for accessing Hardtarget DRF
 
 STRING_PROPS = ["name", "version", "rx_channel", "tx_channel"]
 FLOAT_PROPS = [
+    "tx_pulse_length",
     "file_secs",
-    "pulse_length",
     "doppler_sign",
     "rx_start",
     "rx_end",
@@ -18,17 +18,70 @@ FLOAT_PROPS = [
     "tx_end",
     "cal_on",
     "cal_off",
-    "frequency",
+    "radar_frequency",
 ]
 INT_PROPS = ["sample_rate", "ipp"]
 BOOL_PROPS = ["round_trip_range"]
 SECTIONS = ["Experiment"]
 
 
+####################################################################
+# LOAD HARDTARGET DRF PARAMS
+####################################################################
+
+def load_hardtarget_drf_reader(dstdir):
+    dstdir = Path(dstdir)
+    # digital rf reader
+    return drf.DigitalRFReader(str(dstdir))
+
+
+def load_hardtarget_drf_params(dstdir):
+    """
+    Returns (reader, meta)
+    - reader is a Digital_rf Reader object
+    - meta is a dict with metadata
+    """
+    dstdir = Path(dstdir)
+
+    # metadata file
+    meta = configparser.ConfigParser()
+    meta.read(dstdir / "metadata.ini")
+
+    # parse meta data
+    d = {}
+    for section in SECTIONS:
+        for prop in meta[section].keys():
+            if prop in INT_PROPS:
+                d[prop] = meta.getint(section, prop)
+            elif prop in BOOL_PROPS:
+                d[prop] = meta.getboolean(section, prop)
+            elif prop in FLOAT_PROPS:
+                d[prop] = meta.getfloat(section, prop)
+            elif prop in STRING_PROPS:
+                d[prop] = meta.get(section, prop).strip("'").strip('"')
+            else:
+                d[prop] = meta.get(section, prop)
+    return d
+
+
+# TODO
+# Could also support default parameters if the metadata file does not exist
+
+
+####################################################################
+# TIME INTERVAL TO SAMPEL BOUNDS
+####################################################################
+
+
 def time_interval_to_samples(start_time, end_time, bounds, sample_rate, relative_time=False):
     """Convert a time interval to samples while checking bounds, allows for times relative bounds
     """
     interval = [x for x in bounds]
+
+    if relative_time:
+        start_time = float(start_time)
+        end_time = float(end_time)
+
     if start_time is not None:
         if relative_time:
             _b0 = bounds[0] + start_time * sample_rate
@@ -58,42 +111,14 @@ def time_interval_to_samples(start_time, end_time, bounds, sample_rate, relative
     return interval
 
 
-def get_hardtarget_drf(dstdir):
-    """
-    Returns (reader, meta)
-    - reader is a Digital_rf Reader object
-    - meta is a dict with metadata
-    """
-    dstdir = Path(dstdir)
-
-    # digital rf reader
-    reader = drf.DigitalRFReader(str(dstdir))
-
-    # metadata file
-    meta = configparser.ConfigParser()
-    meta.read(dstdir / "metadata.ini")
-
-    # parse meta data
-    d = {}
-    for section in SECTIONS:
-        for prop in meta[section].keys():
-            if prop in INT_PROPS:
-                d[prop] = meta.getint(section, prop)
-            elif prop in BOOL_PROPS:
-                d[prop] = meta.getboolean(section, prop)
-            elif prop in FLOAT_PROPS:
-                d[prop] = meta.getfloat(section, prop)
-            elif prop in STRING_PROPS:
-                d[prop] = meta.get(section, prop).strip("'").strip('"')
-            else:
-                d[prop] = meta.get(section, prop)
-    return reader, d
-
+####################################################################
+# MAIN
+####################################################################
 
 if __name__ == "__main__":
     import sys
     import pprint
 
     dstdir = sys.argv[1]
-    rdr, d = get_hardtarget_drf(dstdir)
+    d = load_hardtarget_drf_params(dstdir)
     pprint.pprint(d)

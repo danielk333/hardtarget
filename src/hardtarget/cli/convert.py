@@ -1,14 +1,14 @@
 import logging
 
-from . import eiscat2drf
+from . import convert_eiscat
 from .commands import add_command
 
 logger = logging.getLogger(__name__)
 
 SOURCES = {
     "eiscat": {
-        "main": eiscat2drf.main,
-        "parser_build": eiscat2drf.parser_build,
+        "main": convert_eiscat.main,
+        "parser_build": convert_eiscat.parser_build,
         "add_parser_args": {
             "description": "Script converting eiscat data to drf format",
             "usage": "%(prog)s [options] input -o output_folder",

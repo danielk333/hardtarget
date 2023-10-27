@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from hardtarget.convert.eiscat_convert import eiscat_convert
+from hardtarget.convert.eiscat import eiscat_convert
 
 
 ####################################################################
