@@ -1,17 +1,6 @@
 import numpy as np
 from hardtarget.gmf import GMF_LIBS
 import logging
-import digital_rf as drf
-
-_DRF_READERS = {}
-
-
-def get_drf_reader(path):
-    """Returns cached DRF reader instance."""
-    reader = _DRF_READERS.get(path, None)
-    if reader is None:
-        _DRF_READERS[path] = reader = drf.DigitalRFReader([path])
-    return reader
 
 
 ####################################################################
@@ -71,10 +60,8 @@ def analyze_ipps(rx, tx, i0, params, logger=None):
     range_rates = params["range_rates"]
     accs = params["accs"]
 
-    rx_path, rx_channel = rx
-    tx_path, tx_channel = tx
-    rx_reader = get_drf_reader(rx_path)
-    tx_reader = get_drf_reader(tx_path)
+    rx_reader, rx_channel = rx
+    tx_reader, tx_channel = tx
 
     # read data vector with n_ipps, and a little extra
     z = rx_reader.read_vector_1d(i0, (n_ipp + n_extra) * ipp, rx_channel)
@@ -82,7 +69,7 @@ def analyze_ipps(rx, tx, i0, params, logger=None):
     # make a separate copy to hold transmit pulse, and the echo
     z_rx = np.copy(z)
 
-    if tx_channel != rx_channel or tx_path != rx_path:
+    if tx_channel != rx_channel or tx_reader != rx_reader:
         z = tx_reader.read_vector_1d(i0, (n_ipp + n_extra) * ipp, tx_channel)
     z_tx = np.copy(z)
 

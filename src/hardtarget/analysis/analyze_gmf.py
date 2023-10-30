@@ -7,8 +7,7 @@ import h5py
 from tqdm import tqdm
 from pathlib import Path
 from hardtarget.analysis import analyze_ipps
-import hardtarget.analysis.gmf_utils as gmf_utils
-import hardtarget.drf_utils as drf_utils
+from hardtarget import gmf_utils, drf_utils
 
 
 ####################################################################
@@ -20,10 +19,15 @@ def is_pair_unpackable(a):
     return True if isinstance(a, (tuple, list)) and len(a) == 2 else False
 
 
+# Cache reader instances by path
+_DRF_READERS = {}
+
+
 def load_source(src):
     """
     Load Digital_rf reader object from (srcdir, chnl) 
     """
+    global _DRF_READERS
     if type(src) is not tuple:
         raise ValueError(f"tuple (path, chnl) expected, {src}")
     if not is_pair_unpackable(src):
@@ -31,7 +35,10 @@ def load_source(src):
     path, chnl = src
     if path is None or not Path(path).is_dir():
         raise ValueError(f"path must be directory, {path}")
-    reader = drf.DigitalRFReader([path])
+    # read cached instance
+    reader = _DRF_READERS.get(path, None)
+    if reader is None:
+        _DRF_READERS[path] = reader = drf.DigitalRFReader([path])
     channels = reader.get_channels()
     if chnl not in channels:
         raise ValueError(f"reader does not support channel, {chnl}")
@@ -89,15 +96,6 @@ def compute_total_tasks(gmf_params, bounds):
 # BOUNDS
 ####################################################################
 
-# def bounds_to_str(bounds, sample_rate):
-#     """Create human readable representation of bounds, for logging."""
-#     _bounds = []
-#     for sample_number in bounds:
-#         dt = datetime.datetime.utcfromtimestamp(sample_number / sample_rate)
-#         _bounds.append(dt.strftime("%Y-%m-%dT%H:%M:%S"))
-#     return str(_bounds)
-
-
 def compute_bounds(reader, chnl, sample_rate,
                    start_time=None,
                    end_time=None,
@@ -141,7 +139,8 @@ def get_filepath(file_idx, sample_rate):
 ####################################################################
 
 
-def analyze_gmf(rx, tx, 
+def analyze_gmf(rx,
+                tx,
                 config=None,
                 start_time=None,
                 end_time=None,
@@ -237,7 +236,6 @@ def analyze_gmf(rx, tx,
             # crate directory
             dirname = Path(outfile).parent
             dirname.mkdir(parents=True, exist_ok=True)
-
             if outfile.is_file() and not clobber:
                 logger.debug(f"job {job['idx']}/{job['N']} already done task {idx}/{len(job_tasks)}")
                 tasks_skipped += 1
@@ -247,7 +245,9 @@ def analyze_gmf(rx, tx,
         ts0 = time.time()
         for i in range(num_cohints_per_file):
             i0 = file_idx + i * ipp * n_ipp
-            result = analyze_ipps.analyze_ipps(rx, tx, i0, gmf_params)
+            result = analyze_ipps.analyze_ipps((rx_reader, rx_chnl), 
+                                               (tx_reader, tx_chnl), 
+                                               i0, gmf_params)
             gmf_max[i, :], gmf_dc[i, :], gmf_v[i, :], gmf_a[i, :], gmf_txp[i] = result
             # rgi = np.argmax(gmf_max[i, :])
         ts1 = time.time()

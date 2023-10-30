@@ -29,9 +29,13 @@ SECTIONS = ["Experiment"]
 # LOAD HARDTARGET DRF PARAMS
 ####################################################################
 
+def load_hardtarget_drf(dstdir):
+    reader = load_hardtarget_drf_reader(dstdir)
+    params = load_hardtarget_drf_params(dstdir)
+    return reader, params
+
+
 def load_hardtarget_drf_reader(dstdir):
-    dstdir = Path(dstdir)
-    # digital rf reader
     return drf.DigitalRFReader(str(dstdir))
 
 
