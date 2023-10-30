@@ -20,7 +20,7 @@ Convert Eiscat raw data to DRF format
 ####################################################################
 
 """
-- create extra meta-data file within rdf folder
+- compression
 - attempts to overwrite RDF files will raise exceptions
 - no support for resuming an interrupted processing
 - output directory must be empty
