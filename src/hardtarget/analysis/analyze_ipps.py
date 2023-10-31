@@ -8,7 +8,7 @@ import logging
 ####################################################################
 
 
-def analyze_ipps(rx, tx, i0, params, logger=None):
+def analyze_ipps(rx, tx, i0, gmf_params, logger=None):
     """
     Analyse ipps runs the gmf function.
 
@@ -18,7 +18,7 @@ def analyze_ipps(rx, tx, i0, params, logger=None):
         file reader object for drf file
     i0: int
         ?
-    params: dict
+    gmf_params: dict
         gmf parameters
     logger: object, optional
         external logger object
@@ -38,7 +38,7 @@ def analyze_ipps(rx, tx, i0, params, logger=None):
     """
 
     # gmf lib
-    gmf_lib = params.get("gmflib", None)
+    gmf_lib = gmf_params.get("gmflib", None)
     if gmf_lib is None or gmf_lib not in GMF_LIBS:
         gmf_lib = "c" if "c" in GMF_LIBS else "numpy"
     gmf = GMF_LIBS[gmf_lib]
@@ -48,17 +48,17 @@ def analyze_ipps(rx, tx, i0, params, logger=None):
         logger = logging.getLogger(__name__)
 
     # parameters
-    ipp = params["ipp"]
-    n_ipp = params["n_ipp"]
-    n_extra = params["n_extra"]
-    rx_stencil = params["rx_stencil"]
-    tx_stencil = params["tx_stencil"]
-    n_range_gates = params["n_range_gates"]
-    acc_phasors = params["acc_phasors"]
-    rgs_float = params["rgs_float"]
-    frequency_decimation = params["frequency_decimation"]
-    range_rates = params["range_rates"]
-    accs = params["accs"]
+    ipp = gmf_params["ipp"]
+    n_ipp = gmf_params["n_ipp"]
+    n_extra = gmf_params["n_extra"]
+    rx_stencil = gmf_params["rx_stencil"]
+    tx_stencil = gmf_params["tx_stencil"]
+    n_range_gates = gmf_params["n_range_gates"]
+    acc_phasors = gmf_params["acc_phasors"]
+    rgs_float = gmf_params["rgs_float"]
+    frequency_decimation = gmf_params["frequency_decimation"]
+    range_rates = gmf_params["range_rates"]
+    accs = gmf_params["accs"]
 
     rx_reader, rx_channel = rx
     tx_reader, tx_channel = tx
@@ -108,7 +108,7 @@ def analyze_ipps(rx, tx, i0, params, logger=None):
         )
 
     # logging
-    # ranges = params["ranges"]
+    # ranges = gmf_params["ranges"]
     # mri = np.argmax(gmf_vec)
     # info = {
     #     "GMF": np.max(gmf_vec),

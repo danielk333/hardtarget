@@ -24,11 +24,22 @@ def parser_build(parser):
         default="INFO",
         help="Set the log level (default: INFO)",
     )
+    parser.add_argument(
+        "-c",
+        "--compression",
+        choices=["0", "1", "2", "3", "4", "5", "6", "7", "8", "9" ],
+        default="0",
+        help="Set the compression level (0-9) (default: 0)",
+    )
+
     return parser
 
 
 def main(args, cli_logger):
-    eiscat_convert(args.input, cli_logger, dstdir=args.output)
+    compression_level = int(args.compression)
+    eiscat_convert(args.input, cli_logger, 
+                   dstdir=args.output, 
+                   compression_level=compression_level)
 
 
 ####################################################################
@@ -52,4 +63,5 @@ if __name__ == "__main__":
     # Logging
     logger = logging.getLogger("eiscat_convert")
     logger.setLevel(getattr(logging, args.log_level))
+
     main(args, logger)

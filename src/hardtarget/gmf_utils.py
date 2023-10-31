@@ -22,7 +22,7 @@ DEFAULT_PARAMS = {
     "snr_thresh": 10.0,
     "doppler_sign": 1.0,
     "round_trip_range": True,
-    "num_cohints_per_file": 100,
+    "num_cohints_per_file": 100
 }
 
 INT_PARAM_KEYS = [

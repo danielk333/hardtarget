@@ -139,7 +139,7 @@ def load_expconfig(xpname):
 ####################################################################
 
 
-def eiscat_convert(srcdir, logger, dstdir=None):
+def eiscat_convert(srcdir, logger, dstdir=None, compression_level=0):
     """
     Converts folder with eiscat measurements to folder with drf files.
 
@@ -237,7 +237,7 @@ def eiscat_convert(srcdir, logger, dstdir=None):
         sample_rate,  # sample rate numerator
         1,  # sample rate denominator
         uuid_str=cfv.get("rx_channel", "tbd"),
-        compression_level=0,
+        compression_level=compression_level,
         checksum=False,
         is_complex=True,
         num_subchannels=1,
