@@ -1,18 +1,20 @@
 import matplotlib.pyplot as plt
-import digital_rf as drf
 import hardtarget
 
 target = "/home/danielk/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf/"
-drf_reader = drf.DigitalRFReader(target)
+reader, params = hardtarget.load_hardtarget_drf(target)
+
 
 fig, ax = plt.subplots()
 ax, handles = hardtarget.plotting.rti(
     ax,
-    drf_reader,
+    reader,
+    params,
     "uhf",
-    start_time=2,
-    end_time=8,
+    start_time=2.0,
+    end_time=8.0,
     relative_time=True,
+    axis_units=True,
 )
 
 plt.show()
