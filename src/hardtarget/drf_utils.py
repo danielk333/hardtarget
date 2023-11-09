@@ -1,4 +1,5 @@
 from pathlib import Path
+import datetime
 import configparser
 import numpy as np
 import digital_rf as drf
@@ -96,7 +97,10 @@ def time_interval_to_samples(start_time, end_time, bounds, sample_rate, relative
                 dt64_t0 = start_time
             unix_t0 = dt64_t0.astype("datetime64[s]").astype("int64")
             _b0 = unix_t0 * sample_rate
-        assert _b0 >= bounds[0], "Given start time is before input data start"
+
+        dt0 = datetime.datetime.utcfromtimestamp(bounds[0]/sample_rate)
+        dts = datetime.datetime.utcfromtimestamp(unix_t0)
+        assert _b0 >= bounds[0], f"Given start time '{dts}' is before input data start '{dt0}'"
         interval[0] = _b0
 
     if end_time is not None:
@@ -109,7 +113,9 @@ def time_interval_to_samples(start_time, end_time, bounds, sample_rate, relative
                 dt64_t1 = end_time
             unix_t1 = dt64_t1.astype("datetime64[s]").astype("int64")
             _b1 = int(unix_t1 * sample_rate)
-        assert _b1 <= bounds[1], "Given end time is after input data end"
+        dt1 = datetime.datetime.utcfromtimestamp(bounds[1]/sample_rate)
+        dte = datetime.datetime.utcfromtimestamp(unix_t1)
+        assert _b1 <= bounds[1], f"Given end time '{dte}' is after input data end '{dt1}'"
         interval[1] = _b1
 
     return interval
