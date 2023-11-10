@@ -48,6 +48,10 @@ def main(args, cli_logger):
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(getattr(logging, args.log_level))
 
+    if args.relative_time:
+        args.start_time = float(args.start_time)
+        args.end_time = float(args.end_time)
+
     # job
     try:
         from mpi4py import MPI
