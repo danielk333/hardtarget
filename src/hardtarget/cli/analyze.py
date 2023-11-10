@@ -23,6 +23,9 @@ def parser_build(parser):
     parser.add_argument("--config", help="Path to config file for GMF processing")
     parser.add_argument("-o", "--output", default=".", help="Path to output directory")
     parser.add_argument("--progress", action="store_true", help="Progress bar")
+    parser.add_argument("-s", "--start_time", default=None)
+    parser.add_argument("-e", "--end_time", default=None)
+    parser.add_argument("--relative_time", action="store_true")
     parser.add_argument("--clobber", action="store_true", help="Override outputs")
     parser.add_argument(
         "-g",
@@ -78,6 +81,10 @@ def main(args, cli_logger):
         gmflib=args.gmflib,
         clobber=args.clobber,
         output=args.output,
+        start_time=args.start_time,
+        end_time=args.end_time,
+        progress=args.progress,
+        progress_position=comm.rank,
     )
 
     logger.info(f"produced {len(results['files'])} files")
