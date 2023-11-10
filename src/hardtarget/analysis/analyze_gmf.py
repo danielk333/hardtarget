@@ -284,6 +284,13 @@ def analyze_gmf(
         out["tx_pwr"] = gmf_txp
         out["i0"] = i0
 
+        grp = out.create_group("vector_params")
+        for key in gmf_params:
+            if key in gmf_utils.VECTOR_PARAM_KEYS:
+                grp[key] = gmf_params[key]
+            else:
+                out.attrs[key] = gmf_params[key]
+
         if output is not None:
             out.close()
             results["files"].append(filepath.name)

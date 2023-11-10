@@ -43,6 +43,17 @@ FLOAT_PARAM_KEYS = [
     "acceleration_resolution",
 ]
 
+VECTOR_PARAM_KEYS = [
+    "rgs",
+    "rgs_float",
+    "ranges",
+    "fvec",
+    "range_rates",
+    "acc_phasors",
+    "rx_stencil",
+    "tx_stencil",
+]
+
 
 ####################################################################
 # LOAD GMF PROCESSING PARAMS FROM CONFIG
@@ -77,7 +88,7 @@ def load_gmf_processing_params(configfile=None):
 
 def load_gmf_params(drf_srcdir, gmf_configfile):
     """
-        initalise params from 
+        initalise params from
         - experiment (hardtarget_drf)
         - signal processing config (gmf_config)
         calculate additional derived params
