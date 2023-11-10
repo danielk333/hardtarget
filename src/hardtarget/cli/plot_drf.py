@@ -17,7 +17,7 @@ def parser_build(parser):
         "--clutter_removal",
         type=float,
         default=0,
-        help="Clutter removal at start of RX signal in microseconds",
+        help="Clutter removal at start of RX signal in seconds",
     )
     return parser
 
@@ -38,7 +38,7 @@ def main(args, cli_logger):
         relative_time=args.relative_time,
         axis_units=args.axis_units,
         log=args.log,
-        clutter_removal=args.clutter_removal * 1e-6,
+        clutter_removal=args.clutter_removal,
     )
 
     plt.show()
