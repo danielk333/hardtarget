@@ -25,7 +25,8 @@ def parser_build(parser):
     parser.add_argument("--progress", action="store_true", help="Progress bar")
     parser.add_argument("--clobber", action="store_true", help="Override outputs")
     parser.add_argument(
-        "-g", "--gmflib",
+        "-g",
+        "--gmflib",
         choices=["numpy", "c", "cuda"],
         help="GMF implementation",
         default=None,
@@ -47,6 +48,7 @@ def main(args, cli_logger):
     # job
     try:
         from mpi4py import MPI
+
         comm = MPI.COMM_WORLD
     except ImportError:
 
@@ -67,14 +69,16 @@ def main(args, cli_logger):
     tx = (args.tx, args.txchnl)
 
     # process
-    results = analyze_gmf.analyze_gmf(rx, tx,
-                                      config=args.config,
-                                      job=job,
-                                      logger=cli_logger,
-                                      gmflib=args.gmflib,
-                                      clobber=args.clobber,
-                                      output=args.output
-                                      )
+    results = analyze_gmf.analyze_gmf(
+        rx,
+        tx,
+        config=args.config,
+        job=job,
+        logger=cli_logger,
+        gmflib=args.gmflib,
+        clobber=args.clobber,
+        output=args.output,
+    )
 
     logger.info(f"produced {len(results['files'])} files")
 

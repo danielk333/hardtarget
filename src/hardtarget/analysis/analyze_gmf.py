@@ -14,6 +14,7 @@ from hardtarget import gmf_utils, drf_utils
 # DIGITAL RF READERS
 ####################################################################
 
+
 def is_pair_unpackable(a):
     """Returns true if a can be unpacked to a pair of variables."""
     return True if isinstance(a, (tuple, list)) and len(a) == 2 else False
@@ -25,7 +26,7 @@ _DRF_READERS = {}
 
 def load_source(src):
     """
-    Load Digital_rf reader object from (srcdir, chnl) 
+    Load Digital_rf reader object from (srcdir, chnl)
     """
     global _DRF_READERS
     if type(src) is not tuple:
@@ -48,6 +49,7 @@ def load_source(src):
 ####################################################################
 # CALCULATE TASKS
 ####################################################################
+
 
 def compute_job_tasks(job, n_tasks):
     """
@@ -96,12 +98,10 @@ def compute_total_tasks(gmf_params, bounds):
 # BOUNDS
 ####################################################################
 
-def compute_bounds(reader, chnl, sample_rate,
-                   start_time=None,
-                   end_time=None,
-                   relative_time=False):
+
+def compute_bounds(reader, chnl, sample_rate, start_time=None, end_time=None, relative_time=False):
     """
-    optionally restrict sample bounds given timestamps 
+    optionally restrict sample bounds given timestamps
     """
     drf_bounds = reader.get_bounds(chnl)
     return drf_utils.time_interval_to_samples(
@@ -112,6 +112,7 @@ def compute_bounds(reader, chnl, sample_rate,
 ####################################################################
 # OUTPUT FILE PATH
 ####################################################################
+
 
 def get_filepath(file_idx, sample_rate):
     """
@@ -139,20 +140,21 @@ def get_filepath(file_idx, sample_rate):
 ####################################################################
 
 
-def analyze_gmf(rx,
-                tx,
-                config=None,
-                start_time=None,
-                end_time=None,
-                relative_time=False,
-                job={"idx": 1, "N": 1},
-                logger=None,
-                progress=False,
-                progress_position = 0,
-                clobber = False,
-                output=None,
-                gmflib=None
-                ):
+def analyze_gmf(
+    rx,
+    tx,
+    config=None,
+    start_time=None,
+    end_time=None,
+    relative_time=False,
+    job={"idx": 1, "N": 1},
+    logger=None,
+    progress=False,
+    progress_position=0,
+    clobber=False,
+    output=None,
+    gmflib=None,
+):
     """
     Analyze data using gmf.
 
@@ -162,7 +164,7 @@ def analyze_gmf(rx,
     tx: Digital_rf reader
     gmf_config: path gfm config file
     job: used to identify subset of task indexes for this job
- 
+
     Returns
     -------
 
@@ -173,7 +175,7 @@ def analyze_gmf(rx,
             paths to each generated file
         out: dictionary with in-memory results
     """
-    
+
     # load data sources
     rx_srcdir, rx_reader, rx_chnl = load_source(rx)
     tx_srcdir, tx_reader, tx_chnl = load_source(tx)
@@ -182,14 +184,18 @@ def analyze_gmf(rx,
     gmf_params = gmf_utils.load_gmf_params(rx_srcdir, config)
     # override config file
     if gmflib is not None:
-        gmf_params['gmflib'] = gmflib
+        gmf_params["gmflib"] = gmflib
     logger.info("Using GMF backend: " + gmf_params["gmflib"])
 
     # bounds
-    bounds = compute_bounds(rx_reader, rx_chnl, gmf_params["sample_rate"],
-                            start_time=start_time,
-                            end_time=end_time,
-                            relative_time=relative_time)
+    bounds = compute_bounds(
+        rx_reader,
+        rx_chnl,
+        gmf_params["sample_rate"],
+        start_time=start_time,
+        end_time=end_time,
+        relative_time=relative_time,
+    )
 
     # tasks
     total_tasks = compute_total_tasks(gmf_params, bounds)
@@ -237,7 +243,9 @@ def analyze_gmf(rx,
             dirname = Path(outfile).parent
             dirname.mkdir(parents=True, exist_ok=True)
             if outfile.is_file() and not clobber:
-                logger.debug(f"job {job['idx']}/{job['N']} already done task {idx}/{len(job_tasks)}")
+                logger.debug(
+                    f"job {job['idx']}/{job['N']} already done task {idx}/{len(job_tasks)}"
+                )
                 tasks_skipped += 1
                 continue
 
@@ -245,9 +253,9 @@ def analyze_gmf(rx,
         ts0 = time.time()
         for i in range(num_cohints_per_file):
             i0 = file_idx + i * ipp * n_ipp
-            result = analyze_ipps.analyze_ipps((rx_reader, rx_chnl), 
-                                               (tx_reader, tx_chnl), 
-                                               i0, gmf_params)
+            result = analyze_ipps.analyze_ipps(
+                (rx_reader, rx_chnl), (tx_reader, tx_chnl), i0, gmf_params
+            )
             gmf_max[i, :], gmf_dc[i, :], gmf_v[i, :], gmf_a[i, :], gmf_txp[i] = result
             # rgi = np.argmax(gmf_max[i, :])
         ts1 = time.time()
