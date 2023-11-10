@@ -90,6 +90,7 @@ def time_interval_to_samples(start_time, end_time, bounds, sample_rate, relative
     if start_time is not None:
         if relative_time:
             _b0 = bounds[0] + start_time * sample_rate
+            unix_t0 = _b0 / sample_rate
         else:
             if not isinstance(start_time, np.datetime64):
                 dt64_t0 = np.datetime64(start_time)
@@ -106,6 +107,7 @@ def time_interval_to_samples(start_time, end_time, bounds, sample_rate, relative
     if end_time is not None:
         if relative_time:
             _b1 = bounds[0] + end_time * sample_rate
+            unix_t1 = _b1 / sample_rate
         else:
             if not isinstance(end_time, np.datetime64):
                 dt64_t1 = np.datetime64(end_time)
