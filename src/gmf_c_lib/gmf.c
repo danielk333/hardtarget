@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 #define ECHO 1
 #define PEAK_SEARCH 1
 #define FFT_VECTOR 1
@@ -33,7 +32,7 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
     in = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex) * nfft2);
     out = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex) * nfft2);
 
-    //  p=fftwf_plan_dft_1d(nfft2,in,out,FFTW_FORWARD,FFTW_ESTIMATE);
+    // p = fftwf_plan_dft_1d(nfft2, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
     p = fftwf_plan_dft_1d(nfft2, in, out, FFTW_FORWARD, FFTW_MEASURE);
 
     //
@@ -157,5 +156,5 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
     fftwf_free(out);
     fftwf_free(echo);
     fftwf_destroy_plan(p);
-    return (1);
+    return 0; // Success
 }

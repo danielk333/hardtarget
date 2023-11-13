@@ -8,7 +8,7 @@ if suffix is None:
     suffix = ".so"
 
 # We start by making a path to the current directory.
-pymodule_dir = pathlib.Path(__file__).resolve().parent 
+pymodule_dir = pathlib.Path(__file__).resolve().parent
 __libpath__ = pymodule_dir / ('gmfclib' + suffix)
 
 if __libpath__.is_file():
@@ -17,11 +17,11 @@ if __libpath__.is_file():
 
     gmfclib.gmf.restype = C.c_int
     gmfclib.gmf.argtypes = [
-        C.POINTER(C.c_float), C.c_int, 
-        C.POINTER(C.c_float), C.c_int, 
-        C.POINTER(C.c_float), C.c_int, 
-        C.POINTER(C.c_float), C.c_int, C.c_int, 
-        C.POINTER(C.c_float), C.POINTER(C.c_float), 
+        C.POINTER(C.c_float), C.c_int,
+        C.POINTER(C.c_float), C.c_int,
+        C.POINTER(C.c_float), C.c_int,
+        C.POINTER(C.c_float), C.c_int, C.c_int,
+        C.POINTER(C.c_float), C.POINTER(C.c_float),
         C.POINTER(C.c_float), C.POINTER(C.c_float),
     ]
 else:
@@ -32,7 +32,7 @@ def gmf_c(z_tx, z_rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_vec, 
     # This should be pythonified
     txlen = int(len(z_tx))
     rxlen = len(z_rx)
-    a = gmfclib.gmf(
+    error_code = gmfclib.gmf(
         z_tx.ctypes.data_as(C.POINTER(C.c_float)),
         txlen,
         z_rx.ctypes.data_as(C.POINTER(C.c_float)),
@@ -47,3 +47,4 @@ def gmf_c(z_tx, z_rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_vec, 
         v_vec.ctypes.data_as(C.POINTER(C.c_float)),
         a_vec.ctypes.data_as(C.POINTER(C.c_float)),
     )
+    assert error_code == 0, f"GMF C-function returned error {error_code}"
