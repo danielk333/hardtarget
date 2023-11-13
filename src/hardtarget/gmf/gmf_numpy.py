@@ -20,19 +20,13 @@ def gmf_numpy(z_tx, z_rx, a_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_vec
 
     Output parameters:
         gmf_vec: real vector [n_rngs] max value of gmf (power) across vel/acc
-        gmf_dc_vec: real vector [shape??] output of gmf (power) at zero frequency
+        gmf_dc_vec: real vector [n_rngs] output of gmf (power) at zero frequency
         a_vec: integer vector [n_rngs] index of a_phasors that produced max output at each range
         v_vec: integer vector [n_rngs] index of velocity that produced max output at each range
 
     """
 
-    # TODO:
-    # defaults for acc_phasors
-    # defaults for rgs
-    # defaults for dec
-
-    # Stencil and CC tx waveform here, or on the outside?
-    # => on the outside
+    # TODO: clean up this a bit
 
     # n_range_gates = (len(z_rx) -len(z_tx)) // dec    # ??
     # number of range gates is input from user
@@ -49,7 +43,7 @@ def gmf_numpy(z_tx, z_rx, a_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_vec
 
     for ri, rg in enumerate(rgs):
         rg_idx = rg.astype(np.int32)
-        zr = z_rx[rg_idx: (rg_idx + n_fft)]
+        zr = z_rx[rg_idx:(rg_idx + n_fft)]
         # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter)
         # echo = stuffr.decimate(zr * z_tx, dec=dec)
         echo = np.sum((zr * z_tx).reshape(-1, dec), axis=-1)
