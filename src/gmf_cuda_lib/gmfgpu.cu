@@ -317,5 +317,5 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
         fprintf(stderr, "CUFFT error: Failed to destroy plan\n");
         exit(EXIT_FAILURE);
     }
-    return (1);
+    return 0;
 }

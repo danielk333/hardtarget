@@ -8,7 +8,7 @@ if suffix is None:
     suffix = ".so"
 
 # We start by making a path to the current directory.
-pymodule_dir = pathlib.Path(__file__).resolve().parent 
+pymodule_dir = pathlib.Path(__file__).resolve().parent
 __libpath__ = pymodule_dir / ('gmfcudalib' + suffix)
 
 if __libpath__.is_file():
@@ -17,12 +17,12 @@ if __libpath__.is_file():
 
     gmfcudalib.gmf.restype = C.c_int
     gmfcudalib.gmf.argtypes = [
-        C.POINTER(C.c_float), C.c_int, 
-        C.POINTER(C.c_float), C.c_int, 
-        C.POINTER(C.c_float), C.c_int, 
-        C.POINTER(C.c_float), C.c_int, C.c_int, 
-        C.POINTER(C.c_float), C.POINTER(C.c_float), 
-        C.POINTER(C.c_float), C.POINTER(C.c_float), 
+        C.POINTER(C.c_float), C.c_int,
+        C.POINTER(C.c_float), C.c_int,
+        C.POINTER(C.c_float), C.c_int,
+        C.POINTER(C.c_float), C.c_int, C.c_int,
+        C.POINTER(C.c_float), C.POINTER(C.c_float),
+        C.POINTER(C.c_float), C.POINTER(C.c_float),
         C.c_int,
     ]
 else:
@@ -30,9 +30,9 @@ else:
 
 
 def gmf_cuda(z_tx, z_rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_vec, rank=0):
-    txlen=int(len(z_tx))
-    rxlen=len(z_rx)
-    a=gmfcudalib.gmf(
+    txlen = int(len(z_tx))
+    rxlen = len(z_rx)
+    error_code = gmfcudalib.gmf(
         z_tx.ctypes.data_as(C.POINTER(C.c_float)),
         txlen,
         z_rx.ctypes.data_as(C.POINTER(C.c_float)),
@@ -48,3 +48,4 @@ def gmf_cuda(z_tx, z_rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_ve
         a_vec.ctypes.data_as(C.POINTER(C.c_float)),
         rank,
     )
+    assert error_code == 0, f"GMF CUDA-function returned error {error_code}"
