@@ -125,14 +125,14 @@ def compute_bounds(reader, chnl, sample_rate, start_time=None, end_time=None, re
 ####################################################################
 
 
-def get_filepath(file_idx_us, sample_rate):
+def get_filepath(file_idx_sample, sample_rate):
     """
     Generates a file path for h5 file to be written.
 
     Parameters
     ----------
-    file_idx : int
-        index associate with output file
+    file_idx_sample : int
+        sample index associate with output file
     sample_rate: int
         sample rate for processed data
 
@@ -141,9 +141,9 @@ def get_filepath(file_idx_us, sample_rate):
     string
         filepath
     """
-    dt = datetime.datetime.utcfromtimestamp(file_idx_us * 1e-6 / sample_rate)
+    dt = datetime.datetime.utcfromtimestamp(file_idx_sample * 1e-6 / sample_rate)
     time_string = dt.strftime("%Y-%m-%dT%H-00-00")
-    return Path(time_string) / f"gmf-{file_idx_us:08d}.h5"
+    return Path(time_string) / f"gmf-{file_idx_sample:08d}.h5"
 
 
 ####################################################################
@@ -162,6 +162,7 @@ def analyze_gmf(
     logger=None,
     progress=False,
     progress_position=0,
+    subprogress=True,
     clobber=False,
     output=None,
     gmflib=None,
@@ -209,7 +210,6 @@ def analyze_gmf(
         end_time=end_time,
         relative_time=relative_time,
     )
-    unix_bounds_us = [x * 1e6 / gmf_params["sample_rate"] for x in bounds]
 
     # tasks
     total_tasks = compute_total_tasks(gmf_params, bounds)
@@ -221,18 +221,20 @@ def analyze_gmf(
         logger = logging.getLogger(__name__)
     logger.info(f"starting job {job['idx']}/{job['N']} with {len(job_tasks)} tasks")
 
-    # progress
-    if progress:
-        progress_bar = tqdm(
-            position=progress_position,
-            desc="Processing",
-            total=len(job_tasks),
-        )
-
     ipp = gmf_params["ipp"]
+    ipp_samp = gmf_params["ipp_samp"]
     n_ipp = gmf_params["n_ipp"]
     num_cohints_per_file = gmf_params["num_cohints_per_file"]
     sample_rate = gmf_params["sample_rate"]
+
+    # progress
+    if progress:
+        total = len(job_tasks)
+        progress_bar = tqdm(
+            position=progress_position,
+            desc="Processing",
+            total=total,
+        )
 
     reduce_axis = [
         False,
@@ -256,13 +258,14 @@ def analyze_gmf(
         gmf_dc = np.zeros(gmf_size, dtype=np.float32)
 
         gmf_txp = np.zeros(file_data_size, dtype=np.float32)
-        gmf_v_ind = np.zeros(file_data_size, dtype=np.int64)
-        gmf_a_ind = np.zeros(file_data_size, dtype=np.int64)
+        gmf_v_ind = np.zeros(gmf_size, dtype=np.int64)
+        gmf_a_ind = np.zeros(gmf_size, dtype=np.int64)
         gmf_r_ind = np.zeros(file_data_size, dtype=np.int64)
 
         # filename outfile
-        file_idx_us = int(task_idx * ipp * n_ipp * num_cohints_per_file + unix_bounds_us[0])
-        filepath = get_filepath(file_idx_us, sample_rate)
+        file_idx_sample = task_idx * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
+        epoch_unix = file_idx_sample / sample_rate
+        filepath = get_filepath(file_idx_sample, sample_rate)
 
         # write to file if output is defined
         if output is not None:
@@ -280,9 +283,9 @@ def analyze_gmf(
         # process
         ts0 = time.time()
         for i in range(num_cohints_per_file):
-            epoch0_us = file_idx_us + i * ipp * n_ipp
+            start_sample = file_idx_sample + i * ipp_samp * n_ipp
             result = analyze_ipps.analyze_ipps(
-                (rx_reader, rx_chnl), (tx_reader, tx_chnl), epoch0_us, gmf_params
+                (rx_reader, rx_chnl), (tx_reader, tx_chnl), start_sample, gmf_params
             )
             # TODO: fix this
             # breakpoint()
@@ -292,6 +295,12 @@ def analyze_gmf(
             gmf_v_ind[i, ...] = result[2]
             gmf_a_ind[i, ...] = result[3]
             gmf_txp[i] = result[4]
+
+            if progress and subprogress:
+                dots = ("."*(i % 4)).ljust(3, " ")
+                total_num_len = len(str(num_cohints_per_file))
+                curr_num = str(i + 1).ljust(total_num_len, ' ')
+                progress_bar.set_description(f"Processing {curr_num}/{num_cohints_per_file} [{dots}]")
         ts1 = time.time()
 
         # log
@@ -362,9 +371,9 @@ def analyze_gmf(
                 out,
                 "epoch_unix",
                 "Epoch of first integration in unix time",
-                epoch0_us,
+                epoch_unix,
                 [],
-                units="micro s",
+                units="s",
             )
             out.close()
             results["files"].append(filepath.name)
@@ -380,9 +389,9 @@ def analyze_gmf(
             out["range_peak"] = gmf_params["ranges"][gmf_r_ind]
             out["range_rate_peak"] = gmf_params["range_rates"][gmf_v_ind]
             out["acceleration_peak"] = gmf_params["accelerations"][gmf_a_ind]
-            out["epoch_unix"] = epoch0_us
+            out["epoch_unix"] = epoch_unix
 
-            results["data"][file_idx_us] = out
+            results["data"][file_idx_sample] = out
 
         # progress
         if progress:

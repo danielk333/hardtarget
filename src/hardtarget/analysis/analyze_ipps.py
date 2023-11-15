@@ -3,25 +3,29 @@ from hardtarget.gmf import GMF_LIBS
 import logging
 
 
+logger = logging.getLogger(__name__)
+
 ####################################################################
 # ANALYSE IPPS
 ####################################################################
 
 
-def analyze_ipps(rx, tx, i0, gmf_params, logger=None):
+def analyze_ipps(rx, tx, start_sample, gmf_params):
     """
+    TODO: clean up this and all other docstrings when structure is done
+
     Analyse ipps runs the gmf function.
 
     Parameters
     ----------
-    drf_reader: object
-        file reader object for drf file
-    i0: int
-        ?
+    rx: tuple
+        (DigitalRF.reader, str) the drf reader and name of the channel with the rx signal
+    tx: tuple
+        (DigitalRF.reader, str) the drf reader and name of the channel with the tx signal
+    start_sample: int
+        Start sample of integration period
     gmf_params: dict
-        gmf parameters
-    logger: object, optional
-        external logger object
+        GMF parameters
 
     Returns
     -------
@@ -43,42 +47,35 @@ def analyze_ipps(rx, tx, i0, gmf_params, logger=None):
         gmf_lib = "c" if "c" in GMF_LIBS else "numpy"
     gmf = GMF_LIBS[gmf_lib]
 
-    # logger
-    if logger is None:
-        logger = logging.getLogger(__name__)
-
     # parameters
-    ipp = gmf_params["ipp"]
-    n_ipp = gmf_params["n_ipp"]
-    n_extra = gmf_params["n_extra"]
     rx_stencil = gmf_params["rx_stencil"]
     tx_stencil = gmf_params["tx_stencil"]
     n_range_gates = gmf_params["n_ranges"]
     acc_phasors = gmf_params["acceleration_phasors"]
-    rgs_float = gmf_params["rgs_float"]
+    rgs = gmf_params["rgs"]
     frequency_decimation = gmf_params["frequency_decimation"]
-    range_rates = gmf_params["range_rates"]
-    accs = gmf_params["accelerations"]
+    rx_window_indecies = gmf_params["rx_window_indecies"]
 
     rx_reader, rx_channel = rx
     tx_reader, tx_channel = tx
 
-    # read data vector with n_ipps, and a little extra
-    z = rx_reader.read_vector_1d(i0, (n_ipp + n_extra) * ipp, rx_channel)
-
-    # make a separate copy to hold transmit pulse, and the echo
-    z_rx = np.copy(z)
+    # read data vector with n_ipp + n_extra ipp's (to allow for searching across to subsequent pulses)
+    z_rx = rx_reader.read_vector_1d(start_sample, gmf_params["read_length"], rx_channel)
 
     if tx_channel != rx_channel or tx_reader != rx_reader:
-        z = tx_reader.read_vector_1d(i0, (n_ipp + n_extra) * ipp, tx_channel)
-    z_tx = np.copy(z)
+        z_tx = tx_reader.read_vector_1d(start_sample, gmf_params["read_length"], tx_channel)
+    else:
+        z_tx = np.copy(z_rx)
 
     # clean ground clutter, get separate transmit waveform and echo vectors
-    z_tx = z_tx * tx_stencil
-    z_rx = z_rx * rx_stencil
+    # z_rx = z_rx * rx_stencil
+    # z_tx = z_tx * tx_stencil
+    z_rx = z_rx[rx_stencil]
+    z_tx = z_tx[tx_stencil]
 
+    # TODO: WHY THIS?
     # truncate the tx vector to be exactly the length of n_ipp
-    z_tx = z_tx[0: (n_ipp * ipp)]
+    # z_tx = z_tx[0: (n_ipp * ipp)]
 
     # conjugate, so that when matched filtering, it will cancel out phase of transmit waveform.
     # scale transmit waveform to unity power
@@ -88,9 +85,9 @@ def analyze_ipps(rx, tx, i0, gmf_params, logger=None):
     # maximum match function value
     gmf_vec = np.zeros(n_range_gates, dtype=np.float32)
     # best fitting range-rate
-    v_vec = np.zeros(n_range_gates, dtype=np.float32)
+    v_vec = np.zeros(n_range_gates, dtype=np.int64)
     # best fitting range-rate change
-    a_vec = np.zeros(n_range_gates, dtype=np.float32)
+    a_vec = np.zeros(n_range_gates, dtype=np.int64)
     # 0-frequency gmf output
     gmf_dc_vec = np.zeros(n_range_gates, dtype=np.float32)
 
@@ -99,27 +96,13 @@ def analyze_ipps(rx, tx, i0, gmf_params, logger=None):
             z_tx,
             z_rx,
             acc_phasors,
-            rgs_float,
+            rgs,
             frequency_decimation,
             gmf_vec,
             gmf_dc_vec,
             v_vec,
             a_vec,
+            rx_window_indecies,
         )
 
-    # logging
-    # ranges = gmf_params["ranges"]
-    # mri = np.argmax(gmf_vec)
-    # info = {
-    #     "GMF": np.max(gmf_vec),
-    #     "r_max": ranges[mri],
-    #     "vel_max": range_rates[int(v_vec[mri])]/1e3,
-    #     "a_max": accs[int(a_vec[mri])]
-    # }
-    # msg = "GMF={GMF:1.2g} r_max={r_max:1.2f} (km) vel_max={vel_max:1.2f} (km/s) a_max={a_max:1.2f} (m/s**2)"
-    # logger.debug(msg.format(**info))
-
-    avec = accs[np.array(a_vec, dtype=np.int32)]
-    vvec = range_rates[np.array(v_vec, dtype=np.int32)]
-
-    return gmf_vec, gmf_dc_vec, vvec, avec, tx_amp**2.0
+    return gmf_vec, gmf_dc_vec, v_vec, a_vec, tx_amp**2.0

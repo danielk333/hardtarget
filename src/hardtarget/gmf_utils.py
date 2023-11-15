@@ -12,6 +12,7 @@ from hardtarget import drf_utils
 DEFAULT_PARAMS = {
     "gmflib": "c",
     "n_ipp": 5,
+    "ipp_offset": 0,
     "min_range_gate": 0,
     "max_range_gate": -1,
     "range_gate_step": 1,
@@ -30,6 +31,7 @@ DEFAULT_PARAMS = {
 
 INT_PARAM_KEYS = [
     "n_ipp",
+    "ipp_offset",
     "min_range_gate",
     "max_range_gate",
     "range_gate_step",
@@ -59,11 +61,11 @@ AXIS_PARAM_KEYS = {
 }
 VECTOR_PARAM_KEYS = [
     "rgs",
-    "rgs_float",
     "fvec",
     "acceleration_phasors",
     "rx_stencil",
     "tx_stencil",
+    "rx_window_indices",
 ]
 
 
@@ -122,6 +124,7 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     sample_rate = params["sample_rate"]
     n_ipp = params["n_ipp"]
     ipp = params["ipp"]
+    ipp_offset = params["ipp_offset"]
     frequency_decimation = params["frequency_decimation"]
     radar_frequency = params["radar_frequency"]
     doppler_sign = params["doppler_sign"]
@@ -138,6 +141,13 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     T_rx_end_samp = np.round(params["rx_end"] * 1e-6 * sample_rate).astype(np.int64)
     T_tx_start_samp = np.round(params["tx_start"] * 1e-6 * sample_rate).astype(np.int64)
     T_tx_end_samp = np.round(params["tx_end"] * 1e-6 * sample_rate).astype(np.int64)
+    if "tx_pulse_length" in params:
+        tx_pulse_length = params["tx_pulse_length"]
+        _assert_msg = "TX pulse lengths does not correspond to tx start and stop values"
+        assert tx_pulse_length == T_tx_end_samp - T_tx_start_samp, _assert_msg
+    else:
+        tx_pulse_length = T_tx_end_samp - T_tx_start_samp
+        params["tx_pulse_length"] = tx_pulse_length
 
     rgs_min = T_tx_start_samp
     rgs_max = T_rx_end_samp
@@ -147,20 +157,29 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     # range gates to search through
     # range gates are relative to tx start
     rgs = np.arange(min_range_gate, max_range_gate, range_gate_step)
-    rgs_float = rgs.astype(np.float32)
     # total propagation range
     ranges = rgs * scipy.constants.c / sample_rate  # m
+
+    # rgs is relative first TX sample, make relative IPP start
+    rgs += T_tx_start_samp
+
     params["rgs"] = rgs
-    params["rgs_float"] = rgs_float
     params["ranges"] = ranges
     params["n_ranges"] = len(ranges)
 
+    # how many extra ipps do we need to read for coherent integration
+    # TODO: why do we need this? Is this for searching for echoes past the range gate?
+    #   in that case this should be refactored
+    # TODO: refactor to handle searching for echoes of this pulse in the next ipp
+    # params["n_extra"] = n_extra = int(np.ceil(np.max(rgs) / ipp_samp)) + 1
+
     # length of coherent integration
-    params["n_fft"] = n_fft = n_ipp * ipp_samp
+    params["n_fft"] = n_ipp * tx_pulse_length
+    params["decimated_n_fft"] = int(params["n_fft"] / frequency_decimation)
 
     # frequency vector
     params["fvec"] = fvec = np.fft.fftfreq(
-        int(n_fft / frequency_decimation),
+        params["decimated_n_fft"],
         d=frequency_decimation / sample_rate,
     )
 
@@ -172,12 +191,26 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     params["range_rates"] = range_rates  # m/s
     params["n_range_rates"] = len(range_rates)
 
-    # Time vector
-    times = frequency_decimation * np.arange(int(n_fft / frequency_decimation)) / sample_rate
-    times2 = times**2.0
+    # Relevant rx samples
+    rx_start = T_rx_start_samp if T_rx_start_samp > T_tx_end_samp else T_tx_end_samp
+    rx_start += clutter_length
 
-    # radar frequency in radians per second
-    # om = 2.0 * np.pi * radar_frequency * 1e6
+    params["n_rx_samples"] = T_rx_end_samp - rx_start
+
+    # cyclic range gate selector
+    # TODO: this can be generalized for a-periodic codes ect
+    base_rx_window = np.arange(params["tx_pulse_length"], dtype=np.int32)
+    rx_window_indices = np.concatenate([
+        base_rx_window + ind * params["n_rx_samples"]
+        for ind in range(params["n_ipp"])
+    ])
+    params["rx_window_indices"] = rx_window_indices
+
+    # calculate midpoint of decimated vectors
+    rx_win_dec = np.mean(rx_window_indices.copy().reshape(-1, frequency_decimation), axis=-1)
+    # Time vector
+    times = rx_win_dec / sample_rate
+    times2 = times**2.0
 
     # these are the accelerations we'll try out
     tau = n_ipp * ipp * 1e-6
@@ -185,41 +218,39 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     # acceleration sampled with steps at the end of the coherent integration window
     # acceleration_resolution is in radians!
     delta_a = max_acceleration - min_acceleration
-    params["n_accelerations"] = n_accelerations = int(
+    params["n_accelerations"] = int(
         np.ceil(delta_a * (np.pi / wavelength) * tau**2.0 / acceleration_resolution)
     )
+    if params["n_accelerations"] == 0:
+        params["n_accelerations"] = 1
 
-    params["accelerations"] = accs = np.linspace(
-        min_acceleration, max_acceleration, num=n_accelerations
+    params["accelerations"] = np.linspace(
+        min_acceleration, max_acceleration, num=params["n_accelerations"]
     )  # m/s^2
 
     params["acceleration_phasors"] = np.zeros(
-        [n_accelerations, int(n_fft / frequency_decimation)],
+        [params["n_accelerations"], params["decimated_n_fft"]],
         dtype=np.complex64,
     )
 
     # precalculate phasors corresponding to different accelerations
-    for ai, a in enumerate(accs):
+    for ai, a in enumerate(params["accelerations"]):
         params["acceleration_phasors"][ai, :] = np.exp(
-            -1j * 2.0 * np.pi * (doppler_sign * 0.5 * accs[ai] / wavelength) * times2
+            -1j * 2.0 * np.pi * (doppler_sign * 0.5 * params["accelerations"][ai] / wavelength) * times2
         )
 
-    # how many extra ipps do we need to read for coherent integration
-    # TODO: why do we need this?
-    params["n_extra"] = n_extra = int(np.ceil(np.max(rgs) / ipp_samp)) + 1
+    # Read length to include all pulses to be searched
+    params["read_length"] = (n_ipp + n_extra) * ipp_samp
 
     # this stencil is used to block tx pulses and ground clutter
-    params["read_length"] = read_length = n_fft + n_extra * ipp_samp
-    params["rx_stencil"] = rx_stencil = np.zeros(read_length, dtype=np.float32)
+    params["rx_stencil"] = np.full((params["read_length"],), False, dtype=bool)
     # this stencil is used to select tx pulses
-    params["tx_stencil"] = tx_stencil = np.zeros(read_length, dtype=np.float32)
-
-    rx_start = T_rx_start_samp if T_rx_start_samp > T_tx_end_samp else T_tx_end_samp
-    rx_start += clutter_length
+    params["tx_stencil"] = np.full((params["read_length"],), False, dtype=bool)
 
     # for each coherently integrated IPP, create stencils
     for k in range(n_ipp + n_extra):
-        tx_stencil[(k * ipp_samp + T_tx_start_samp): (k * ipp_samp + T_tx_end_samp)] = 1
-        rx_stencil[(k * ipp_samp + rx_start): (k * ipp_samp + T_rx_end_samp)] = 1
+        params["rx_stencil"][(k * ipp_samp + rx_start): (k * ipp_samp + T_rx_end_samp)] = True
+    for k in range(n_ipp):
+        params["tx_stencil"][(k * ipp_samp + T_tx_start_samp): (k * ipp_samp + T_tx_end_samp)] = True
 
     return params
