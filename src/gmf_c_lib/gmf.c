@@ -18,7 +18,7 @@
     the expected value. This would save a lot of computation.
  */
 int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors, int n_accs, float *rgs, int n_rg,
-        int dec, float *gmf_vec, float *gmf_dc_vec, float *v_vec, float *a_vec) {
+        int dec, float *gmf_vec, float *gmf_dc_vec, long *v_vec, long *a_vec) {
     fftwf_complex *echo;
     fftwf_complex *in;
     fftwf_complex *out;
@@ -134,15 +134,15 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
 #endif
 #ifdef PEAK_SEARCH
             float gmf2;
-            for (int ti = 0; ti < nfft2; ti++) {
+            for (long ti = 0; ti < nfft2; ti++) {
                 gmf2 = out[ti][0]*out[ti][0] + out[ti][1]*out[ti][1];
                 if (ai == 0 && ti == 0) {
                     gmf_dc_vec[ri] = gmf2;
                 }
                 if (gmf2 > gmf_vec[ri]) {
                     gmf_vec[ri] = gmf2;
-                    v_vec[ri] = (float)ti;  // frequency index
-                    a_vec[ri] = (float)ai;  // acceleration index
+                    v_vec[ri] = ti;  // frequency index
+                    a_vec[ri] = ai;  // acceleration index
                 }
             }
 #endif

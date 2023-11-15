@@ -38,17 +38,17 @@ __global__ void form_input(cufftComplex *z_tx, int z_tx_len, int nfft2, cufftCom
   For each range gate (i), find the value of the spectrum that has highest power.
   Also store DC value for noise floor determination.
  */
-__global__ void peak_find(cufftComplex *z_out, float *gmf_vec, float *gmf_dc_vec, float *v_vec, float *a_vec, int nfft2,
-                          int acc_idx) {
+__global__ void peak_find(cufftComplex *z_out, float *gmf_vec, float *gmf_dc_vec, long *v_vec, long *a_vec, int nfft2,
+                          long acc_idx) {
     int i = blockIdx.x;
     if (acc_idx == 0) gmf_dc_vec[i] = z_out[i * nfft2].x * z_out[i * nfft2].x + z_out[i * nfft2].y * z_out[i * nfft2].y;
-    for (int j = 0; j < nfft2; j++) {
+    for (long j = 0; j < nfft2; j++) {
         float this_gmf =
             z_out[i * nfft2 + j].x * z_out[i * nfft2 + j].x + z_out[i * nfft2 + j].y * z_out[i * nfft2 + j].y;
         if (this_gmf > gmf_vec[i]) {
             gmf_vec[i] = this_gmf;
-            v_vec[i] = (float)j;
-            a_vec[i] = (float)acc_idx;
+            v_vec[i] = j;
+            a_vec[i] = acc_idx;
         }
     }
 }
@@ -71,8 +71,8 @@ __global__ void phasor_multiply(cufftComplex *d_z_echo, cufftComplex *d_z_in, in
    This is the main code. If you have N GPUs, you can run N gmf functions in parallel.
 */
 extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors, int n_accs, float *rgs,
-                   int n_rg, int dec, float *gmf_vec, float *gmf_dc_vec, float *v_vec, float *a_vec, int rank) {
-    cudaSetDevice(rank);
+                   int n_rg, int dec, float *gmf_vec, float *gmf_dc_vec, long *v_vec, long *a_vec, int gpu_id) {
+    cudaSetDevice(gpu_id);
     // initializing pointers to device (GPU) memory, denoted with "d_"
     cufftComplex *d_z_tx;
     cufftComplex *d_z_rx;
@@ -82,8 +82,8 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
     cufftComplex *d_acc_phasors;
     float *d_gmf_vec;
     float *d_gmf_dc_vec;
-    float *d_v_vec;
-    float *d_a_vec;
+    long *d_v_vec;
+    long *d_a_vec;
     int *d_tx_idx;
 
     int *d_rgs;
@@ -165,12 +165,12 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
         fprintf(stderr, "Cuda error: Failed to allocate spectrum\n");
         exit(EXIT_FAILURE);
     }
-    if (cudaMalloc((void **)&d_v_vec, sizeof(float) * n_rg) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to allocate spectrum\n");
+    if (cudaMalloc((void **)&d_v_vec, sizeof(long) * n_rg) != cudaSuccess) {
+        fprintf(stderr, "Cuda error: Failed to allocate output\n");
         exit(EXIT_FAILURE);
     }
-    if (cudaMalloc((void **)&d_a_vec, sizeof(float) * n_rg) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to allocate spectrum\n");
+    if (cudaMalloc((void **)&d_a_vec, sizeof(long) * n_rg) != cudaSuccess) {
+        fprintf(stderr, "Cuda error: Failed to allocate output\n");
         exit(EXIT_FAILURE);
     }
     //  printf("malloced stuff\n");
@@ -227,7 +227,7 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
     // form input
     form_input<<<n_rg, 1>>>(d_z_tx, z_tx_len, nfft2, d_z_rx, d_rgs, dec, d_z_echo, d_tx_idx, nzi);
 
-    for (int i = 0; i < n_accs; i++) {
+    for (long i = 0; i < n_accs; i++) {
         if (cudaMemset(d_z_in, 0, sizeof(cufftComplex) * nfft2 * n_rg) != cudaSuccess) {
             fprintf(stderr, "Cuda error: Failed to zero device spectrum\n");
             exit(EXIT_FAILURE);
@@ -253,13 +253,13 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
         exit(EXIT_FAILURE);
     }
     // copying device resultant spectrum to host, now able to be manipulated
-    if (cudaMemcpy(v_vec, d_v_vec, sizeof(float) * n_rg, cudaMemcpyDeviceToHost) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Memory copy failed, spectrum DtH\n");
+    if (cudaMemcpy(v_vec, d_v_vec, sizeof(long) * n_rg, cudaMemcpyDeviceToHost) != cudaSuccess) {
+        fprintf(stderr, "Cuda error: Memory copy failed, output v index\n");
         exit(EXIT_FAILURE);
     }
     // copying device resultant spectrum to host, now able to be manipulated
-    if (cudaMemcpy(a_vec, d_a_vec, sizeof(float) * n_rg, cudaMemcpyDeviceToHost) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Memory copy failed, spectrum DtH\n");
+    if (cudaMemcpy(a_vec, d_a_vec, sizeof(long) * n_rg, cudaMemcpyDeviceToHost) != cudaSuccess) {
+        fprintf(stderr, "Cuda error: Memory copy failed, output a index\n");
         exit(EXIT_FAILURE);
     }
 
