@@ -10,6 +10,16 @@ from hardtarget.analysis import analyze_ipps
 from hardtarget import gmf_utils, drf_utils
 
 
+def _create_annotated_var(h5file, name, long_name, data, scales, units=None):
+    h5file[name] = data
+    var = h5file[name]
+    # for ind in range(len(scales)):
+    #     var.dims[ind].attach_scale(scales[ind])
+    var.attrs["long_name"] = long_name
+    if units is not None:
+        var.attrs["units"] = units
+
+
 ####################################################################
 # DIGITAL RF READERS
 ####################################################################
@@ -21,6 +31,7 @@ def is_pair_unpackable(a):
 
 
 # Cache reader instances by path
+# TODO: this is a memory leak technically since it keeps a reference of the object here without deletion
 _DRF_READERS = {}
 
 
@@ -114,7 +125,7 @@ def compute_bounds(reader, chnl, sample_rate, start_time=None, end_time=None, re
 ####################################################################
 
 
-def get_filepath(file_idx, sample_rate):
+def get_filepath(file_idx_us, sample_rate):
     """
     Generates a file path for h5 file to be written.
 
@@ -130,9 +141,9 @@ def get_filepath(file_idx, sample_rate):
     string
         filepath
     """
-    dt = datetime.datetime.utcfromtimestamp(file_idx / sample_rate)
+    dt = datetime.datetime.utcfromtimestamp(file_idx_us * 1e-6 / sample_rate)
     time_string = dt.strftime("%Y-%m-%dT%H-00-00")
-    return Path(time_string) / f"gmf-{file_idx:08d}.h5"
+    return Path(time_string) / f"gmf-{file_idx_us:08d}.h5"
 
 
 ####################################################################
@@ -168,6 +179,8 @@ def analyze_gmf(
     Returns
     -------
 
+    # TODO: make it able to return any portion of the GMF full map
+
     result: dict
         dir: string
             path to directory with files
@@ -196,6 +209,7 @@ def analyze_gmf(
         end_time=end_time,
         relative_time=relative_time,
     )
+    unix_bounds_us = [x * 1e6 / gmf_params["sample_rate"] for x in bounds]
 
     # tasks
     total_tasks = compute_total_tasks(gmf_params, bounds)
@@ -215,26 +229,40 @@ def analyze_gmf(
             total=len(job_tasks),
         )
 
-    # variable access
-    n_range_gates = gmf_params["n_range_gates"]
     ipp = gmf_params["ipp"]
     n_ipp = gmf_params["n_ipp"]
     num_cohints_per_file = gmf_params["num_cohints_per_file"]
     sample_rate = gmf_params["sample_rate"]
 
+    reduce_axis = [
+        False,
+        gmf_params["reduce_range"],
+        gmf_params["reduce_range_rate"],
+        gmf_params["reduce_acceleration"],
+    ]
+    gmf_size = [
+        num_cohints_per_file,
+        gmf_params["n_ranges"],
+        gmf_params["n_range_rates"],
+        gmf_params["n_accelerations"],
+    ]
+    gmf_size = [s for red, s in zip(reduce_axis, gmf_size) if not red]
+    file_data_size = [num_cohints_per_file,]
     # process
     results = {"dir": output, "files": [], "out": {}}
     for idx, task_idx in enumerate(job_tasks):
         # initialise
-        gmf_max = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-        gmf_dc = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-        gmf_v = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-        gmf_a = np.zeros([num_cohints_per_file, n_range_gates], dtype=np.float32)
-        gmf_txp = np.zeros(num_cohints_per_file, dtype=np.float32)
+        gmf_max = np.zeros(gmf_size, dtype=np.float32)
+        gmf_dc = np.zeros(gmf_size, dtype=np.float32)
+
+        gmf_txp = np.zeros(file_data_size, dtype=np.float32)
+        gmf_v_ind = np.zeros(file_data_size, dtype=np.int64)
+        gmf_a_ind = np.zeros(file_data_size, dtype=np.int64)
+        gmf_r_ind = np.zeros(file_data_size, dtype=np.int64)
 
         # filename outfile
-        file_idx = task_idx * ipp * n_ipp * num_cohints_per_file + bounds[0]
-        filepath = get_filepath(file_idx, sample_rate)
+        file_idx_us = int(task_idx * ipp * n_ipp * num_cohints_per_file + unix_bounds_us[0])
+        filepath = get_filepath(file_idx_us, sample_rate)
 
         # write to file if output is defined
         if output is not None:
@@ -252,19 +280,25 @@ def analyze_gmf(
         # process
         ts0 = time.time()
         for i in range(num_cohints_per_file):
-            i0 = file_idx + i * ipp * n_ipp
+            epoch0_us = file_idx_us + i * ipp * n_ipp
             result = analyze_ipps.analyze_ipps(
-                (rx_reader, rx_chnl), (tx_reader, tx_chnl), i0, gmf_params
+                (rx_reader, rx_chnl), (tx_reader, tx_chnl), epoch0_us, gmf_params
             )
-            gmf_max[i, :], gmf_dc[i, :], gmf_v[i, :], gmf_a[i, :], gmf_txp[i] = result
-            # rgi = np.argmax(gmf_max[i, :])
+            # TODO: fix this
+            # breakpoint()
+            gmf_max[i, :] = result[0]
+            gmf_dc[i, :] = result[1]
+            gmf_r_ind[i, ...] = np.argmax(gmf_max[i, :])
+            gmf_v_ind[i, ...] = result[2]
+            gmf_a_ind[i, ...] = result[3]
+            gmf_txp[i] = result[4]
         ts1 = time.time()
 
         # log
         info = {
             "task": task_idx,
             "time": ts1 - ts0,
-            "real": (ts1 - ts0) / (n_ipp * ipp / sample_rate),
+            "real": (ts1 - ts0) / (n_ipp * ipp * 1e-6 / sample_rate),
         }
         msg = "task_idx {task:4} time {time:1.2f} cpu/real {real:1.2f}"
         logger.debug(msg.format(**info))
@@ -272,30 +306,83 @@ def analyze_gmf(
         if output is not None:
             # write result
             out = h5py.File(outfile, "w")
-        else:
-            out = {}
+            gmf_axes = {}
 
-        # output
-        out["gmf"] = gmf_max
-        out["gmf_dc"] = gmf_dc
-        out["r"] = gmf_params["ranges"].copy()
-        out["a"] = gmf_a
-        out["v"] = gmf_v
-        out["tx_pwr"] = gmf_txp
-        out["i0"] = i0
+            out["integration_index"] = np.arange(num_cohints_per_file, dtype=np.int64)
+            gmf_axis = out["integration_index"]
+            gmf_axis.make_scale("integration_index")
+            gmf_axis.attrs["long_name"] = "Integration index within this file relative the epoch"
+            gmf_axes["integration_index"] = gmf_axis
 
-        grp = out.create_group("vector_params")
-        for key in gmf_params:
-            if key in gmf_utils.VECTOR_PARAM_KEYS:
-                grp[key] = gmf_params[key]
-            else:
-                out.attrs[key] = gmf_params[key]
+            grp = out.create_group("vector_params")
+            for key in gmf_params:
+                if key in gmf_utils.VECTOR_PARAM_KEYS:
+                    grp[key] = gmf_params[key]
+                elif key in gmf_utils.AXIS_PARAM_KEYS:
+                    out[key] = gmf_params[key]
+                    long_name, units = gmf_utils.AXIS_PARAM_KEYS[key]
+                    gmf_axis = out[key]
+                    gmf_axis.make_scale(key)
+                    gmf_axis.attrs["long_name"] = long_name
+                    gmf_axis.attrs["units"] = units
+                    gmf_axes[key] = gmf_axis
+                else:
+                    out.attrs[key] = gmf_params[key]
 
-        if output is not None:
+            # TODO: this should be input variable
+            scales = [gmf_axes["integration_index"], gmf_axes["ranges"]]
+            per_int_scales = [gmf_axes["integration_index"]]
+            _create_annotated_var(
+                out,
+                "gmf",
+                "Generalized Matched Filter output values",
+                gmf_max,
+                scales,
+                units=None,
+            )
+            out["gmf_zero_frequency"] = gmf_dc
+
+            out["range_index"] = gmf_r_ind
+            out["range_rate_index"] = gmf_v_ind
+            out["acceleration_index"] = gmf_a_ind
+
+            out["range_peak"] = gmf_params["ranges"][gmf_r_ind]
+            out["range_rate_peak"] = gmf_params["range_rates"][gmf_v_ind]
+            out["acceleration_peak"] = gmf_params["accelerations"][gmf_a_ind]
+
+            _create_annotated_var(
+                out,
+                "tx_power",
+                "Measured transmitted power",
+                gmf_txp,
+                per_int_scales,
+                units=None,
+            )
+            _create_annotated_var(
+                out,
+                "epoch_unix",
+                "Epoch of first integration in unix time",
+                epoch0_us,
+                [],
+                units="micro s",
+            )
             out.close()
             results["files"].append(filepath.name)
         else:
-            results["out"][filepath.name] = out
+            out = {}
+            out["gmf"] = gmf_max
+            out["gmf_zero_frequency"] = gmf_dc
+
+            out["range_index"] = gmf_r_ind
+            out["range_rate_index"] = gmf_v_ind
+            out["acceleration_index"] = gmf_a_ind
+
+            out["range_peak"] = gmf_params["ranges"][gmf_r_ind]
+            out["range_rate_peak"] = gmf_params["range_rates"][gmf_v_ind]
+            out["acceleration_peak"] = gmf_params["accelerations"][gmf_a_ind]
+            out["epoch_unix"] = epoch0_us
+
+            results["data"][file_idx_us] = out
 
         # progress
         if progress:

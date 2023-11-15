@@ -53,12 +53,12 @@ def analyze_ipps(rx, tx, i0, gmf_params, logger=None):
     n_extra = gmf_params["n_extra"]
     rx_stencil = gmf_params["rx_stencil"]
     tx_stencil = gmf_params["tx_stencil"]
-    n_range_gates = gmf_params["n_range_gates"]
-    acc_phasors = gmf_params["acc_phasors"]
+    n_range_gates = gmf_params["n_ranges"]
+    acc_phasors = gmf_params["acceleration_phasors"]
     rgs_float = gmf_params["rgs_float"]
     frequency_decimation = gmf_params["frequency_decimation"]
     range_rates = gmf_params["range_rates"]
-    accs = gmf_params["accs"]
+    accs = gmf_params["accelerations"]
 
     rx_reader, rx_channel = rx
     tx_reader, tx_channel = tx
