@@ -17,7 +17,8 @@ def parser_build(parser):
         "--clutter_removal",
         type=float,
         default=0,
-        help="Clutter removal at start of RX signal in seconds",
+        help="Clutter removal at start of RX signal or after end of TX signal,\
+             whichever comes last, in seconds",
     )
     return parser
 
