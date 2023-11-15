@@ -28,9 +28,9 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
     int nfft2;
 
     nfft2 = (int)(z_tx_len / dec);
-    echo = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex) * nfft2);
-    in = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex) * nfft2);
-    out = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex) * nfft2);
+    echo = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
+    in = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
+    out = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
 
     // p = fftwf_plan_dft_1d(nfft2, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
     p = fftwf_plan_dft_1d(nfft2, in, out, FFTW_FORWARD, FFTW_MEASURE);
@@ -42,8 +42,8 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
     //
     float *tx_power;
     float *tx_power2;
-    tx_power = (float *)malloc(sizeof(float) * z_tx_len);
-    tx_power2 = (float *)malloc(sizeof(float) * nfft2);
+    tx_power = (float *)malloc(sizeof(float)*z_tx_len);
+    tx_power2 = (float *)malloc(sizeof(float)*nfft2);
 
     // zero tx power
     for (int ti = 0; ti < z_tx_len; ti++) {
@@ -55,8 +55,8 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
 
     int n_nonzero_tx = 0;
     for (int ti = 0; ti < z_tx_len; ti++) {
-        tx_power[ti] = z_tx[2 * ti] * z_tx[2 * ti] + z_tx[2 * ti + 1] * z_tx[2 * ti + 1];
-        tx_power2[ti / dec] += z_tx[2 * ti] * z_tx[2 * ti] + z_tx[2 * ti + 1] * z_tx[2 * ti + 1];
+        tx_power[ti] = z_tx[2*ti]*z_tx[2*ti] + z_tx[2*ti + 1]*z_tx[2*ti + 1];
+        tx_power2[ti / dec] += z_tx[2*ti]*z_tx[2*ti] + z_tx[2*ti + 1]*z_tx[2*ti + 1];
         if (tx_power[ti] > 1e-10) n_nonzero_tx++;
     }
     int n_nonzero_tx2 = 0;
@@ -65,7 +65,7 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
     }
 
     int *tx_idx;
-    tx_idx = malloc(sizeof(int) * n_nonzero_tx);
+    tx_idx = malloc(sizeof(int)*n_nonzero_tx);
     //  n_nonzero_tx_dec=n_nonzero_tx/dec;
     int nzi = 0;
     for (int ti = 0; ti < z_tx_len; ti++) {
@@ -76,7 +76,7 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
     }
     // What elements for the decimated echo*tx vector are non-zero
     int *tx_idx2;
-    tx_idx2 = malloc(sizeof(int) * n_nonzero_tx2);
+    tx_idx2 = malloc(sizeof(int)*n_nonzero_tx2);
     nzi = 0;
     for (int ti = 0; ti < nfft2; ti++) {
         if (tx_power2[ti] > 1e-10) {
@@ -104,28 +104,28 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
             // z_tx*conj(z_rx)
             int tidx = ti / dec;
             // Real part of z_t[ti]x*z_rx[rg+ti]
-            echo[tidx][0] += z_tx[2 * ti] * z_rx[2 * (rg + ti)] - z_tx[2 * ti + 1] * z_rx[2 * (rg + ti) + 1];
+            echo[tidx][0] += z_tx[2*ti]*z_rx[2*(rg + ti)] - z_tx[2*ti + 1]*z_rx[2*(rg + ti) + 1];
             //                rea*imb        + ima*reb
             // Imag part of z_t[ti]x*z_rx[rg+ti]
-            echo[tidx][1] += z_tx[2 * ti] * z_rx[2 * (rg + ti) + 1] + z_tx[2 * ti + 1] * z_rx[2 * (rg + ti)];
+            echo[tidx][1] += z_tx[2*ti]*z_rx[2*(rg + ti) + 1] + z_tx[2*ti + 1]*z_rx[2*(rg + ti)];
         }
 #endif  // ECHO
         // for all accelerations
         // add range gate dependent accelerations
         for (int ai = 0; ai < n_accs; ai++) {
-            int phasor_i = 2 * ai * nfft2;
+            int phasor_i = 2*ai*nfft2;
             // echo*acc_phasors
             // only multiply what is needed
 #ifdef ACC_MULT
             for (int ni = 0; ni < n_nonzero_tx2; ni++) {
                 int ti = tx_idx2[ni];
-                float rep = acc_phasors[phasor_i + 2 * ti];
-                float imp = acc_phasors[phasor_i + 2 * ti + 1];
+                float rep = acc_phasors[phasor_i + 2*ti];
+                float imp = acc_phasors[phasor_i + 2*ti + 1];
 
                 // rea*reb - ima*imb
-                in[ti][0] = echo[ti][0] * rep - echo[ti][1] * imp;
+                in[ti][0] = echo[ti][0]*rep - echo[ti][1]*imp;
                 // rea*imb + ima*reb
-                in[ti][1] = echo[ti][0] * imp + echo[ti][1] * rep;
+                in[ti][1] = echo[ti][0]*imp + echo[ti][1]*rep;
             }
 #endif
             // fft in and store result in out
@@ -135,7 +135,7 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
 #ifdef PEAK_SEARCH
             float gmf2;
             for (int ti = 0; ti < nfft2; ti++) {
-                gmf2 = out[ti][0] * out[ti][0] + out[ti][1] * out[ti][1];
+                gmf2 = out[ti][0]*out[ti][0] + out[ti][1]*out[ti][1];
                 if (ai == 0 && ti == 0) {
                     gmf_dc_vec[ri] = gmf2;
                 }

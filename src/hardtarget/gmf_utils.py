@@ -128,14 +128,24 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     max_acceleration = params["max_acceleration"]
     min_acceleration = params["min_acceleration"]
     acceleration_resolution = params["acceleration_resolution"]
-    tx_pulse_length = params["tx_end"] - params["tx_start"]
     clutter_length = params["clutter_length"]
 
     ipp_samp = np.round(ipp * 1e-6 * sample_rate).astype(np.int64)
     params["ipp_samp"] = ipp_samp
 
+    # Use np.round and case to int to avoid floating point errors in floor
+    T_rx_start_samp = np.round(params["rx_start"] * 1e-6 * sample_rate).astype(np.int64)
+    T_rx_end_samp = np.round(params["rx_end"] * 1e-6 * sample_rate).astype(np.int64)
+    T_tx_start_samp = np.round(params["tx_start"] * 1e-6 * sample_rate).astype(np.int64)
+    T_tx_end_samp = np.round(params["tx_end"] * 1e-6 * sample_rate).astype(np.int64)
+
+    rgs_min = T_tx_start_samp
+    rgs_max = T_rx_end_samp
+    max_range_gate += rgs_max if max_range_gate < 0 else rgs_min
+    min_range_gate += rgs_max if min_range_gate < 0 else rgs_min
     # reset range gates
     # range gates to search through
+    # range gates are relative to tx start
     rgs = np.arange(min_range_gate, max_range_gate, range_gate_step)
     rgs_float = rgs.astype(np.float32)
     # total propagation range
@@ -200,16 +210,16 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
 
     # this stencil is used to block tx pulses and ground clutter
     params["read_length"] = read_length = n_fft + n_extra * ipp_samp
-    params["rx_stencil"] = rx_stencil = np.ones(read_length, dtype=np.float32)
+    params["rx_stencil"] = rx_stencil = np.zeros(read_length, dtype=np.float32)
     # this stencil is used to select tx pulses
-    params["tx_stencil"] = tx_stencil = np.ones(read_length, dtype=np.float32)
+    params["tx_stencil"] = tx_stencil = np.zeros(read_length, dtype=np.float32)
+
+    rx_start = T_rx_start_samp if T_rx_start_samp > T_tx_end_samp else T_tx_end_samp
+    rx_start += clutter_length
 
     # for each coherently integrated IPP, create stencils
-    tx_pulse_length = np.array(tx_pulse_length).astype(int)
     for k in range(n_ipp + n_extra):
-        tx_stencil[(k * ipp_samp + tx_pulse_length): (k * ipp_samp + ipp)] = 0.0
-        # pad zeros to rx
-        # TODO: This stencil is not generalized!!! I think? should use tx-start and stop and rx start and stop
-        rx_stencil[(k * ipp_samp): (k * ipp_samp + tx_pulse_length + clutter_length)] = 0.0
+        tx_stencil[(k * ipp_samp + T_tx_start_samp): (k * ipp_samp + T_tx_end_samp)] = 1
+        rx_stencil[(k * ipp_samp + rx_start): (k * ipp_samp + T_rx_end_samp)] = 1
 
     return params
