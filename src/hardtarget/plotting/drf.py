@@ -80,20 +80,26 @@ def rti(
     data_vec = drf_reader.read_vector_1d(bounds[0], bounds[1] - bounds[0], rxchn)
 
     range_T = T_tx_start_samp / sample_rate
+    samp_vec = np.arange(ipp_samps)
     rt_vec = np.arange(T_rx_end_samp - T_rx_start_samp) * T_samp - range_T
 
     mat_shape = (data_vec.size // ipp_samps, ipp_samps)
     data_vec = data_vec.reshape(mat_shape).T
     data_vec = data_vec[T_rx_start_samp:T_rx_end_samp, :]
+    samp_vec = samp_vec[T_rx_start_samp:T_rx_end_samp]
 
-    # Remove tx-signal (if it exists) and calibration signal
-    data_vec[T_tx_start_samp:T_tx_end_samp, :] = 0
+    # Remove tx-signal (if it exists) and null calibration signal
+    if T_rx_start_samp < T_tx_end_samp:
+        data_vec = data_vec[samp_vec > T_tx_end_samp, :]
+        rt_vec = rt_vec[samp_vec > T_tx_end_samp]
+        samp_vec = samp_vec[samp_vec > T_tx_end_samp]
     data_vec[T_cal_start_samp:T_cal_end_samp, :] = 0
 
     if clutter_removal > 0:
         clutter_removal_samp = np.round(clutter_removal * sample_rate).astype(np.int64)
         data_vec = data_vec[(clutter_removal_samp + 1):, :]
         rt_vec = rt_vec[(clutter_removal_samp + 1):]
+        samp_vec = samp_vec[(clutter_removal_samp + 1):]
 
     powsum = np.log10(np.abs(data_vec) ** 2) if log else np.abs(data_vec) ** 2
 
