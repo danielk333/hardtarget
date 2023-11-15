@@ -31,19 +31,27 @@ SECTIONS = ["Experiment"]
 ####################################################################
 
 def load_hardtarget_drf(dstdir):
+    """
+    Returns (reader, meta)
+    - reader is a Digital_rf Reader object
+    - meta is a dict with metadata
+    """
     reader = load_hardtarget_drf_reader(dstdir)
     params = load_hardtarget_drf_params(dstdir)
     return reader, params
 
 
 def load_hardtarget_drf_reader(dstdir):
+    """
+    Returns reader
+    - reader is a Digital_rf Reader object
+    """
     return drf.DigitalRFReader(str(dstdir))
 
 
 def load_hardtarget_drf_params(dstdir):
     """
-    Returns (reader, meta)
-    - reader is a Digital_rf Reader object
+    Returns meta
     - meta is a dict with metadata
     """
     dstdir = Path(dstdir)
