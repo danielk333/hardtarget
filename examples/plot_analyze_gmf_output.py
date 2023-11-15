@@ -16,6 +16,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import h5py
 
+import hardtarget
+
 # Give the data path as the first argument to this example
 parser = argparse.ArgumentParser(description="Plot the analyze gmd output")
 parser.add_argument("data_folder")
@@ -24,9 +26,12 @@ args = parser.parse_args()
 config = configparser.ConfigParser()
 config.read("./examples/cfg/test.ini")
 
+drf_path = "/home/danielk/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf"
+reader, params = hardtarget.load_hardtarget_drf(drf_path)
+
 n_ranges = config.getint("signal-processing", "n_range_gates")
 n_cohints = config.getint("signal-processing", "num_cohints_per_file")
-sample_rate = config.getint("radar-experiment", "sample_rate")
+sample_rate = params["sample_rate"]
 
 h5_files = list(Path(args.data_folder).glob("**/*.h5"))
 h5_files.sort()
@@ -46,7 +51,8 @@ file_ind = np.argmin(np.abs(dt))
 
 print(f"Found files {dt[file_ind]/sample_rate} sec off target event")
 
-inds = list(range(file_ind - 5, file_ind + 15))
+#inds = list(range(file_ind - 5, file_ind + 15))
+inds = list(range(len(h5_files)))
 
 print("Loading data...")
 t_vecs = None
