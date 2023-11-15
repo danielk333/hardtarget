@@ -87,6 +87,7 @@ def main(args, cli_logger):
         output=args.output,
         start_time=args.start_time,
         end_time=args.end_time,
+        relative_time=args.relative_time,
         progress=args.progress,
         progress_position=comm.rank,
     )
