@@ -183,14 +183,14 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
         min_acceleration, max_acceleration, num=n_accelerations
     )  # m/s^2
 
-    params["acceleration_phasors"] = acc_phasors = np.zeros(
+    params["acceleration_phasors"] = np.zeros(
         [n_accelerations, int(n_fft / frequency_decimation)],
         dtype=np.complex64,
     )
 
     # precalculate phasors corresponding to different accelerations
     for ai, a in enumerate(accs):
-        acc_phasors[ai, :] = np.exp(
+        params["acceleration_phasors"][ai, :] = np.exp(
             -1j * 2.0 * np.pi * (doppler_sign * 0.5 * accs[ai] / wavelength) * times2
         )
 
