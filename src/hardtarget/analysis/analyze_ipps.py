@@ -54,7 +54,7 @@ def analyze_ipps(rx, tx, start_sample, gmf_params):
     acc_phasors = gmf_params["acceleration_phasors"]
     rgs = gmf_params["rgs"]
     frequency_decimation = gmf_params["frequency_decimation"]
-    rx_window_indecies = gmf_params["rx_window_indecies"]
+    rx_window_indices = gmf_params["rx_window_indices"]
 
     rx_reader, rx_channel = rx
     tx_reader, tx_channel = tx
@@ -102,7 +102,7 @@ def analyze_ipps(rx, tx, start_sample, gmf_params):
             gmf_dc_vec,
             v_vec,
             a_vec,
-            rx_window_indecies,
+            rx_window_indices,
         )
 
     return gmf_vec, gmf_dc_vec, v_vec, a_vec, tx_amp**2.0

@@ -142,15 +142,22 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     T_tx_start_samp = np.round(params["tx_start"] * 1e-6 * sample_rate).astype(np.int64)
     T_tx_end_samp = np.round(params["tx_end"] * 1e-6 * sample_rate).astype(np.int64)
     if "tx_pulse_length" in params:
-        tx_pulse_length = params["tx_pulse_length"]
+        tx_pulse_samps = np.round(params["tx_pulse_length"] * 1e-6 * sample_rate).astype(np.int64)
         _assert_msg = "TX pulse lengths does not correspond to tx start and stop values"
-        assert tx_pulse_length == T_tx_end_samp - T_tx_start_samp, _assert_msg
+        assert tx_pulse_samps == T_tx_end_samp - T_tx_start_samp, _assert_msg
     else:
-        tx_pulse_length = T_tx_end_samp - T_tx_start_samp
-        params["tx_pulse_length"] = tx_pulse_length
+        tx_pulse_samps = T_tx_end_samp - T_tx_start_samp
+    params["tx_pulse_samps"] = tx_pulse_samps
 
+    # Relevant rx samples
+    rx_start = T_rx_start_samp if T_rx_start_samp > T_tx_end_samp else T_tx_end_samp
+    rx_start += clutter_length
+
+    params["n_rx_samples"] = T_rx_end_samp - rx_start
+
+    # TODO: this current does not handle partial codes, add this functionality
     rgs_min = T_tx_start_samp
-    rgs_max = T_rx_end_samp
+    rgs_max = T_rx_end_samp - tx_pulse_samps
     max_range_gate += rgs_max if max_range_gate < 0 else rgs_min
     min_range_gate += rgs_max if min_range_gate < 0 else rgs_min
     # reset range gates
@@ -158,23 +165,19 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     # range gates are relative to tx start
     rgs = np.arange(min_range_gate, max_range_gate, range_gate_step)
     # total propagation range
-    ranges = rgs * scipy.constants.c / sample_rate  # m
+    ranges = (rgs - T_tx_start_samp) * scipy.constants.c / sample_rate  # m
 
-    # rgs is relative first TX sample, make relative IPP start
-    rgs += T_tx_start_samp
-
+    # make relative the stencil start
+    rgs -= rx_start
     params["rgs"] = rgs
     params["ranges"] = ranges
     params["n_ranges"] = len(ranges)
 
     # how many extra ipps do we need to read for coherent integration
-    # TODO: why do we need this? Is this for searching for echoes past the range gate?
-    #   in that case this should be refactored
-    # TODO: refactor to handle searching for echoes of this pulse in the next ipp
-    # params["n_extra"] = n_extra = int(np.ceil(np.max(rgs) / ipp_samp)) + 1
+    params["n_extra"] = ipp_offset
 
     # length of coherent integration
-    params["n_fft"] = n_ipp * tx_pulse_length
+    params["n_fft"] = n_ipp * tx_pulse_samps
     params["decimated_n_fft"] = int(params["n_fft"] / frequency_decimation)
 
     # frequency vector
@@ -191,15 +194,9 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     params["range_rates"] = range_rates  # m/s
     params["n_range_rates"] = len(range_rates)
 
-    # Relevant rx samples
-    rx_start = T_rx_start_samp if T_rx_start_samp > T_tx_end_samp else T_tx_end_samp
-    rx_start += clutter_length
-
-    params["n_rx_samples"] = T_rx_end_samp - rx_start
-
     # cyclic range gate selector
     # TODO: this can be generalized for a-periodic codes ect
-    base_rx_window = np.arange(params["tx_pulse_length"], dtype=np.int32)
+    base_rx_window = np.arange(params["tx_pulse_samps"], dtype=np.int32)
     rx_window_indices = np.concatenate([
         base_rx_window + ind * params["n_rx_samples"]
         for ind in range(params["n_ipp"])
@@ -240,7 +237,7 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
         )
 
     # Read length to include all pulses to be searched
-    params["read_length"] = (n_ipp + n_extra) * ipp_samp
+    params["read_length"] = (n_ipp + ipp_offset) * ipp_samp
 
     # this stencil is used to block tx pulses and ground clutter
     params["rx_stencil"] = np.full((params["read_length"],), False, dtype=bool)
@@ -248,9 +245,13 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     params["tx_stencil"] = np.full((params["read_length"],), False, dtype=bool)
 
     # for each coherently integrated IPP, create stencils
-    for k in range(n_ipp + n_extra):
-        params["rx_stencil"][(k * ipp_samp + rx_start): (k * ipp_samp + T_rx_end_samp)] = True
     for k in range(n_ipp):
-        params["tx_stencil"][(k * ipp_samp + T_tx_start_samp): (k * ipp_samp + T_tx_end_samp)] = True
+        rx0 = ((k + ipp_offset) * ipp_samp + rx_start)
+        rx1 = ((k + ipp_offset) * ipp_samp + T_rx_end_samp)
+        params["rx_stencil"][rx0:rx1] = True
+
+        tx0 = (k * ipp_samp + T_tx_start_samp)
+        tx1 = (k * ipp_samp + T_tx_end_samp)
+        params["tx_stencil"][tx0:tx1] = True
 
     return params

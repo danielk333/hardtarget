@@ -141,7 +141,7 @@ def get_filepath(file_idx_sample, sample_rate):
     string
         filepath
     """
-    dt = datetime.datetime.utcfromtimestamp(file_idx_sample * 1e-6 / sample_rate)
+    dt = datetime.datetime.utcfromtimestamp(file_idx_sample / sample_rate)
     time_string = dt.strftime("%Y-%m-%dT%H-00-00")
     return Path(time_string) / f"gmf-{file_idx_sample:08d}.h5"
 
@@ -230,9 +230,10 @@ def analyze_gmf(
     # progress
     if progress:
         total = len(job_tasks)
+        sub_desc_len = 8 + 2*len(str(num_cohints_per_file))
         progress_bar = tqdm(
             position=progress_position,
-            desc="Processing",
+            desc="Processing".ljust(sub_desc_len, " ") if subprogress else "Processing",
             total=total,
         )
 

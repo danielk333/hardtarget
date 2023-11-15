@@ -9,49 +9,21 @@ hardtarget convert eiscat ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf \
 
 from pathlib import Path
 import configparser
-import datetime
 import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
 
-import hardtarget
-
 # Give the data path as the first argument to this example
 parser = argparse.ArgumentParser(description="Plot the analyze gmd output")
 parser.add_argument("data_folder")
 args = parser.parse_args()
 
-config = configparser.ConfigParser()
-config.read("./examples/cfg/test.ini")
-
-drf_path = "/home/danielk/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf"
-reader, params = hardtarget.load_hardtarget_drf(drf_path)
-
-n_ranges = config.getint("signal-processing", "n_range_gates")
-n_cohints = config.getint("signal-processing", "num_cohints_per_file")
-sample_rate = params["sample_rate"]
-
 h5_files = list(Path(args.data_folder).glob("**/*.h5"))
 h5_files.sort()
 print(f"{len(h5_files)} files found")
 
-# The target event
-# dt = datetime.datetime(2021, 4, 12, 12, 1, 33, 600000)
-dt = datetime.datetime(2021, 4, 12, 12, 15, 57, 400000)
-time_stamp = dt.replace(tzinfo=datetime.timezone.utc).timestamp()
-print(f"Event should be located at {time_stamp}...")
-sample_stamp = time_stamp * sample_rate
-
-samples_times = [int(Path(x).name.split("-")[1].split(".")[0]) for x in h5_files]
-samples_times = np.array(samples_times)
-dt = samples_times - sample_stamp
-file_ind = np.argmin(np.abs(dt))
-
-print(f"Found files {dt[file_ind]/sample_rate} sec off target event")
-
-#inds = list(range(file_ind - 5, file_ind + 15))
 inds = list(range(len(h5_files)))
 
 print("Loading data...")
@@ -61,19 +33,20 @@ for ind in inds:
 
     with h5py.File(h5_files[ind], "r") as hf:
         gmf = hf["gmf"][()]
-        r = hf["r"][()]
-        v = hf["v"][()]
-        a = hf["a"][()]
-    r_inds = np.argmax(gmf, axis=1)
+        r = hf["ranges"][()]
+        r_inds = hf["range_index"][()]
+        v = hf["range_rate_peak"][()]
+        a = hf["acceleration_peak"][()]
 
+    n_cohints = gmf.shape[0]
     if ind == inds[0]:
         t_vec = np.arange(n_cohints)
     else:
         t_vec = np.arange(t_vecs[-1], t_vecs[-1] + n_cohints)
     r_vec = r[r_inds]
-    v_vec = np.array([v[ind, r_inds[ind]] for ind in range(n_cohints)])
-    a_vec = np.array([a[ind, r_inds[ind]] for ind in range(n_cohints)])
-    g_vec = np.array([gmf[ind, r_inds[ind]] for ind in range(n_cohints)])
+    v_vec = np.array([v[cohind, r_inds[cohind]] for cohind in range(n_cohints)])
+    a_vec = np.array([a[cohind, r_inds[cohind]] for cohind in range(n_cohints)])
+    g_vec = np.array([gmf[cohind, r_inds[cohind]] for cohind in range(n_cohints)])
 
     if ind == inds[0]:
         t_vecs = t_vec
@@ -87,6 +60,10 @@ for ind in inds:
         v_vecs = np.append(v_vecs, v_vec)
         a_vecs = np.append(a_vecs, a_vec)
         g_vecs = np.append(g_vecs, g_vec)
+
+    fig, ax = plt.subplots()
+    ax.pcolormesh(gmf)
+    plt.show()
 
 
 fig, axes = plt.subplots(2, 2)
