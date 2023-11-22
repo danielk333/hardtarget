@@ -9,7 +9,7 @@ params = hardtarget.load_gmf_params(target, config)
 
 t = np.arange(params["read_length"], dtype=np.float64)/params["sample_rate"]
 rgs_t = np.zeros_like(t)
-rel_rgs = params["rgs"] + np.round(params["tx_start"]*1e-6*params["sample_rate"]).astype(np.int64)
+rel_rgs = params["rgs"] + params["stencil_start_samp"]
 rgs_t[rel_rgs] = 0.5
 
 vline_st = dict(ls="--", alpha=0.5)
