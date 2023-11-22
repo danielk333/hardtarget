@@ -169,6 +169,8 @@ def analyze_gmf(
     """
     Analyze data using gmf.
 
+    TODO: update docstrings
+
     Parameters
     ----------
     rx: Digital_rf reader
