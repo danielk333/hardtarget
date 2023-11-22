@@ -72,6 +72,9 @@ def analyze_ipps(rx, tx, start_sample, gmf_params):
     tx_amp = np.sqrt(tx_amp2)
     z_tx = np.conj(z_tx) / tx_amp
 
+    # TODO: There are better ways of estimating the background noise by
+    #   removing all coherent echoes first and using the individual signal samples
+
     gmf_vars = gmf_utils.GMFVariables(
         vals = np.zeros(gmf_params["gmf_size"], dtype=np.float32),
         dc = np.zeros([gmf_params["n_ranges"], ], dtype=np.float32),
