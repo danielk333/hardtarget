@@ -33,10 +33,16 @@ for ind in inds:
 
     with h5py.File(h5_files[ind], "r") as hf:
         gmf = hf["gmf"][()]
+
+        coh_ints = np.arange(gmf.shape[0])
+
+        r_inds = np.argmax(gmf, axis=1)
+        v_inds = hf["range_rate_index"][()]
+        a_inds = hf["acceleration_index"][()]
+
         r = hf["ranges"][()]
-        r_inds = hf["range_index"][()]
-        v = hf["range_rate_peak"][()]
-        a = hf["acceleration_peak"][()]
+        v = hf["range_rates"][()]
+        a = hf["accelerations"][()]
 
     n_cohints = gmf.shape[0]
     if ind == inds[0]:
@@ -44,26 +50,28 @@ for ind in inds:
     else:
         t_vec = np.arange(t_vecs[-1], t_vecs[-1] + n_cohints)
     r_vec = r[r_inds]
-    v_vec = np.array([v[cohind, r_inds[cohind]] for cohind in range(n_cohints)])
-    a_vec = np.array([a[cohind, r_inds[cohind]] for cohind in range(n_cohints)])
-    g_vec = np.array([gmf[cohind, r_inds[cohind]] for cohind in range(n_cohints)])
+    v_vec = v[v_inds[coh_ints, r_inds]]
+    a_vec = a[a_inds[coh_ints, r_inds]]
+    g_vec = gmf[coh_ints, r_inds]
 
     if ind == inds[0]:
+        gmf_vec = gmf
         t_vecs = t_vec
         r_vecs = r_vec
         v_vecs = v_vec
         a_vecs = a_vec
         g_vecs = g_vec
     else:
+        gmf_vec = np.append(gmf_vec, gmf, axis=0)
         t_vecs = np.append(t_vecs, t_vec)
         r_vecs = np.append(r_vecs, r_vec)
         v_vecs = np.append(v_vecs, v_vec)
         a_vecs = np.append(a_vecs, a_vec)
         g_vecs = np.append(g_vecs, g_vec)
 
-    fig, ax = plt.subplots()
-    ax.pcolormesh(gmf)
-    plt.show()
+fig, ax = plt.subplots()
+ax.pcolormesh(gmf_vec.T)
+plt.show()
 
 
 fig, axes = plt.subplots(2, 2)
