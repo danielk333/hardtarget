@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -fPIC -shared
+CFLAGS = -fPIC -shared -g
 LIBS = -lfftw3f
 INSTALL = ../hardtarget/gmf
 
