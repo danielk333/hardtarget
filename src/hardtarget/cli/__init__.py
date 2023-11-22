@@ -4,6 +4,7 @@ from . import analyze
 from . import cudacheck
 from . import info_drf
 from . import plot_drf
+from . import plot_gmf
 
 #Then expose the main after registration
 from . commands import main
