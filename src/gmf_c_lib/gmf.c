@@ -16,9 +16,13 @@
   - range dependent acceleration grid. The expected acceleration is a function
     of altitude. we only would need to search through a finite grid around
     the expected value. This would save a lot of computation.
+
+    Here the input signals are complex but interpreted as floats making 
+    them 2*len long and interpreted as [ind0_re, ind0_im, ind0_re...]
+
  */
-int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors, int n_accs, float *rgs, int n_rg,
-        int dec, float *gmf_vec, float *gmf_dc_vec, long *v_vec, long *a_vec) {
+int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors, int n_accs, int *rgs, int n_rg,
+        int dec, float *gmf_vec, float *gmf_dc_vec, int *v_vec, int *a_vec, int *rx_window) {
     fftwf_complex *echo;
     fftwf_complex *in;
     fftwf_complex *out;
@@ -26,6 +30,9 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
     fftwf_plan p;
     int rg;
     int nfft2;
+
+    float *rx_select;
+    rx_select = (float *)malloc(sizeof(fftwf_complex)*z_tx_len*2);
 
     nfft2 = (int)(z_tx_len / dec);
     echo = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
@@ -95,8 +102,12 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
             in[fi][0] = 0.0;
             in[fi][1] = 0.0;
         }
-
-        int rg = (int)rgs[ri];
+        int rg = rgs[ri];
+        int rxwi;
+        for (int rxi = 0; rxi < z_tx_len*2; rxi++) {
+            rxwi = (int)((float)rxi / 2.0);
+            rx_select[rxi] = z_rx[rx_window[rxwi] + rg];
+        }
 
         for (int ni = 0; ni < n_nonzero_tx; ni++) {
             int ti = tx_idx[ni];
@@ -104,10 +115,10 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
             // z_tx*conj(z_rx)
             int tidx = ti / dec;
             // Real part of z_t[ti]x*z_rx[rg+ti]
-            echo[tidx][0] += z_tx[2*ti]*z_rx[2*(rg + ti)] - z_tx[2*ti + 1]*z_rx[2*(rg + ti) + 1];
+            echo[tidx][0] += z_tx[2*ti]*rx_select[2*ti] - z_tx[2*ti + 1]*rx_select[2*ti + 1];
             //                rea*imb        + ima*reb
             // Imag part of z_t[ti]x*z_rx[rg+ti]
-            echo[tidx][1] += z_tx[2*ti]*z_rx[2*(rg + ti) + 1] + z_tx[2*ti + 1]*z_rx[2*(rg + ti)];
+            echo[tidx][1] += z_tx[2*ti]*rx_select[2*ti + 1] + z_tx[2*ti + 1]*rx_select[2*ti];
         }
 #endif  // ECHO
         // for all accelerations
@@ -134,7 +145,7 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
 #endif
 #ifdef PEAK_SEARCH
             float gmf2;
-            for (long ti = 0; ti < nfft2; ti++) {
+            for (int ti = 0; ti < nfft2; ti++) {
                 gmf2 = out[ti][0]*out[ti][0] + out[ti][1]*out[ti][1];
                 if (ai == 0 && ti == 0) {
                     gmf_dc_vec[ri] = gmf2;

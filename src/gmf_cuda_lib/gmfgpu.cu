@@ -1,7 +1,7 @@
 // header file for the plasmaline project
 #include "gmfgpu.h"
 
-void print_devices() {
+extern "C" void print_devices() {
     int nDevices;
 
     int ret = cudaGetDeviceCount(&nDevices);
@@ -25,12 +25,15 @@ void print_devices() {
 
  */
 __global__ void form_input(cufftComplex *z_tx, int z_tx_len, int nfft2, cufftComplex *z_rx, int *rgs, int dec,
-                           cufftComplex *d_z_echo, int *tx_idx, int nzi) {
+                           cufftComplex *d_z_echo, int *tx_idx, int *d_rxwin_idx, int nzi) {
     int i = blockIdx.x;
     int rg = rgs[i];
     for (int ni = 0; ni < nzi; ni++) {
         int ti = tx_idx[ni];
-        d_z_echo[i * nfft2 + ti / dec] = cuCaddf(d_z_echo[i * nfft2 + ti / dec], cuCmulf(z_tx[ti], z_rx[rg + ti]));
+        d_z_echo[i * nfft2 + ti / dec] = cuCaddf(
+            d_z_echo[i * nfft2 + ti / dec], 
+            cuCmulf(z_tx[ti], z_rx[rg + d_rxwin_idx[ti]])
+        );
     }
 }
 
@@ -38,11 +41,11 @@ __global__ void form_input(cufftComplex *z_tx, int z_tx_len, int nfft2, cufftCom
   For each range gate (i), find the value of the spectrum that has highest power.
   Also store DC value for noise floor determination.
  */
-__global__ void peak_find(cufftComplex *z_out, float *gmf_vec, float *gmf_dc_vec, long *v_vec, long *a_vec, int nfft2,
-                          long acc_idx) {
+__global__ void peak_find(cufftComplex *z_out, float *gmf_vec, float *gmf_dc_vec, int *v_vec, int *a_vec, int nfft2,
+                          int acc_idx) {
     int i = blockIdx.x;
     if (acc_idx == 0) gmf_dc_vec[i] = z_out[i * nfft2].x * z_out[i * nfft2].x + z_out[i * nfft2].y * z_out[i * nfft2].y;
-    for (long j = 0; j < nfft2; j++) {
+    for (int j = 0; j < nfft2; j++) {
         float this_gmf =
             z_out[i * nfft2 + j].x * z_out[i * nfft2 + j].x + z_out[i * nfft2 + j].y * z_out[i * nfft2 + j].y;
         if (this_gmf > gmf_vec[i]) {
@@ -60,7 +63,7 @@ __global__ void phasor_multiply(cufftComplex *d_z_echo, cufftComplex *d_z_in, in
                                 cufftComplex *d_acc_phasors) {
     int rgi = blockIdx.x;
     /*
-       tbd: only multiply non-zero values.
+       TODO: only multiply non-zero values.
     */
     for (int j = 0; j < nfft2; j++) {
         d_z_in[rgi * nfft2 + j] = cuCmulf(d_z_echo[rgi * nfft2 + j], d_acc_phasors[i * nfft2 + j]);
@@ -69,9 +72,14 @@ __global__ void phasor_multiply(cufftComplex *d_z_echo, cufftComplex *d_z_in, in
 
 /*
    This is the main code. If you have N GPUs, you can run N gmf functions in parallel.
+
+    TODO: fix docstring in code and print statements to print better messages
+    TODO: refactor out deallocs and allocs into a function call
+
 */
-extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors, int n_accs, float *rgs,
-                   int n_rg, int dec, float *gmf_vec, float *gmf_dc_vec, long *v_vec, long *a_vec, int gpu_id) {
+extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors, int n_accs, int *rgs,
+                   int n_rg, int dec, float *gmf_vec, float *gmf_dc_vec, int *v_vec, int *a_vec, int *rx_window,
+                   int gpu_id) {
     cudaSetDevice(gpu_id);
     // initializing pointers to device (GPU) memory, denoted with "d_"
     cufftComplex *d_z_tx;
@@ -82,16 +90,12 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
     cufftComplex *d_acc_phasors;
     float *d_gmf_vec;
     float *d_gmf_dc_vec;
-    long *d_v_vec;
-    long *d_a_vec;
+    int *d_v_vec;
+    int *d_a_vec;
     int *d_tx_idx;
+    int *d_rx_window;
 
     int *d_rgs;
-    int *h_rgs;
-    h_rgs = (int *)malloc(sizeof(int) * n_rg);
-    for (int i = 0; i < n_rg; i++) {
-        h_rgs[i] = (int)rgs[i];
-    }
 
     float *tx_power;
     tx_power = (float *)malloc(sizeof(float) * z_tx_len);
@@ -133,6 +137,10 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
         fprintf(stderr, "Cuda error: Failed to allocate tx\n");
         exit(EXIT_FAILURE);
     }
+    if (cudaMalloc((void **)&d_rx_window, sizeof(int) * z_tx_len) != cudaSuccess) {
+        fprintf(stderr, "Cuda error: Failed to allocate rx win\n");
+        exit(EXIT_FAILURE);
+    }
 
     if (cudaMalloc((void **)&d_z_rx, sizeof(cufftComplex) * z_rx_len) != cudaSuccess) {
         fprintf(stderr, "Cuda error: Failed to allocate echo\n");
@@ -165,11 +173,11 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
         fprintf(stderr, "Cuda error: Failed to allocate spectrum\n");
         exit(EXIT_FAILURE);
     }
-    if (cudaMalloc((void **)&d_v_vec, sizeof(long) * n_rg) != cudaSuccess) {
+    if (cudaMalloc((void **)&d_v_vec, sizeof(int) * n_rg) != cudaSuccess) {
         fprintf(stderr, "Cuda error: Failed to allocate output\n");
         exit(EXIT_FAILURE);
     }
-    if (cudaMalloc((void **)&d_a_vec, sizeof(long) * n_rg) != cudaSuccess) {
+    if (cudaMalloc((void **)&d_a_vec, sizeof(int) * n_rg) != cudaSuccess) {
         fprintf(stderr, "Cuda error: Failed to allocate output\n");
         exit(EXIT_FAILURE);
     }
@@ -199,13 +207,17 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
         exit(EXIT_FAILURE);
     }
     // copying n_ipp'th row of host data into device
-    if (cudaMemcpy(d_rgs, h_rgs, sizeof(int) * n_rg, cudaMemcpyHostToDevice) != cudaSuccess) {
+    if (cudaMemcpy(d_rgs, rgs, sizeof(int) * n_rg, cudaMemcpyHostToDevice) != cudaSuccess) {
         fprintf(stderr, "Cuda error: Memory copy failed, tx HtD\n");
         exit(EXIT_FAILURE);
     }
 
     // copying n_ipp'th row of host data into device
     if (cudaMemcpy(d_tx_idx, tx_idx, sizeof(int) * nzi, cudaMemcpyHostToDevice) != cudaSuccess) {
+        fprintf(stderr, "Cuda error: Memory copy failed, tx HtD\n");
+        exit(EXIT_FAILURE);
+    }
+    if (cudaMemcpy(d_rx_window, rx_window, sizeof(int) * z_tx_len, cudaMemcpyHostToDevice) != cudaSuccess) {
         fprintf(stderr, "Cuda error: Memory copy failed, tx HtD\n");
         exit(EXIT_FAILURE);
     }
@@ -225,9 +237,9 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
     //  if (cudaMalloc((void **) &d_acc_phasors, sizeof(cufftComplex) * n_accs*nfft2)
 
     // form input
-    form_input<<<n_rg, 1>>>(d_z_tx, z_tx_len, nfft2, d_z_rx, d_rgs, dec, d_z_echo, d_tx_idx, nzi);
+    form_input<<<n_rg, 1>>>(d_z_tx, z_tx_len, nfft2, d_z_rx, d_rgs, dec, d_z_echo, d_tx_idx, d_rx_window, nzi);
 
-    for (long i = 0; i < n_accs; i++) {
+    for (int i = 0; i < n_accs; i++) {
         if (cudaMemset(d_z_in, 0, sizeof(cufftComplex) * nfft2 * n_rg) != cudaSuccess) {
             fprintf(stderr, "Cuda error: Failed to zero device spectrum\n");
             exit(EXIT_FAILURE);
@@ -253,17 +265,16 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
         exit(EXIT_FAILURE);
     }
     // copying device resultant spectrum to host, now able to be manipulated
-    if (cudaMemcpy(v_vec, d_v_vec, sizeof(long) * n_rg, cudaMemcpyDeviceToHost) != cudaSuccess) {
+    if (cudaMemcpy(v_vec, d_v_vec, sizeof(int) * n_rg, cudaMemcpyDeviceToHost) != cudaSuccess) {
         fprintf(stderr, "Cuda error: Memory copy failed, output v index\n");
         exit(EXIT_FAILURE);
     }
     // copying device resultant spectrum to host, now able to be manipulated
-    if (cudaMemcpy(a_vec, d_a_vec, sizeof(long) * n_rg, cudaMemcpyDeviceToHost) != cudaSuccess) {
+    if (cudaMemcpy(a_vec, d_a_vec, sizeof(int) * n_rg, cudaMemcpyDeviceToHost) != cudaSuccess) {
         fprintf(stderr, "Cuda error: Memory copy failed, output a index\n");
         exit(EXIT_FAILURE);
     }
 
-    free(h_rgs);
     free(tx_idx);
     free(tx_power);
 
@@ -310,6 +321,10 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
         exit(EXIT_FAILURE);
     }
     if (cudaFree(d_tx_idx) != cudaSuccess) {
+        fprintf(stderr, "Cuda error: Failed to free spectrum\n");
+        exit(EXIT_FAILURE);
+    }
+    if (cudaFree(d_rx_window) != cudaSuccess) {
         fprintf(stderr, "Cuda error: Failed to free spectrum\n");
         exit(EXIT_FAILURE);
     }
