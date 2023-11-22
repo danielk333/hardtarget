@@ -20,19 +20,23 @@ if __libpath__.is_file():
         ctypes.POINTER(ctypes.c_float), ctypes.c_int,
         ctypes.POINTER(ctypes.c_float), ctypes.c_int,
         ctypes.POINTER(ctypes.c_float), ctypes.c_int,
-        ctypes.POINTER(ctypes.c_float), ctypes.c_int,
+        ctypes.POINTER(ctypes.c_int), ctypes.c_int,
         ctypes.c_int,
         ctypes.POINTER(ctypes.c_float),
         ctypes.POINTER(ctypes.c_float),
-        ctypes.POINTER(ctypes.c_long),
-        ctypes.POINTER(ctypes.c_long),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
     ]
 else:
     raise ImportError(f'{__libpath__} GMF C Library not found')
 
 
-def gmf_c(z_tx, z_rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_vec):
-    # TODO: This should be pythonified
+def gmfc(z_tx, z_rx, gmf_variables, gmf_params):
+    acc_phasors = gmf_params["acceleration_phasors"]
+    rgs = gmf_params["rgs"]
+    frequency_decimation = gmf_params["frequency_decimation"]
+    rx_window_indices = gmf_params["rx_window_indices"]
+
     error_code = gmfclib.gmf(
         z_tx.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
         z_tx.size,
@@ -40,12 +44,13 @@ def gmf_c(z_tx, z_rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_vec):
         z_rx.size,
         acc_phasors.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
         acc_phasors.shape[0],
-        rgs.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-        len(rgs),
-        dec,
-        gmf_vec.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-        gmf_dc_vec.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-        v_vec.ctypes.data_as(ctypes.POINTER(ctypes.c_long)),
-        a_vec.ctypes.data_as(ctypes.POINTER(ctypes.c_long)),
+        rgs.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        rgs.size,
+        frequency_decimation,
+        gmf_variables.vals.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+        gmf_variables.dc.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+        gmf_variables.v_ind.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        gmf_variables.a_ind.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        rx_window_indices.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
     )
     assert error_code == 0, f"GMF C-function returned error {error_code}"

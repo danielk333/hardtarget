@@ -20,19 +20,36 @@ if __libpath__.is_file():
         ctypes.POINTER(ctypes.c_float), ctypes.c_int,
         ctypes.POINTER(ctypes.c_float), ctypes.c_int,
         ctypes.POINTER(ctypes.c_float), ctypes.c_int,
-        ctypes.POINTER(ctypes.c_float), ctypes.c_int,
+        ctypes.POINTER(ctypes.c_int), ctypes.c_int,
         ctypes.c_int,
         ctypes.POINTER(ctypes.c_float),
         ctypes.POINTER(ctypes.c_float),
-        ctypes.POINTER(ctypes.c_long),
-        ctypes.POINTER(ctypes.c_long),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
         ctypes.c_int,
     ]
+
+    gmfcudalib.print_devices.restype = None
+    gmfcudalib.print_devices.argtypes = []
 else:
     raise ImportError(f'{__libpath__} GMF Cuda Library not found')
 
 
-def gmf_cuda(z_tx, z_rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_vec, gpu_id=0):
+def print_cuda_devices():
+    """Print available cuda devices
+    """
+    gmfcudalib.print_devices()
+
+
+def gmfcu(z_tx, z_rx, gmf_variables, gmf_params, gpu_id=0):
+    # TODO: gpu_id should be option somehow or should be set by mpi
+    # it depends on the node / gpu-count layout of the cluster
+    acc_phasors = gmf_params["acceleration_phasors"]
+    rgs = gmf_params["rgs"]
+    frequency_decimation = gmf_params["frequency_decimation"]
+    rx_window_indices = gmf_params["rx_window_indices"]
+
     error_code = gmfcudalib.gmf(
         z_tx.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
         z_tx.size,
@@ -40,13 +57,14 @@ def gmf_cuda(z_tx, z_rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_ve
         z_rx.size,
         acc_phasors.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
         acc_phasors.shape[0],
-        rgs.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-        len(rgs),
-        dec,
-        gmf_vec.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-        gmf_dc_vec.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-        v_vec.ctypes.data_as(ctypes.POINTER(ctypes.c_long)),
-        a_vec.ctypes.data_as(ctypes.POINTER(ctypes.c_long)),
+        rgs.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        rgs.size,
+        frequency_decimation,
+        gmf_variables.vals.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+        gmf_variables.dc.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+        gmf_variables.v_ind.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        gmf_variables.a_ind.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        rx_window_indices.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
         gpu_id,
     )
     assert error_code == 0, f"GMF CUDA-function returned error {error_code}"

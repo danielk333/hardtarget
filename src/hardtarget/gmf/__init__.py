@@ -1,19 +1,19 @@
-from .gmf_numpy import gmf_numpy
+from .gmf_numpy import gmfnp
 
 GMF_LIBS = {
-    'numpy': gmf_numpy,
+    "numpy": gmfnp,
 }
 
 try:
-    from .gmf_c import gmf_c
+    from .gmf_c import gmfc
 except ImportError:
-    gmf_c = None
+    gmfc = None
 else:
-    GMF_LIBS['c'] = gmf_c
+    GMF_LIBS["c"] = gmfc
 
 try:
-    from .gmf_cuda import gmf_cuda
+    from .gmf_cuda import gmfcu
 except ImportError:
-    gmf_cuda = None
+    gmfcu = None
 else:
-    GMF_LIBS['cuda'] = gmf_cuda
+    GMF_LIBS["cuda"] = gmfcu
