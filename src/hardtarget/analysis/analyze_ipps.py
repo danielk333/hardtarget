@@ -1,5 +1,7 @@
 import numpy as np
 from hardtarget.gmf import GMF_LIBS
+from hardtarget import gmf_utils
+
 import logging
 
 
@@ -18,27 +20,21 @@ def analyze_ipps(rx, tx, start_sample, gmf_params):
 
     Parameters
     ----------
-    rx: tuple
+    rx : tuple
         (DigitalRF.reader, str) the drf reader and name of the channel with the rx signal
-    tx: tuple
+    tx : tuple
         (DigitalRF.reader, str) the drf reader and name of the channel with the tx signal
-    start_sample: int
+    start_sample : int
         Start sample of integration period
-    gmf_params: dict
+    gmf_params : dict
         GMF parameters
 
     Returns
     -------
-    gmf_vec: numpy array
-        ?
-    gmf_dc_vec: numpy array
-        ?
-    vvec: numpy array
-        ?
-    avec: numpy array
-        ?
-    tx_amp: numpy array
-        ?
+    gmf_vars : hardtarget.gmf_utils.GMFVariables
+        Named tuple container for compacting the variables set by the GMF function.
+    tx_amp2 : float
+        Squared summed tx amplitude
     """
 
     # gmf lib
@@ -47,14 +43,13 @@ def analyze_ipps(rx, tx, start_sample, gmf_params):
         gmf_lib = "c" if "c" in GMF_LIBS else "numpy"
     gmf = GMF_LIBS[gmf_lib]
 
+    # TODO: implement this
+    if not gmf_params["reduce_range_rate"] and gmf_params["reduce_acceleration"]:
+        raise NotImplementedError("reduce settings not implemented")
+
     # parameters
     rx_stencil = gmf_params["rx_stencil"]
     tx_stencil = gmf_params["tx_stencil"]
-    n_range_gates = gmf_params["n_ranges"]
-    acc_phasors = gmf_params["acceleration_phasors"]
-    rgs = gmf_params["rgs"]
-    frequency_decimation = gmf_params["frequency_decimation"]
-    rx_window_indices = gmf_params["rx_window_indices"]
 
     rx_reader, rx_channel = rx
     tx_reader, tx_channel = tx
@@ -68,41 +63,29 @@ def analyze_ipps(rx, tx, start_sample, gmf_params):
         z_tx = np.copy(z_rx)
 
     # clean ground clutter, get separate transmit waveform and echo vectors
-    # z_rx = z_rx * rx_stencil
-    # z_tx = z_tx * tx_stencil
     z_rx = z_rx[rx_stencil]
     z_tx = z_tx[tx_stencil]
 
-    # TODO: WHY THIS?
-    # truncate the tx vector to be exactly the length of n_ipp
-    # z_tx = z_tx[0: (n_ipp * ipp)]
-
     # conjugate, so that when matched filtering, it will cancel out phase of transmit waveform.
     # scale transmit waveform to unity power
-    tx_amp = np.sqrt(np.sum(np.abs(z_tx) ** 2.0))
+    tx_amp2 = np.sum(np.abs(z_tx) ** 2.0)
+    tx_amp = np.sqrt(tx_amp2)
     z_tx = np.conj(z_tx) / tx_amp
 
-    # maximum match function value
-    gmf_vec = np.zeros(n_range_gates, dtype=np.float32)
-    # best fitting range-rate
-    v_vec = np.zeros(n_range_gates, dtype=np.int64)
-    # best fitting range-rate change
-    a_vec = np.zeros(n_range_gates, dtype=np.int64)
-    # 0-frequency gmf output
-    gmf_dc_vec = np.zeros(n_range_gates, dtype=np.float32)
+    gmf_vars = gmf_utils.GMFVariables(
+        vals = np.zeros(gmf_params["gmf_size"], dtype=np.float32),
+        dc = np.zeros([gmf_params["n_ranges"], ], dtype=np.float32),
+        r_ind = np.full(gmf_params["gmf_size"], -1, dtype=np.int32),
+        v_ind = np.full(gmf_params["gmf_size"], -1, dtype=np.int32),
+        a_ind = np.full(gmf_params["gmf_size"], -1, dtype=np.int32),
+    )
 
     if tx_amp > 1.0:
         gmf(
             z_tx,
             z_rx,
-            acc_phasors,
-            rgs,
-            frequency_decimation,
-            gmf_vec,
-            gmf_dc_vec,
-            v_vec,
-            a_vec,
-            rx_window_indices,
+            gmf_vars,
+            gmf_params,
         )
 
-    return gmf_vec, gmf_dc_vec, v_vec, a_vec, tx_amp**2.0
+    return gmf_vars, tx_amp2

@@ -10,16 +10,6 @@ from hardtarget.analysis import analyze_ipps
 from hardtarget import gmf_utils, drf_utils
 
 
-def _create_annotated_var(h5file, name, long_name, data, scales, units=None):
-    h5file[name] = data
-    var = h5file[name]
-    # for ind in range(len(scales)):
-    #     var.dims[ind].attach_scale(scales[ind])
-    var.attrs["long_name"] = long_name
-    if units is not None:
-        var.attrs["units"] = units
-
-
 ####################################################################
 # DIGITAL RF READERS
 ####################################################################
@@ -150,6 +140,17 @@ def get_filepath(file_idx_sample, sample_rate):
 # ANALYZE GMF
 ####################################################################
 
+def _create_annotated_var(h5file, name, long_name, data, units=None):
+    h5file[name] = data
+    var = h5file[name]
+    # TODO: this breaks vitables for some reason?
+    #   but ncdump still recognizes the axis
+    # for ind in range(len(scales)):
+    #     var.dims[ind].attach_scale(scales[ind])
+    var.attrs["long_name"] = long_name
+    if units is not None:
+        var.attrs["units"] = units
+
 
 def analyze_gmf(
     rx,
@@ -237,31 +238,16 @@ def analyze_gmf(
             total=total,
         )
 
-    reduce_axis = [
-        False,
-        gmf_params["reduce_range"],
-        gmf_params["reduce_range_rate"],
-        gmf_params["reduce_acceleration"],
-    ]
-    gmf_size = [
-        num_cohints_per_file,
-        gmf_params["n_ranges"],
-        gmf_params["n_range_rates"],
-        gmf_params["n_accelerations"],
-    ]
-    gmf_size = [s for red, s in zip(reduce_axis, gmf_size) if not red]
-    file_data_size = [num_cohints_per_file,]
     # process
     results = {"dir": output, "files": [], "out": {}}
     for idx, task_idx in enumerate(job_tasks):
         # initialise
-        gmf_max = np.zeros(gmf_size, dtype=np.float32)
-        gmf_dc = np.zeros(gmf_size, dtype=np.float32)
-
-        gmf_txp = np.zeros(file_data_size, dtype=np.float32)
-        gmf_v_ind = np.zeros(gmf_size, dtype=np.int64)
-        gmf_a_ind = np.zeros(gmf_size, dtype=np.int64)
-        gmf_r_ind = np.zeros(file_data_size, dtype=np.int64)
+        gmf_vals = []
+        gmf_dc = []
+        gmf_txp = []
+        gmf_r_ind = []
+        gmf_v_ind = []
+        gmf_a_ind = []
 
         # filename outfile
         file_idx_sample = task_idx * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
@@ -285,17 +271,15 @@ def analyze_gmf(
         ts0 = time.time()
         for i in range(num_cohints_per_file):
             start_sample = file_idx_sample + i * ipp_samp * n_ipp
-            result = analyze_ipps.analyze_ipps(
+            gmf_vars, gmf_tx = analyze_ipps.analyze_ipps(
                 (rx_reader, rx_chnl), (tx_reader, tx_chnl), start_sample, gmf_params
             )
-            # TODO: fix this
-            # breakpoint()
-            gmf_max[i, :] = result[0]
-            gmf_dc[i, :] = result[1]
-            gmf_r_ind[i, ...] = np.argmax(gmf_max[i, :])
-            gmf_v_ind[i, ...] = result[2]
-            gmf_a_ind[i, ...] = result[3]
-            gmf_txp[i] = result[4]
+            gmf_vals.append(gmf_vars.vals)
+            gmf_dc.append(gmf_vars.dc)
+            gmf_r_ind.append(gmf_vars.r_ind)
+            gmf_v_ind.append(gmf_vars.v_ind)
+            gmf_a_ind.append(gmf_vars.a_ind)
+            gmf_txp.append(gmf_tx)
 
             if progress and subprogress:
                 dots = ("."*(i % 4)).ljust(3, " ")
@@ -303,6 +287,13 @@ def analyze_gmf(
                 curr_num = str(i + 1).ljust(total_num_len, ' ')
                 progress_bar.set_description(f"Processing {curr_num}/{num_cohints_per_file} [{dots}]")
         ts1 = time.time()
+
+        gmf_vals = np.stack(gmf_vals, axis=0)
+        gmf_dc = np.stack(gmf_dc, axis=0)
+        gmf_txp = np.stack(gmf_txp, axis=0)
+        gmf_r_ind = np.stack(gmf_r_ind, axis=0)
+        gmf_v_ind = np.stack(gmf_v_ind, axis=0)
+        gmf_a_ind = np.stack(gmf_a_ind, axis=0)
 
         # log
         info = {
@@ -337,35 +328,68 @@ def analyze_gmf(
                     gmf_axis.attrs["units"] = units
                     gmf_axes[key] = gmf_axis
                 else:
-                    out.attrs[key] = gmf_params[key]
+                    if isinstance(gmf_params[key], bool):
+                        val = np.bool_(gmf_params[key])
+                    else:
+                        val = gmf_params[key]
+                    out.attrs[key] = val
 
-            # TODO: this should be input variable
-            scales = [gmf_axes["integration_index"], gmf_axes["ranges"]]
-            per_int_scales = [gmf_axes["integration_index"]]
+            # TODO: this is if we want to attach scales to the dims
+            # scales = [gmf_axes["integration_index"]]
+            # if not gmf_params["reduce_range"]:
+            #     scales.append(gmf_axes["ranges"])
+            # if not gmf_params["reduce_range_rate"]:
+            #     scales.append(gmf_axes["range_rates"])
+            # if not gmf_params["reduce_acceleration"]:
+            #     scales.append(gmf_axes["accelerations"])
+            # per_int_scales = [gmf_axes["integration_index"]]
+
             _create_annotated_var(
                 out,
                 "gmf",
                 "Generalized Matched Filter output values",
-                gmf_max,
-                scales,
+                gmf_vals,
                 units=None,
             )
-            out["gmf_zero_frequency"] = gmf_dc
+            _create_annotated_var(
+                out,
+                "gmf_zero_frequency",
+                "Range dependant noise floor (0-frequency gmf output)",
+                gmf_dc,
+                units=None,
+            )
+            _create_annotated_var(
+                out,
+                "range_index",
+                "If range is reduced, contains the best range index for each left over axis",
+                gmf_r_ind,
+                units=None,
+            )
+            _create_annotated_var(
+                out,
+                "range_rate_index",
+                "If range rate is reduced, contains the best range rate index for each left over axis",
+                gmf_v_ind,
+                units=None,
+            )
+            _create_annotated_var(
+                out,
+                "acceleration_index",
+                "If acceleration is reduced, contains the best acceleration index for each left over axis",
+                gmf_a_ind,
+                units=None,
+            )
 
-            out["range_index"] = gmf_r_ind
-            out["range_rate_index"] = gmf_v_ind
-            out["acceleration_index"] = gmf_a_ind
-
-            out["range_peak"] = gmf_params["ranges"][gmf_r_ind]
-            out["range_rate_peak"] = gmf_params["range_rates"][gmf_v_ind]
-            out["acceleration_peak"] = gmf_params["accelerations"][gmf_a_ind]
+            # TODO: select out this
+            # out["range_peak"] = gmf_params["ranges"][gmf_r_ind]
+            # out["range_rate_peak"] = gmf_params["range_rates"][gmf_v_ind]
+            # out["acceleration_peak"] = gmf_params["accelerations"][gmf_a_ind]
 
             _create_annotated_var(
                 out,
                 "tx_power",
                 "Measured transmitted power",
                 gmf_txp,
-                per_int_scales,
                 units=None,
             )
             _create_annotated_var(
@@ -373,23 +397,23 @@ def analyze_gmf(
                 "epoch_unix",
                 "Epoch of first integration in unix time",
                 epoch_unix,
-                [],
                 units="s",
             )
             out.close()
             results["files"].append(filepath.name)
         else:
             out = {}
-            out["gmf"] = gmf_max
+            out["gmf"] = gmf_vals
             out["gmf_zero_frequency"] = gmf_dc
 
             out["range_index"] = gmf_r_ind
             out["range_rate_index"] = gmf_v_ind
             out["acceleration_index"] = gmf_a_ind
 
-            out["range_peak"] = gmf_params["ranges"][gmf_r_ind]
-            out["range_rate_peak"] = gmf_params["range_rates"][gmf_v_ind]
-            out["acceleration_peak"] = gmf_params["accelerations"][gmf_a_ind]
+            # out["range_peak"] = gmf_params["ranges"][gmf_r_ind]
+            # out["range_rate_peak"] = gmf_params["range_rates"][gmf_v_ind]
+            # out["acceleration_peak"] = gmf_params["accelerations"][gmf_a_ind]
+            out["tx_power"] = gmf_txp
             out["epoch_unix"] = epoch_unix
 
             results["data"][file_idx_sample] = out
