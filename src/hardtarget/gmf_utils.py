@@ -3,6 +3,24 @@ import numpy as np
 import scipy.constants
 import pathlib
 from hardtarget import drf_utils
+from collections import namedtuple
+
+
+####################################################################
+# GMF INPUT DATA
+####################################################################
+
+"""Container for compacting the variables set by the GMF function."""
+GMFVariables = namedtuple(
+    "GMFVariables",
+    [
+        "vals",  # match function values reduced over the requested axis
+        "dc",  # 0-frequency gmf output
+        "r_ind",  # best fitting range
+        "v_ind",  # best fitting range-rate
+        "a_ind",  # best fitting range-rate change
+    ],
+)
 
 
 ####################################################################
@@ -150,10 +168,11 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     params["tx_pulse_samps"] = tx_pulse_samps
 
     # Relevant rx samples
-    rx_start = T_rx_start_samp if T_rx_start_samp > T_tx_end_samp else T_tx_end_samp
-    rx_start += clutter_length
+    stencil_start_samp = T_rx_start_samp if T_rx_start_samp > T_tx_end_samp else T_tx_end_samp
+    stencil_start_samp += clutter_length
 
-    params["n_rx_samples"] = T_rx_end_samp - rx_start
+    params["n_rx_samples"] = T_rx_end_samp - stencil_start_samp
+    params["stencil_start_samp"] = stencil_start_samp
 
     # TODO: this current does not handle partial codes, add this functionality
     rgs_min = T_tx_start_samp
@@ -168,7 +187,7 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     ranges = (rgs - T_tx_start_samp) * scipy.constants.c / sample_rate  # m
 
     # make relative the stencil start
-    rgs -= rx_start
+    rgs -= stencil_start_samp
     params["rgs"] = rgs
     params["ranges"] = ranges
     params["n_ranges"] = len(ranges)
@@ -197,15 +216,18 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     # cyclic range gate selector
     # TODO: this can be generalized for a-periodic codes ect
     base_rx_window = np.arange(params["tx_pulse_samps"], dtype=np.int32)
-    rx_window_indices = np.concatenate([
+    rx_window_blocks = [
         base_rx_window + ind * params["n_rx_samples"]
         for ind in range(params["n_ipp"])
-    ])
+    ]
+    rx_window_indices = np.concatenate(rx_window_blocks)
+    # TODO: This is part of future generalization to partial codes too
+    # params["rx_window_blocks"] = rx_window_blocks
     params["rx_window_indices"] = rx_window_indices
 
     # calculate midpoint of decimated vectors
     rx_win_dec = np.mean(rx_window_indices.copy().reshape(-1, frequency_decimation), axis=-1)
-    # Time vector
+    # Time vector relative detected range-gate
     times = rx_win_dec / sample_rate
     times2 = times**2.0
 
@@ -246,12 +268,27 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
 
     # for each coherently integrated IPP, create stencils
     for k in range(n_ipp):
-        rx0 = ((k + ipp_offset) * ipp_samp + rx_start)
+        rx0 = ((k + ipp_offset) * ipp_samp + stencil_start_samp)
         rx1 = ((k + ipp_offset) * ipp_samp + T_rx_end_samp)
         params["rx_stencil"][rx0:rx1] = True
 
         tx0 = (k * ipp_samp + T_tx_start_samp)
         tx1 = (k * ipp_samp + T_tx_end_samp)
         params["tx_stencil"][tx0:tx1] = True
+
+    reduce_axis = [
+        params["reduce_range"],
+        params["reduce_range_rate"],
+        params["reduce_acceleration"],
+    ]
+    gmf_size = [
+        params["n_ranges"],
+        params["n_range_rates"],
+        params["n_accelerations"],
+    ]
+    gmf_size = [s for red, s in zip(reduce_axis, gmf_size) if not red]
+
+    params["gmf_size"] = gmf_size
+    params["reduce_axis"] = reduce_axis
 
     return params
