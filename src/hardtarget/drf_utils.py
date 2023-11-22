@@ -104,7 +104,7 @@ def time_interval_to_samples(start_time, end_time, bounds, sample_rate, relative
                 dt64_t0 = np.datetime64(start_time)
             else:
                 dt64_t0 = start_time
-            unix_t0 = dt64_t0.astype("datetime64[s]").astype("int64")
+            unix_t0 = dt64_t0.astype("datetime64[us]").astype("int64")*1e-6
             _b0 = unix_t0 * sample_rate
 
         dt0 = datetime.datetime.utcfromtimestamp(bounds[0]/sample_rate)
@@ -121,7 +121,7 @@ def time_interval_to_samples(start_time, end_time, bounds, sample_rate, relative
                 dt64_t1 = np.datetime64(end_time)
             else:
                 dt64_t1 = end_time
-            unix_t1 = dt64_t1.astype("datetime64[s]").astype("int64")
+            unix_t1 = dt64_t1.astype("datetime64[us]").astype("int64")*1e-6
             _b1 = int(unix_t1 * sample_rate)
         dt1 = datetime.datetime.utcfromtimestamp(bounds[1]/sample_rate)
         dte = datetime.datetime.utcfromtimestamp(unix_t1)
