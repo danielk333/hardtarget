@@ -115,32 +115,30 @@ def compute_bounds(reader, chnl, sample_rate, start_time=None, end_time=None, re
 ####################################################################
 
 
-def get_filepath(file_idx_sample, sample_rate):
+def get_filepath(epoch_unix_us):
     """
     Generates a file path for h5 file to be written.
 
     Parameters
     ----------
-    file_idx_sample : int
-        sample index associate with output file
-    sample_rate: int
-        sample rate for processed data
+    epoch_unix_us : int
+        Epoch in unix time of file in microseconds
 
     Returns
     -------
     string
         filepath
     """
-    dt = datetime.datetime.utcfromtimestamp(file_idx_sample / sample_rate)
+    dt = datetime.datetime.utcfromtimestamp(epoch_unix_us*1e-6)
     time_string = dt.strftime("%Y-%m-%dT%H-00-00")
-    return Path(time_string) / f"gmf-{file_idx_sample:08d}.h5"
+    return Path(time_string) / f"gmf-{epoch_unix_us:08d}.h5"
 
 
 ####################################################################
 # ANALYZE GMF
 ####################################################################
 
-def _create_annotated_var(h5file, name, long_name, data, units=None):
+def _create_annotated_var(h5file, name, data, long_name, units=None):
     h5file[name] = data
     var = h5file[name]
     # TODO: this breaks vitables for some reason?
@@ -251,8 +249,11 @@ def analyze_gmf(
 
         # filename outfile
         file_idx_sample = task_idx * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
+
+        # filenames are in unix time microseconds
         epoch_unix = file_idx_sample / sample_rate
-        filepath = get_filepath(file_idx_sample, sample_rate)
+        epoch_unix_us = epoch_unix.astype("int64")*1000000
+        filepath = get_filepath(epoch_unix_us)
 
         # write to file if output is defined
         if output is not None:
@@ -304,6 +305,14 @@ def analyze_gmf(
         msg = "task_idx {task:4} time {time:1.2f} cpu/real {real:1.2f}"
         logger.debug(msg.format(**info))
 
+        coh_ints = np.arange(num_cohints_per_file)
+
+        r_inds = np.argmax(gmf_vals, axis=1)
+        r_vec = gmf_params["ranges"][r_inds]
+        v_vec = gmf_params["range_rates"][gmf_v_ind[coh_ints, r_inds]]
+        a_vec = gmf_params["accelerations"][gmf_a_ind[coh_ints, r_inds]]
+        g_vec = gmf_vals[coh_ints, r_inds]
+
         if output is not None:
             # write result
             out = h5py.File(outfile, "w")
@@ -345,58 +354,50 @@ def analyze_gmf(
             # per_int_scales = [gmf_axes["integration_index"]]
 
             _create_annotated_var(
-                out,
-                "gmf",
+                out, "gmf", gmf_vals,
                 "Generalized Matched Filter output values",
-                gmf_vals,
-                units=None,
             )
             _create_annotated_var(
-                out,
-                "gmf_zero_frequency",
+                out, "gmf_zero_frequency", gmf_dc,
                 "Range dependant noise floor (0-frequency gmf output)",
-                gmf_dc,
-                units=None,
             )
             _create_annotated_var(
-                out,
-                "range_index",
+                out, "range_index", gmf_r_ind,
                 "If range is reduced, contains the best range index for each left over axis",
-                gmf_r_ind,
-                units=None,
             )
             _create_annotated_var(
-                out,
-                "range_rate_index",
+                out, "range_rate_index", gmf_v_ind,
                 "If range rate is reduced, contains the best range rate index for each left over axis",
-                gmf_v_ind,
-                units=None,
             )
             _create_annotated_var(
-                out,
-                "acceleration_index",
+                out, "acceleration_index", gmf_a_ind,
                 "If acceleration is reduced, contains the best acceleration index for each left over axis",
-                gmf_a_ind,
-                units=None,
             )
 
-            # TODO: select out this
-            # out["range_peak"] = gmf_params["ranges"][gmf_r_ind]
-            # out["range_rate_peak"] = gmf_params["range_rates"][gmf_v_ind]
-            # out["acceleration_peak"] = gmf_params["accelerations"][gmf_a_ind]
+            _create_annotated_var(
+                out, "range_peak", r_vec,
+                "Range at peak GMF",
+            )
+            _create_annotated_var(
+                out, "range_rate_peak", v_vec,
+                "Range rate at peak GMF",
+            )
+            _create_annotated_var(
+                out, "acceleration_peak", a_vec,
+                "Acceleration at peak GMF",
+            )
+            _create_annotated_var(
+                out, "gmf_peak", g_vec,
+                "Peak GMF",
+            )
 
             _create_annotated_var(
-                out,
-                "tx_power",
+                out, "tx_power", gmf_txp,
                 "Measured transmitted power",
-                gmf_txp,
-                units=None,
             )
             _create_annotated_var(
-                out,
-                "epoch_unix",
+                out, "epoch_unix", epoch_unix,
                 "Epoch of first integration in unix time",
-                epoch_unix,
                 units="s",
             )
             out.close()
