@@ -1,154 +1,20 @@
 import logging
 import numpy as np
 import time
-import datetime
-import digital_rf as drf
 import h5py
 from tqdm import tqdm
 from pathlib import Path
 from hardtarget.gmf import GMF_LIBS
-from hardtarget import gmf_utils, drf_utils
+from hardtarget import gmf_utils
+
+from . import analysis_utils
 
 logger = logging.getLogger(__name__)
-
-####################################################################
-# DIGITAL RF READERS
-####################################################################
-
-
-def is_pair_unpackable(a):
-    """Returns true if a can be unpacked to a pair of variables."""
-    return True if isinstance(a, (tuple, list)) and len(a) == 2 else False
-
-
-# Cache reader instances by path
-# TODO: this is a memory leak technically since it keeps a reference of the object here without deletion
-_DRF_READERS = {}
-
-
-def load_source(src):
-    """
-    Load Digital_rf reader object from (srcdir, chnl)
-    """
-    global _DRF_READERS
-    if type(src) is not tuple:
-        raise ValueError(f"tuple (path, chnl) expected, {src}")
-    if not is_pair_unpackable(src):
-        raise ValueError(f"tuple (path, chnl) expected, {src}")
-    path, chnl = src
-    if path is None or not Path(path).is_dir():
-        raise ValueError(f"path must be directory, {path}")
-    # read cached instance
-    reader = _DRF_READERS.get(path, None)
-    if reader is None:
-        _DRF_READERS[path] = reader = drf.DigitalRFReader([str(path)])
-    channels = reader.get_channels()
-    if chnl not in channels:
-        raise ValueError(f"reader does not support channel, {chnl}")
-    return path, reader, chnl
-
-
-####################################################################
-# CALCULATE TASKS
-####################################################################
-
-
-def compute_job_tasks(job, n_tasks):
-    """
-    Generates a list of task indexes for given job.
-
-    Parameters
-    ----------
-    job : dict
-        job["N"] : int
-            total number of jobs
-        job["idx"] : int
-            index of this job (idx < N)
-
-    n_tasks: int
-        total number of tasks
-
-    Returns
-    -------
-    list
-        List of task indexes
-
-    Examples
-    --------
-    >>> get_tasks({"idx":1, "N:2"}, 8)
-    [1,3,5,7]
-    """
-    return list(range(job["idx"], n_tasks, job["N"]))
-
-
-def compute_total_tasks(gmf_params, bounds):
-    """
-    Compute the total number of tasks, associated with sample bounds.
-    """
-    # inter-pulse period length in samples
-    ipp = gmf_params["ipp"]
-    # number of interpulse periods to coherently integrate
-    n_ipp = gmf_params["n_ipp"]
-    # number of coherent integration periods to include in one output file
-    # smaller means that lower latency can be achieved
-    num_cohints_per_file = gmf_params["num_cohints_per_file"]
-    n_tasks = int(np.floor((bounds[1] - bounds[0]) / (ipp * n_ipp)) / num_cohints_per_file)
-    return n_tasks
-
-
-####################################################################
-# BOUNDS
-####################################################################
-
-
-def compute_bounds(reader, chnl, sample_rate, start_time=None, end_time=None, relative_time=False):
-    """
-    optionally restrict sample bounds given timestamps
-    """
-    drf_bounds = reader.get_bounds(chnl)
-    return drf_utils.time_interval_to_samples(
-        start_time, end_time, drf_bounds, sample_rate, relative_time=relative_time
-    )
-
-
-####################################################################
-# OUTPUT FILE PATH
-####################################################################
-
-
-def get_filepath(epoch_unix_us):
-    """
-    Generates a file path for h5 file to be written.
-
-    Parameters
-    ----------
-    epoch_unix_us : int
-        Epoch in unix time of file in microseconds
-
-    Returns
-    -------
-    string
-        filepath
-    """
-    dt = datetime.datetime.utcfromtimestamp(epoch_unix_us*1e-6)
-    time_string = dt.strftime("%Y-%m-%dT%H-00-00")
-    return Path(time_string) / f"gmf-{epoch_unix_us:08d}.h5"
 
 
 ####################################################################
 # ANALYZE GMF
 ####################################################################
-
-def _create_annotated_var(h5file, name, data, long_name, units=None):
-    h5file[name] = data
-    var = h5file[name]
-    # TODO: this breaks vitables for some reason?
-    #   but ncdump still recognizes the axis
-    # for ind in range(len(scales)):
-    #     var.dims[ind].attach_scale(scales[ind])
-    var.attrs["long_name"] = long_name
-    if units is not None:
-        var.attrs["units"] = units
 
 
 def compute_gmf(
@@ -192,8 +58,8 @@ def compute_gmf(
     """
 
     # load data sources
-    rx_srcdir, rx_reader, rx_chnl = load_source(rx)
-    tx_srcdir, tx_reader, tx_chnl = load_source(tx)
+    rx_srcdir, rx_reader, rx_chnl = analysis_utils.load_source(rx)
+    tx_srcdir, tx_reader, tx_chnl = analysis_utils.load_source(tx)
 
     # gmf params
     gmf_params = gmf_utils.load_gmf_params(rx_srcdir, config)
@@ -203,7 +69,7 @@ def compute_gmf(
     logger.info("Using GMF backend: " + gmf_params["gmflib"])
 
     # bounds
-    bounds = compute_bounds(
+    bounds = analysis_utils.compute_bounds(
         rx_reader,
         rx_chnl,
         gmf_params["sample_rate"],
@@ -213,8 +79,8 @@ def compute_gmf(
     )
 
     # tasks
-    total_tasks = compute_total_tasks(gmf_params, bounds)
-    job_tasks = compute_job_tasks(job, total_tasks)
+    total_tasks = analysis_utils.compute_total_tasks(gmf_params, bounds)
+    job_tasks = analysis_utils.compute_job_tasks(job, total_tasks)
     tasks_skipped = 0
 
     logger.info(f"starting job {job['idx']}/{job['N']} with {len(job_tasks)} tasks")
@@ -252,7 +118,7 @@ def compute_gmf(
         # filenames are in unix time microseconds
         epoch_unix = file_idx_sample / sample_rate
         epoch_unix_us = epoch_unix.astype("int64")*1000000
-        filepath = get_filepath(epoch_unix_us)
+        filepath = analysis_utils.get_filepath(epoch_unix_us)
 
         # write to file if output is defined
         if output is not None:
@@ -352,49 +218,49 @@ def compute_gmf(
             #     scales.append(gmf_axes["accelerations"])
             # per_int_scales = [gmf_axes["integration_index"]]
 
-            _create_annotated_var(
+            analysis_utils.create_annotated_h5var(
                 out, "gmf", gmf_vals,
                 "Generalized Matched Filter output values",
             )
-            _create_annotated_var(
+            analysis_utils.create_annotated_h5var(
                 out, "gmf_zero_frequency", gmf_dc,
                 "Range dependant noise floor (0-frequency gmf output)",
             )
-            _create_annotated_var(
+            analysis_utils.create_annotated_h5var(
                 out, "range_index", gmf_r_ind,
                 "If range is reduced, contains the best range index for each left over axis",
             )
-            _create_annotated_var(
+            analysis_utils.create_annotated_h5var(
                 out, "range_rate_index", gmf_v_ind,
                 "If range rate is reduced, contains the best range rate index for each left over axis",
             )
-            _create_annotated_var(
+            analysis_utils.create_annotated_h5var(
                 out, "acceleration_index", gmf_a_ind,
                 "If acceleration is reduced, contains the best acceleration index for each left over axis",
             )
 
-            _create_annotated_var(
+            analysis_utils.create_annotated_h5var(
                 out, "range_peak", r_vec,
                 "Range at peak GMF",
             )
-            _create_annotated_var(
+            analysis_utils.create_annotated_h5var(
                 out, "range_rate_peak", v_vec,
                 "Range rate at peak GMF",
             )
-            _create_annotated_var(
+            analysis_utils.create_annotated_h5var(
                 out, "acceleration_peak", a_vec,
                 "Acceleration at peak GMF",
             )
-            _create_annotated_var(
+            analysis_utils.create_annotated_h5var(
                 out, "gmf_peak", g_vec,
                 "Peak GMF",
             )
 
-            _create_annotated_var(
+            analysis_utils.create_annotated_h5var(
                 out, "tx_power", gmf_txp,
                 "Measured transmitted power",
             )
-            _create_annotated_var(
+            analysis_utils.create_annotated_h5var(
                 out, "epoch_unix", epoch_unix,
                 "Epoch of first integration in unix time",
                 units="s",
@@ -410,9 +276,11 @@ def compute_gmf(
             out["range_rate_index"] = gmf_v_ind
             out["acceleration_index"] = gmf_a_ind
 
-            # out["range_peak"] = gmf_params["ranges"][gmf_r_ind]
-            # out["range_rate_peak"] = gmf_params["range_rates"][gmf_v_ind]
-            # out["acceleration_peak"] = gmf_params["accelerations"][gmf_a_ind]
+            out["range_peak"] = r_vec
+            out["range_rate_peak"] = v_vec
+            out["acceleration_peak"] = a_vec
+            out["gmf_peak"] = g_vec
+
             out["tx_power"] = gmf_txp
             out["epoch_unix"] = epoch_unix
 
@@ -493,10 +361,6 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params):
     tx_amp2 = np.sum(np.abs(z_tx) ** 2.0)
     tx_amp = np.sqrt(tx_amp2)
     z_tx = np.conj(z_tx) / tx_amp
-
-    # TODO: Create a truncated transmission envelope based on if the tx power
-    # in the sample is > limit=1e-10 or not, then truncate the rx select window
-    # and acceleration phasors accordingly
 
     # TODO: There are better ways of estimating the background noise by
     #   removing all coherent echoes first and using the individual signal samples
