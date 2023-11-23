@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 
 import logging
-from hardtarget.analysis import analyze_gmf
+from hardtarget.analysis import compute_gmf
 
 from .commands import add_command
 
 
-LOGGER_NAME = "analyse_gmf"
 LOGGER_NAME = "hardtarget.analysis.analyze_gmf"
 
 
@@ -77,7 +76,7 @@ def main(args):
     tx = (args.tx, args.txchnl)
 
     # process
-    results = analyze_gmf.analyze_gmf(
+    results = compute_gmf(
         rx,
         tx,
         config=args.config,
