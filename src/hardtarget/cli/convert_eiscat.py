@@ -27,7 +27,7 @@ def parser_build(parser):
     parser.add_argument(
         "-c",
         "--compression",
-        choices=["0", "1", "2", "3", "4", "5", "6", "7", "8", "9" ],
+        choices=["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
         default="0",
         help="Set the compression level (0-9) (default: 0)",
     )
@@ -35,10 +35,10 @@ def parser_build(parser):
     return parser
 
 
-def main(args, cli_logger):
+def main(args):
     compression_level = int(args.compression)
-    eiscat_convert(args.input, cli_logger, 
-                   dstdir=args.output, 
+    eiscat_convert(args.input,
+                   dstdir=args.output,
                    compression_level=compression_level)
 
 

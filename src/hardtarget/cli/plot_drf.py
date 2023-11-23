@@ -23,7 +23,7 @@ def parser_build(parser):
     return parser
 
 
-def main(args, cli_logger):
+def main(args):
     reader, params = load_hardtarget_drf(args.path)
 
     if args.relative_time:

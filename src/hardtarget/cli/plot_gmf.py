@@ -14,7 +14,7 @@ def parser_build(parser):
     return parser
 
 
-def main(args, cli_logger):
+def main(args):
     if args.relative_time:
         args.start_time = float(args.start_time)
         args.end_time = float(args.end_time)

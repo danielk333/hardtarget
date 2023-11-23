@@ -14,7 +14,7 @@ def parser_build(parser):
     return parser
 
 
-def main(args, cli_logger):
+def main(args):
 
     drf_reader, drf_params = drf_utils.load_hardtarget_drf(args.path)
 
