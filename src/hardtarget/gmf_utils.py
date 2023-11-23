@@ -182,7 +182,7 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     # reset range gates
     # range gates to search through
     # range gates are relative to tx start
-    rgs = np.arange(min_range_gate, max_range_gate, range_gate_step)
+    rgs = np.arange(min_range_gate, max_range_gate, range_gate_step, dtype=np.int32)
     # total propagation range
     ranges = (rgs - T_tx_start_samp) * scipy.constants.c / sample_rate  # m
 
