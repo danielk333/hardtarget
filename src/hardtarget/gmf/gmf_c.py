@@ -2,6 +2,8 @@ import ctypes
 import sysconfig
 import pathlib
 
+from . import preprocess
+
 # Load the C-lib
 suffix = sysconfig.get_config_var('EXT_SUFFIX')
 if suffix is None:
@@ -15,6 +17,9 @@ if __libpath__.is_file():
     # Then we open the created shared lib file
     gmfclib = ctypes.cdll.LoadLibrary(__libpath__)
 
+    # TODO: we should use numpy ctypes here for arrays, that would
+    # error if we accidentally pass the wrong dtype
+    # the current `data_as` usage will reinterpret cast which is unsafe
     gmfclib.gmf.restype = ctypes.c_int
     gmfclib.gmf.argtypes = [
         ctypes.POINTER(ctypes.c_float), ctypes.c_int,
@@ -26,6 +31,7 @@ if __libpath__.is_file():
         ctypes.POINTER(ctypes.c_float),
         ctypes.POINTER(ctypes.c_int),
         ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
     ]
 else:
     raise ImportError(f'{__libpath__} GMF C Library not found')
@@ -33,9 +39,14 @@ else:
 
 def gmfc(z_tx, z_rx, gmf_variables, gmf_params):
     acc_phasors = gmf_params["acceleration_phasors"]
+    rx_window_indices = gmf_params["rx_window_indices"]
+
+    # acc_phasors, rx_window_indices, z_tx = preprocess.filter_low_tx_signal(
+    #     acc_phasors, rx_window_indices, z_tx
+    # )
+
     rgs = gmf_params["rgs"]
     frequency_decimation = gmf_params["frequency_decimation"]
-    rx_window_indices = gmf_params["rx_window_indices"]
 
     error_code = gmfclib.gmf(
         z_tx.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
