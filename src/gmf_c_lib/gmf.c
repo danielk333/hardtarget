@@ -8,7 +8,25 @@
 #define PEAK_SEARCH 1
 #define FFT_VECTOR 1
 #define ACC_MULT 1
+#define FFT_PLAN_ID FFTW_MEASURE
+
 /*
+
+Choosing FFTW plan flag, citing [fftw.org docs](https://www.fftw.org/fftw3_doc/Planner-Flags.html):
+ - FFTW_ESTIMATE specifies that, instead of actual measurements of different algorithms, a simple 
+    heuristic is used to pick a (probably sub-optimal) plan quickly. With this flag, the 
+    input/output arrays are not overwritten during planning.
+ - FFTW_MEASURE tells FFTW to find an optimized plan by actually computing several FFTs and 
+    measuring their execution time. Depending on your machine, this can take some time (often a few
+    seconds). FFTW_MEASURE is the default planning option.
+ - FFTW_PATIENT is like FFTW_MEASURE, but considers a wider range of algorithms and often produces 
+    a “more optimal” plan (especially for large transforms), but at the expense of several times 
+    longer planning time (especially for large transforms).
+ - FFTW_EXHAUSTIVE is like FFTW_PATIENT, but considers an even wider range of algorithms, including
+    many that we think are unlikely to be fast, to produce the most optimal plan but with a
+    substantially increased planning time.
+
+
   Range-Velocity-Acceleration matched filter
 
   todo optimizations:
@@ -28,69 +46,15 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
     fftwf_complex *out;
 
     fftwf_plan p;
-    int rg;
     int nfft2;
 
-    float *rx_select;
-    rx_select = (float *)malloc(sizeof(fftwf_complex)*z_tx_len*2);
-
+    float *rx_select = malloc(sizeof(float)*z_tx_len*2);
     nfft2 = (int)(z_tx_len / dec);
     echo = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
     in = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
     out = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
 
-    // p = fftwf_plan_dft_1d(nfft2, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
-    p = fftwf_plan_dft_1d(nfft2, in, out, FFTW_FORWARD, FFTW_MEASURE);
-
-    //
-    // in order to reduce the number of operations later on, determine the
-    // number of non-zero transmit pulses. we don't need to calculate
-    // zero values.
-    //
-    float *tx_power;
-    float *tx_power2;
-    tx_power = (float *)malloc(sizeof(float)*z_tx_len);
-    tx_power2 = (float *)malloc(sizeof(float)*nfft2);
-
-    // zero tx power
-    for (int ti = 0; ti < z_tx_len; ti++) {
-        tx_power[ti] = 0.0;
-    }
-    for (int ti = 0; ti < nfft2; ti++) {
-        tx_power2[ti] = 0.0;
-    }
-
-    int n_nonzero_tx = 0;
-    for (int ti = 0; ti < z_tx_len; ti++) {
-        tx_power[ti] = z_tx[2*ti]*z_tx[2*ti] + z_tx[2*ti + 1]*z_tx[2*ti + 1];
-        tx_power2[ti / dec] += z_tx[2*ti]*z_tx[2*ti] + z_tx[2*ti + 1]*z_tx[2*ti + 1];
-        if (tx_power[ti] > 1e-10) n_nonzero_tx++;
-    }
-    int n_nonzero_tx2 = 0;
-    for (int ti = 0; ti < nfft2; ti++) {
-        if (tx_power2[ti] > 1e-10) n_nonzero_tx2++;
-    }
-
-    int *tx_idx;
-    tx_idx = malloc(sizeof(int)*n_nonzero_tx);
-    //  n_nonzero_tx_dec=n_nonzero_tx/dec;
-    int nzi = 0;
-    for (int ti = 0; ti < z_tx_len; ti++) {
-        if (tx_power[ti] > 1e-10) {
-            tx_idx[nzi] = ti;
-            nzi++;
-        }
-    }
-    // What elements for the decimated echo*tx vector are non-zero
-    int *tx_idx2;
-    tx_idx2 = malloc(sizeof(int)*n_nonzero_tx2);
-    nzi = 0;
-    for (int ti = 0; ti < nfft2; ti++) {
-        if (tx_power2[ti] > 1e-10) {
-            tx_idx2[nzi] = ti;
-            nzi++;
-        }
-    }
+    p = fftwf_plan_dft_1d(nfft2, in, out, FFTW_FORWARD, FFT_PLAN_ID);
 
     // for each range gate
     for (int ri = 0; ri < n_rg; ri++) {
@@ -102,21 +66,18 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
             in[fi][0] = 0.0;
             in[fi][1] = 0.0;
         }
-        int rg = rgs[ri];
-        int rxwi;
-        for (int rxi = 0; rxi < z_tx_len*2; rxi++) {
-            rxwi = (int)((float)rxi / 2.0);
-            rx_select[rxi] = z_rx[rx_window[rxwi] + rg];
+        for (int rxi = 0; rxi < z_tx_len; rxi++) {
+            rx_select[rxi*2] = z_rx[(rx_window[rxi] + rgs[ri])*2];
+            rx_select[rxi*2 + 1] = z_rx[(rx_window[rxi] + rgs[ri])*2 + 1];
         }
-
-        for (int ni = 0; ni < n_nonzero_tx; ni++) {
-            int ti = tx_idx[ni];
-            //                rea*reb        -ima*imb
+        int tidx;
+        for (int ti = 0; ti < z_tx_len; ti++) {
+            // rea*reb - ima*imb
             // z_tx*conj(z_rx)
-            int tidx = ti / dec;
+            tidx = ti / dec;
             // Real part of z_t[ti]x*z_rx[rg+ti]
             echo[tidx][0] += z_tx[2*ti]*rx_select[2*ti] - z_tx[2*ti + 1]*rx_select[2*ti + 1];
-            //                rea*imb        + ima*reb
+            // rea*imb + ima*reb
             // Imag part of z_t[ti]x*z_rx[rg+ti]
             echo[tidx][1] += z_tx[2*ti]*rx_select[2*ti + 1] + z_tx[2*ti + 1]*rx_select[2*ti];
         }
@@ -128,19 +89,19 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
             // echo*acc_phasors
             // only multiply what is needed
 #ifdef ACC_MULT
-            for (int ni = 0; ni < n_nonzero_tx2; ni++) {
-                int ti = tx_idx2[ni];
-                float rep = acc_phasors[phasor_i + 2*ti];
-                float imp = acc_phasors[phasor_i + 2*ti + 1];
+            float rep, imp;
+            for (int tidx = 0; tidx < nfft2; tidx++) {
+                rep = acc_phasors[phasor_i + 2*tidx];
+                imp = acc_phasors[phasor_i + 2*tidx + 1];
 
                 // rea*reb - ima*imb
-                in[ti][0] = echo[ti][0]*rep - echo[ti][1]*imp;
+                in[tidx][0] = echo[tidx][0]*rep - echo[tidx][1]*imp;
                 // rea*imb + ima*reb
-                in[ti][1] = echo[ti][0]*imp + echo[ti][1]*rep;
+                in[tidx][1] = echo[tidx][0]*imp + echo[tidx][1]*rep;
             }
 #endif
-            // fft in and store result in out
 #ifdef FFT_VECTOR
+            // fft in and store result in out
             fftwf_execute(p);
 #endif
 #ifdef PEAK_SEARCH
@@ -159,10 +120,7 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
 #endif
         }
     }
-    free(tx_power);
-    free(tx_power2);
-    free(tx_idx);
-    free(tx_idx2);
+    free(rx_select);
     fftwf_free(in);
     fftwf_free(out);
     fftwf_free(echo);
