@@ -85,10 +85,9 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
         // for all accelerations
         // add range gate dependent accelerations
         for (int ai = 0; ai < n_accs; ai++) {
+#ifdef ACC_MULT
             int phasor_i = 2*ai*nfft2;
             // echo*acc_phasors
-            // only multiply what is needed
-#ifdef ACC_MULT
             float rep, imp;
             for (int tidx = 0; tidx < nfft2; tidx++) {
                 rep = acc_phasors[phasor_i + 2*tidx];
