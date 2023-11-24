@@ -1,5 +1,5 @@
 CC = nvcc
-CFLAGS = --compiler-options '-fPIC' -shared
+CFLAGS = --compiler-options '-fPIC' -shared -g -G
 LIBS = -lcufft
 INSTALL = ../hardtarget/gmf
 
