@@ -48,7 +48,6 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
     fftwf_plan p;
     int nfft2;
 
-    float *rx_select = malloc(sizeof(float)*z_tx_len*2);
     nfft2 = (int)(z_tx_len / dec);
     echo = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
     in = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
@@ -66,29 +65,24 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
             in[fi][0] = 0.0;
             in[fi][1] = 0.0;
         }
-        for (int rxi = 0; rxi < z_tx_len; rxi++) {
-            rx_select[rxi*2] = z_rx[(rx_window[rxi] + rgs[ri])*2];
-            rx_select[rxi*2 + 1] = z_rx[(rx_window[rxi] + rgs[ri])*2 + 1];
-        }
         int tidx;
         for (int ti = 0; ti < z_tx_len; ti++) {
             // rea*reb - ima*imb
             // z_tx*conj(z_rx)
             tidx = ti / dec;
             // Real part of z_t[ti]x*z_rx[rg+ti]
-            echo[tidx][0] += z_tx[2*ti]*rx_select[2*ti] - z_tx[2*ti + 1]*rx_select[2*ti + 1];
+            echo[tidx][0] += z_tx[2*ti]*z_rx[(rx_window[ti] + rgs[ri])*2] - z_tx[2*ti + 1]*z_rx[(rx_window[ti] + rgs[ri])*2 + 1];
             // rea*imb + ima*reb
             // Imag part of z_t[ti]x*z_rx[rg+ti]
-            echo[tidx][1] += z_tx[2*ti]*rx_select[2*ti + 1] + z_tx[2*ti + 1]*rx_select[2*ti];
+            echo[tidx][1] += z_tx[2*ti]*z_rx[(rx_window[ti] + rgs[ri])*2 + 1] + z_tx[2*ti + 1]*z_rx[(rx_window[ti] + rgs[ri])*2];
         }
 #endif  // ECHO
         // for all accelerations
         // add range gate dependent accelerations
         for (int ai = 0; ai < n_accs; ai++) {
+#ifdef ACC_MULT
             int phasor_i = 2*ai*nfft2;
             // echo*acc_phasors
-            // only multiply what is needed
-#ifdef ACC_MULT
             float rep, imp;
             for (int tidx = 0; tidx < nfft2; tidx++) {
                 rep = acc_phasors[phasor_i + 2*tidx];
@@ -120,7 +114,6 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
 #endif
         }
     }
-    free(rx_select);
     fftwf_free(in);
     fftwf_free(out);
     fftwf_free(echo);

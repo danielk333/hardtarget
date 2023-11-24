@@ -25,15 +25,13 @@ extern "C" void print_devices() {
 
  */
 __global__ void form_input(cufftComplex *z_tx, int z_tx_len, int nfft2, cufftComplex *z_rx, int *rgs, int dec,
-                           cufftComplex *d_z_echo, int *tx_idx, int *d_rxwin_idx, int nzi) {
-    int i = blockIdx.x;
-    int rg = rgs[i];
-    for (int ni = 0; ni < nzi; ni++) {
-        int ti = tx_idx[ni];
-        d_z_echo[i * nfft2 + ti / dec] = cuCaddf(
-            d_z_echo[i * nfft2 + ti / dec], 
-            cuCmulf(z_tx[ti], z_rx[rg + d_rxwin_idx[ti]])
-        );
+                           cufftComplex *z_echo, int *rxwin_idx) {
+    int rgi = blockIdx.x;
+    int rg = rgs[rgi];
+    int ind;
+    for (int ti = 0; ti < z_tx_len; ti++) {
+        ind = rgi * nfft2 + ti / dec;
+        z_echo[ind] = cuCaddf(z_echo[ind], cuCmulf(z_tx[ti], z_rx[rg + rxwin_idx[ti]]));
     }
 }
 
@@ -43,15 +41,16 @@ __global__ void form_input(cufftComplex *z_tx, int z_tx_len, int nfft2, cufftCom
  */
 __global__ void peak_find(cufftComplex *z_out, float *gmf_vec, float *gmf_dc_vec, int *v_vec, int *a_vec, int nfft2,
                           int acc_idx) {
-    int i = blockIdx.x;
-    if (acc_idx == 0) gmf_dc_vec[i] = z_out[i * nfft2].x * z_out[i * nfft2].x + z_out[i * nfft2].y * z_out[i * nfft2].y;
+    int rgi = blockIdx.x;
+    float this_gmf;
+    int ind = rgi * nfft2;
+    if (acc_idx == 0) gmf_dc_vec[rgi] = z_out[ind].x * z_out[ind].x + z_out[ind].y * z_out[ind].y;
     for (int j = 0; j < nfft2; j++) {
-        float this_gmf =
-            z_out[i * nfft2 + j].x * z_out[i * nfft2 + j].x + z_out[i * nfft2 + j].y * z_out[i * nfft2 + j].y;
-        if (this_gmf > gmf_vec[i]) {
-            gmf_vec[i] = this_gmf;
-            v_vec[i] = j;
-            a_vec[i] = acc_idx;
+        this_gmf = z_out[ind + j].x * z_out[ind + j].x + z_out[ind + j].y * z_out[ind + j].y;
+        if (this_gmf > gmf_vec[rgi]) {
+            gmf_vec[rgi] = this_gmf;
+            v_vec[rgi] = j;
+            a_vec[rgi] = acc_idx;
         }
     }
 }
@@ -59,16 +58,53 @@ __global__ void peak_find(cufftComplex *z_out, float *gmf_vec, float *gmf_dc_vec
 /*
   Multiply echo with acceleration phasor, store input in d_z_in
  */
-__global__ void phasor_multiply(cufftComplex *d_z_echo, cufftComplex *d_z_in, int nfft2, int i,
-                                cufftComplex *d_acc_phasors) {
+__global__ void phasor_multiply(cufftComplex *z_echo, cufftComplex *z_in, int nfft2, int acc_idx,
+                                cufftComplex *acc_phasors) {
     int rgi = blockIdx.x;
     /*
        TODO: only multiply non-zero values.
     */
     for (int j = 0; j < nfft2; j++) {
-        d_z_in[rgi * nfft2 + j] = cuCmulf(d_z_echo[rgi * nfft2 + j], d_acc_phasors[i * nfft2 + j]);
+        z_in[rgi * nfft2 + j] = cuCmulf(z_echo[rgi * nfft2 + j], acc_phasors[acc_idx * nfft2 + j]);
     }
 }
+
+/*
+  Check that cuda function did not fail with custom message
+ */
+static inline void check_cufft(int res, const char *description){
+    if (res != CUFFT_SUCCESS) {
+        printf("Error %d\n", res);
+        fprintf(stderr, "Cuda FFT error: Failed to %s\n", description);
+        exit(EXIT_FAILURE);
+    }
+}
+
+/*
+  Check that cuda function did not fail with custom message
+ */
+static inline void check_cuda(int res, const char *name, const char *description){
+    if (res != cudaSuccess) {
+        printf("Error %d\n", res);
+        fprintf(stderr, "Cuda error: Failed to %s for variable '%s'\n", description, name);
+        exit(EXIT_FAILURE);
+    }
+}
+
+
+static inline void check_cudaMalloc(int res, const char *name){
+    check_cuda(res, name, "allocate");
+}
+static inline void check_cudaFree(int res, const char *name){
+    check_cuda(res, name, "free");
+}
+static inline void check_cudaMemcopy(int res, const char *name){
+    check_cuda(res, name, "copy values");
+}
+static inline void check_cudaMemset(int res, const char *name){
+    check_cuda(res, name, "set values");
+}
+
 
 /*
    This is the main code. If you have N GPUs, you can run N gmf functions in parallel.
@@ -84,253 +120,84 @@ extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *
     // initializing pointers to device (GPU) memory, denoted with "d_"
     cufftComplex *d_z_tx;
     cufftComplex *d_z_rx;
-    //  cufftComplex *d_z_out;
-    cufftComplex *d_z_echo;
     cufftComplex *d_z_in;
+    cufftComplex *d_z_echo;
     cufftComplex *d_acc_phasors;
+
     float *d_gmf_vec;
     float *d_gmf_dc_vec;
-    int *d_v_vec;
-    int *d_a_vec;
-    int *d_tx_idx;
-    int *d_rx_window;
 
     int *d_rgs;
+    int *d_v_vec;
+    int *d_a_vec;
+    int *d_rx_window;
 
-    float *tx_power;
-    tx_power = (float *)malloc(sizeof(float) * z_tx_len);
-
-    int n_nonzero_tx = 0;
-    for (int ti = 0; ti < z_tx_len; ti++) {
-        tx_power[ti] = z_tx[2 * ti] * z_tx[2 * ti] + z_tx[2 * ti + 1] * z_tx[2 * ti + 1];
-        if (tx_power[ti] > 1e-10) n_nonzero_tx++;
-    }
-
-    int *tx_idx;
-    tx_idx = (int *)malloc(sizeof(int) * n_nonzero_tx);
-    int nzi = 0;
-    for (int ti = 0; ti < z_tx_len; ti++) {
-        if (tx_power[ti] > 1e-10) {
-            tx_idx[nzi] = ti;
-            nzi++;
-        }
-    }
-
-    int nfft2;
-
-    nfft2 = (int)(z_tx_len / dec);
+    int nfft2 = (int)(z_tx_len / dec);
 
     // allocating device memory to the above pointers
     // the signal and echo here are only one row of the CPU data (one time step)
-    int res = cudaMalloc((void **)&d_z_tx, sizeof(cufftComplex) * z_tx_len);
-    if (res != cudaSuccess) {
-        printf("error %d\n", res);
-        fprintf(stderr, "Cuda error: Failed to allocate tx\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaMalloc((void **)&d_rgs, sizeof(int) * n_rg) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to allocate tx\n");
-        exit(EXIT_FAILURE);
-    }
+    check_cudaMalloc(cudaMalloc((void **)&d_z_tx, sizeof(cufftComplex) * z_tx_len), "d_z_tx");
+    check_cudaMalloc(cudaMalloc((void **)&d_z_rx, sizeof(cufftComplex) * z_rx_len), "d_z_rx");
+    check_cudaMalloc(cudaMalloc((void **)&d_z_in, sizeof(cufftComplex) * nfft2 * n_rg), "d_z_in");
+    check_cudaMalloc(cudaMalloc((void **)&d_z_echo, sizeof(cufftComplex) * nfft2 * n_rg), "d_z_echo");
+    check_cudaMalloc(cudaMalloc((void **)&d_acc_phasors, sizeof(cufftComplex) * n_accs * nfft2), "d_acc_phasors");
 
-    if (cudaMalloc((void **)&d_tx_idx, sizeof(int) * nzi) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to allocate tx\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaMalloc((void **)&d_rx_window, sizeof(int) * z_tx_len) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to allocate rx win\n");
-        exit(EXIT_FAILURE);
-    }
+    check_cudaMalloc(cudaMalloc((void **)&d_gmf_vec, sizeof(float) * n_rg), "d_gmf_vec");
+    check_cudaMalloc(cudaMalloc((void **)&d_gmf_dc_vec, sizeof(float) * n_rg), "d_gmf_dc_vec");
 
-    if (cudaMalloc((void **)&d_z_rx, sizeof(cufftComplex) * z_rx_len) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to allocate echo\n");
-        exit(EXIT_FAILURE);
-    }
+    check_cudaMalloc(cudaMalloc((void **)&d_rgs, sizeof(int) * n_rg), "d_rgs");
+    check_cudaMalloc(cudaMalloc((void **)&d_v_vec, sizeof(int) * n_rg), "d_v_vec");
+    check_cudaMalloc(cudaMalloc((void **)&d_a_vec, sizeof(int) * n_rg), "d_a_vec");
+    check_cudaMalloc(cudaMalloc((void **)&d_rx_window, sizeof(int) * z_tx_len), "d_rx_window");
 
-    if (cudaMalloc((void **)&d_z_in, sizeof(cufftComplex) * nfft2 * n_rg) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to allocate batch\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaMalloc((void **)&d_z_echo, sizeof(cufftComplex) * nfft2 * n_rg) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to allocate batch\n");
-        exit(EXIT_FAILURE);
-    }
-    //  if (cudaMalloc((void **) &d_z_out, sizeof(cufftComplex) * nfft2 * n_rg)
-    //  != cudaSuccess)
-    //  {
-    // fprintf(stderr, "Cuda error: Failed to allocate batch\n");
-    // exit(EXIT_FAILURE);
-    // }
-    if (cudaMalloc((void **)&d_acc_phasors, sizeof(cufftComplex) * n_accs * nfft2) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to allocate spectrum\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaMalloc((void **)&d_gmf_vec, sizeof(float) * n_rg) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to allocate spectrum\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaMalloc((void **)&d_gmf_dc_vec, sizeof(float) * n_rg) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to allocate spectrum\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaMalloc((void **)&d_v_vec, sizeof(int) * n_rg) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to allocate output\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaMalloc((void **)&d_a_vec, sizeof(int) * n_rg) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to allocate output\n");
-        exit(EXIT_FAILURE);
-    }
-    //  printf("malloced stuff\n");
     // initializing 1D FFT plan, this will tell cufft execution how to operate
     // cufft is well optimized and will run with different parameters than above
     cufftHandle plan;
-    if (cufftPlan1d(&plan, nfft2, CUFFT_C2C, n_rg) != CUFFT_SUCCESS) {
-        fprintf(stderr, "CUFFT error: Plan creation failed\n");
-        exit(EXIT_FAILURE);
-    }
-    //  printf("planned fft\n");
+    check_cufft(cufftPlan1d(&plan, nfft2, CUFFT_C2C, n_rg), "Create 1D FFT plan");
+
     // execution of the prepared kernels n_ipp times
     // ensure empty device spectrum
-    if (cudaMemset(d_z_in, 0, sizeof(cufftComplex) * nfft2 * n_rg) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to zero device spectrum\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaMemset(d_z_echo, 0, sizeof(cufftComplex) * nfft2 * n_rg) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to zero device spectrum\n");
-        exit(EXIT_FAILURE);
-    }
+    check_cudaMemset(cudaMemset(d_z_in, 0, sizeof(cufftComplex) * nfft2 * n_rg), "d_z_in");
+    check_cudaMemset(cudaMemset(d_z_echo, 0, sizeof(cufftComplex) * nfft2 * n_rg), "d_z_echo");
 
     // copying n_ipp'th row of host data into device
-    if (cudaMemcpy(d_z_tx, z_tx, sizeof(cufftComplex) * z_tx_len, cudaMemcpyHostToDevice) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Memory copy failed, tx HtD\n");
-        exit(EXIT_FAILURE);
-    }
-    // copying n_ipp'th row of host data into device
-    if (cudaMemcpy(d_rgs, rgs, sizeof(int) * n_rg, cudaMemcpyHostToDevice) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Memory copy failed, tx HtD\n");
-        exit(EXIT_FAILURE);
-    }
-
-    // copying n_ipp'th row of host data into device
-    if (cudaMemcpy(d_tx_idx, tx_idx, sizeof(int) * nzi, cudaMemcpyHostToDevice) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Memory copy failed, tx HtD\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaMemcpy(d_rx_window, rx_window, sizeof(int) * z_tx_len, cudaMemcpyHostToDevice) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Memory copy failed, tx HtD\n");
-        exit(EXIT_FAILURE);
-    }
-
-    // copying n_ipp'th row of host data into device
-    if (cudaMemcpy(d_acc_phasors, acc_phasors, sizeof(cufftComplex) * nfft2 * n_accs, cudaMemcpyHostToDevice) !=
-        cudaSuccess) {
-        fprintf(stderr, "Cuda error: Memory copy failed, tx HtD\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (cudaMemcpy(d_z_rx, z_rx, sizeof(cufftComplex) * z_rx_len, cudaMemcpyHostToDevice) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Memory copy failed, echo HtD\n");
-        exit(EXIT_FAILURE);
-    }
-
-    //  if (cudaMalloc((void **) &d_acc_phasors, sizeof(cufftComplex) * n_accs*nfft2)
+    check_cudaMemcopy(cudaMemcpy(d_z_tx, z_tx, sizeof(cufftComplex) * z_tx_len, cudaMemcpyHostToDevice), "d_z_tx");
+    check_cudaMemcopy(cudaMemcpy(d_rgs, rgs, sizeof(int) * n_rg, cudaMemcpyHostToDevice), "d_rgs");
+    check_cudaMemcopy(cudaMemcpy(d_rx_window, rx_window, sizeof(int) * z_tx_len, cudaMemcpyHostToDevice), "d_rx_window");
+    check_cudaMemcopy(cudaMemcpy(d_acc_phasors, acc_phasors, sizeof(cufftComplex) * nfft2*n_accs, cudaMemcpyHostToDevice), "d_acc_phasors");
+    check_cudaMemcopy(cudaMemcpy(d_z_rx, z_rx, sizeof(cufftComplex) * z_rx_len, cudaMemcpyHostToDevice), "d_z_rx");
 
     // form input
-    form_input<<<n_rg, 1>>>(d_z_tx, z_tx_len, nfft2, d_z_rx, d_rgs, dec, d_z_echo, d_tx_idx, d_rx_window, nzi);
+    form_input<<<n_rg, 1>>>(d_z_tx, z_tx_len, nfft2, d_z_rx, d_rgs, dec, d_z_echo, d_rx_window);
 
-    for (int i = 0; i < n_accs; i++) {
-        if (cudaMemset(d_z_in, 0, sizeof(cufftComplex) * nfft2 * n_rg) != cudaSuccess) {
-            fprintf(stderr, "Cuda error: Failed to zero device spectrum\n");
-            exit(EXIT_FAILURE);
-        }
-        phasor_multiply<<<n_rg, 1>>>(d_z_echo, d_z_in, nfft2, i, d_acc_phasors);
+    for (int acc_idx = 0; acc_idx < n_accs; acc_idx++) {
+        check_cudaMemset(cudaMemset(d_z_in, 0, sizeof(cufftComplex) * nfft2 * n_rg), "d_z_in");
+        phasor_multiply<<<n_rg, 1>>>(d_z_echo, d_z_in, nfft2, acc_idx, d_acc_phasors);
 
         // cufft kernel execution
-        if (cufftExecC2C(plan, (cufftComplex *)d_z_in, (cufftComplex *)d_z_in, CUFFT_FORWARD) != CUFFT_SUCCESS) {
-            fprintf(stderr, "CUFFT error: ExecC2C Forward failed\n");
-            exit(EXIT_FAILURE);
-        }
-        peak_find<<<n_rg, 1>>>(d_z_in, d_gmf_vec, d_gmf_dc_vec, d_v_vec, d_a_vec, nfft2, i);
+        check_cufft(cufftExecC2C(plan, (cufftComplex *)d_z_in, (cufftComplex *)d_z_in, CUFFT_FORWARD), "ExecC2C Forward");
+        peak_find<<<n_rg, 1>>>(d_z_in, d_gmf_vec, d_gmf_dc_vec, d_v_vec, d_a_vec, nfft2, acc_idx);
     }
 
     // copying device resultant spectrum to host, now able to be manipulated
-    if (cudaMemcpy(gmf_vec, d_gmf_vec, sizeof(float) * n_rg, cudaMemcpyDeviceToHost) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Memory copy failed, spectrum DtH\n");
-        exit(EXIT_FAILURE);
-    }
-    // copying device resultant spectrum to host, now able to be manipulated
-    if (cudaMemcpy(gmf_dc_vec, d_gmf_dc_vec, sizeof(float) * n_rg, cudaMemcpyDeviceToHost) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Memory copy failed, spectrum DtH\n");
-        exit(EXIT_FAILURE);
-    }
-    // copying device resultant spectrum to host, now able to be manipulated
-    if (cudaMemcpy(v_vec, d_v_vec, sizeof(int) * n_rg, cudaMemcpyDeviceToHost) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Memory copy failed, output v index\n");
-        exit(EXIT_FAILURE);
-    }
-    // copying device resultant spectrum to host, now able to be manipulated
-    if (cudaMemcpy(a_vec, d_a_vec, sizeof(int) * n_rg, cudaMemcpyDeviceToHost) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Memory copy failed, output a index\n");
-        exit(EXIT_FAILURE);
-    }
-
-    free(tx_idx);
-    free(tx_power);
+    check_cudaMemcopy(cudaMemcpy(gmf_vec, d_gmf_vec, sizeof(float) * n_rg, cudaMemcpyDeviceToHost), "gmf_vec");
+    check_cudaMemcopy(cudaMemcpy(gmf_dc_vec, d_gmf_dc_vec, sizeof(float) * n_rg, cudaMemcpyDeviceToHost), "gmf_dc_vec");
+    check_cudaMemcopy(cudaMemcpy(v_vec, d_v_vec, sizeof(int) * n_rg, cudaMemcpyDeviceToHost), "v_vec");
+    check_cudaMemcopy(cudaMemcpy(a_vec, d_a_vec, sizeof(int) * n_rg, cudaMemcpyDeviceToHost), "a_vec");
 
     // memory clean up
-    if (cudaFree(d_z_tx) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to free tx\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (cudaFree(d_rgs) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to free tx\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaFree(d_z_rx) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to free echo\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaFree(d_z_in) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to free batch\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaFree(d_z_echo) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to free batch\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaFree(d_v_vec) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to free spectrum\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaFree(d_a_vec) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to free spectrum\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaFree(d_gmf_vec) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to free spectrum\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaFree(d_gmf_dc_vec) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to free spectrum\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaFree(d_acc_phasors) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to free spectrum\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaFree(d_tx_idx) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to free spectrum\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cudaFree(d_rx_window) != cudaSuccess) {
-        fprintf(stderr, "Cuda error: Failed to free spectrum\n");
-        exit(EXIT_FAILURE);
-    }
-    if (cufftDestroy(plan) != CUFFT_SUCCESS) {
-        fprintf(stderr, "CUFFT error: Failed to destroy plan\n");
-        exit(EXIT_FAILURE);
-    }
+    check_cudaFree(cudaFree(d_z_tx), "d_z_tx");
+    check_cudaFree(cudaFree(d_rgs), "d_rgs");
+    check_cudaFree(cudaFree(d_z_rx), "d_z_rx");
+    check_cudaFree(cudaFree(d_z_in), "d_z_in");
+    check_cudaFree(cudaFree(d_z_echo), "d_z_echo");
+    check_cudaFree(cudaFree(d_v_vec), "d_v_vec");
+    check_cudaFree(cudaFree(d_a_vec), "d_a_vec");
+    check_cudaFree(cudaFree(d_gmf_vec), "d_gmf_vec");
+    check_cudaFree(cudaFree(d_gmf_dc_vec), "d_gmf_dc_vec");
+    check_cudaFree(cudaFree(d_acc_phasors), "d_acc_phasors");
+    check_cudaFree(cudaFree(d_rx_window), "d_rx_window");
+    
+    check_cufft(cufftDestroy(plan), "destroy plan");
     return 0;
 }

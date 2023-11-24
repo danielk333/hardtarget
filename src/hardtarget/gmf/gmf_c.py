@@ -2,8 +2,6 @@ import ctypes
 import sysconfig
 import pathlib
 
-from . import preprocess
-
 # Load the C-lib
 suffix = sysconfig.get_config_var('EXT_SUFFIX')
 if suffix is None:
@@ -40,13 +38,11 @@ else:
 def gmfc(z_tx, z_rx, gmf_variables, gmf_params):
     acc_phasors = gmf_params["acceleration_phasors"]
     rx_window_indices = gmf_params["rx_window_indices"]
-
-    # acc_phasors, rx_window_indices, z_tx = preprocess.filter_low_tx_signal(
-    #     acc_phasors, rx_window_indices, z_tx
-    # )
-
     rgs = gmf_params["rgs"]
     frequency_decimation = gmf_params["frequency_decimation"]
+
+    # TODO: generalize the preprocess filtering of 0 tx power
+    # since it can cause unnessary slowdowns depending on experiment setup
 
     error_code = gmfclib.gmf(
         z_tx.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),

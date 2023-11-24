@@ -1,6 +1,9 @@
 import ctypes
 import sysconfig
 import pathlib
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Load the C-lib
 suffix = sysconfig.get_config_var('EXT_SUFFIX')
@@ -43,8 +46,6 @@ def print_cuda_devices():
 
 
 def gmfcu(z_tx, z_rx, gmf_variables, gmf_params, gpu_id=0):
-    # TODO: gpu_id should be option somehow or should be set by mpi
-    # it depends on the node / gpu-count layout of the cluster
     acc_phasors = gmf_params["acceleration_phasors"]
     rgs = gmf_params["rgs"]
     frequency_decimation = gmf_params["frequency_decimation"]
