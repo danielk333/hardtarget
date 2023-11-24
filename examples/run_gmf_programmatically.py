@@ -51,6 +51,10 @@ to access variables one might have to use the correct memory location specifiers
 such as @global, @shared, @local, @generic, @texture, and @parameter. However,
 usually it is sufficient to use the regular syntax like `print *rgs@10`
 
+WARNING: Sometimes its possible to mess up the GPU temporarily during debugging
+leaving halted threads and memory leaks if not careful. In this case, reboot to
+return to original performance.
+
 """
 
 
