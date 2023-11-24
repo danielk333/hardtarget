@@ -33,6 +33,8 @@ def main(args):
     for data in data_generator:
         fig, axes = plt.subplots(2, 2)
         gmf.plot_peaks(axes, data)
+        fig, axes = plt.subplots(2, 3)
+        gmf.plot_detections(axes, data)
         fig, axes = plt.subplots(2, 2)
         gmf.plot_map(axes, data)
         plt.show()
