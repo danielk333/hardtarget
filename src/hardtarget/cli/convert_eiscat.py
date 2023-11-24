@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import logging
 from hardtarget.convert.eiscat import eiscat_convert
 
 
@@ -37,7 +38,11 @@ def parser_build(parser):
 
 def main(args):
     compression_level = int(args.compression)
+    # Logging
+    logger = logging.getLogger("eiscat_convert")
+    logger.setLevel(getattr(logging, args.log_level))
     eiscat_convert(args.input,
+                   logger,
                    dstdir=args.output,
                    compression_level=compression_level)
 
@@ -59,9 +64,4 @@ if __name__ == "__main__":
     parser = parser_build(parser)
     # Parse the arguments
     args = parser.parse_args()
-
-    # Logging
-    logger = logging.getLogger("eiscat_convert")
-    logger.setLevel(getattr(logging, args.log_level))
-
-    main(args, logger)
+    main(args)
