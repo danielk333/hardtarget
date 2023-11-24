@@ -29,6 +29,7 @@ GMFVariables = namedtuple(
 
 DEFAULT_PARAMS = {
     "gmflib": "c",
+    "node_GPUs": 1,
     "n_ipp": 5,
     "ipp_offset": 0,
     "min_range_gate": 0,
@@ -48,6 +49,7 @@ DEFAULT_PARAMS = {
 }
 
 INT_PARAM_KEYS = [
+    "node_GPUs",
     "n_ipp",
     "ipp_offset",
     "min_range_gate",

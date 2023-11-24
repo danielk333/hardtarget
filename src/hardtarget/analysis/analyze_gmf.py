@@ -104,6 +104,12 @@ def compute_gmf(
     # process
     results = {"dir": output, "files": [], "out": {}}
     for idx, task_idx in enumerate(job_tasks):
+        # In case we are running MPI to distribute CUDA calculation
+        # across multiple GPUs on multiple nodes we assume the ranks
+        # distribute across the nodes in a linear fashion
+        # e.g. node1[rank=(0,1,2)], node2[rank=(3,4,5)] for np=6 and node_GPUs=3
+        gpu_id = task_idx % gmf_params["node_GPUs"]
+
         # initialise
         gmf_vals = []
         gmf_dc = []
@@ -138,7 +144,11 @@ def compute_gmf(
         for i in range(num_cohints_per_file):
             start_sample = file_idx_sample + i * ipp_samp * n_ipp
             gmf_vars, gmf_tx = integrate_and_match_ipps(
-                (rx_reader, rx_chnl), (tx_reader, tx_chnl), start_sample, gmf_params
+                (rx_reader, rx_chnl),
+                (tx_reader, tx_chnl),
+                start_sample,
+                gmf_params,
+                gpu_id=gpu_id,
             )
             gmf_vals.append(gmf_vars.vals)
             gmf_dc.append(gmf_vars.dc)
@@ -302,7 +312,7 @@ def compute_gmf(
 ####################################################################
 
 
-def integrate_and_match_ipps(rx, tx, start_sample, gmf_params):
+def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     """
     TODO: clean up this and all other docstrings when structure is done
 
@@ -332,6 +342,10 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params):
     if gmf_lib is None or gmf_lib not in GMF_LIBS:
         gmf_lib = "c" if "c" in GMF_LIBS else "numpy"
     gmf = GMF_LIBS[gmf_lib]
+
+    kwargs = {}
+    if gmf_lib == "cuda":
+        kwargs["gpu_id"] = gpu_id
 
     # TODO: implement this
     if not gmf_params["reduce_range_rate"] and gmf_params["reduce_acceleration"]:
@@ -379,6 +393,7 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params):
             z_rx,
             gmf_vars,
             gmf_params,
+            **kwargs
         )
 
     return gmf_vars, tx_amp2
