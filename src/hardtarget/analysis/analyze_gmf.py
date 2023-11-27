@@ -140,6 +140,8 @@ def compute_gmf(
                 continue
 
         # process
+        # TODO: in case the RAM load is too heavy, this should write directly to disk instead
+        # of collecting all the data
         ts0 = time.time()
         for i in range(num_cohints_per_file):
             start_sample = file_idx_sample + i * ipp_samp * n_ipp
