@@ -227,21 +227,24 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     # params["rx_window_blocks"] = rx_window_blocks
     params["rx_window_indices"] = rx_window_indices
 
+    # We are modelling the target at the time of the first tx-pulse scattered
+    # of the target, the first sample of the coherent integration
+    # is a "good enough" timestamp but its actually that
+    # + (range_gate + stencil_start_samp)/2 for monostatic
+
     # calculate midpoint of decimated vectors
     rx_win_dec = np.mean(rx_window_indices.copy().reshape(-1, frequency_decimation), axis=-1)
+
     # Time vector relative detected range-gate
     times = rx_win_dec / sample_rate
     times2 = times**2.0
 
-    # these are the accelerations we'll try out
-    tau = n_ipp * ipp * 1e-6
-
     # acceleration sampled with steps at the end of the coherent integration window
     # acceleration_resolution is in radians!
-    delta_a = max_acceleration - min_acceleration
-    params["n_accelerations"] = int(
-        np.ceil(delta_a * (np.pi / wavelength) * tau**2.0 / acceleration_resolution)
-    )
+    max_time2 = np.max(times2)
+    acc_interval = max_acceleration - min_acceleration
+    max_phase_change = 2.0 * np.pi * (0.5 * acc_interval / wavelength) * max_time2
+    params["n_accelerations"] = int(np.ceil(max_phase_change/acceleration_resolution))
     if params["n_accelerations"] == 0:
         params["n_accelerations"] = 1
 
