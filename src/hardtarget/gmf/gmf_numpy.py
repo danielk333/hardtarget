@@ -52,3 +52,26 @@ def gmfnp(z_tx, z_rx, gmf_variables, gmf_params):
                 # index of acceleration that gives highest integrated energy at this range gate
                 gmf_variables.a_ind[ri] = ai
     # Finished!
+
+
+def gmfnp_no_reduce(z_tx, z_rx, gmf_variables, gmf_params):
+    acc_phasors = gmf_params["acceleration_phasors"]
+    rgs = gmf_params["rgs"]
+    frequency_decimation = gmf_params["frequency_decimation"]
+    rx_window_indices = gmf_params["rx_window_indices"]
+
+    # number of range gates is input from user
+    n_acc = acc_phasors.shape[0]
+
+    for ri, rg in enumerate(rgs):
+        zr = z_rx[rx_window_indices + rg]
+        # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter), decimate
+        echo = np.sum((zr * z_tx).reshape(-1, frequency_decimation), axis=-1)
+
+        for ai in range(n_acc):
+            _gmfo = np.abs(fft.fft(acc_phasors[ai] * echo, len(echo))) ** 2
+            if ai == 0:
+                # gmf_dc_vec is the range-dependent noise floor
+                gmf_variables.dc[ri] = _gmfo[0]
+
+            gmf_variables.vals[ri, :, ai] = _gmfo

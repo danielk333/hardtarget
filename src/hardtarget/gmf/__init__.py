@@ -1,7 +1,8 @@
-from .gmf_numpy import gmfnp
+from .gmf_numpy import gmfnp, gmfnp_no_reduce
 
 GMF_LIBS = {
     "numpy": gmfnp,
+    "numpy_no_reduce": gmfnp_no_reduce,
 }
 
 try:
