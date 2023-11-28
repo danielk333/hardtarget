@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 import logging
-from hardtarget.analysis import analyze_gmf
+from hardtarget.analysis import compute_gmf
 
 from .commands import add_command
 
 
-LOGGER_NAME = "analyse_gmf"
+LOGGER_NAME = "hardtarget.analysis.analyze_gmf"
 
 
 ####################################################################
@@ -43,7 +43,7 @@ def parser_build(parser):
     return parser
 
 
-def main(args, cli_logger):
+def main(args):
     # logging
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(getattr(logging, args.log_level))
@@ -76,12 +76,11 @@ def main(args, cli_logger):
     tx = (args.tx, args.txchnl)
 
     # process
-    results = analyze_gmf.analyze_gmf(
+    results = compute_gmf(
         rx,
         tx,
         config=args.config,
         job=job,
-        logger=cli_logger,
         gmflib=args.gmflib,
         clobber=args.clobber,
         output=args.output,

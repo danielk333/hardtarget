@@ -6,3 +6,4 @@ from .experiments import EXP_FILES
 # Functions
 from .drf_utils import load_hardtarget_drf
 from .gmf_utils import load_gmf_params
+from .analysis import compute_gmf

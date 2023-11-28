@@ -14,7 +14,7 @@ def parser_build(parser):
     return parser
 
 
-def main(args, cli_logger):
+def main(args):
     if args.relative_time:
         args.start_time = float(args.start_time)
         args.end_time = float(args.end_time)
@@ -33,6 +33,8 @@ def main(args, cli_logger):
     for data in data_generator:
         fig, axes = plt.subplots(2, 2)
         gmf.plot_peaks(axes, data)
+        fig, axes = plt.subplots(2, 3)
+        gmf.plot_detections(axes, data)
         fig, axes = plt.subplots(2, 2)
         gmf.plot_map(axes, data)
         plt.show()

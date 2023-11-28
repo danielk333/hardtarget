@@ -29,6 +29,7 @@ GMFVariables = namedtuple(
 
 DEFAULT_PARAMS = {
     "gmflib": "c",
+    "node_GPUs": 1,
     "n_ipp": 5,
     "ipp_offset": 0,
     "min_range_gate": 0,
@@ -48,6 +49,7 @@ DEFAULT_PARAMS = {
 }
 
 INT_PARAM_KEYS = [
+    "node_GPUs",
     "n_ipp",
     "ipp_offset",
     "min_range_gate",
@@ -168,7 +170,7 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     # reset range gates
     # range gates to search through
     # range gates are relative to tx start
-    rgs = np.arange(min_range_gate, max_range_gate, range_gate_step)
+    rgs = np.arange(min_range_gate, max_range_gate, range_gate_step, dtype=np.int32)
     # total propagation range
     ranges = (rgs - T_tx_start_samp) * scipy.constants.c / sample_rate  # m
 
@@ -211,21 +213,24 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     # params["rx_window_blocks"] = rx_window_blocks
     params["rx_window_indices"] = rx_window_indices
 
+    # We are modelling the target at the time of the first tx-pulse scattered
+    # of the target, the first sample of the coherent integration
+    # is a "good enough" timestamp but its actually that
+    # + (range_gate + stencil_start_samp)/2 for monostatic
+
     # calculate midpoint of decimated vectors
     rx_win_dec = np.mean(rx_window_indices.copy().reshape(-1, frequency_decimation), axis=-1)
+
     # Time vector relative detected range-gate
     times = rx_win_dec / sample_rate
     times2 = times**2.0
 
-    # these are the accelerations we'll try out
-    tau = n_ipp * ipp * 1e-6
-
     # acceleration sampled with steps at the end of the coherent integration window
     # acceleration_resolution is in radians!
-    delta_a = max_acceleration - min_acceleration
-    params["n_accelerations"] = int(
-        np.ceil(delta_a * (np.pi / wavelength) * tau**2.0 / acceleration_resolution)
-    )
+    max_time2 = np.max(times2)
+    acc_interval = max_acceleration - min_acceleration
+    max_phase_change = 2.0 * np.pi * (0.5 * acc_interval / wavelength) * max_time2
+    params["n_accelerations"] = int(np.ceil(max_phase_change/acceleration_resolution))
     if params["n_accelerations"] == 0:
         params["n_accelerations"] = 1
 

@@ -116,10 +116,28 @@ def plot_peaks(axes, data):
     return axes, handles
 
 
+def plot_detections(axes, data):
+    snr = data["gmf_vec"]/data["nf_range"][None, :] - 1
+    r_inds = np.argmax(data["gmf_vec"], axis=1)
+    coh_inds = np.arange(data["gmf_vec"].shape[0])
+    snr = snr[coh_inds, r_inds]
+    snrdb = 10*np.log10(snr)
+    inds = snrdb > 12.0
+
+    h00 = axes[0, 0].plot(data["t_vecs"][inds], data["r_vecs"][inds]*1e-3*0.5, ls="none", marker='.')
+    h01 = axes[0, 1].plot(data["t_vecs"][inds], data["v_vecs"][inds]*1e-3*0.5, ls="none", marker='.')
+    h10 = axes[1, 0].plot(data["t_vecs"][inds], data["a_vecs"][inds]*1e-3*0.5, ls="none", marker='.')
+    h11 = axes[1, 1].plot(data["t_vecs"][inds], snrdb[inds], ls="none", marker='.')
+    h11 = axes[0, 2].plot(data["r_vecs"], data["v_vecs"], ls="none", marker='.')
+    h11 = axes[1, 2].plot(data["r_vecs"], data["a_vecs"], ls="none", marker='.')
+    handles = [[h00, h01], [h10, h11]]
+    return axes, handles
+
+
 def plot_map(axes, data):
     h00 = axes[0, 0].pcolormesh(np.log10(data["gmf_vec"].T))
     h01 = axes[0, 1].pcolormesh(data["nf_vecs"].T)
-    h10 = axes[1, 0].plot(data["ranges"]*1e-3, data["nf_range"])
+    h10 = axes[1, 0].plot(data["ranges"], data["nf_range"])
     h11 = axes[1, 1].plot(data["nf_ts"], data["nf_time"])
     handles = [[h00, h01], [h10, h11]]
     return axes, handles

@@ -4,6 +4,7 @@ import numpy as np
 import digital_rf as drf
 from hardtarget import drf_utils
 import h5py
+from collections import namedtuple
 
 ####################################################################
 # DIGITAL RF READERS
@@ -129,6 +130,25 @@ def get_filepath(epoch_unix_us):
     return Path(time_string) / f"gmf-{epoch_unix_us:08d}.h5"
 
 
+
+
+####################################################################
+# GMF OUTPUT DATA
+####################################################################
+
+"""Container for compacting the output variables from the GMF function."""
+GMFVariables = namedtuple(
+    "GMFVariables",
+    [
+        "vals",  # match function values reduced over the requested axis
+        "dc",  # 0-frequency gmf output
+        "r_ind",  # best fitting range
+        "v_ind",  # best fitting range-rate
+        "a_ind",  # best fitting range-rate change
+    ],
+)
+
+
 ####################################################################
 # OUTPUT H5 FILE
 ####################################################################
@@ -164,7 +184,10 @@ def create_annotated_h5var(h5file, name, data, long_name, units=None):
         var.attrs["units"] = units
 
 
-def write_h5(outfile, gmf_params):
+def write_h5(outfile, 
+             gmf_params,
+             num_cohints_per_file,
+             ):
 
     # write result
     out = h5py.File(outfile, "w")

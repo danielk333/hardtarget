@@ -29,11 +29,11 @@ def parser_build(parser):
     return parser
 
 
-def main(args, cli_logger):
+def main(args):
     function = SOURCES[args.source]["main"]
     logger.info(f"Executing command {args.command}")
 
-    function(args, logger)
+    function(args)
 
 
 add_command(

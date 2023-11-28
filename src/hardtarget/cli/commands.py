@@ -70,4 +70,4 @@ def main():
     function = COMMANDS[args.command]["function"]
     logger.info(f"Executing command {args.command}")
 
-    function(args, logger)
+    function(args)
