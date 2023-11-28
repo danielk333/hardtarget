@@ -5,9 +5,10 @@ import h5py
 from tqdm import tqdm
 from pathlib import Path
 from hardtarget.gmf import GMF_LIBS
-from hardtarget import gmf_utils
+from hardtarget.gmf_utils import load_gmf_params
+from hardtarget.gmf_utils import GMFVariables
 
-from . import analysis_utils
+from hardtarget.analysis import analysis_utils as a_utils
 
 logger = logging.getLogger(__name__)
 
@@ -58,38 +59,45 @@ def compute_gmf(
     """
 
     # load data sources
-    rx_srcdir, rx_reader, rx_chnl = analysis_utils.load_source(rx)
-    tx_srcdir, tx_reader, tx_chnl = analysis_utils.load_source(tx)
+    rx_srcdir, rx_reader, rx_chnl = a_utils.load_source(rx)
+    tx_srcdir, tx_reader, tx_chnl = a_utils.load_source(tx)
 
     # gmf params
-    gmf_params = gmf_utils.load_gmf_params(rx_srcdir, config)
+    gmf_params = load_gmf_params(rx_srcdir, config)
+    params_exp = gmf_params["EXP"]
+    params_pro = gmf_params["PRO"]
+    params_der = gmf_params["DER"]
+
     # override config file
     if gmflib is not None:
-        gmf_params["gmflib"] = gmflib
-    logger.info("Using GMF backend: " + gmf_params["gmflib"])
+        params_pro["gmflib"] = gmflib
+    logger.info("Using GMF backend: " + params_pro["gmflib"])
 
     # bounds
-    bounds = analysis_utils.compute_bounds(
+    bounds = a_utils.compute_bounds(
         rx_reader,
         rx_chnl,
-        gmf_params["sample_rate"],
+        params_exp["sample_rate"],
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
     )
 
+    # easy access
+    ipp = params_exp["ipp"]
+    sample_rate = params_exp["sample_rate"]
+    n_ipp = params_pro["n_ipp"]
+    num_cohints_per_file = params_pro["num_cohints_per_file"]
+    ipp_samp = params_der["ipp_samp"]
+
     # tasks
-    total_tasks = analysis_utils.compute_total_tasks(gmf_params, bounds)
-    job_tasks = analysis_utils.compute_job_tasks(job, total_tasks)
+    total_tasks = a_utils.compute_total_tasks(ipp, n_ipp, 
+                                              num_cohints_per_file, 
+                                              bounds)
+    job_tasks = a_utils.compute_job_tasks(job, total_tasks)
     tasks_skipped = 0
 
     logger.info(f"starting job {job['idx']}/{job['N']} with {len(job_tasks)} tasks")
-
-    ipp = gmf_params["ipp"]
-    ipp_samp = gmf_params["ipp_samp"]
-    n_ipp = gmf_params["n_ipp"]
-    num_cohints_per_file = gmf_params["num_cohints_per_file"]
-    sample_rate = gmf_params["sample_rate"]
 
     # progress
     if progress:
@@ -108,7 +116,7 @@ def compute_gmf(
         # across multiple GPUs on multiple nodes we assume the ranks
         # distribute across the nodes in a linear fashion
         # e.g. node1[rank=(0,1,2)], node2[rank=(3,4,5)] for np=6 and node_GPUs=3
-        gpu_id = task_idx % gmf_params["node_GPUs"]
+        gpu_id = task_idx % params_pro["node_GPUs"]
 
         # initialise
         gmf_vals = []
@@ -124,7 +132,7 @@ def compute_gmf(
         # filenames are in unix time microseconds
         epoch_unix = file_idx_sample / sample_rate
         epoch_unix_us = epoch_unix.astype("int64")*1000000
-        filepath = analysis_utils.get_filepath(epoch_unix_us)
+        filepath = a_utils.get_filepath(epoch_unix_us)
 
         # write to file if output is defined
         if output is not None:
@@ -185,117 +193,44 @@ def compute_gmf(
         coh_ints = np.arange(num_cohints_per_file)
 
         r_inds = np.argmax(gmf_vals, axis=1)
-        r_vec = gmf_params["ranges"][r_inds]
-        v_vec = gmf_params["range_rates"][gmf_v_ind[coh_ints, r_inds]]
-        a_vec = gmf_params["accelerations"][gmf_a_ind[coh_ints, r_inds]]
+        r_vec = params_der["ranges"][r_inds]
+        v_vec = params_der["range_rates"][gmf_v_ind[coh_ints, r_inds]]
+        a_vec = params_der["accelerations"][gmf_a_ind[coh_ints, r_inds]]
         g_vec = gmf_vals[coh_ints, r_inds]
 
+        integration_ind = np.arange(num_cohints_per_file, dtype=np.int64)
+
         if output is not None:
-            # write result
-            out = h5py.File(outfile, "w")
-            gmf_axes = {}
+            a_utils.write_h5_file(outfile,
+                                  gmf_params,
+                                  integration_ind,
+                                  gmf_vals,
+                                  gmf_dc,
+                                  gmf_txp,
+                                  gmf_r_ind,
+                                  gmf_v_ind,
+                                  gmf_a_ind,
+                                  r_vec,
+                                  v_vec,
+                                  a_vec,
+                                  g_vec,
+                                  epoch_unix)
 
-            out["integration_index"] = np.arange(num_cohints_per_file, dtype=np.int64)
-            gmf_axis = out["integration_index"]
-            gmf_axis.make_scale("integration_index")
-            gmf_axis.attrs["long_name"] = "Integration index within this file relative the epoch"
-            gmf_axes["integration_index"] = gmf_axis
-
-            grp = out.create_group("vector_params")
-            for key in gmf_params:
-                if key in gmf_utils.VECTOR_PARAM_KEYS:
-                    grp[key] = gmf_params[key]
-                elif key in gmf_utils.AXIS_PARAM_KEYS:
-                    out[key] = gmf_params[key]
-                    long_name, units = gmf_utils.AXIS_PARAM_KEYS[key]
-                    gmf_axis = out[key]
-                    gmf_axis.make_scale(key)
-                    gmf_axis.attrs["long_name"] = long_name
-                    gmf_axis.attrs["units"] = units
-                    gmf_axes[key] = gmf_axis
-                else:
-                    if isinstance(gmf_params[key], bool):
-                        val = np.bool_(gmf_params[key])
-                    else:
-                        val = gmf_params[key]
-                    out.attrs[key] = val
-
-            # TODO: this is if we want to attach scales to the dims
-            # scales = [gmf_axes["integration_index"]]
-            # if not gmf_params["reduce_range"]:
-            #     scales.append(gmf_axes["ranges"])
-            # if not gmf_params["reduce_range_rate"]:
-            #     scales.append(gmf_axes["range_rates"])
-            # if not gmf_params["reduce_acceleration"]:
-            #     scales.append(gmf_axes["accelerations"])
-            # per_int_scales = [gmf_axes["integration_index"]]
-
-            analysis_utils.create_annotated_h5var(
-                out, "gmf", gmf_vals,
-                "Generalized Matched Filter output values",
-            )
-            analysis_utils.create_annotated_h5var(
-                out, "gmf_zero_frequency", gmf_dc,
-                "Range dependant noise floor (0-frequency gmf output)",
-            )
-            analysis_utils.create_annotated_h5var(
-                out, "range_index", gmf_r_ind,
-                "If range is reduced, contains the best range index for each left over axis",
-            )
-            analysis_utils.create_annotated_h5var(
-                out, "range_rate_index", gmf_v_ind,
-                "If range rate is reduced, contains the best range rate index for each left over axis",
-            )
-            analysis_utils.create_annotated_h5var(
-                out, "acceleration_index", gmf_a_ind,
-                "If acceleration is reduced, contains the best acceleration index for each left over axis",
-            )
-
-            analysis_utils.create_annotated_h5var(
-                out, "range_peak", r_vec,
-                "Range at peak GMF",
-            )
-            analysis_utils.create_annotated_h5var(
-                out, "range_rate_peak", v_vec,
-                "Range rate at peak GMF",
-            )
-            analysis_utils.create_annotated_h5var(
-                out, "acceleration_peak", a_vec,
-                "Acceleration at peak GMF",
-            )
-            analysis_utils.create_annotated_h5var(
-                out, "gmf_peak", g_vec,
-                "Peak GMF",
-            )
-
-            analysis_utils.create_annotated_h5var(
-                out, "tx_power", gmf_txp,
-                "Measured transmitted power",
-            )
-            analysis_utils.create_annotated_h5var(
-                out, "epoch_unix", epoch_unix,
-                "Epoch of first integration in unix time",
-                units="s",
-            )
-            out.close()
             results["files"].append(filepath.name)
         else:
+            # write dict
             out = {}
             out["gmf"] = gmf_vals
             out["gmf_zero_frequency"] = gmf_dc
-
             out["range_index"] = gmf_r_ind
             out["range_rate_index"] = gmf_v_ind
             out["acceleration_index"] = gmf_a_ind
-
             out["range_peak"] = r_vec
             out["range_rate_peak"] = v_vec
             out["acceleration_peak"] = a_vec
             out["gmf_peak"] = g_vec
-
             out["tx_power"] = gmf_txp
             out["epoch_unix"] = epoch_unix
-
             results["data"][file_idx_sample] = out
 
         # progress
@@ -339,8 +274,11 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
         Squared summed tx amplitude
     """
 
+    params_pro = gmf_params["PRO"]
+    params_der = gmf_params["DER"]
+
     # gmf lib
-    gmf_lib_name = gmf_params.get("gmflib", None)
+    gmf_lib_name = params_pro.get("gmflib", None)
     if gmf_lib_name is None or gmf_lib_name not in GMF_LIBS:
         gmf_lib_name = "c" if "c" in GMF_LIBS else "numpy"
     gmf_lib = GMF_LIBS[gmf_lib_name]
@@ -350,21 +288,21 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
         kwargs["gpu_id"] = gpu_id
 
     # TODO: implement this
-    if not gmf_params["reduce_range_rate"] and gmf_params["reduce_acceleration"]:
+    if not params_pro["reduce_range_rate"] and params_pro["reduce_acceleration"]:
         raise NotImplementedError("reduce settings not implemented")
 
     # parameters
-    rx_stencil = gmf_params["rx_stencil"]
-    tx_stencil = gmf_params["tx_stencil"]
+    rx_stencil = params_der["rx_stencil"]
+    tx_stencil = params_der["tx_stencil"]
 
     rx_reader, rx_channel = rx
     tx_reader, tx_channel = tx
 
     # read data vector with n_ipp + n_extra ipp's (to allow for searching across to subsequent pulses)
-    z_rx = rx_reader.read_vector_1d(start_sample, gmf_params["read_length"], rx_channel)
+    z_rx = rx_reader.read_vector_1d(start_sample, params_der["read_length"], rx_channel)
 
     if tx_channel != rx_channel or tx_reader != rx_reader:
-        z_tx = tx_reader.read_vector_1d(start_sample, gmf_params["read_length"], tx_channel)
+        z_tx = tx_reader.read_vector_1d(start_sample, params_der["read_length"], tx_channel)
     else:
         z_tx = np.copy(z_rx)
 
@@ -381,12 +319,12 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     # TODO: There are better ways of estimating the background noise by
     #   removing all coherent echoes first and using the individual signal samples
 
-    gmf_vars = gmf_utils.GMFVariables(
-        vals = np.zeros(gmf_params["gmf_size"], dtype=np.float32),
-        dc = np.zeros([gmf_params["n_ranges"], ], dtype=np.float32),
-        r_ind = np.full(gmf_params["gmf_size"], -1, dtype=np.int32),
-        v_ind = np.full(gmf_params["gmf_size"], -1, dtype=np.int32),
-        a_ind = np.full(gmf_params["gmf_size"], -1, dtype=np.int32),
+    gmf_vars = GMFVariables(
+        vals = np.zeros(params_der["gmf_size"], dtype=np.float32),
+        dc = np.zeros([params_der["n_ranges"], ], dtype=np.float32),
+        r_ind = np.full(params_der["gmf_size"], -1, dtype=np.int32),
+        v_ind = np.full(params_der["gmf_size"], -1, dtype=np.int32),
+        a_ind = np.full(params_der["gmf_size"], -1, dtype=np.int32),
     )
 
     if tx_amp > 1.0:

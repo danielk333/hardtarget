@@ -25,10 +25,10 @@ def gmfnp(z_tx, z_rx, gmf_variables, gmf_params):
 
     """
 
-    acc_phasors = gmf_params["acceleration_phasors"]
-    rgs = gmf_params["rgs"]
-    frequency_decimation = gmf_params["frequency_decimation"]
-    rx_window_indices = gmf_params["rx_window_indices"]
+    acc_phasors = gmf_params["DER"]["acceleration_phasors"]
+    rgs = gmf_params["DER"]["rgs"]
+    frequency_decimation = gmf_params["PRO"]["frequency_decimation"]
+    rx_window_indices = gmf_params["DER"]["rx_window_indices"]
 
     # number of range gates is input from user
     n_acc = acc_phasors.shape[0]
@@ -55,10 +55,10 @@ def gmfnp(z_tx, z_rx, gmf_variables, gmf_params):
 
 
 def gmfnp_no_reduce(z_tx, z_rx, gmf_variables, gmf_params):
-    acc_phasors = gmf_params["acceleration_phasors"]
-    rgs = gmf_params["rgs"]
-    frequency_decimation = gmf_params["frequency_decimation"]
-    rx_window_indices = gmf_params["rx_window_indices"]
+    acc_phasors = gmf_params["DER"]["acceleration_phasors"]
+    rgs = gmf_params["DER"]["rgs"]
+    frequency_decimation = gmf_params["PRO"]["frequency_decimation"]
+    rx_window_indices = gmf_params["DER"]["rx_window_indices"]
 
     # number of range gates is input from user
     n_acc = acc_phasors.shape[0]
