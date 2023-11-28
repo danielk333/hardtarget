@@ -164,94 +164,92 @@ def create_annotated_h5var(h5file, name, data, long_name, units=None):
         var.attrs["units"] = units
 
 
-
-
-def write_h5(outfile):
+def write_h5(outfile, gmf_params):
 
     # write result
-        out = h5py.File(outfile, "w")
-        gmf_axes = {}
+    out = h5py.File(outfile, "w")
+    gmf_axes = {}
 
-        out["integration_index"] = np.arange(num_cohints_per_file, dtype=np.int64)
-        gmf_axis = out["integration_index"]
-        gmf_axis.make_scale("integration_index")
-        gmf_axis.attrs["long_name"] = "Integration index within this file relative the epoch"
-        gmf_axes["integration_index"] = gmf_axis
+    out["integration_index"] = np.arange(num_cohints_per_file, dtype=np.int64)
+    gmf_axis = out["integration_index"]
+    gmf_axis.make_scale("integration_index")
+    gmf_axis.attrs["long_name"] = "Integration index within this file relative the epoch"
+    gmf_axes["integration_index"] = gmf_axis
 
-        grp = out.create_group("vector_params")
-        for key in gmf_params:
-            if key in gmf_utils.VECTOR_PARAM_KEYS:
-                grp[key] = gmf_params[key]
-            elif key in gmf_utils.AXIS_PARAM_KEYS:
-                out[key] = gmf_params[key]
-                long_name, units = gmf_utils.AXIS_PARAM_KEYS[key]
-                gmf_axis = out[key]
-                gmf_axis.make_scale(key)
-                gmf_axis.attrs["long_name"] = long_name
-                gmf_axis.attrs["units"] = units
-                gmf_axes[key] = gmf_axis
+    grp = out.create_group("vector_params")
+    for key in gmf_params:
+        if key in VECTOR_PARAM_KEYS:
+            grp[key] = gmf_params[key]
+        elif key in AXIS_PARAM_KEYS:
+            out[key] = gmf_params[key]
+            long_name, units = AXIS_PARAM_KEYS[key]
+            gmf_axis = out[key]
+            gmf_axis.make_scale(key)
+            gmf_axis.attrs["long_name"] = long_name
+            gmf_axis.attrs["units"] = units
+            gmf_axes[key] = gmf_axis
+        else:
+            if isinstance(gmf_params[key], bool):
+                val = np.bool_(gmf_params[key])
             else:
-                if isinstance(gmf_params[key], bool):
-                    val = np.bool_(gmf_params[key])
-                else:
-                    val = gmf_params[key]
-                out.attrs[key] = val
+                val = gmf_params[key]
+            out.attrs[key] = val
 
-        # TODO: this is if we want to attach scales to the dims
-        # scales = [gmf_axes["integration_index"]]
-        # if not gmf_params["reduce_range"]:
-        #     scales.append(gmf_axes["ranges"])
-        # if not gmf_params["reduce_range_rate"]:
-        #     scales.append(gmf_axes["range_rates"])
-        # if not gmf_params["reduce_acceleration"]:
-        #     scales.append(gmf_axes["accelerations"])
-        # per_int_scales = [gmf_axes["integration_index"]]
+    # TODO: this is if we want to attach scales to the dims
+    # scales = [gmf_axes["integration_index"]]
+    # if not gmf_params["reduce_range"]:
+    #     scales.append(gmf_axes["ranges"])
+    # if not gmf_params["reduce_range_rate"]:
+    #     scales.append(gmf_axes["range_rates"])
+    # if not gmf_params["reduce_acceleration"]:
+    #     scales.append(gmf_axes["accelerations"])
+    # per_int_scales = [gmf_axes["integration_index"]]
 
-        analysis_utils.create_annotated_h5var(
-            out, "gmf", gmf_vals,
-            "Generalized Matched Filter output values",
-        )
-        analysis_utils.create_annotated_h5var(
-            out, "gmf_zero_frequency", gmf_dc,
-            "Range dependant noise floor (0-frequency gmf output)",
-        )
-        analysis_utils.create_annotated_h5var(
-            out, "range_index", gmf_r_ind,
-            "If range is reduced, contains the best range index for each left over axis",
-        )
-        analysis_utils.create_annotated_h5var(
-            out, "range_rate_index", gmf_v_ind,
-            "If range rate is reduced, contains the best range rate index for each left over axis",
-        )
-        analysis_utils.create_annotated_h5var(
-            out, "acceleration_index", gmf_a_ind,
-            "If acceleration is reduced, contains the best acceleration index for each left over axis",
-        )
+    create_annotated_h5var(
+        out, "gmf", gmf_vals,
+        "Generalized Matched Filter output values",
+    )
+    create_annotated_h5var(
+        out, "gmf_zero_frequency", gmf_dc,
+        "Range dependant noise floor (0-frequency gmf output)",
+    )
+    create_annotated_h5var(
+        out, "range_index", gmf_r_ind,
+        "If range is reduced, contains the best range index for each left over axis",
+    )
+    create_annotated_h5var(
+        out, "range_rate_index", gmf_v_ind,
+        "If range rate is reduced, contains the best range rate index for each left over axis",
+    )
+    create_annotated_h5var(
+        out, "acceleration_index", gmf_a_ind,
+        "If acceleration is reduced, contains the best acceleration index for each left over axis",
+    )
 
-        analysis_utils.create_annotated_h5var(
-            out, "range_peak", r_vec,
-            "Range at peak GMF",
-        )
-        analysis_utils.create_annotated_h5var(
-            out, "range_rate_peak", v_vec,
-            "Range rate at peak GMF",
-        )
-        analysis_utils.create_annotated_h5var(
-            out, "acceleration_peak", a_vec,
-            "Acceleration at peak GMF",
-        )
-        analysis_utils.create_annotated_h5var(
-            out, "gmf_peak", g_vec,
-            "Peak GMF",
-        )
+    create_annotated_h5var(
+        out, "range_peak", r_vec,
+        "Range at peak GMF",
+    )
+    create_annotated_h5var(
+        out, "range_rate_peak", v_vec,
+        "Range rate at peak GMF",
+    )
+    create_annotated_h5var(
+        out, "acceleration_peak", a_vec,
+        "Acceleration at peak GMF",
+    )
+    create_annotated_h5var(
+        out, "gmf_peak", g_vec,
+        "Peak GMF",
+    )
 
-        analysis_utils.create_annotated_h5var(
-            out, "tx_power", gmf_txp,
-            "Measured transmitted power",
-        )
-        analysis_utils.create_annotated_h5var(
-            out, "epoch_unix", epoch_unix,
-            "Epoch of first integration in unix time",
-            units="s",
-        )
-        out.close()
+    create_annotated_h5var(
+        out, "tx_power", gmf_txp,
+        "Measured transmitted power",
+    )
+    create_annotated_h5var(
+        out, "epoch_unix", epoch_unix,
+        "Epoch of first integration in unix time",
+        units="s",
+    )
+    out.close()
