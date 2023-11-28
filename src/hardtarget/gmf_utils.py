@@ -72,20 +72,6 @@ FLOAT_PARAM_KEYS = [
     "doppler_sign",
 ]
 
-AXIS_PARAM_KEYS = {
-    "ranges": ("Matched filter ranges", "m"),
-    "range_rates": ("Matched filter range rates", "m/s"),
-    "accelerations": ("Matched filter range accelerations", "m/s^2"),
-}
-VECTOR_PARAM_KEYS = [
-    "rgs",
-    "fvec",
-    "acceleration_phasors",
-    "rx_stencil",
-    "tx_stencil",
-    "rx_window_indices",
-]
-
 
 ####################################################################
 # LOAD GMF PROCESSING PARAMS FROM CONFIG
