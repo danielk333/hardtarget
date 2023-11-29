@@ -83,7 +83,7 @@ def load_gmf_processing_params(configfile=None):
 
     d = {**DEFAULT_PARAMS}
 
-    assert configfile is not None, f"Config file is NONE"
+    assert configfile is not None, "Config file is NONE"
     cfg_pth = pathlib.Path(configfile)
     assert cfg_pth.exists(), f"Config file '{configfile}' does not exist"
     assert not cfg_pth.is_dir(), f"Config file '{configfile}' is a directory"
@@ -103,6 +103,13 @@ def load_gmf_processing_params(configfile=None):
             else:
                 # string
                 d[key] = config.get(SECTION, key).strip("'").strip('"')
+    
+    # GMF library implementation currently implicitly assumes reduction over
+    # range_rate and acceleration.
+    assert d["reduce_range"] is False, "Not supported: reduce_range: True"
+    assert d["reduce_range_rate"] is True, "Not supported: reduce_range_rate: False"
+    assert d["reduce_acceleration"] is True, "Not supported: reduce_acceleration: False"
+
     return d
 
 
@@ -118,6 +125,8 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
         - signal processing config (gmf_config)
         calculate additional derived params
     """
+
+    print(drf_srcdir)
 
     # drf experiment parmeters
     params_exp = drf_utils.load_hardtarget_drf_params(drf_srcdir)

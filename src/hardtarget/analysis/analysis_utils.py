@@ -4,7 +4,6 @@ import numpy as np
 import digital_rf as drf
 from hardtarget import drf_utils
 import h5py
-from collections import namedtuple
 
 ####################################################################
 # DIGITAL RF READERS
@@ -129,12 +128,9 @@ def get_filepath(epoch_unix_us):
     return Path(time_string) / f"gmf-{epoch_unix_us:08d}.h5"
 
 
-
-
 ####################################################################
 # OUTPUT H5 FILE
 ####################################################################
-
 
 VECTOR_PARAMS = [
     "rgs",
@@ -165,13 +161,11 @@ def create_annotated_h5var(h5file, name, data, long_name, units=None):
 # WRITE H5 FILE
 ####################################################################
 
+# def toBool(val):
+#    if isinstance(val, bool):
+#        return np.bool_(val)
 
-def toBool(val):
-    if isinstance(val, bool):
-        return np.bool_(val)
-
-
-def write_h5_file(outfile, 
+def write_h5_file(outfile,
                   gmf_params,
                   integration_ind,
                   gmf_vals,
@@ -184,19 +178,18 @@ def write_h5_file(outfile,
                   v_vec,
                   a_vec,
                   g_vec,
-                  epoch_unix
-                ):
+                  epoch_unix):
 
     # write result
     out = h5py.File(outfile, "w")
 
     # EXPERIMENT PARAMS
-    exp_grp = out.create_group("exp")
+    exp_grp = out.create_group("experiment")
     for key, val in gmf_params["EXP"].items():
         exp_grp[key] = val
 
     # GMF PROCESSING PARAMS
-    pro_grp = out.create_group("pro")
+    pro_grp = out.create_group("processing")
     for key, val in gmf_params["PRO"].items():
         pro_grp[key] = val
 
@@ -206,37 +199,33 @@ def write_h5_file(outfile,
     #    der_grp[key] = val
 
     # VECTORS
-    vector_grp = out.create_group("vectors")
+    vector_grp = out.create_group("vector_params")
     for key in VECTOR_PARAMS:
         vector_grp[key] = gmf_params["DER"][key]
 
     # AXIS
     AXIS_MAP = {
         "integration_index": (
-            integration_ind, 
-            "Integration index within this file relative the epoch", 
-            None
-            ),
+            integration_ind,
+            "Integration index within this file relative the epoch",
+            None),
         "ranges": (
-            gmf_params["DER"]["ranges"], 
-            "Matched filter ranges", 
-            "m"
-            ),
+            gmf_params["DER"]["ranges"],
+            "Matched filter ranges",
+            "m"),
         "range_rates": (
-            gmf_params["DER"]["range_rates"], 
-            "Matched filter range rates", 
-            "m/s"
-            ),
+            gmf_params["DER"]["range_rates"],
+            "Matched filter range rates",
+            "m/s"),
         "accelerations": (
-            gmf_params["DER"]["ranges"], 
-            "Matched filter range accelerations", 
+            gmf_params["DER"]["accelerations"],
+            "Matched filter range accelerations",
             "m/s^2"),
     }
 
-    axis_grp = out.create_group("axis")
     for key, [val, long_name, units] in AXIS_MAP.items():
-        axis_grp[key] = val
-        _axis = axis_grp[key]
+        out[key] = val
+        _axis = out[key]
         _axis.make_scale(key)
         _axis.attrs["long_name"] = long_name
         if units is not None:
@@ -255,37 +244,32 @@ def write_h5_file(outfile,
     # VARS
     VAR_MAP = {
         "gmf": (
-            gmf_vals, 
+            gmf_vals,
             "Generalized Matched Filter output values",
-            None
-            ),
+            None),
         "gmf_zero_frequency": (
             gmf_dc,
             "Range dependant noise floor (0-frequency gmf output)",
-            None
-            ),
+            None),
         "range_index": (
             gmf_r_ind,
             "If range is reduced, contains the best range index for each left over axis",
-            None
-            ),
+            None),
         "range_rate_index": (
             gmf_v_ind,
             "If range rate is reduced, contains the best range rate index for each left over axis",
-            None
-            ),
+            None),
         "acceleration_index": (
             gmf_a_ind,
             "If acceleration is reduced, contains the best acceleration index for each left over axis",
-            None
-            ),
-        "range_peak": (r_vec, "Range at peak GMF", None),
-        "range_rate_peak": (v_vec, "Range rate at peak GMF", None),
-        "acceleration_peak": (a_vec, "Acceleration at peak GMF", None),
+            None),
+        # "range_peak": (r_vec, "Range at peak GMF", "m"),
+        # "range_rate_peak": (v_vec, "Range rate at peak GMF", "m/s"),
+        # "acceleration_peak": (a_vec, "Acceleration at peak GMF", "m/s^2"),
         "gmf_peak": (g_vec, "Peak GMF", None),
-        "tx_power": (gmf_txp, "Measured transmitted power", None),
+        "tx_power": (gmf_txp, "Measured transmitted power", "W"),
         "epoch_unix": (
-            epoch_unix, 
+            epoch_unix,
             "Epoch of first integration in unix time",
             "s"),
     }
@@ -294,4 +278,3 @@ def write_h5_file(outfile,
         create_annotated_h5var(out, key, val, long_name, units=units)
 
     out.close()
-    return outfile

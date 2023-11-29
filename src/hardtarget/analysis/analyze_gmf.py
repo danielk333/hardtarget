@@ -1,7 +1,6 @@
 import logging
 import numpy as np
 import time
-import h5py
 from tqdm import tqdm
 from pathlib import Path
 from hardtarget.gmf import GMF_LIBS
@@ -321,7 +320,7 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
 
     gmf_vars = GMFVariables(
         vals = np.zeros(params_der["gmf_size"], dtype=np.float32),
-        dc = np.zeros([params_der["n_ranges"], ], dtype=np.float32),
+        dc = np.zeros(params_der["n_ranges"], dtype=np.float32),
         r_ind = np.full(params_der["gmf_size"], -1, dtype=np.int32),
         v_ind = np.full(params_der["gmf_size"], -1, dtype=np.int32),
         a_ind = np.full(params_der["gmf_size"], -1, dtype=np.int32),
