@@ -163,7 +163,6 @@ if __name__ == "__main__":
     ]
     vector_grp = out.create_group("vector_params")
     for key in VECTOR_PARAMS:
-        print(key)
         vector_grp[key] = gmf_params["DER"][key]
 
     # EPOCH
