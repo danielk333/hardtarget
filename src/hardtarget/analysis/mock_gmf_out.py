@@ -22,8 +22,8 @@ tx_power_data = np.random.rand(INTEGRATION_SIZE)
 rgs = np.random.randint(0, 1000, size=(RANGES_SIZE), dtype=np.int32)
 fvec = np.random.rand(RANGE_RATE_SIZE)
 acceleration_phasors = np.random.rand(135, RANGE_RATE_SIZE) + 1j * np.random.rand(135, RANGE_RATE_SIZE)
-rx_stensil = random_bool_array = np.random.choice([True, False], size=100000)
-tx_stensil = random_bool_array = np.random.choice([True, False], size=100000)
+rx_stencil = random_bool_array = np.random.choice([True, False], size=100000)
+tx_stencil = random_bool_array = np.random.choice([True, False], size=100000)
 rx_window_indices = np.random.randint(0, 1000, size=(9600), dtype=np.int32)
 
 
@@ -71,8 +71,8 @@ gmf_params = {
         'rgs': rgs,
         'fvec': fvec,
         'acceleration_phasors': acceleration_phasors,
-        'rx_stencil': rx_stensil,
-        'tx_stencil': tx_stensil,
+        'rx_stencil': rx_stencil,
+        'tx_stencil': tx_stencil,
         'rx_window_indices': rx_window_indices
     }
 }
@@ -86,56 +86,97 @@ gmf_params = {
 VARIABLE_MAP = {
     "integration_index": {
         "data": integration_index,
-        "long_name": "Integration index within this file relative the epoch"
+        "long_name": "Integration index within this file relative the epoch",
+        "scale": True
     },
     "ranges": {
         "data": ranges,
         "long_name": "Matched filter ranges",
-        "units": "m"
+        "units": "m",
+        "scale": True
     },
     "range_rates": {
         "data": range_rates,
         "long_name": "Matched filter range rates",
-        "units": "m/s"
+        "units": "m/s",
+        "scale": True
     },
     "accelerations": {
         "data": accelerations,
         "long_name": "Matched filter range accelerations",
-        "units": "m/s^2"
+        "units": "m/s^2",
+        "scale": True
     },
     "gmf": {
         "data": gmf_data,
         "dims": [("integration_index", "t"), ("ranges", "r")],
         "long_name": "Generalized Matched Filter output values",
+        "group": "gmf"
     },
     "gmf_zero_frequency": {
         "data": gmf_zero_data,
         "dims": [("integration_index", "t"), ("ranges", "r")],
-        "long_name": "Range dependant noise floor (0-frequency gmf output)"
+        "long_name": "Range dependant noise floor (0-frequency gmf output)",
+        "group": "gmf"
     },
     # DROPPED - As long as there is no reduction in range dimension
     # "range_index": {
     #     "data": range_data,
     #     "dims": [("integration_index", "t"), ("ranges", "r")],
-    #     "long_name": "If range is reduced, contains the best range index for each left over axis"
+    #     "long_name": "If range is reduced, contains the best range index for each left over axis",
+    #     "group": "gmf"
     # }
     "range_rate_index": {
         "data": range_rate_data,
         "dims": [("integration_index", "t"), ("ranges", "r")],
         "long_name": "If range_rate is reduced, contains the best range rate index for each left over axis",
+        "group": "gmf"
     },
     "acceleration_index": {
         "data": acceleration_data,
         "dims": [("integration_index", "t"), ("ranges", "r")],
         "long_name": "If acceleration is reduced, contains the best acceleration index for each left over axis",
+        "group": "gmf",
     },
     "tx_power": {
         "data": tx_power_data, 
         "dims": [("integration_index", "t")],
         "long_name": "Measured transmitted power",
-        "units": "W"
+        "units": "W",
+        "group": "gmf"
+    },
+    "rgs": {
+        "data": gmf_params["DER"]["rgs"],
+        "long_name": "Missing",
+        "group": "vector_params",
+    },
+    "fvec": {
+        "data": gmf_params["DER"]["fvec"],
+        "long_name": "Missing",
+        "group": "vector_params",
+    },
+    "acceleration_phasors": {
+        "data": gmf_params["DER"]["acceleration_phasors"],
+        "long_name": "Missing",
+        "group": "vector_params",
+    },
+    "rx_stencil": {
+        "data": gmf_params["DER"]["rx_stencil"],
+        "long_name": "Missing",
+        "group": "vector_params",
+    },
+    "tx_stencil": {
+        "data": gmf_params["DER"]["tx_stencil"],
+        "long_name": "Missing",
+        "group": "vector_params",
+    },
+    "rx_window_indices": {
+        "data": gmf_params["DER"]["rx_window_indices"],
+        "long_name": "Missing",
+        "group": "vector_params",
     }
 }
+
 
 
 if __name__ == "__main__":
@@ -152,33 +193,33 @@ if __name__ == "__main__":
     for key, val in gmf_params["PRO"].items():
         pro_grp[key] = val
 
-    # VECTORS
-    VECTOR_PARAMS = [
-        "rgs",
-        "fvec",
-        "acceleration_phasors",
-        "rx_stencil",
-        "tx_stencil",
-        "rx_window_indices",
-    ]
-    vector_grp = out.create_group("vector_params")
-    for key in VECTOR_PARAMS:
-        vector_grp[key] = gmf_params["DER"][key]
-
     # EPOCH
     out["epoch_unix"] = 1    
 
     # VARIABLES
-    var_grp = out.create_group("gmf")
     for key, item in VARIABLE_MAP.items():
-        ds = var_grp.create_dataset(key, data=item["data"])
-        if "dims" not in item:
+        # scale
+        is_scale = "scale" in item and item["scale"]
+
+        # set group as target (only non-scales)
+        target = out
+        if "group" in item and not is_scale:
+            grp_name = item["group"]
+            if grp_name not in out:
+                out.create_group(grp_name)
+            target = out[grp_name]
+        # create dataset
+        ds = target.create_dataset(key, data=item["data"])
+        # register scale
+        if is_scale:
             ds.make_scale(key)
-        else:
+        # attach ds dimensions to scales
+        if "dims" in item:
             for idx, (scale_key, label) in enumerate(item["dims"]):
-                scale = var_grp[scale_key]
+                scale = out[scale_key]
                 ds.dims[idx].attach_scale(scale)
                 ds.dims[idx].label = label
+        # set name and units
         ds.attrs["long_name"] = item["long_name"]
         if "units" in item:
             ds.attrs["units"] = item["units"]
