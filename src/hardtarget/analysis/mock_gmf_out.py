@@ -206,21 +206,9 @@ if __name__ == "__main__":
 
     out = h5py.File('example.h5', "w")
 
-    # EXPERIMENT PARAMS
-    exp_grp = out.create_group("experiment")
-    for key, val in gmf_params["EXP"].items():
-        exp_grp[key] = val
-
-    # GMF PROCESSING PARAMS
-    pro_grp = out.create_group("processing")
-    for key, val in gmf_params["PRO"].items():
-        pro_grp[key] = val
-
-    # EPOCH
-    out["epoch_unix"] = 1
-
     # VARIABLES
     for key, item in VARIABLE_MAP.items():
+
         # scale
         is_scale = "scale" in item and item["scale"]
 
@@ -246,5 +234,18 @@ if __name__ == "__main__":
         ds.attrs["long_name"] = item["long_name"]
         if "units" in item:
             ds.attrs["units"] = item["units"]
+
+    # EXPERIMENT PARAMS
+    exp_grp = out.create_group("experiment")
+    for key, val in gmf_params["EXP"].items():
+        exp_grp[key] = val
+
+    # GMF PROCESSING PARAMS
+    pro_grp = out.create_group("processing")
+    for key, val in gmf_params["PRO"].items():
+        pro_grp[key] = val
+
+    # EPOCH
+    out["epoch_unix"] = 1
 
     out.close()
