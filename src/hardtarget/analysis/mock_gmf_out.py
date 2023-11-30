@@ -80,11 +80,16 @@ gmf_params = {
     }
 }
 
-
 ####################################################################
-# H5 DIMENSIONS AND VARIABLES 
+# H5 DIMENSIONS AND VARIABLES
 ####################################################################
-
+# DROPPED - As long as there is no reduction in range dimension
+# "range_index": {
+#     "data": range_data,
+#     "dims": [("integration_index", "t"), ("ranges", "r")],
+#     "long_name": "If range is reduced, contains the best range index for each left over axis",
+#     "group": "gmf"
+# }
 
 VARIABLE_MAP = {
     "integration_index": {
@@ -122,27 +127,24 @@ VARIABLE_MAP = {
         "long_name": "Range dependant noise floor (0-frequency gmf output)",
         "group": "gmf"
     },
-    # DROPPED - As long as there is no reduction in range dimension
-    # "range_index": {
-    #     "data": range_data,
-    #     "dims": [("integration_index", "t"), ("ranges", "r")],
-    #     "long_name": "If range is reduced, contains the best range index for each left over axis",
-    #     "group": "gmf"
-    # }
     "range_rate_index": {
         "data": range_rate_data,
         "dims": [("integration_index", "t"), ("ranges", "r")],
-        "long_name": "If range_rate is reduced, contains the best range rate index for each left over axis",
+        "long_name": (
+            "If range_rate is reduced, contains the best range rate index "
+            "for each left over axis"),
         "group": "gmf"
     },
     "acceleration_index": {
         "data": acceleration_data,
         "dims": [("integration_index", "t"), ("ranges", "r")],
-        "long_name": "If acceleration is reduced, contains the best acceleration index for each left over axis",
+        "long_name": (
+            "If acceleration is reduced, contains the best acceleration "
+            "index for each left over axis"),
         "group": "gmf",
     },
     "tx_power": {
-        "data": tx_power_data, 
+        "data": tx_power_data,
         "dims": [("integration_index", "t")],
         "long_name": "Measured transmitted power",
         "units": "W",

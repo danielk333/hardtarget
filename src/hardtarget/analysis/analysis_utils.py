@@ -81,7 +81,7 @@ def compute_total_tasks(ipp, n_ipp, num_cohints_per_file, bounds):
 
     ipp: inter-pulse period length in samples
     n_ipp: number of interpulse periods to coherently integrate
-    num_cohints_per_file: 
+    num_cohints_per_file:
       number of coherent integration periods to include in one output file
       smaller means that lower latency can be achieved
     """
