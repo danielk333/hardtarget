@@ -19,13 +19,16 @@ acceleration_data = np.random.randint(0, 1000, size=(INTEGRATION_SIZE, RANGES_SI
 gmf_data = np.random.randint(0, 1000, size=(INTEGRATION_SIZE, RANGES_SIZE), dtype=np.int64)
 gmf_zero_data = np.random.randint(0, 1000, size=(INTEGRATION_SIZE, RANGES_SIZE), dtype=np.int64)
 tx_power_data = np.random.rand(INTEGRATION_SIZE)
+r_vec = np.random.rand(100)
+v_vec = np.random.rand(100)
+a_vec = np.random.rand(100)
+g_vec = np.random.rand(100)
 rgs = np.random.randint(0, 1000, size=(RANGES_SIZE), dtype=np.int32)
 fvec = np.random.rand(RANGE_RATE_SIZE)
 acceleration_phasors = np.random.rand(135, RANGE_RATE_SIZE) + 1j * np.random.rand(135, RANGE_RATE_SIZE)
 rx_stencil = random_bool_array = np.random.choice([True, False], size=100000)
 tx_stencil = random_bool_array = np.random.choice([True, False], size=100000)
 rx_window_indices = np.random.randint(0, 1000, size=(9600), dtype=np.int32)
-
 
 gmf_params = {
     'EXP': {
@@ -145,6 +148,26 @@ VARIABLE_MAP = {
         "units": "W",
         "group": "gmf"
     },
+    "range_peak": {
+        "data": r_vec,
+        "long_name": "Range at peak GMF",
+        "group": "gmf"
+    },
+    "range_rate_peak": {
+        "data": v_vec,
+        "long_name": "Range rate at peak GMF",
+        "group": "gmf"
+    },
+    "acceleration_peak": {
+        "data": a_vec,
+        "long_name": "Acceleration at peak GMF",
+        "group": "gmf"
+    },
+    "gmf_peak": {
+        "data": g_vec,
+        "long_name": "Peak GMF",
+        "group": "gmf"
+    },
     "rgs": {
         "data": gmf_params["DER"]["rgs"],
         "long_name": "Missing",
@@ -177,8 +200,6 @@ VARIABLE_MAP = {
     }
 }
 
-
-
 if __name__ == "__main__":
 
     out = h5py.File('example.h5', "w")
@@ -194,7 +215,7 @@ if __name__ == "__main__":
         pro_grp[key] = val
 
     # EPOCH
-    out["epoch_unix"] = 1    
+    out["epoch_unix"] = 1
 
     # VARIABLES
     for key, item in VARIABLE_MAP.items():
@@ -223,6 +244,5 @@ if __name__ == "__main__":
         ds.attrs["long_name"] = item["long_name"]
         if "units" in item:
             ds.attrs["units"] = item["units"]
-
 
     out.close()
