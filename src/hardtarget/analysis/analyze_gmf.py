@@ -4,8 +4,9 @@ import time
 from tqdm import tqdm
 from pathlib import Path
 from hardtarget.gmf import GMF_LIBS
-from hardtarget.gmf_utils import load_gmf_params
-from hardtarget.gmf_utils import GMFVariables
+from hardtarget.gmf_in_utils import load_gmf_params, GMFVariables
+from hardtarget.gmf_out_utils import GMFOutArgs, dump_gmf_out
+
 
 from hardtarget.analysis import analysis_utils as a_utils
 
@@ -200,21 +201,43 @@ def compute_gmf(
         integration_ind = np.arange(num_cohints_per_file, dtype=np.int64)
 
         if output is not None:
-            a_utils.write_h5_file(outfile,
-                                  gmf_params,
-                                  integration_ind,
-                                  gmf_vals,
-                                  gmf_dc,
-                                  gmf_txp,
-                                  gmf_r_ind,
-                                  gmf_v_ind,
-                                  gmf_a_ind,
-                                  r_vec,
-                                  v_vec,
-                                  a_vec,
-                                  g_vec,
-                                  epoch_unix)
 
+            # DUMP TO FILE
+
+            MOCK_DIM_1 = 135
+            MOCK_DIM_2 = 9600
+            SAMPLE_SIZE = 100000
+            RANGES_SIZE = 500
+            RANGE_RATE_SIZE = 600
+            ACCELERATIONS_SIZE = 500
+
+            # TODO - create
+            gmf_out_args = GMFOutArgs(
+                integration_index=integration_ind,
+                ranges=RANGES_SIZE,
+                range_rates=RANGE_RATE_SIZE,
+                accelerations=ACCELERATIONS_SIZE,
+                sample_numbers=SAMPLE_SIZE,
+                mock_dim_1=MOCK_DIM_1,
+                mock_dim_2=MOCK_DIM_2,
+                vals=gmf_vals,
+                dc=gmf_dc,
+                v_ind=gmf_v_ind,
+                a_ind=gmf_a_ind,
+                txp=gmf_tx,
+                r_vec=r_vec,
+                v_vec=v_vec,
+                a_vec=a_vec,
+                g_vec=g_vec,
+                rgs=gmf_params["DER"]["rgs"],
+                fvec=gmf_params["DER"]["fvec"],
+                acceleration_phasors=gmf_params["DER"]["acceleration_params"],
+                rx_stencil=gmf_params["DER"]["rx_stencil"],
+                tx_stencil=gmf_params["DER"]["tx_stencil"],
+                rx_window_indices=gmf_params["DER"]["rx_window_indices"],
+                epoch=epoch_unix)
+
+            dump_gmf_out(gmf_out_args, gmf_params, outfile)
             results["files"].append(filepath.name)
         else:
             # write dict

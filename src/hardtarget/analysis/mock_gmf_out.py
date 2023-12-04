@@ -1,19 +1,25 @@
-import h5py
 import numpy as np
 
 ####################################################################
 # MOCK UP DATA
 ####################################################################
 
+MOCK_DIM_1 = 135
+MOCK_DIM_2 = 9600
+SAMPLE_SIZE = 100000
 INTEGRATION_SIZE = 100
 RANGES_SIZE = 500
 RANGE_RATE_SIZE = 600
 ACCELERATIONS_SIZE = 500
 
+mock_dim_1 = np.arange(MOCK_DIM_1)
+mock_dim_2 = np.arange(MOCK_DIM_2)
+sample_numbers = np.arange(SAMPLE_SIZE)
 integration_index = np.arange(INTEGRATION_SIZE)
 ranges = np.linspace(0, 1, RANGES_SIZE)
 range_rates = np.linspace(0, 1, RANGE_RATE_SIZE)
 accelerations = np.linspace(0, 1, ACCELERATIONS_SIZE)
+
 range_rate_data = np.random.randint(0, 1000, size=(INTEGRATION_SIZE, RANGES_SIZE), dtype=np.int64)
 acceleration_data = np.random.randint(0, 1000, size=(INTEGRATION_SIZE, RANGES_SIZE), dtype=np.int64)
 gmf_data = np.random.randint(0, 1000, size=(INTEGRATION_SIZE, RANGES_SIZE), dtype=np.int64)
@@ -79,173 +85,3 @@ gmf_params = {
         'rx_window_indices': rx_window_indices
     }
 }
-
-####################################################################
-# H5 DIMENSIONS AND VARIABLES
-####################################################################
-# DROPPED - As long as there is no reduction in range dimension
-# "range_index": {
-#     "data": range_data,
-#     "dims": [("integration_index", "t"), ("ranges", "r")],
-#     "long_name": "If range is reduced, contains the best range index for each left over axis",
-#     "group": "gmf"
-# }
-
-VARIABLE_MAP = {
-    "integration_index": {
-        "data": integration_index,
-        "long_name": "Integration index within this file relative the epoch",
-        "scale": True
-    },
-    "ranges": {
-        "data": ranges,
-        "long_name": "Matched filter ranges",
-        "units": "m",
-        "scale": True
-    },
-    "range_rates": {
-        "data": range_rates,
-        "long_name": "Matched filter range rates",
-        "units": "m/s",
-        "scale": True
-    },
-    "accelerations": {
-        "data": accelerations,
-        "long_name": "Matched filter range accelerations",
-        "units": "m/s^2",
-        "scale": True
-    },
-    "gmf": {
-        "data": gmf_data,
-        "dims": [("integration_index", "t"), ("ranges", "r")],
-        "long_name": "Generalized Matched Filter output values",
-        "group": "gmf"
-    },
-    "gmf_zero_frequency": {
-        "data": gmf_zero_data,
-        "dims": [("integration_index", "t"), ("ranges", "r")],
-        "long_name": "Range dependant noise floor (0-frequency gmf output)",
-        "group": "gmf"
-    },
-    "range_rate_index": {
-        "data": range_rate_data,
-        "dims": [("integration_index", "t"), ("ranges", "r")],
-        "long_name": (
-            "If range_rate is reduced, contains the best range rate index "
-            "for each left over axis"),
-        "group": "gmf"
-    },
-    "acceleration_index": {
-        "data": acceleration_data,
-        "dims": [("integration_index", "t"), ("ranges", "r")],
-        "long_name": (
-            "If acceleration is reduced, contains the best acceleration "
-            "index for each left over axis"),
-        "group": "gmf",
-    },
-    "tx_power": {
-        "data": tx_power_data,
-        "dims": [("integration_index", "t")],
-        "long_name": "Measured transmitted power",
-        "units": "W",
-        "group": "gmf"
-    },
-    "range_peak": {
-        "data": r_vec,
-        "long_name": "Range at peak GMF",
-        "group": "gmf"
-    },
-    "range_rate_peak": {
-        "data": v_vec,
-        "long_name": "Range rate at peak GMF",
-        "group": "gmf"
-    },
-    "acceleration_peak": {
-        "data": a_vec,
-        "long_name": "Acceleration at peak GMF",
-        "group": "gmf"
-    },
-    "gmf_peak": {
-        "data": g_vec,
-        "long_name": "Peak GMF",
-        "group": "gmf"
-    },
-    "rgs": {
-        "data": gmf_params["DER"]["rgs"],
-        "long_name": "Missing",
-        "group": "vector_params",
-    },
-    "fvec": {
-        "data": gmf_params["DER"]["fvec"],
-        "long_name": "Missing",
-        "group": "vector_params",
-    },
-    "acceleration_phasors": {
-        "data": gmf_params["DER"]["acceleration_phasors"],
-        "long_name": "Missing",
-        "group": "vector_params",
-    },
-    "rx_stencil": {
-        "data": gmf_params["DER"]["rx_stencil"],
-        "long_name": "Missing",
-        "group": "vector_params",
-    },
-    "tx_stencil": {
-        "data": gmf_params["DER"]["tx_stencil"],
-        "long_name": "Missing",
-        "group": "vector_params",
-    },
-    "rx_window_indices": {
-        "data": gmf_params["DER"]["rx_window_indices"],
-        "long_name": "Missing",
-        "group": "vector_params",
-    }
-}
-
-if __name__ == "__main__":
-
-    out = h5py.File('example.h5', "w")
-
-    # VARIABLES
-    for key, item in VARIABLE_MAP.items():
-
-        # scale
-        is_scale = "scale" in item and item["scale"]
-
-        # set group as target (only non-scales)
-        target = out
-        if "group" in item and not is_scale:
-            grp_name = item["group"]
-            if grp_name not in out:
-                out.create_group(grp_name)
-            target = out[grp_name]
-        # create dataset
-        ds = target.create_dataset(key, data=item["data"])
-        # register scale
-        if is_scale:
-            ds.make_scale(key)
-        # attach ds dimensions to scales
-        if "dims" in item:
-            for idx, (scale_key, label) in enumerate(item["dims"]):
-                scale = out[scale_key]
-                ds.dims[idx].attach_scale(scale)
-                ds.dims[idx].label = label
-        # set name and units
-        ds.attrs["long_name"] = item["long_name"]
-        if "units" in item:
-            ds.attrs["units"] = item["units"]
-
-    # EXPERIMENT PARAMS
-    exp_grp = out.create_group("experiment")
-    for key, val in gmf_params["EXP"].items():
-        exp_grp[key] = val
-
-    # GMF PROCESSING PARAMS
-    pro_grp = out.create_group("processing")
-    for key, val in gmf_params["PRO"].items():
-        pro_grp[key] = val
-
-    # EPOCH
-    out["epoch_unix"] = 1
-
-    out.close()
