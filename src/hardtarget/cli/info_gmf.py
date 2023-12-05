@@ -38,14 +38,14 @@ def main(args):
     for path, item in items:
         _path = path_to_str(path)
         if item["type"] == "scalar":
-            print(f"-- {_path} value:{item['value']} dtype:{item['value'].dtype}")
+            print(f"-- {_path} value:{item['value']} dtype:{item['dtype']}")
         elif item["type"] == "string":
             print(f"-- {_path} value:{item['value']}")
         elif item["type"] == "dataset":
             if item["scale"]:
-                print(f"-- {_path} (scale) shape:{item['value'].shape} dtype:{item['value'].dtype}")
+                print(f"-- {_path} (scale) shape:{item['shape']} dtype:{item['dtype']}")
             else:
-                print(f"-- {_path} (dataset) shape:{item['value'].shape} dtype:{item['value'].dtype}")
+                print(f"-- {_path} (dataset) shape:{item['shape']} dtype:{item['dtype']}")
 
 
 ################################################################

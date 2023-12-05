@@ -198,8 +198,6 @@ def compute_gmf(
         a_vec = params_der["accelerations"][gmf_a_ind[coh_ints, r_inds]]
         g_vec = gmf_vals[coh_ints, r_inds]
 
-        integration_ind = np.arange(num_cohints_per_file, dtype=np.int64)
-
         if output is not None:
 
             # DUMP TO FILE
@@ -211,9 +209,8 @@ def compute_gmf(
             RANGE_RATE_SIZE = 600
             ACCELERATIONS_SIZE = 500
 
-            # TODO - create
             gmf_out_args = GMFOutArgs(
-                integration_index=integration_ind,
+                num_cohints_per_file=gmf_params["PRO"]["num_cohints_per_file"],
                 ranges=RANGES_SIZE,
                 range_rates=RANGE_RATE_SIZE,
                 accelerations=ACCELERATIONS_SIZE,
@@ -224,14 +221,14 @@ def compute_gmf(
                 dc=gmf_dc,
                 v_ind=gmf_v_ind,
                 a_ind=gmf_a_ind,
-                txp=gmf_tx,
+                txp=gmf_txp,
                 r_vec=r_vec,
                 v_vec=v_vec,
                 a_vec=a_vec,
                 g_vec=g_vec,
                 rgs=gmf_params["DER"]["rgs"],
                 fvec=gmf_params["DER"]["fvec"],
-                acceleration_phasors=gmf_params["DER"]["acceleration_params"],
+                acceleration_phasors=gmf_params["DER"]["acceleration_phasors"],
                 rx_stencil=gmf_params["DER"]["rx_stencil"],
                 tx_stencil=gmf_params["DER"]["tx_stencil"],
                 rx_window_indices=gmf_params["DER"]["rx_window_indices"],

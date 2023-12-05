@@ -32,12 +32,16 @@ def inspect_h5_leaf(obj, path):
         item["scale"] = is_scale(obj)
         if obj.dtype == "object":
             item["type"] = "string"
+            item["dtype"] = obj.dtype
             item["value"] = obj[()].decode('utf-8')
         elif obj.shape == ():
             item["type"] = "scalar"
+            item["dtype"] = obj.dtype
             item["value"] = obj[()]
         else:
             item["type"] = "dataset"
+            item["shape"] = obj.shape
+            item["dtype"] = obj.dtype
             item["value"] = obj
     else:
         item["type"] = "other"
@@ -73,6 +77,7 @@ def dump_gmf_out(gmf_out_args, gmf_params, outfile):
                 out.create_group(grp_name)
             target = out[grp_name]
         # create dataset
+        print("Create dataset", key)
         ds = target.create_dataset(key, data=item["data"])
         # register scale
         if is_scale:
@@ -113,7 +118,7 @@ def dump_gmf_out(gmf_out_args, gmf_params, outfile):
 GMFOutArgs = namedtuple(
     "GMFOutArgs",
     [
-        "integration_index",
+        "num_cohints_per_file",
         "ranges",
         "range_rates",
         "accelerations",
@@ -153,7 +158,9 @@ GMFOutArgs = namedtuple(
 # }
 
 def define_variables(gmf_out_args):
-
+    
+    integration_ind = np.arange(gmf_out_args.num_cohints_per_file, 
+                                dtype=np.int64)
     mock_dim_1 = np.arange(gmf_out_args.mock_dim_1)
     mock_dim_2 = np.arange(gmf_out_args.mock_dim_2)
     sample_numbers = np.arange(gmf_out_args.sample_numbers)
@@ -163,7 +170,7 @@ def define_variables(gmf_out_args):
 
     return {
         "integration_index": {
-            "data": gmf_out_args.integration_ind,
+            "data": integration_ind,
             "long_name": "Integration index within this file relative the epoch",
             "scale": True
         },
