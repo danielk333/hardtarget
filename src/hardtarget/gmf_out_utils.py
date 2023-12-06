@@ -77,7 +77,6 @@ def dump_gmf_out(gmf_out_args, gmf_params, outfile):
                 out.create_group(grp_name)
             target = out[grp_name]
         # create dataset
-        print("Create dataset", key)
         ds = target.create_dataset(key, data=item["data"])
         # register scale
         if is_scale:
