@@ -1,3 +1,17 @@
+from hardtarget.experiments import EXP_FILES
+
+def load_expconfig(xpname):
+    cfg_name = xpname + ".ini"
+    assert cfg_name in EXP_FILES, "experiment not found in pre-defined configurations"
+    cfg_file = EXP_FILES[cfg_name]
+    try:
+        cfg = configparser.ConfigParser()
+        cfg.read_file(open(cfg_file, "r"))
+        return cfg
+    except Exception as e:
+        raise ValueError(f"Couldn't open config file for {xpname}:" + str(e))
+
+
 DEFAULT_SETTINGS = {
     "r0": 1000e3,
     "v0": 2e3,
