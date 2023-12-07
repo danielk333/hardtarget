@@ -1,18 +1,7 @@
-import h5py
 import re
 from pathlib import Path
 from .commands import add_command
-
-
-################################################################
-# PARSE GMF OUT (H5)
-#
-# Parse groups and datasets recursively
-################################################################
-
-
-def is_scale(obj):
-    return obj.attrs.get("CLASS") == b"DIMENSION_SCALE"
+from hardtarget.gmf_out_utils import load_gmf_out
 
 
 def all_h5_files(gmf_folder):
@@ -25,28 +14,6 @@ def all_h5_files(gmf_folder):
     for subdir in subdirs: 
         files += [f for f in subdir.iterdir() if f.is_file and file_pattern.match(f.name)]
     return files
-
-
-def inspect_h5_node(obj, path=[]):
-    items = []
-    for child_key, child_item in obj.items():
-        child_path = path + [child_key]
-        if isinstance(child_item, h5py.Group):
-            items += inspect_h5_node(child_item, child_path)
-        else:
-            items.append(inspect_h5_leaf(child_item, child_path))
-    return items
-
-
-def inspect_h5_leaf(obj, path):
-    item = {
-        "obj": obj
-    }
-    if isinstance(obj, h5py.Dataset):
-        item["type"] = "scale" if is_scale(obj) else "dataset"
-    else:
-        item["type"] = "other"
-    return path, item
 
 
 ################################################################
@@ -63,19 +30,22 @@ def main(args):
         print("Found no files at path", args.path)
         return
 
-    file = files[0]
-    with h5py.File(file, "r") as f:
-        items = inspect_h5_node(f)
+    # print
+    def path_to_str(path):
+        return "".join([f"[{k}]" for k in path])
 
-        # print
-
-        def path_to_str(path):
-            return "".join([f"[{k}]" for k in path])
-
-        for path, item in items:
-            _path = path_to_str(path)
-            if item['type'] in ["dataset", "scale"]:
-                print(f"-- {_path} type:{item['type']} shape:{item['obj'].shape} dtype:{item['obj'].dtype}")
+    items = load_gmf_out(files[0])
+    for path, item in items:
+        _path = path_to_str(path)
+        if item["type"] == "scalar":
+            print(f"-- {_path} value:{item['value']} dtype:{item['dtype']}")
+        elif item["type"] == "string":
+            print(f"-- {_path} value:{item['value']}")
+        elif item["type"] == "dataset":
+            if item["scale"]:
+                print(f"-- {_path} (scale) shape:{item['shape']} dtype:{item['dtype']}")
+            else:
+                print(f"-- {_path} (dataset) shape:{item['shape']} dtype:{item['dtype']}")
 
 
 ################################################################

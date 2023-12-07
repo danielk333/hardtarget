@@ -74,17 +74,16 @@ def compute_job_tasks(job, n_tasks):
     return list(range(job["idx"], n_tasks, job["N"]))
 
 
-def compute_total_tasks(gmf_params, bounds):
+def compute_total_tasks(ipp, n_ipp, num_cohints_per_file, bounds):
     """
     Compute the total number of tasks, associated with sample bounds.
+
+    ipp: inter-pulse period length in samples
+    n_ipp: number of interpulse periods to coherently integrate
+    num_cohints_per_file:
+      number of coherent integration periods to include in one output file
+      smaller means that lower latency can be achieved
     """
-    # inter-pulse period length in samples
-    ipp = gmf_params["ipp"]
-    # number of interpulse periods to coherently integrate
-    n_ipp = gmf_params["n_ipp"]
-    # number of coherent integration periods to include in one output file
-    # smaller means that lower latency can be achieved
-    num_cohints_per_file = gmf_params["num_cohints_per_file"]
     n_tasks = int(np.floor((bounds[1] - bounds[0]) / (ipp * n_ipp)) / num_cohints_per_file)
     return n_tasks
 
@@ -127,18 +126,3 @@ def get_filepath(epoch_unix_us):
     time_string = dt.strftime("%Y-%m-%dT%H-00-00")
     return Path(time_string) / f"gmf-{epoch_unix_us:08d}.h5"
 
-####################################################################
-# OUTPUT H5 FILE
-####################################################################
-
-
-def create_annotated_h5var(h5file, name, data, long_name, units=None):
-    h5file[name] = data
-    var = h5file[name]
-    # TODO: this breaks vitables for some reason?
-    #   but ncdump still recognizes the axis
-    # for ind in range(len(scales)):
-    #     var.dims[ind].attach_scale(scales[ind])
-    var.attrs["long_name"] = long_name
-    if units is not None:
-        var.attrs["units"] = units

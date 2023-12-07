@@ -36,10 +36,11 @@ else:
 
 
 def gmfc(z_tx, z_rx, gmf_variables, gmf_params):
-    acc_phasors = gmf_params["acceleration_phasors"]
-    rx_window_indices = gmf_params["rx_window_indices"]
-    rgs = gmf_params["rgs"]
-    frequency_decimation = gmf_params["frequency_decimation"]
+    
+    acc_phasors = gmf_params["DER"]["acceleration_phasors"]
+    rgs = gmf_params["DER"]["rgs"]
+    frequency_decimation = gmf_params["PRO"]["frequency_decimation"]
+    rx_window_indices = gmf_params["DER"]["rx_window_indices"]
 
     # TODO: generalize the preprocess filtering of 0 tx power
     # since it can cause unnessary slowdowns depending on experiment setup

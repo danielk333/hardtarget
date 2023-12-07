@@ -74,20 +74,6 @@ FLOAT_PARAM_KEYS = [
     "doppler_sign",
 ]
 
-AXIS_PARAM_KEYS = {
-    "ranges": ("Matched filter ranges", "m"),
-    "range_rates": ("Matched filter range rates", "m/s"),
-    "accelerations": ("Matched filter range accelerations", "m/s^2"),
-}
-VECTOR_PARAM_KEYS = [
-    "rgs",
-    "fvec",
-    "acceleration_phasors",
-    "rx_stencil",
-    "tx_stencil",
-    "rx_window_indices",
-]
-
 
 ####################################################################
 # LOAD GMF PROCESSING PARAMS FROM CONFIG
@@ -97,6 +83,7 @@ def load_gmf_processing_params(configfile=None):
 
     d = {**DEFAULT_PARAMS}
 
+    assert configfile is not None, "Config file is NONE"
     cfg_pth = pathlib.Path(configfile)
     assert cfg_pth.exists(), f"Config file '{configfile}' does not exist"
     assert not cfg_pth.is_dir(), f"Config file '{configfile}' is a directory"
@@ -116,6 +103,13 @@ def load_gmf_processing_params(configfile=None):
             else:
                 # string
                 d[key] = config.get(SECTION, key).strip("'").strip('"')
+    
+    # GMF library implementation currently implicitly assumes reduction over
+    # range_rate and acceleration.
+    assert d["reduce_range"] is False, "Not supported: reduce_range: True"
+    assert d["reduce_range_rate"] is True, "Not supported: reduce_range_rate: False"
+    assert d["reduce_acceleration"] is True, "Not supported: reduce_acceleration: False"
+
     return d
 
 
@@ -132,49 +126,76 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
         calculate additional derived params
     """
 
-    params = {
-        **drf_utils.load_hardtarget_drf_params(drf_srcdir),
-        **load_gmf_processing_params(gmf_configfile)
+    print(drf_srcdir)
+
+    # drf experiment parmeters
+    params_exp = drf_utils.load_hardtarget_drf_params(drf_srcdir)
+    # gmf processing params
+    params_pro = load_gmf_processing_params(gmf_configfile)
+    # gmf derived params
+    derived_params = compute_derived_gmf_params(params_exp, params_pro) 
+
+    return {
+        "EXP": params_exp,
+        "PRO": params_pro,
+        "DER": derived_params
     }
 
-    # variable access
-    min_range_gate = params["min_range_gate"]
-    max_range_gate = params["max_range_gate"]
-    range_gate_step = params["range_gate_step"]
-    sample_rate = params["sample_rate"]
-    n_ipp = params["n_ipp"]
-    ipp = params["ipp"]
-    ipp_offset = params["ipp_offset"]
-    frequency_decimation = params["frequency_decimation"]
-    radar_frequency = params["radar_frequency"]
-    doppler_sign = params["doppler_sign"]
-    max_acceleration = params["max_acceleration"]
-    min_acceleration = params["min_acceleration"]
-    acceleration_resolution = params["acceleration_resolution"]
-    clutter_length = params["clutter_length"]
+
+####################################################################
+# COMPUTE DERIVED GMF PARAMS
+####################################################################
+
+def compute_derived_gmf_params(params_exp, params_pro):
+
+    # experiment params
+    sample_rate = params_exp["sample_rate"]
+    ipp = params_exp["ipp"]
+    radar_frequency = params_exp["radar_frequency"]
+    doppler_sign = params_exp["doppler_sign"]
+    rx_start = params_exp["rx_start"]
+    rx_end = params_exp["rx_end"]
+    tx_start = params_exp["tx_start"]
+    tx_end = params_exp["tx_end"]
+
+    # gmf processing params
+    min_range_gate = params_pro["min_range_gate"]
+    max_range_gate = params_pro["max_range_gate"]
+    range_gate_step = params_pro["range_gate_step"]
+    n_ipp = params_pro["n_ipp"]
+    ipp_offset = params_pro["ipp_offset"]
+    frequency_decimation = params_pro["frequency_decimation"]
+    max_acceleration = params_pro["max_acceleration"]
+    min_acceleration = params_pro["min_acceleration"]
+    acceleration_resolution = params_pro["acceleration_resolution"]
+    clutter_length = params_pro["clutter_length"]
+
+    # compute derived params
+    p = {}
 
     ipp_samp = np.round(ipp * 1e-6 * sample_rate).astype(np.int64)
-    params["ipp_samp"] = ipp_samp
+    p["ipp_samp"] = ipp_samp
 
     # Use np.round and case to int to avoid floating point errors in floor
-    T_rx_start_samp = np.round(params["rx_start"] * 1e-6 * sample_rate).astype(np.int64)
-    T_rx_end_samp = np.round(params["rx_end"] * 1e-6 * sample_rate).astype(np.int64)
-    T_tx_start_samp = np.round(params["tx_start"] * 1e-6 * sample_rate).astype(np.int64)
-    T_tx_end_samp = np.round(params["tx_end"] * 1e-6 * sample_rate).astype(np.int64)
-    if "tx_pulse_length" in params:
-        tx_pulse_samps = np.round(params["tx_pulse_length"] * 1e-6 * sample_rate).astype(np.int64)
+    T_rx_start_samp = np.round(rx_start * 1e-6 * sample_rate).astype(np.int64)
+    T_rx_end_samp = np.round(rx_end * 1e-6 * sample_rate).astype(np.int64)
+    T_tx_start_samp = np.round(tx_start * 1e-6 * sample_rate).astype(np.int64)
+    T_tx_end_samp = np.round(tx_end * 1e-6 * sample_rate).astype(np.int64)
+    tx_pulse_length = params_exp.get("tx_pulse_length", None)
+    if tx_pulse_length is not None:
+        tx_pulse_samps = np.round(tx_pulse_length * 1e-6 * sample_rate).astype(np.int64)
         _assert_msg = "TX pulse lengths does not correspond to tx start and stop values"
         assert tx_pulse_samps == T_tx_end_samp - T_tx_start_samp, _assert_msg
     else:
         tx_pulse_samps = T_tx_end_samp - T_tx_start_samp
-    params["tx_pulse_samps"] = tx_pulse_samps
+    p["tx_pulse_samps"] = tx_pulse_samps
 
     # Relevant rx samples
     stencil_start_samp = T_rx_start_samp if T_rx_start_samp > T_tx_end_samp else T_tx_end_samp
     stencil_start_samp += clutter_length
 
-    params["n_rx_samples"] = T_rx_end_samp - stencil_start_samp
-    params["stencil_start_samp"] = stencil_start_samp
+    p["n_rx_samples"] = T_rx_end_samp - stencil_start_samp
+    p["stencil_start_samp"] = stencil_start_samp
 
     # TODO: this current does not handle partial codes, add this functionality
     rgs_min = T_tx_start_samp
@@ -190,42 +211,42 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
 
     # make relative the stencil start
     rgs -= stencil_start_samp
-    params["rgs"] = rgs
-    params["ranges"] = ranges
-    params["n_ranges"] = len(ranges)
+    p["rgs"] = rgs
+    p["ranges"] = ranges
+    p["n_ranges"] = len(ranges)
 
     # how many extra ipps do we need to read for coherent integration
-    params["n_extra"] = ipp_offset
+    p["n_extra"] = ipp_offset
 
     # length of coherent integration
-    params["n_fft"] = n_ipp * tx_pulse_samps
-    params["decimated_n_fft"] = int(params["n_fft"] / frequency_decimation)
+    p["n_fft"] = n_ipp * tx_pulse_samps
+    p["decimated_n_fft"] = int(p["n_fft"] / frequency_decimation)
 
     # frequency vector
-    params["fvec"] = fvec = np.fft.fftfreq(
-        params["decimated_n_fft"],
+    p["fvec"] = fvec = np.fft.fftfreq(
+        p["decimated_n_fft"],
         d=frequency_decimation / sample_rate,
     )
 
     # range-rate is doppler-shift in hertz multiplied with wavelength
     wavelength = scipy.constants.c / (radar_frequency * 1e6)
-    params["wavelength"] = wavelength
+    p["wavelength"] = wavelength
 
     range_rates = doppler_sign * wavelength * fvec
-    params["range_rates"] = range_rates  # m/s
-    params["n_range_rates"] = len(range_rates)
+    p["range_rates"] = range_rates  # m/s
+    p["n_range_rates"] = len(range_rates)
 
     # cyclic range gate selector
     # TODO: this can be generalized for a-periodic codes ect
-    base_rx_window = np.arange(params["tx_pulse_samps"], dtype=np.int32)
+    base_rx_window = np.arange(p["tx_pulse_samps"], dtype=np.int32)
     rx_window_blocks = [
-        base_rx_window + ind * params["n_rx_samples"]
-        for ind in range(params["n_ipp"])
+        base_rx_window + ind * p["n_rx_samples"]
+        for ind in range(n_ipp)
     ]
     rx_window_indices = np.concatenate(rx_window_blocks)
     # TODO: This is part of future generalization to partial codes too
-    # params["rx_window_blocks"] = rx_window_blocks
-    params["rx_window_indices"] = rx_window_indices
+    # p["rx_window_blocks"] = rx_window_blocks
+    p["rx_window_indices"] = rx_window_indices
 
     # We are modelling the target at the time of the first tx-pulse scattered
     # of the target, the first sample of the coherent integration
@@ -244,56 +265,56 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     max_time2 = np.max(times2)
     acc_interval = max_acceleration - min_acceleration
     max_phase_change = 2.0 * np.pi * (0.5 * acc_interval / wavelength) * max_time2
-    params["n_accelerations"] = int(np.ceil(max_phase_change/acceleration_resolution))
-    if params["n_accelerations"] == 0:
-        params["n_accelerations"] = 1
+    p["n_accelerations"] = int(np.ceil(max_phase_change/acceleration_resolution))
+    if p["n_accelerations"] == 0:
+        p["n_accelerations"] = 1
 
-    params["accelerations"] = np.linspace(
-        min_acceleration, max_acceleration, num=params["n_accelerations"]
+    p["accelerations"] = np.linspace(
+        min_acceleration, max_acceleration, num=p["n_accelerations"]
     )  # m/s^2
 
-    params["acceleration_phasors"] = np.zeros(
-        [params["n_accelerations"], params["decimated_n_fft"]],
+    p["acceleration_phasors"] = np.zeros(
+        [p["n_accelerations"], p["decimated_n_fft"]],
         dtype=np.complex64,
     )
 
     # precalculate phasors corresponding to different accelerations
-    for ai, a in enumerate(params["accelerations"]):
-        params["acceleration_phasors"][ai, :] = np.exp(
-            -1j * 2.0 * np.pi * (doppler_sign * 0.5 * params["accelerations"][ai] / wavelength) * times2
+    for ai, a in enumerate(p["accelerations"]):
+        p["acceleration_phasors"][ai, :] = np.exp(
+            -1j * 2.0 * np.pi * (doppler_sign * 0.5 * p["accelerations"][ai] / wavelength) * times2
         )
 
     # Read length to include all pulses to be searched
-    params["read_length"] = (n_ipp + ipp_offset) * ipp_samp
+    p["read_length"] = (n_ipp + ipp_offset) * ipp_samp
 
     # this stencil is used to block tx pulses and ground clutter
-    params["rx_stencil"] = np.full((params["read_length"],), False, dtype=bool)
+    p["rx_stencil"] = np.full((p["read_length"],), False, dtype=bool)
     # this stencil is used to select tx pulses
-    params["tx_stencil"] = np.full((params["read_length"],), False, dtype=bool)
+    p["tx_stencil"] = np.full((p["read_length"],), False, dtype=bool)
 
     # for each coherently integrated IPP, create stencils
     for k in range(n_ipp):
         rx0 = ((k + ipp_offset) * ipp_samp + stencil_start_samp)
         rx1 = ((k + ipp_offset) * ipp_samp + T_rx_end_samp)
-        params["rx_stencil"][rx0:rx1] = True
+        p["rx_stencil"][rx0:rx1] = True
 
         tx0 = (k * ipp_samp + T_tx_start_samp)
         tx1 = (k * ipp_samp + T_tx_end_samp)
-        params["tx_stencil"][tx0:tx1] = True
+        p["tx_stencil"][tx0:tx1] = True
 
     reduce_axis = [
-        params["reduce_range"],
-        params["reduce_range_rate"],
-        params["reduce_acceleration"],
+        params_pro["reduce_range"],
+        params_pro["reduce_range_rate"],
+        params_pro["reduce_acceleration"],
     ]
     gmf_size = [
-        params["n_ranges"],
-        params["n_range_rates"],
-        params["n_accelerations"],
+        p["n_ranges"],
+        p["n_range_rates"],
+        p["n_accelerations"],
     ]
     gmf_size = [s for red, s in zip(reduce_axis, gmf_size) if not red]
 
-    params["gmf_size"] = gmf_size
-    params["reduce_axis"] = reduce_axis
+    p["gmf_size"] = gmf_size
+    p["reduce_axis"] = reduce_axis
 
-    return params
+    return p

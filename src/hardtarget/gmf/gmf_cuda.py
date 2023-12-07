@@ -46,10 +46,10 @@ def print_cuda_devices():
 
 
 def gmfcu(z_tx, z_rx, gmf_variables, gmf_params, gpu_id=0):
-    acc_phasors = gmf_params["acceleration_phasors"]
-    rgs = gmf_params["rgs"]
-    frequency_decimation = gmf_params["frequency_decimation"]
-    rx_window_indices = gmf_params["rx_window_indices"]
+    acc_phasors = gmf_params["DER"]["acceleration_phasors"]
+    rgs = gmf_params["DER"]["rgs"]
+    frequency_decimation = gmf_params["PRO"]["frequency_decimation"]
+    rx_window_indices = gmf_params["DER"]["rx_window_indices"]
 
     error_code = gmfcudalib.gmf(
         z_tx.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
