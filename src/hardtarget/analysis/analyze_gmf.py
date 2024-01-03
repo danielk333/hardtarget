@@ -202,23 +202,24 @@ def compute_gmf(
 
             # DUMP TO FILE
 
-            MOCK_DIM_1 = 135
-            MOCK_DIM_2 = 9600
-            SAMPLE_SIZE = 100000
-            RANGES_SIZE = 500
-            RANGE_RATE_SIZE = 600
+            # SAMPLE_SIZE = 100000 
+            # RANGES_SIZE = 500
+            # RANGE_RATE_SIZE = 600
             ACCELERATIONS_SIZE = 500
+            range_accelerations = np.linspace(0, 1, ACCELERATIONS_SIZE)
+
+            sample_numbers = np.arange(gmf_params["DER"]["read_length"])
 
             gmf_out_args = GMFOutArgs(
-                num_cohints_per_file=gmf_params["PRO"]["num_cohints_per_file"],
-                ranges=RANGES_SIZE,
-                range_rates=RANGE_RATE_SIZE,
-                accelerations=ACCELERATIONS_SIZE,
-                sample_numbers=SAMPLE_SIZE,
-                mock_dim_1=MOCK_DIM_1,
-                mock_dim_2=MOCK_DIM_2,
+                num_cohints_per_file=num_cohints_per_file,
+                ranges=gmf_params["DER"]["ranges"],
+                range_rates=gmf_params["DER"]["range_rates"],
+                accelerations=range_accelerations,
+                sample_numbers=sample_numbers,
+                acceleration_cells=gmf_params["DER"]["accelerations"],
                 vals=gmf_vals,
                 dc=gmf_dc,
+                # r_ind=gmf_r_ind,
                 v_ind=gmf_v_ind,
                 a_ind=gmf_a_ind,
                 txp=gmf_txp,
