@@ -120,9 +120,8 @@ GMFOutArgs = namedtuple(
         "num_cohints_per_file",
         "ranges",
         "range_rates",
-        "accelerations",
+        "accelerations",    # [min_acc, ..., max_acc] length - n_accelarations
         "sample_numbers",
-        "acceleration_cells",  # [min_acc, ..., max_acc] n_accelarations 
         "vals",
         "dc",
         # r_ind,
@@ -182,11 +181,6 @@ def define_variables(gmf_out_args):
             "data": gmf_out_args.accelerations,
             "long_name": "Matched filter range accelerations",
             "units": "m/s^2",
-            "scale": True
-        },
-        "acceleration_cells": {
-            "data": gmf_out_args.acceleration_cells,
-            "long_name": "Acceleration cells",
             "scale": True
         },
         "sample_numbers": {
@@ -273,7 +267,7 @@ def define_variables(gmf_out_args):
         },
         "acceleration_phasors": {
             "data": gmf_out_args.acceleration_phasors,
-            "dims": [("acceleration_cells", "c"), ("range_rates", "v")],
+            "dims": [("accelerations", "a"), ("range_rates", "v")],
             "long_name": "Missing",
             "group": "vector_params",
             "unit": "rad"

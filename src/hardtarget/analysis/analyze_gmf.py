@@ -199,24 +199,15 @@ def compute_gmf(
         g_vec = gmf_vals[coh_ints, r_inds]
 
         if output is not None:
-
             # DUMP TO FILE
-
-            # SAMPLE_SIZE = 100000 
-            # RANGES_SIZE = 500
-            # RANGE_RATE_SIZE = 600
-            ACCELERATIONS_SIZE = 500
-            range_accelerations = np.linspace(0, 1, ACCELERATIONS_SIZE)
-
             sample_numbers = np.arange(gmf_params["DER"]["read_length"])
 
             gmf_out_args = GMFOutArgs(
                 num_cohints_per_file=num_cohints_per_file,
                 ranges=gmf_params["DER"]["ranges"],
                 range_rates=gmf_params["DER"]["range_rates"],
-                accelerations=range_accelerations,
+                accelerations=gmf_params["DER"]["accelerations"],
                 sample_numbers=sample_numbers,
-                acceleration_cells=gmf_params["DER"]["accelerations"],
                 vals=gmf_vals,
                 dc=gmf_dc,
                 # r_ind=gmf_r_ind,
