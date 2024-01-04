@@ -103,7 +103,7 @@ def dump_gmf_out(gmf_out_args, gmf_params, outfile):
         pro_grp[key] = val
 
     # EPOCH
-    out["epoch_unix"] = 1
+    out["epoch_unix"] = gmf_out_args.epoch
 
     out.close()
 

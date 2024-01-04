@@ -125,9 +125,6 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
         - signal processing config (gmf_config)
         calculate additional derived params
     """
-
-    print(drf_srcdir)
-
     # drf experiment parmeters
     params_exp = drf_utils.load_hardtarget_drf_params(drf_srcdir)
     # gmf processing params

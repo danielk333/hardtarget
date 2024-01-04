@@ -11,12 +11,20 @@ def collect_data(paths):
     t_vec_pos = 0
     for path in paths:
         with h5py.File(path, "r") as hf:
-            gmf = hf["gmf"][()]
 
-            r_vec = hf["range_peak"][()]
-            v_vec = hf["range_rate_peak"][()]
-            a_vec = hf["acceleration_peak"][()]
-            g_vec = hf["gmf_peak"][()]
+            new = True
+            if new:
+                gmf = hf["gmf"]["gmf"][()]
+                r_vec = hf["gmf"]["range_peak"][()]
+                v_vec = hf["gmf"]["range_rate_peak"][()]
+                a_vec = hf["gmf"]["acceleration_peak"][()]
+                g_vec = hf["gmf"]["gmf_peak"][()]
+            else:
+                gmf = hf["gmf"][()]
+                r_vec = hf["range_peak"][()]
+                v_vec = hf["range_rate_peak"][()]
+                a_vec = hf["acceleration_peak"][()]
+                g_vec = hf["gmf_peak"][()]
 
             ranges = hf["ranges"][()]
 
@@ -78,6 +86,7 @@ def collect_paths(
         int(file.stem.split("-")[1])*1e-6
         for file in fl
     ]
+
     epoch_unix = fl_epochs[0]
     max_unix = fl_epochs[-1]
 
@@ -104,6 +113,10 @@ def collect_paths(
         file for file, ep in zip(fl, fl_epochs)
         if ep >= unix_t0 and ep <= unix_t1
     ]
+
+    # TODO - provide useful feedback if only one file exists
+    # and start_time, end_time is given, but not a perfect match with the file
+
     return fl
 
 
