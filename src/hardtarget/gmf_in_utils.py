@@ -204,6 +204,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     # range gates are relative to tx start
     rgs = np.arange(min_range_gate, max_range_gate, range_gate_step, dtype=np.int32)
     # total propagation range
+    # TODO - assumes config round_trip_range is True
     ranges = (rgs - T_tx_start_samp) * scipy.constants.c / sample_rate  # m
 
     # make relative the stencil start
