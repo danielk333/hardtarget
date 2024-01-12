@@ -20,8 +20,11 @@ bounds = analysis_utils.compute_bounds(
     relative_time=False,
 )
 range_sample = 410
-acc_ind = 40
+acc_ind = 76
 
+print("Range: ", params["DER"]["ranges"][range_sample]*1e-3, " km")
+print("Acceleration: ", params["DER"]["accelerations"][acc_ind]*1e-3, " km/s^2")
+# breakpoint()
 phasors = params["DER"]["acceleration_phasors"][acc_ind]
 rg = params["DER"]["rgs"][range_sample]
 
@@ -58,14 +61,16 @@ axes = [
 
 axes[0].semilogy(t[not_used_sig], np.abs(z_rx[not_used_sig]), ".k")
 axes[0].semilogy(
-    t[params["DER"]["rx_stencil"]][rx_window], np.abs(z_rx[params["DER"]["rx_stencil"]][rx_window]), ".g"
+    t[params["DER"]["rx_stencil"]][rx_window],
+    np.abs(z_rx[params["DER"]["rx_stencil"]][rx_window]),
+    ".g"
 )
 axes[0].semilogy(
     t[params["DER"]["rx_stencil"]][not_rx_window],
     np.abs(z_rx[params["DER"]["rx_stencil"]][not_rx_window]),
     ".b",
 )
-axes[0].semilogy(t[params["DER"]["tx_stencil"]], np.abs(z_rx[params["DER"]["tx_stencil"]])**2, ".r")
+axes[0].semilogy(t[params["DER"]["tx_stencil"]], np.abs(z_rx[params["DER"]["tx_stencil"]]), ".r")
 axes[0].set_title("Raw signal power")
 
 axes[1][0].plot(comp_samps, np.real(sel_rxs) / np.sum(np.real(sel_rxs)), "-g", label="RX")
