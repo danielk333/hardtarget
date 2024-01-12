@@ -88,11 +88,11 @@ def compute_gmf(
     sample_rate = params_exp["sample_rate"]
     n_ipp = params_pro["n_ipp"]
     num_cohints_per_file = params_pro["num_cohints_per_file"]
-    ipp_samp = params_der["ipp_samp"]
+    ipp_samp = params_exp["ipp_samp"]
 
     # tasks
-    total_tasks = a_utils.compute_total_tasks(ipp, n_ipp, 
-                                              num_cohints_per_file, 
+    total_tasks = a_utils.compute_total_tasks(ipp, n_ipp,
+                                              num_cohints_per_file,
                                               bounds)
     job_tasks = a_utils.compute_job_tasks(job, total_tasks)
     tasks_skipped = 0
@@ -199,26 +199,18 @@ def compute_gmf(
         g_vec = gmf_vals[coh_ints, r_inds]
 
         if output is not None:
-
             # DUMP TO FILE
-
-            MOCK_DIM_1 = 135
-            MOCK_DIM_2 = 9600
-            SAMPLE_SIZE = 100000
-            RANGES_SIZE = 500
-            RANGE_RATE_SIZE = 600
-            ACCELERATIONS_SIZE = 500
+            sample_numbers = np.arange(gmf_params["PRO"]["read_length"])
 
             gmf_out_args = GMFOutArgs(
-                num_cohints_per_file=gmf_params["PRO"]["num_cohints_per_file"],
-                ranges=RANGES_SIZE,
-                range_rates=RANGE_RATE_SIZE,
-                accelerations=ACCELERATIONS_SIZE,
-                sample_numbers=SAMPLE_SIZE,
-                mock_dim_1=MOCK_DIM_1,
-                mock_dim_2=MOCK_DIM_2,
+                num_cohints_per_file=num_cohints_per_file,
+                ranges=gmf_params["DER"]["ranges"],
+                range_rates=gmf_params["DER"]["range_rates"],
+                accelerations=gmf_params["DER"]["accelerations"],
+                sample_numbers=sample_numbers,
                 vals=gmf_vals,
                 dc=gmf_dc,
+                # r_ind=gmf_r_ind,
                 v_ind=gmf_v_ind,
                 a_ind=gmf_a_ind,
                 txp=gmf_txp,

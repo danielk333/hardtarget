@@ -103,7 +103,7 @@ def dump_gmf_out(gmf_out_args, gmf_params, outfile):
         pro_grp[key] = val
 
     # EPOCH
-    out["epoch_unix"] = 1
+    out["epoch_unix"] = gmf_out_args.epoch
 
     out.close()
 
@@ -120,10 +120,8 @@ GMFOutArgs = namedtuple(
         "num_cohints_per_file",
         "ranges",
         "range_rates",
-        "accelerations",
+        "accelerations",    # [min_acc, ..., max_acc] length - n_accelarations
         "sample_numbers",
-        "mock_dim_1",
-        "mock_dim_2",
         "vals",
         "dc",
         # r_ind,
@@ -157,66 +155,55 @@ GMFOutArgs = namedtuple(
 # }
 
 def define_variables(gmf_out_args):
-    
-    integration_ind = np.arange(gmf_out_args.num_cohints_per_file, 
-                                dtype=np.int64)
-    mock_dim_1 = np.arange(gmf_out_args.mock_dim_1)
-    mock_dim_2 = np.arange(gmf_out_args.mock_dim_2)
-    sample_numbers = np.arange(gmf_out_args.sample_numbers)
-    ranges = np.linspace(0, 1, gmf_out_args.ranges)
-    range_rates = np.linspace(0, 1, gmf_out_args.range_rates)
-    accelerations = np.linspace(0, 1, gmf_out_args.accelerations)
+
+    integration_index = np.arange(gmf_out_args.num_cohints_per_file, dtype=np.int64)
+    rx_window_index = np.arange(len(gmf_out_args.rx_window_indices))
 
     return {
         "integration_index": {
-            "data": integration_ind,
+            "data": integration_index,
             "long_name": "Integration index within this file relative the epoch",
             "scale": True
         },
         "ranges": {
-            "data": ranges,
+            "data": gmf_out_args.ranges,
             "long_name": "Matched filter ranges",
             "units": "m",
             "scale": True
         },
         "range_rates": {
-            "data": range_rates,
+            "data": gmf_out_args.range_rates,
             "long_name": "Matched filter range rates",
             "units": "m/s",
             "scale": True
         },
         "accelerations": {
-            "data": accelerations,
+            "data": gmf_out_args.accelerations,
             "long_name": "Matched filter range accelerations",
             "units": "m/s^2",
             "scale": True
         },
         "sample_numbers": {
-            "data": sample_numbers,
+            "data": gmf_out_args.sample_numbers,
             "long_name": "Sample numbers.",
             "scale": True
         },
-        "mock_dim_1": {
-            "data": mock_dim_1,
-            "long_name": "Mock Dimension 1",
-            "scale": True
-        },
-        "mock_dim_2": {
-            "data": mock_dim_2,
-            "long_name": "Mock Dimension 2",
+        "rx_window_index": {
+            "data": rx_window_index,
+            "long_name": "RX window index index",
             "scale": True
         },
         "gmf": {
             "data": gmf_out_args.vals,
             "dims": [("integration_index", "t"), ("ranges", "r")],
             "long_name": "Generalized Matched Filter output values",
-            "group": "gmf"
+            #"group": "gmf"
         },
         "gmf_zero_frequency": {
             "data": gmf_out_args.dc,
             "dims": [("integration_index", "t"), ("ranges", "r")],
             "long_name": "Range dependant noise floor (0-frequency gmf output)",
-            "group": "gmf"
+            #"group": "gmf"
         },
         "range_rate_index": {
             "data": gmf_out_args.v_ind,
@@ -224,7 +211,7 @@ def define_variables(gmf_out_args):
             "long_name": (
                 "If range_rate is reduced, contains the best range rate index "
                 "for each left over axis"),
-            "group": "gmf"
+            #"group": "gmf"
         },
         "acceleration_index": {
             "data": gmf_out_args.a_ind,
@@ -232,38 +219,38 @@ def define_variables(gmf_out_args):
             "long_name": (
                 "If acceleration is reduced, contains the best acceleration "
                 "index for each left over axis"),
-            "group": "gmf"
+            #"group": "gmf"
         },
         "tx_power": {
             "data": gmf_out_args.txp,
             "dims": [("integration_index", "t")],
             "long_name": "Measured transmitted power",
             "units": "W",
-            "group": "gmf"
+            #"group": "gmf"
         },
         "range_peak": {
             "data": gmf_out_args.r_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Range at peak GMF",
-            "group": "gmf"
+            #"group": "gmf"
         },
         "range_rate_peak": {
             "data": gmf_out_args.v_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Range rate at peak GMF",
-            "group": "gmf"
+            #"group": "gmf"
         },
         "acceleration_peak": {
             "data": gmf_out_args.a_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Acceleration at peak GMF",
-            "group": "gmf"
+            #"group": "gmf"
         },
         "gmf_peak": {
             "data": gmf_out_args.g_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Peak GMF",
-            "group": "gmf"
+            #"group": "gmf"
         },
         "rgs": {
             "data": gmf_out_args.rgs,
@@ -276,13 +263,14 @@ def define_variables(gmf_out_args):
             "dims": [("range_rates", "v")],
             "long_name": "Missing",
             "group": "vector_params",
-            "units": "Hz"
+            "units": "Hz"  # TODO - correct?
         },
         "acceleration_phasors": {
             "data": gmf_out_args.acceleration_phasors,
-            "dims": [("mock_dim_1", "md1"), ("range_rates", "v")],
+            "dims": [("accelerations", "a"), ("range_rates", "v")],
             "long_name": "Missing",
-            "group": "vector_params"
+            "group": "vector_params",
+            "unit": "rad"
         },
         "rx_stencil": {
             "data": gmf_out_args.rx_stencil,
@@ -298,7 +286,7 @@ def define_variables(gmf_out_args):
         },
         "rx_window_indices": {
             "data": gmf_out_args.rx_window_indices,
-            "dims": [("mock_dim_2", "md2")],
+            "dims": [("rx_window_index", "rx_idx")],
             "long_name": "Missing",
             "group": "vector_params"
         }
