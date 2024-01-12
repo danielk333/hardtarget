@@ -107,6 +107,16 @@ def simulate_drf(
         if sim_params["noise_sigma"] > 0:
             signal[T_rx_select] += noise_generator(sim_params["noise_sigma"], (T_rx_samps,))
 
+        tx_wave = waveform_generator(
+            t_tx,
+            np.ones_like(t_tx),
+            experiment_params["baud_length"],
+            experiment_params["frequency"],
+            experiment_params["code"][pid % codes],
+        )
+        # TODO: this assumes rx streches over tx, generalize
+        signal[T_tx_start_samp:T_tx_end_samp] += tx_wave
+
         if samp0 <= samp_sig_t0 or samp0 >= samp_sig_t1:
             ipp_samples = to_i2x16(signal)
             rf_writer.rf_write(ipp_samples)
@@ -115,6 +125,7 @@ def simulate_drf(
         t0 = (samp0 - samp_epoch) / sample_rate
         r0 = interp_data["ranges"](t0)
         rg0 = np.round((r0 / scipy.constants.c) * sample_rate).astype(np.int64)
+
         if rg0 < (T_rx_start_samp - T_tx_start_samp) or rg0 > (T_rx_end_samp - T_tx_start_samp):
             ipp_samples = to_i2x16(signal)
             rf_writer.rf_write(ipp_samples)
@@ -135,16 +146,8 @@ def simulate_drf(
             experiment_params["frequency"],
             experiment_params["code"][pid % codes],
         )
-        tx_wave = waveform_generator(
-            t_tx,
-            np.ones_like(t_tx),
-            experiment_params["baud_length"],
-            experiment_params["frequency"],
-            experiment_params["code"][pid % codes],
-        )
-        # TODO: this assumes rx streches over tx, generalize
+
         signal[(rg0 + T_tx_start_samp):(rg0 + T_tx_start_samp + T_tx_samps)] += rx_wave*sn
-        signal[T_tx_start_samp:T_tx_end_samp] += tx_wave
 
         ipp_samples = to_i2x16(signal)
         rf_writer.rf_write(ipp_samples)
