@@ -1,5 +1,7 @@
 import pathlib
 import importlib.resources
+import configparser
+import numpy as np
 
 EXP_FILES = {}
 
@@ -25,3 +27,30 @@ else:
                 continue
 
             EXP_FILES[file.name] = pathlib.Path(str(file))
+
+
+def load_radar_code(xpname):
+    code_name = xpname + "_code.txt"
+    assert code_name in EXP_FILES, "radar code not found in pre-defined configurations"
+    code_file = EXP_FILES[code_name]
+    try:
+        with open(code_file, "r") as fh:
+            code = []
+            for line in fh:
+                code.append([1 if ch == '+' else -1 for ch in line.strip()])
+        code = np.array(code)
+        return code
+    except Exception as e:
+        raise ValueError(f"Couldn't open code file for {xpname}:" + str(e))
+
+
+def load_expconfig(xpname):
+    cfg_name = xpname + ".ini"
+    assert cfg_name in EXP_FILES, "experiment not found in pre-defined configurations"
+    cfg_file = EXP_FILES[cfg_name]
+    try:
+        cfg = configparser.ConfigParser()
+        cfg.read_file(open(cfg_file, "r"))
+        return cfg
+    except Exception as e:
+        raise ValueError(f"Couldn't open config file for {xpname}:" + str(e))

@@ -9,7 +9,7 @@ import bz2
 import logging
 import configparser
 from pathlib import Path
-from hardtarget.experiments import EXP_FILES
+from hardtarget.experiments import load_expconfig
 
 """
 Convert Eiscat raw data to DRF format
@@ -120,18 +120,6 @@ def expinfo_split(xpinf):
         return match.groups()
     except Exception as e:
         raise ValueError(f"d_ExpInfo: {xpinf} not understood: {e}")
-
-
-def load_expconfig(xpname):
-    cfg_name = xpname + ".ini"
-    assert cfg_name in EXP_FILES, "experiment not found in pre-defined configurations"
-    cfg_file = EXP_FILES[cfg_name]
-    try:
-        cfg = configparser.ConfigParser()
-        cfg.read_file(open(cfg_file, "r"))
-        return cfg
-    except Exception as e:
-        raise ValueError(f"Couldn't open config file for {xpname}:" + str(e))
 
 
 ####################################################################
