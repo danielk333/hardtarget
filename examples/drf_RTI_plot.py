@@ -10,11 +10,11 @@ ax, handles = hardtarget.plotting.rti(
     ax,
     reader,
     params,
-    start_time=2.0,  # s
-    end_time=8.0,  # s
-    relative_time=True,
+    start_time="2021-04-12T12:15:53",
+    end_time="2021-04-12T12:16:03",
     axis_units=True,
     clutter_removal=2500.0e-6,  # s
+    log=True,
 )
 
 plt.show()

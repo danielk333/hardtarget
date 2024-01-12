@@ -25,11 +25,13 @@ GMFVariables = namedtuple(
 
 ####################################################################
 # GET GMF PROCESSING PARAMS
+# 
+# NOTE: all keys have to be lower-case here due to configparser
 ####################################################################
 
 DEFAULT_PARAMS = {
     "gmflib": "c",
-    "node_GPUs": 1,
+    "node_gpus": 1,
     "n_ipp": 5,
     "ipp_offset": 0,
     "min_range_gate": 0,
@@ -49,7 +51,7 @@ DEFAULT_PARAMS = {
 }
 
 INT_PARAM_KEYS = [
-    "node_GPUs",
+    "node_gpus",
     "n_ipp",
     "ipp_offset",
     "min_range_gate",
@@ -103,7 +105,7 @@ def load_gmf_processing_params(configfile=None):
             else:
                 # string
                 d[key] = config.get(SECTION, key).strip("'").strip('"')
-    
+
     # GMF library implementation currently implicitly assumes reduction over
     # range_rate and acceleration.
     assert d["reduce_range"] is False, "Not supported: reduce_range: True"
@@ -119,26 +121,35 @@ def load_gmf_processing_params(configfile=None):
 
 
 def load_gmf_params(drf_srcdir, gmf_configfile):
-    """
-        initalise params from
-        - experiment (hardtarget_drf)
-        - signal processing config (gmf_config)
-        calculate additional derived params
-    """
+    """Loads and calculates parameters needed to run analysis.
 
-    print(drf_srcdir)
+    First load params from
+     - experiment (hardtarget_drf)
+     - signal processing config (gmf_config)
+    Then calculate additional derived parameters that are implementation specific
+    and cumbersome, such as signal stencils and acceleration phasors.
+
+    Output format is structured as:
+        {
+            "EXP": experiment parameters,
+            "PRO": signal processing parameters,
+            "DER": derived parameters for internal use,
+        }
+
+    All parameters are assumed to be constant after initialization.
+    """
 
     # drf experiment parmeters
     params_exp = drf_utils.load_hardtarget_drf_params(drf_srcdir)
     # gmf processing params
     params_pro = load_gmf_processing_params(gmf_configfile)
     # gmf derived params
-    derived_params = compute_derived_gmf_params(params_exp, params_pro) 
+    params_exp, params_pro, params_der = compute_derived_gmf_params(params_exp, params_pro)
 
     return {
         "EXP": params_exp,
         "PRO": params_pro,
-        "DER": derived_params
+        "DER": params_der
     }
 
 
@@ -174,7 +185,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     p = {}
 
     ipp_samp = np.round(ipp * 1e-6 * sample_rate).astype(np.int64)
-    p["ipp_samp"] = ipp_samp
+    params_exp["ipp_samp"] = ipp_samp
 
     # Use np.round and case to int to avoid floating point errors in floor
     T_rx_start_samp = np.round(rx_start * 1e-6 * sample_rate).astype(np.int64)
@@ -188,7 +199,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
         assert tx_pulse_samps == T_tx_end_samp - T_tx_start_samp, _assert_msg
     else:
         tx_pulse_samps = T_tx_end_samp - T_tx_start_samp
-    p["tx_pulse_samps"] = tx_pulse_samps
+    params_exp["tx_pulse_samps"] = tx_pulse_samps
 
     # Relevant rx samples
     stencil_start_samp = T_rx_start_samp if T_rx_start_samp > T_tx_end_samp else T_tx_end_samp
@@ -213,32 +224,32 @@ def compute_derived_gmf_params(params_exp, params_pro):
     rgs -= stencil_start_samp
     p["rgs"] = rgs
     p["ranges"] = ranges
-    p["n_ranges"] = len(ranges)
+    params_pro["n_ranges"] = len(ranges)
 
     # how many extra ipps do we need to read for coherent integration
-    p["n_extra"] = ipp_offset
+    params_pro["n_extra"] = ipp_offset
 
     # length of coherent integration
-    p["n_fft"] = n_ipp * tx_pulse_samps
-    p["decimated_n_fft"] = int(p["n_fft"] / frequency_decimation)
+    params_pro["n_fft"] = n_ipp * tx_pulse_samps
+    params_pro["decimated_n_fft"] = int(params_pro["n_fft"] / frequency_decimation)
 
     # frequency vector
     p["fvec"] = fvec = np.fft.fftfreq(
-        p["decimated_n_fft"],
+        params_pro["decimated_n_fft"],
         d=frequency_decimation / sample_rate,
     )
 
     # range-rate is doppler-shift in hertz multiplied with wavelength
     wavelength = scipy.constants.c / (radar_frequency * 1e6)
-    p["wavelength"] = wavelength
+    params_exp["wavelength"] = wavelength
 
     range_rates = doppler_sign * wavelength * fvec
     p["range_rates"] = range_rates  # m/s
-    p["n_range_rates"] = len(range_rates)
+    params_pro["n_range_rates"] = len(range_rates)
 
     # cyclic range gate selector
     # TODO: this can be generalized for a-periodic codes ect
-    base_rx_window = np.arange(p["tx_pulse_samps"], dtype=np.int32)
+    base_rx_window = np.arange(params_exp["tx_pulse_samps"], dtype=np.int32)
     rx_window_blocks = [
         base_rx_window + ind * p["n_rx_samples"]
         for ind in range(n_ipp)
@@ -265,16 +276,16 @@ def compute_derived_gmf_params(params_exp, params_pro):
     max_time2 = np.max(times2)
     acc_interval = max_acceleration - min_acceleration
     max_phase_change = 2.0 * np.pi * (0.5 * acc_interval / wavelength) * max_time2
-    p["n_accelerations"] = int(np.ceil(max_phase_change/acceleration_resolution))
-    if p["n_accelerations"] == 0:
-        p["n_accelerations"] = 1
+    params_pro["n_accelerations"] = int(np.ceil(max_phase_change/acceleration_resolution))
+    if params_pro["n_accelerations"] == 0:
+        params_pro["n_accelerations"] = 1
 
     p["accelerations"] = np.linspace(
-        min_acceleration, max_acceleration, num=p["n_accelerations"]
+        min_acceleration, max_acceleration, num=params_pro["n_accelerations"]
     )  # m/s^2
 
     p["acceleration_phasors"] = np.zeros(
-        [p["n_accelerations"], p["decimated_n_fft"]],
+        [params_pro["n_accelerations"], params_pro["decimated_n_fft"]],
         dtype=np.complex64,
     )
 
@@ -285,12 +296,12 @@ def compute_derived_gmf_params(params_exp, params_pro):
         )
 
     # Read length to include all pulses to be searched
-    p["read_length"] = (n_ipp + ipp_offset) * ipp_samp
+    params_pro["read_length"] = (n_ipp + ipp_offset) * ipp_samp
 
     # this stencil is used to block tx pulses and ground clutter
-    p["rx_stencil"] = np.full((p["read_length"],), False, dtype=bool)
+    p["rx_stencil"] = np.full((params_pro["read_length"],), False, dtype=bool)
     # this stencil is used to select tx pulses
-    p["tx_stencil"] = np.full((p["read_length"],), False, dtype=bool)
+    p["tx_stencil"] = np.full((params_pro["read_length"],), False, dtype=bool)
 
     # for each coherently integrated IPP, create stencils
     for k in range(n_ipp):
@@ -308,13 +319,13 @@ def compute_derived_gmf_params(params_exp, params_pro):
         params_pro["reduce_acceleration"],
     ]
     gmf_size = [
-        p["n_ranges"],
-        p["n_range_rates"],
-        p["n_accelerations"],
+        params_pro["n_ranges"],
+        params_pro["n_range_rates"],
+        params_pro["n_accelerations"],
     ]
     gmf_size = [s for red, s in zip(reduce_axis, gmf_size) if not red]
 
-    p["gmf_size"] = gmf_size
-    p["reduce_axis"] = reduce_axis
+    params_pro["gmf_size"] = gmf_size
+    params_pro["reduce_axis"] = reduce_axis
 
-    return p
+    return params_exp, params_pro, p

@@ -115,8 +115,8 @@ def compute_gmf(
         # In case we are running MPI to distribute CUDA calculation
         # across multiple GPUs on multiple nodes we assume the ranks
         # distribute across the nodes in a linear fashion
-        # e.g. node1[rank=(0,1,2)], node2[rank=(3,4,5)] for np=6 and node_GPUs=3
-        gpu_id = task_idx % params_pro["node_GPUs"]
+        # e.g. node1[rank=(0,1,2)], node2[rank=(3,4,5)] for np=6 and node_gpus=3
+        gpu_id = task_idx % params_pro["node_gpus"]
 
         # initialise
         gmf_vals = []
@@ -318,10 +318,10 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     tx_reader, tx_channel = tx
 
     # read data vector with n_ipp + n_extra ipp's (to allow for searching across to subsequent pulses)
-    z_rx = rx_reader.read_vector_1d(start_sample, params_der["read_length"], rx_channel)
+    z_rx = rx_reader.read_vector_1d(start_sample, params_pro["read_length"], rx_channel)
 
     if tx_channel != rx_channel or tx_reader != rx_reader:
-        z_tx = tx_reader.read_vector_1d(start_sample, params_der["read_length"], tx_channel)
+        z_tx = tx_reader.read_vector_1d(start_sample, params_pro["read_length"], tx_channel)
     else:
         z_tx = np.copy(z_rx)
 
@@ -339,11 +339,11 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     #   removing all coherent echoes first and using the individual signal samples
 
     gmf_vars = GMFVariables(
-        vals = np.zeros(params_der["gmf_size"], dtype=np.float32),
-        dc = np.zeros(params_der["n_ranges"], dtype=np.float32),
-        r_ind = np.full(params_der["gmf_size"], -1, dtype=np.int32),
-        v_ind = np.full(params_der["gmf_size"], -1, dtype=np.int32),
-        a_ind = np.full(params_der["gmf_size"], -1, dtype=np.int32),
+        vals = np.zeros(params_pro["gmf_size"], dtype=np.float32),
+        dc = np.zeros(params_pro["n_ranges"], dtype=np.float32),
+        r_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),
+        v_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),
+        a_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),
     )
 
     if tx_amp > 1.0:

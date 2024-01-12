@@ -16,14 +16,14 @@ chnl = "uhf"
 bounds = analysis_utils.compute_bounds(
     reader,
     "uhf",
-    params["sample_rate"],
+    params["EXP"]["sample_rate"],
     start_time="2021-04-12T12:15:57.5",
     end_time="2021-04-12T12:15:57.9",
     relative_time=False,
 )
 
 start_sample = bounds[0]
-delta_samples = params["ipp_samp"] * params["n_ipp"]
+delta_samples = params["EXP"]["ipp_samp"] * params["PRO"]["n_ipp"]
 
 reduce_axis = [
     False,
@@ -31,13 +31,13 @@ reduce_axis = [
     False,
 ]
 gmf_size = [
-    params["n_ranges"],
-    params["n_range_rates"],
-    params["n_accelerations"],
+    params["PRO"]["n_ranges"],
+    params["PRO"]["n_range_rates"],
+    params["PRO"]["n_accelerations"],
 ]
-params["gmf_size"] = gmf_size
-params["reduce_axis"] = reduce_axis
-params["gmflib"] = "numpy_no_reduce"
+params["PRO"]["gmf_size"] = gmf_size
+params["PRO"]["reduce_axis"] = reduce_axis
+params["PRO"]["gmflib"] = "numpy_no_reduce"
 
 
 gmf_vars, gmf_tx = analyze_gmf.integrate_and_match_ipps(
