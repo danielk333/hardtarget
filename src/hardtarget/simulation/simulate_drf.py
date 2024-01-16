@@ -20,10 +20,10 @@ def noise_generator(noise_sigma, shape):
 
 def phase_function(t, range0, velocity0, acceleration0, wavelength):
     rng = range0 + t * velocity0 + 0.5 * t**2 * acceleration0
-    return rng * np.pi * 2 / wavelength
+    return np.mod(rng / wavelength, 1) * np.pi * 2
 
 
-def waveform_generator(t, baud_length, frequency, code, dtype=np.complex64):
+def waveform_generator(t, baud_length, frequency, code, dtype=np.complex128):
     t_ind = (t // baud_length).astype(np.int64)
     signal = np.zeros(t.shape, dtype=dtype)
     inds = np.logical_and(t >= 0, t <= baud_length * len(code))
@@ -102,44 +102,42 @@ def simulate_drf(
     t_tx = np.arange(T_tx_samps) / sample_rate
     for pid in range(sim_pulses):
         samp0 = pid * ipp_samp + samp_t0
-        signal = np.zeros((ipp_samp,), dtype=np.complex64)
+        signal = np.zeros((ipp_samp,), dtype=np.complex128)
 
         if sim_params["noise_sigma"] > 0:
             signal[T_rx_select] += noise_generator(sim_params["noise_sigma"], (T_rx_samps,))
 
         tx_wave = waveform_generator(
             t_tx,
-            experiment_params["baud_length"],
-            experiment_params["frequency"],
+            experiment_params["baud_length"] * 1e-6,
+            experiment_params["frequency"] * 1e6,
             experiment_params["code"][pid % codes],
         )
+
         # TODO: this assumes rx streches over tx, generalize
         signal[T_tx_start_samp:T_tx_end_samp] += tx_wave
 
-        if samp0 <= samp_sig_t0 or samp0 >= samp_sig_t1:
-            ipp_samples = to_i2x16(signal)
-            rf_writer.rf_write(ipp_samples)
-            continue
+        if samp0 > samp_sig_t0 and samp0 < samp_sig_t1:
+            t0 = (samp0 - samp_epoch) / sample_rate
+            r0 = interp_data["ranges"](t0)
+            rg0 = np.round((r0 / scipy.constants.c) * sample_rate).astype(np.int64)
+            rg_samp0 = rg0 + T_tx_start_samp
+        else:
+            rg_samp0 = None
 
-        t0 = (samp0 - samp_epoch) / sample_rate
-        r0 = interp_data["ranges"](t0)
-        rg0 = np.round((r0 / scipy.constants.c) * sample_rate).astype(np.int64)
+        if rg_samp0 is not None and (
+            rg_samp0 >= T_rx_start_samp and rg_samp0 <= T_rx_end_samp
+        ):
+            phase = phase_function(
+                t_tx,
+                r0,
+                interp_data["velocities"](t0),
+                interp_data["accelerations"](t0),
+                wavelength,
+            )
 
-        if rg0 < (T_rx_start_samp - T_tx_start_samp) or rg0 > (T_rx_end_samp - T_tx_start_samp):
-            ipp_samples = to_i2x16(signal)
-            rf_writer.rf_write(ipp_samples)
-            continue
-
-        phase = phase_function(
-            t_tx,
-            r0,
-            interp_data["velocities"](t0),
-            interp_data["accelerations"](t0),
-            wavelength,
-        )
-        rx_wave = tx_wave * np.exp(-1j * phase)
-
-        signal[(rg0 + T_tx_start_samp):(rg0 + T_tx_start_samp + T_tx_samps)] += rx_wave
+            rx_wave = tx_wave * np.exp(-1j * phase)
+            signal[rg_samp0:(rg_samp0 + T_tx_samps)] += rx_wave
 
         ipp_samples = to_i2x16(signal)
         rf_writer.rf_write(ipp_samples)

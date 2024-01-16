@@ -63,16 +63,16 @@ hardtarget.simulation.drf(drf_path, simulation_data, simulation_params, experime
 reader, params = hardtarget.drf_utils.load_hardtarget_drf(drf_path)
 
 # process
-results = hardtarget.compute_gmf(
-    rx=(drf_path, rx_channel),
-    tx=(drf_path, rx_channel),
-    config=config_path,
-    job={"idx": 0, "N": 1},
-    gmflib=gmflib,
-    clobber=True,
-    output=output_path,
-    progress=True,
-)
+# results = hardtarget.compute_gmf(
+#     rx=(drf_path, rx_channel),
+#     tx=(drf_path, rx_channel),
+#     config=config_path,
+#     job={"idx": 0, "N": 1},
+#     gmflib=gmflib,
+#     clobber=True,
+#     output=output_path,
+#     progress=True,
+# )
 
 
 fig, axes = plt.subplots(3, 1)
@@ -95,16 +95,16 @@ ax, handles = hardtarget.plotting.rti(
     axis_units=True,
 )
 
-paths = hardtarget.plotting.gmf.collect_paths(
-    output_path,
-)
+# paths = hardtarget.plotting.gmf.collect_paths(
+#     output_path,
+# )
 
-data_generator = hardtarget.plotting.gmf.yield_chunked_data(paths)
-for data in data_generator:
-    fig, axes = plt.subplots(2, 2)
-    hardtarget.plotting.gmf.plot_peaks(axes, data)
-    fig, axes = plt.subplots(2, 3)
-    hardtarget.plotting.gmf.plot_detections(axes, data)
-    fig, axes = plt.subplots(2, 2)
-    hardtarget.plotting.gmf.plot_map(axes, data)
+# data_generator = hardtarget.plotting.gmf.yield_chunked_data(paths)
+# for data in data_generator:
+#     fig, axes = plt.subplots(2, 2)
+#     hardtarget.plotting.gmf.plot_peaks(axes, data)
+#     fig, axes = plt.subplots(2, 3)
+#     hardtarget.plotting.gmf.plot_detections(axes, data)
+#     fig, axes = plt.subplots(2, 2)
+#     hardtarget.plotting.gmf.plot_map(axes, data)
 plt.show()
