@@ -213,6 +213,9 @@ def compute_derived_gmf_params(params_exp, params_pro):
     rgs_max = T_rx_end_samp - tx_pulse_samps
     max_range_gate += rgs_max if max_range_gate < 0 else rgs_min
     min_range_gate += rgs_max if min_range_gate < 0 else rgs_min
+
+    params_pro["min_range_gate"] = min_range_gate
+    params_pro["max_range_gate"] = max_range_gate
     # reset range gates
     # range gates to search through
     # range gates are relative to tx start
