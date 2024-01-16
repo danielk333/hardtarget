@@ -196,6 +196,10 @@ def plot_detections(axes, data):
 
 
 def plot_map(axes, data):
+    # TODO: there is a better way to get noise background which also gives
+    # higher resolution in the estimates, (by estimating the noise sigma directly
+    # from the receiver samples distribution as a function of range and time)
+    # But this works as a placeholder
 
     # GMF
     min_y, max_y = data["min_range_gate"], data["max_range_gate"]
@@ -204,8 +208,8 @@ def plot_map(axes, data):
     x = np.arange(0, size_x)
     y = np.arange(min_y, max_y)
     h00 = axes[0, 0].pcolormesh(x, y, gmf_data)
-    axes[0, 0].set_xlabel("? [?]")
-    axes[0, 0].set_ylabel("range gates")
+    axes[0, 0].set_xlabel("Time [s]")
+    axes[0, 0].set_ylabel("Range gates")
 
     # NF
     nf_data = data["nf_vecs"].T
@@ -215,18 +219,18 @@ def plot_map(axes, data):
     h01 = axes[0, 1].pcolormesh(nf_x, nf_y, nf_data)
     axes[0, 1].set_xlabel("? [?]")
     # TODO - y-label should be number from min_range_gate to max_range_gate
-    axes[0, 1].set_ylabel("range gates")
+    axes[0, 1].set_ylabel("Range gates")
 
-    # 
+    #
     ranges_data = convert(data["ranges"])
     h10 = axes[1, 0].plot(ranges_data, data["nf_range"])
-    axes[1, 0].set_xlabel("ranges [km]")
-    axes[1, 0].set_ylabel("? [?]")
+    axes[1, 0].set_xlabel("Ranges [km]")
+    axes[1, 0].set_ylabel("Time [s]")
 
     #
     h11 = axes[1, 1].plot(data["nf_ts"], data["nf_time"])
-    axes[1, 1].set_xlabel("? [?]")
-    axes[1, 1].set_ylabel("? [?]")
+    axes[1, 1].set_xlabel("Time [s]")
+    axes[1, 1].set_ylabel("Mean noise level [?]")
 
     handles = [[h00, h01], [h10, h11]]
     return axes, handles
