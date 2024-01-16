@@ -5,7 +5,7 @@ import pathlib
 import hardtarget
 
 range0 = 2000e3
-vel0 = 0.1e3
+vel0 = 4.4e3
 accel_ph = 1.0/2.0
 acel0 = 0.04e3
 
@@ -23,7 +23,7 @@ simulation_params = {
     "epoch": "2021-04-12T12:15:40",
     "start_time": 0,
     "end_time": 15.0,
-    "noise_sigma": 1,
+    "noise_sigma": 0,
 }
 
 t = np.arange(5, 10, 0.1)
@@ -33,7 +33,6 @@ simulation_data = {
     "ranges": range0 + vel0*t - np.sin(t*accel_ph)*acel0/accel_ph**2,
     "velocities": vel0 + np.cos(t*accel_ph)*acel0/accel_ph,
     "accelerations": np.sin(t*accel_ph)*acel0,
-    "snrs": np.ones_like(t)*2,
     "times": t,
 }
 
@@ -59,34 +58,41 @@ experiment_params["code"] = hardtarget.load_radar_code("leo_bpark")
 for key, val in experiment_params.items():
     print(f"{key}: {val}")
 
-# hardtarget.simulation.drf(drf_path, simulation_data, simulation_params, experiment_params, clobber=True)
+hardtarget.simulation.drf(drf_path, simulation_data, simulation_params, experiment_params, clobber=True)
 
 reader, params = hardtarget.drf_utils.load_hardtarget_drf(drf_path)
 
-# # process
-# results = hardtarget.compute_gmf(
-#     rx=(drf_path, rx_channel),
-#     tx=(drf_path, rx_channel),
-#     config=config_path,
-#     job={"idx": 0, "N": 1},
-#     gmflib=gmflib,
-#     clobber=True,
-#     output=output_path,
-#     progress=True,
-# )
+# process
+results = hardtarget.compute_gmf(
+    rx=(drf_path, rx_channel),
+    tx=(drf_path, rx_channel),
+    config=config_path,
+    job={"idx": 0, "N": 1},
+    gmflib=gmflib,
+    clobber=True,
+    output=output_path,
+    progress=True,
+)
 
 
 fig, axes = plt.subplots(3, 1)
-axes[0].plot(t, simulation_data["ranges"])
-axes[1].plot(t, simulation_data["velocities"])
+axes[0].plot(t, 1e-3*simulation_data["ranges"])
+axes[0].set_xlabel("Time [s]")
+axes[0].set_ylabel("Range [km]")
+axes[1].plot(t, 1e-3*simulation_data["velocities"])
+axes[1].set_xlabel("Time [s]")
+axes[1].set_ylabel("Velocity [km/s]")
 axes[2].plot(t, simulation_data["accelerations"])
+axes[2].set_xlabel("Time [s]")
+axes[2].set_ylabel("Acceleration [m/s^2]")
 
 fig, ax = plt.subplots()
 ax, handles = hardtarget.plotting.rti(
     ax,
     reader,
     params,
-    remove_non_rx=False
+    keep_tx=True,
+    axis_units=True,
 )
 
 paths = hardtarget.plotting.gmf.collect_paths(
@@ -97,5 +103,8 @@ data_generator = hardtarget.plotting.gmf.yield_chunked_data(paths)
 for data in data_generator:
     fig, axes = plt.subplots(2, 2)
     hardtarget.plotting.gmf.plot_peaks(axes, data)
-
+    fig, axes = plt.subplots(2, 3)
+    hardtarget.plotting.gmf.plot_detections(axes, data)
+    fig, axes = plt.subplots(2, 2)
+    hardtarget.plotting.gmf.plot_map(axes, data)
 plt.show()

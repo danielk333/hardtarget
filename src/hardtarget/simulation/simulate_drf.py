@@ -23,11 +23,11 @@ def phase_function(t, range0, velocity0, acceleration0, wavelength):
     return rng * np.pi * 2 / wavelength
 
 
-def waveform_generator(t, phase, baud_length, frequency, code, dtype=np.complex64):
+def waveform_generator(t, baud_length, frequency, code, dtype=np.complex64):
     t_ind = (t // baud_length).astype(np.int64)
     signal = np.zeros(t.shape, dtype=dtype)
     inds = np.logical_and(t >= 0, t <= baud_length * len(code))
-    signal[inds] = np.exp(-1j * phase) * code[t_ind[inds]]
+    signal[inds] = code[t_ind[inds]]
     return signal
 
 
@@ -109,7 +109,6 @@ def simulate_drf(
 
         tx_wave = waveform_generator(
             t_tx,
-            np.ones_like(t_tx),
             experiment_params["baud_length"],
             experiment_params["frequency"],
             experiment_params["code"][pid % codes],
@@ -131,7 +130,6 @@ def simulate_drf(
             rf_writer.rf_write(ipp_samples)
             continue
 
-        sn = interp_data["snrs"](t0)
         phase = phase_function(
             t_tx,
             r0,
@@ -139,15 +137,9 @@ def simulate_drf(
             interp_data["accelerations"](t0),
             wavelength,
         )
-        rx_wave = waveform_generator(
-            t_tx,
-            phase,
-            experiment_params["baud_length"],
-            experiment_params["frequency"],
-            experiment_params["code"][pid % codes],
-        )
+        rx_wave = tx_wave * np.exp(-1j * phase)
 
-        signal[(rg0 + T_tx_start_samp):(rg0 + T_tx_start_samp + T_tx_samps)] += rx_wave*sn
+        signal[(rg0 + T_tx_start_samp):(rg0 + T_tx_start_samp + T_tx_samps)] += rx_wave
 
         ipp_samples = to_i2x16(signal)
         rf_writer.rf_write(ipp_samples)
