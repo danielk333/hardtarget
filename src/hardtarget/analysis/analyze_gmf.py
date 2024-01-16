@@ -40,9 +40,9 @@ def compute_gmf(
 
     Parameters
     ----------
-    rx: Digital_rf reader
-    tx: Digital_rf reader
-    gmf_config: path gfm config file
+    rx: (drf source dir, channel name)
+    tx: (drf source dir, channel name)
+    config: path gfm config file
     job: used to identify subset of task indexes for this job
 
     Returns
