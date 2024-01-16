@@ -7,13 +7,6 @@ import configparser
 import shutil
 
 
-def to_i2x16(zz):
-    zz2x16 = np.empty((len(zz), 2), dtype=np.int16)
-    zz2x16[:, 0] = zz.real.astype(np.int16)
-    zz2x16[:, 1] = zz.imag.astype(np.int16)
-    return zz2x16
-
-
 def noise_generator(noise_sigma, shape):
     return noise_sigma * (np.random.randn(*shape) + 1j * np.random.randn(*shape))
 
@@ -84,7 +77,7 @@ def simulate_drf(
 
     rf_writer = drf.DigitalRFWriter(
         str(dstdir),  # directory
-        np.int16,  # dtype
+        np.complex64,  # dtype
         3600,  # subdir cadence secs    => one dir per hour
         1000,  # file cadence millisecs => one file per second
         samp_t0,  # start global index
@@ -93,7 +86,6 @@ def simulate_drf(
         uuid_str="tbd",
         compression_level=compression_level,
         checksum=False,
-        is_complex=True,
         num_subchannels=1,
         is_continuous=True,
         marching_periods=True,
@@ -102,7 +94,7 @@ def simulate_drf(
     t_tx = np.arange(T_tx_samps) / sample_rate
     for pid in range(sim_pulses):
         samp0 = pid * ipp_samp + samp_t0
-        signal = np.zeros((ipp_samp,), dtype=np.complex128)
+        signal = np.zeros((ipp_samp,), dtype=np.complex64)
 
         if sim_params["noise_sigma"] > 0:
             signal[T_rx_select] += noise_generator(sim_params["noise_sigma"], (T_rx_samps,))
@@ -139,8 +131,7 @@ def simulate_drf(
             rx_wave = tx_wave * np.exp(-1j * phase)
             signal[rg_samp0:(rg_samp0 + T_tx_samps)] += rx_wave
 
-        ipp_samples = to_i2x16(signal)
-        rf_writer.rf_write(ipp_samples)
+        rf_writer.rf_write(signal)
 
     EXP_SECTION = "Experiment"
     meta = configparser.ConfigParser()
