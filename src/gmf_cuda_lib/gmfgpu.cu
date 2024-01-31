@@ -61,9 +61,6 @@ __global__ void peak_find(cufftComplex *z_out, float *gmf_vec, float *gmf_dc_vec
 __global__ void phasor_multiply(cufftComplex *z_echo, cufftComplex *z_in, int nfft2, int acc_idx,
                                 cufftComplex *acc_phasors) {
     int rgi = blockIdx.x;
-    /*
-       TODO: only multiply non-zero values.
-    */
     for (int j = 0; j < nfft2; j++) {
         z_in[rgi * nfft2 + j] = cuCmulf(z_echo[rgi * nfft2 + j], acc_phasors[acc_idx * nfft2 + j]);
     }
@@ -108,9 +105,6 @@ static inline void check_cudaMemset(int res, const char *name){
 
 /*
    This is the main code. If you have N GPUs, you can run N gmf functions in parallel.
-
-    TODO: fix docstring in code and print statements to print better messages
-    TODO: refactor out deallocs and allocs into a function call
 
 */
 extern "C" int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors, int n_accs, int *rgs,
