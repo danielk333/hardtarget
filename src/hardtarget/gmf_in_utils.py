@@ -15,7 +15,7 @@ GMFVariables = namedtuple(
     "GMFVariables",
     [
         "vals",  # match function values reduced over the requested axis
-        "dc",  # 0-frequency gmf output
+        "dc",  # 0-frequency gmf output as a function of range
         "r_ind",  # best fitting range
         "v_ind",  # best fitting range-rate
         "a_ind",  # best fitting range-rate change
@@ -25,7 +25,7 @@ GMFVariables = namedtuple(
 
 ####################################################################
 # GET GMF PROCESSING PARAMS
-# 
+#
 # NOTE: all keys have to be lower-case here due to configparser
 ####################################################################
 
@@ -241,7 +241,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     params_der["fvec"] = fvec = np.fft.fftfreq(
         params_pro["decimated_n_fft"],
         d=frequency_decimation / sample_rate,
-    )
+    )  # Hz
 
     # range-rate is doppler-shift in hertz multiplied with wavelength
     wavelength = scipy.constants.c / (radar_frequency * 1e6)
@@ -274,6 +274,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     # Time vector relative detected range-gate
     times = rx_win_dec / sample_rate
     times2 = times**2.0
+    params_der["decimated_sample_times"] = times
 
     # acceleration sampled with steps at the end of the coherent integration window
     # acceleration_resolution is in radians!

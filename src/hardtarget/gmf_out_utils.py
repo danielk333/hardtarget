@@ -93,12 +93,16 @@ def dump_gmf_out(gmf_out_args, gmf_params, outfile):
             ds.attrs["units"] = item["units"]
 
     # EXPERIMENT PARAMS
-    exp_grp = out.create_group("experiment")
+    if "experiment" not in out:
+        out.create_group("experiment")
+    exp_grp = out["experiment"]
     for key, val in gmf_params["EXP"].items():
         exp_grp[key] = val
 
     # GMF PROCESSING PARAMS
-    pro_grp = out.create_group("processing")
+    if "processing" not in out:
+        out.create_group("processing")
+    pro_grp = out["processing"]
     for key, val in gmf_params["PRO"].items():
         pro_grp[key] = val
 
@@ -120,7 +124,7 @@ GMFOutArgs = namedtuple(
         "num_cohints_per_file",
         "ranges",
         "range_rates",
-        "accelerations",    # [min_acc, ..., max_acc] length - n_accelarations
+        "accelerations",
         "sample_numbers",
         "vals",
         "dc",
@@ -134,6 +138,7 @@ GMFOutArgs = namedtuple(
         "g_vec",
         "rgs",
         "fvec",
+        "decimated_sample_times",
         "acceleration_phasors",
         "rx_stencil",
         "tx_stencil",
@@ -162,7 +167,7 @@ def define_variables(gmf_out_args):
     return {
         "integration_index": {
             "data": integration_index,
-            "long_name": "Integration index within this file relative the epoch",
+            "long_name": "Integration index within this file relative the file epoch",
             "scale": True
         },
         "ranges": {
@@ -185,25 +190,31 @@ def define_variables(gmf_out_args):
         },
         "sample_numbers": {
             "data": gmf_out_args.sample_numbers,
-            "long_name": "Sample numbers.",
+            "long_name": "Receiver sample number in radar cycle",
+            "scale": True
+        },
+        "decimated_sample_times": {
+            "data": gmf_out_args.decimated_sample_times,
+            "long_name": "Time of decimated receiver samples in integration cycle",
+            "units": "s",
             "scale": True
         },
         "rx_window_index": {
             "data": rx_window_index,
-            "long_name": "RX window index index",
+            "long_name": "Index within stenciled RX windows",
             "scale": True
         },
         "gmf": {
             "data": gmf_out_args.vals,
             "dims": [("integration_index", "t"), ("ranges", "r")],
             "long_name": "Generalized Matched Filter output values",
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "gmf_zero_frequency": {
             "data": gmf_out_args.dc,
             "dims": [("integration_index", "t"), ("ranges", "r")],
             "long_name": "Range dependant noise floor (0-frequency gmf output)",
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "range_rate_index": {
             "data": gmf_out_args.v_ind,
@@ -211,7 +222,7 @@ def define_variables(gmf_out_args):
             "long_name": (
                 "If range_rate is reduced, contains the best range rate index "
                 "for each left over axis"),
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "acceleration_index": {
             "data": gmf_out_args.a_ind,
@@ -219,75 +230,82 @@ def define_variables(gmf_out_args):
             "long_name": (
                 "If acceleration is reduced, contains the best acceleration "
                 "index for each left over axis"),
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "tx_power": {
             "data": gmf_out_args.txp,
             "dims": [("integration_index", "t")],
-            "long_name": "Measured transmitted power",
-            "units": "W",
-            #"group": "gmf"
+            "long_name": "Transmitted signal power",
+            # "units": "W", # TODO: this is not converted to real power, just signal power
+            # "group": "gmf"
         },
         "range_peak": {
             "data": gmf_out_args.r_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Range at peak GMF",
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "range_rate_peak": {
             "data": gmf_out_args.v_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Range rate at peak GMF",
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "acceleration_peak": {
             "data": gmf_out_args.a_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Acceleration at peak GMF",
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "gmf_peak": {
             "data": gmf_out_args.g_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Peak GMF",
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "rgs": {
             "data": gmf_out_args.rgs,
             "dims": [("ranges", "r")],
-            "long_name": "Missing",
-            "group": "vector_params"
+            "long_name": "Range gates in signal samples",
+            "group": "processing"
         },
         "fvec": {
             "data": gmf_out_args.fvec,
             "dims": [("range_rates", "v")],
-            "long_name": "Missing",
-            "group": "vector_params",
-            "units": "Hz"  # TODO - correct?
+            "long_name": "Searched doppler frequencies",
+            "group": "processing",
+            "units": "Hz"
         },
         "acceleration_phasors": {
             "data": gmf_out_args.acceleration_phasors,
-            "dims": [("accelerations", "a"), ("range_rates", "v")],
-            "long_name": "Missing",
-            "group": "vector_params",
-            "unit": "rad"
+            "dims": [("accelerations", "a"), ("decimated_sample_times", "t")],
+            "long_name": (
+                "Complex number representation of signal phase shift "
+                "during decimated reception due to acceleration"
+            ),
+            "group": "processing",
         },
         "rx_stencil": {
             "data": gmf_out_args.rx_stencil,
             "dims": [("sample_numbers", "samples")],
-            "long_name": "Missing",
-            "group": "vector_params"
+            "long_name": "Stencil for selecting receiver samples in an integration cycle",
+            "group": "processing"
         },
         "tx_stencil": {
             "data": gmf_out_args.tx_stencil,
             "dims": [("sample_numbers", "samples")],
-            "long_name": "Missing",
-            "group": "vector_params"
+            "long_name": "Stencil for selecting transmitter samples in an integration cycle",
+            "group": "processing"
         },
         "rx_window_indices": {
             "data": gmf_out_args.rx_window_indices,
             "dims": [("rx_window_index", "rx_idx")],
-            "long_name": "Missing",
-            "group": "vector_params"
+            "long_name": (
+                "Template receiver sample indices for selecting the length of a "
+                "transmit signal within each radar cycle for an entire "
+                "integration cycle, offset by range gate to select all signals "
+                "from that range within each radar cycle"
+            ),
+            "group": "processing"
         }
     }
