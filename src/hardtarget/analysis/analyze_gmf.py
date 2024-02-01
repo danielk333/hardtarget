@@ -7,6 +7,12 @@ from hardtarget.gmf import GMF_LIBS
 from hardtarget.gmf_in_utils import load_gmf_params, GMFVariables
 from hardtarget.gmf_out_utils import GMFOutArgs, dump_gmf_out
 
+try:
+    from mpi4py import MPI
+except ImportError:
+    comm = None
+finally:
+    comm = MPI.COMM_WORLD
 
 from hardtarget.analysis import analysis_utils as a_utils
 
@@ -108,6 +114,12 @@ def compute_gmf(
             desc="Processing".ljust(sub_desc_len, " ") if subprogress else "Processing",
             total=total,
         )
+
+    if comm is not None:
+        # Make sure all jobs start at the same time
+        # Good for logging, printing and debugging reasons as setup time should
+        # still be minimal compared to the actual job times
+        comm.barrier()
 
     # process
     results = {"dir": output, "files": [], "out": {}}
