@@ -11,6 +11,9 @@
 #vs-code
 .vscode
 
+#drawio
+**/*.bkp
+
 #vi/vim
 *~
 .*.swo
