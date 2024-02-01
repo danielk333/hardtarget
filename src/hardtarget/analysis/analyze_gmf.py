@@ -220,6 +220,7 @@ def compute_gmf(
                 g_vec=g_vec,
                 rgs=gmf_params["DER"]["rgs"],
                 fvec=gmf_params["DER"]["fvec"],
+                decimated_sample_times=gmf_params["DER"]["decimated_sample_times"],
                 acceleration_phasors=gmf_params["DER"]["acceleration_phasors"],
                 rx_stencil=gmf_params["DER"]["rx_stencil"],
                 tx_stencil=gmf_params["DER"]["tx_stencil"],
@@ -263,6 +264,9 @@ def compute_gmf(
 def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     """
     TODO: clean up this and all other docstrings when structure is done
+
+    TODO: it would be nice if one could run this with signal data in the RAM
+        instead of having to give or mock digitalrf readers
 
     Analyse ipps runs the gmf function.
 
@@ -326,9 +330,6 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     tx_amp2 = np.sum(np.abs(z_tx) ** 2.0)
     tx_amp = np.sqrt(tx_amp2)
     z_tx = np.conj(z_tx) / tx_amp
-
-    # TODO: There are better ways of estimating the background noise by
-    #   removing all coherent echoes first and using the individual signal samples
 
     gmf_vars = GMFVariables(
         vals = np.zeros(params_pro["gmf_size"], dtype=np.float32),
