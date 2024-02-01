@@ -4,11 +4,12 @@ from hardtarget import noise
 
 def _convert(data, km=True, monostatic=True):
     """Assume data is [m] and two-way range"""
+    _data = data.copy()
     if km:
-        data *= 0.001
+        _data *= 0.001
     if monostatic:
-        data *= 0.5
-    return data
+        _data *= 0.5
+    return _data
 
 
 def plot_peaks(axes, data, meta, monostatic=True, snr_dB_limit=12.0):
