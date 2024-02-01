@@ -5,6 +5,7 @@ import digital_rf as drf
 import pathlib
 import configparser
 import shutil
+from hardtarget.version import __version__
 
 
 def noise_generator(noise_sigma, shape):
@@ -25,9 +26,10 @@ def waveform_generator(t, baud_length, frequency, code, dtype=np.complex128):
 
 
 def simulate_drf(
-    target, sim_data, sim_params, experiment_params, compression_level=0, chnl="sign", clobber=False
+    target, sim_data, sim_params, experiment_params, compression_level=0, chnl="sim", clobber=False
 ):
-    """ """
+    """
+    """
     target = pathlib.Path(target)
     target.mkdir(exist_ok=True)
 
@@ -104,14 +106,18 @@ def simulate_drf(
             experiment_params["baud_length"] * 1e-6,
             experiment_params["frequency"] * 1e6,
             experiment_params["code"][pid % codes],
+            dtype=np.complex64,
         )
+        tx_amp0 = sim_params["tx_amp"] if "tx_amp" in sim_params else 1.0
 
         # TODO: this assumes rx streches over tx, generalize
-        signal[T_tx_start_samp:T_tx_end_samp] += tx_wave
+        signal[T_tx_start_samp:T_tx_end_samp] += tx_amp0*tx_wave
 
         if samp0 > samp_sig_t0 and samp0 < samp_sig_t1:
             t0 = (samp0 - samp_epoch) / sample_rate
             r0 = interp_data["ranges"](t0)
+            sn0 = interp_data["snr"](t0) if "snr" in interp_data else 1.0
+
             rg0 = np.round((r0 / scipy.constants.c) * sample_rate).astype(np.int64)
             rg_samp0 = rg0 + T_tx_start_samp
         else:
@@ -127,8 +133,12 @@ def simulate_drf(
                 interp_data["accelerations"](t0),
                 wavelength,
             )
+            if sim_params["noise_sigma"] > 0 and "snr" in interp_data:
+                amp0 = np.sqrt(sn0*2*sim_params["noise_sigma"]**2)
+            else:
+                amp0 = np.sqrt(sn0)
 
-            rx_wave = tx_wave * np.exp(-1j * phase)
+            rx_wave = tx_wave * amp0 * np.exp(-1j * phase)
             signal[rg_samp0:(rg_samp0 + T_tx_samps)] += rx_wave
 
         rf_writer.rf_write(signal)
@@ -138,7 +148,7 @@ def simulate_drf(
     meta.add_section(EXP_SECTION)
     exp = meta[EXP_SECTION]
     exp["name"] = "simulation"
-    exp["version"] = "1.0"
+    exp["version"] = __version__
 
     # forward values from experiment config file
     props = [
