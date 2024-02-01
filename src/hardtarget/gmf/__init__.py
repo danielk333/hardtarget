@@ -5,6 +5,8 @@ GMF_LIBS = {
     "numpy_no_reduce": gmfnp_no_reduce,
 }
 
+# TODO: add fine optimization!!!!!!!!!!!!!!!!!!!!!!!
+
 try:
     from .gmf_c import gmfc
 except ImportError:
