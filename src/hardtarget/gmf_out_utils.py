@@ -12,6 +12,98 @@ import re
 ################################################################
 
 
+def collect_gmf_data(paths, mats=None, vecs=None):
+    """Given a number of input h5 GMF paths, collect and concatenate some of the useful data.
+    """
+    data = None
+    meta = None
+    if mats is None:
+        # Default mats
+        mats = [
+            "gmf",
+            "gmf_zero_frequency",
+            "range_rate_index",
+            "acceleration_index",
+            "nf_vec",
+        ]
+    if vecs is None:
+        # Default vecs
+        vecs = [
+            "range_peak",
+            "range_rate_peak",
+            "acceleration_peak",
+            "gmf_peak",
+            "tx_power",
+            "t"
+        ]
+    derived = ["t", "nf_vec"]
+
+    t_vec_pos = 0
+    mats_data = {}
+    vecs_data = {}
+    for path in paths:
+        with h5py.File(path, "r") as hf:
+            for key in mats:
+                if key in derived:
+                    continue
+                mats_data[key] = hf[key][()]
+            for key in vecs:
+                if key in derived:
+                    continue
+                vecs_data[key] = hf[key][()]
+
+            if meta is None:
+                meta = {
+                    "ranges": hf["ranges"][()],
+                    "range_rates": hf["range_rates"][()],
+                    "accelerations": hf["accelerations"][()],
+                    "range_gates": hf["processing"]["rgs"][()],
+                }
+                meta["processing"] = {key: val for key, val in hf["processing"].attrs.items()}
+                meta["experiment"] = {key: val for key, val in hf["processing"].attrs.items()}
+                for key, val in hf.attrs.items():
+                    meta[key] = val
+
+            _t_conv = (hf["processing"].attrs["n_ipp"][()] * hf["experiment"].attrs["ipp"][()]) * 1e-6
+
+        # Additional useful parameters to calculate
+        n_cohints = mats_data["gmf"].shape[0]
+        vecs_data["t"] = np.arange(n_cohints) * _t_conv + t_vec_pos
+        t_vec_pos = vecs_data["t"][-1] + 1
+        nf_vec = np.nanmedian(mats_data["gmf_zero_frequency"], axis=0)
+        nf_vec = nf_vec.reshape((1, nf_vec.size))
+        mats_data["nf_vec"] = nf_vec
+
+        if data is None:
+            data = {}
+            for key in mats:
+                data[key] = mats_data[key]
+            for key in vecs:
+                data[key] = vecs_data[key]
+        else:
+            for key in mats:
+                data[key] = np.append(data[key], mats_data[key], axis=0)
+            for key in vecs:
+                data[key] = np.append(data[key], vecs_data[key])
+
+    data["nf_range"] = np.nanmedian(data["nf_vec"], axis=0)
+
+    return data, meta
+
+
+def yield_chunked_gmf_data(paths, chunk_size=None):
+    paths.sort()
+    pth_num = len(paths)
+    if chunk_size is None:
+        chunks = 1
+        chunk_size = pth_num
+    else:
+        chunks = pth_num // chunk_size + 1
+    for ind in range(chunks):
+        sub_paths = paths[(ind * chunk_size):((ind + 1) * chunk_size)]
+        yield collect_gmf_data(sub_paths)
+
+
 def all_gmf_h5_files(gmf_folder):
     """generate all files matching 'yyyy-mm-ddThh-00-00/gmf-*.h5'"""
     top = pathlib.Path(gmf_folder)
@@ -110,9 +202,24 @@ def inspect_h5_leaf(obj, path):
     return path, item
 
 
-def load_gmf_out(file):
-    with h5py.File(file, "r") as f:
-        return inspect_h5_node(f)
+def load_gmf_out(
+    folder,
+    start_time=None,
+    end_time=None,
+    relative_time=False,
+    chunk_size=None,
+):
+    """Create a generator that loads and concatenates all GMF output data from
+    given folder between the given time periods in desired chunks.
+    """
+    files = collect_gmf_paths(
+        folder,
+        start_time=start_time,
+        end_time=end_time,
+        relative_time=relative_time,
+    )
+
+    return yield_chunked_gmf_data(files, chunk_size=chunk_size)
 
 
 ####################################################################
