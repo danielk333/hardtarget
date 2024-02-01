@@ -1,13 +1,67 @@
 import numpy as np
 import h5py
 from collections import namedtuple
-
+import datetime
+import pathlib
+import re
 
 ################################################################
 # LOAD GMF OUT (H5)
 #
 # Parse groups and datasets recursively
 ################################################################
+
+
+def all_gmf_h5_files(gmf_folder):
+    """generate all files matching 'yyyy-mm-ddThh-00-00/gmf-*.h5'"""
+    top = pathlib.Path(gmf_folder)
+    dir_pattern = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}-00-00')
+    subdirs = [d for d in top.iterdir() if d.is_dir() and dir_pattern.match(d.name)]
+    file_pattern = re.compile(r'^gmf-.*\.h5$')
+    files = []
+    for subdir in subdirs:
+        files += [f for f in subdir.iterdir() if f.is_file and file_pattern.match(f.name)]
+    return files
+
+
+def collect_gmf_paths(
+    folder,
+    start_time=None,
+    end_time=None,
+    relative_time=False,
+):
+    fl = all_gmf_h5_files(folder)
+    fl.sort()
+    fl_epochs = [int(file.stem.split("-")[1]) * 1e-6 for file in fl]
+
+    epoch_unix = fl_epochs[0]
+    max_unix = fl_epochs[-1]
+
+    if relative_time:
+        if start_time is None:
+            start_time = 0
+        if end_time is None:
+            end_time = max_unix - epoch_unix
+        unix_t0 = epoch_unix + start_time
+        unix_t1 = epoch_unix + end_time
+    else:
+        if start_time is None:
+            start_time = datetime.datetime.utcfromtimestamp(epoch_unix)
+        if end_time is None:
+            end_time = datetime.datetime.utcfromtimestamp(max_unix)
+
+        dt64_t0 = start_time if isinstance(start_time, np.datetime64) else np.datetime64(start_time)
+        unix_t0 = dt64_t0.astype("datetime64[us]").astype("int64") * 1e-6
+
+        dt64_t1 = end_time if isinstance(end_time, np.datetime64) else np.datetime64(end_time)
+        unix_t1 = dt64_t1.astype("datetime64[us]").astype("int64") * 1e-6
+
+    fl = [file for file, ep in zip(fl, fl_epochs) if ep >= unix_t0 and ep <= unix_t1]
+
+    # TODO - provide useful feedback if only one file exists
+    # and start_time, end_time is given, but not a perfect match with the file
+
+    return fl
 
 
 def is_scale(obj):
@@ -22,7 +76,16 @@ def inspect_h5_node(obj, path=[]):
             items += inspect_h5_node(child_item, child_path)
         else:
             items.append(inspect_h5_leaf(child_item, child_path))
+    items.append(inspect_h5_attributes(obj, path))
     return items
+
+
+def inspect_h5_attributes(obj, path):
+    item = {
+        "type": "attributes",
+        "attrs": {key: val for key, val in obj.attrs.items()},
+    }
+    return path, item
 
 
 def inspect_h5_leaf(obj, path):
@@ -30,22 +93,19 @@ def inspect_h5_leaf(obj, path):
 
     if isinstance(obj, h5py.Dataset):
         item["scale"] = is_scale(obj)
+        item["dtype"] = obj.dtype
+        item["value"] = obj[()]
+
         if obj.dtype == "object":
-            item["type"] = "string"
-            item["dtype"] = obj.dtype
-            item["value"] = obj[()].decode('utf-8')
+            item["type"] = "object"
         elif obj.shape == ():
             item["type"] = "scalar"
-            item["dtype"] = obj.dtype
-            item["value"] = obj[()]
         else:
             item["type"] = "dataset"
             item["shape"] = obj.shape
-            item["dtype"] = obj.dtype
-            item["value"] = obj
     else:
         item["type"] = "other"
-        item["value"]: obj
+        item["value"] = obj
 
     return path, item
 
@@ -97,14 +157,14 @@ def dump_gmf_out(gmf_out_args, gmf_params, outfile):
         out.create_group("experiment")
     exp_grp = out["experiment"]
     for key, val in gmf_params["EXP"].items():
-        exp_grp[key] = val
+        exp_grp.attrs[key] = val
 
     # GMF PROCESSING PARAMS
     if "processing" not in out:
         out.create_group("processing")
     pro_grp = out["processing"]
     for key, val in gmf_params["PRO"].items():
-        pro_grp[key] = val
+        pro_grp.attrs[key] = val
 
     # EPOCH
     out["epoch_unix"] = gmf_out_args.epoch
@@ -128,7 +188,6 @@ GMFOutArgs = namedtuple(
         "sample_numbers",
         "vals",
         "dc",
-        # r_ind,
         "v_ind",
         "a_ind",
         "txp",
@@ -151,13 +210,6 @@ GMFOutArgs = namedtuple(
 ####################################################################
 # H5 VARIABLE DEFINITIONS
 ####################################################################
-# DROPPED - As long as there is no reduction in range dimension
-# "range_index": {
-#     "data": r_ind,
-#     "dims": [("integration_index", "t"), ("ranges", "r")],
-#     "long_name": "If range is reduced, contains the best range index for each left over axis",
-#     "group": "gmf"
-# }
 
 def define_variables(gmf_out_args):
 
