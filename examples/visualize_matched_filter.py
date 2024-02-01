@@ -1,11 +1,28 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.fftpack as fft
 import hardtarget
 import hardtarget.analysis.analysis_utils as analysis_utils
 import digital_rf as drf
 
-target = "/home/danielk/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/"
-config = "/home/danielk/git/hard_target/examples/cfg/test.ini"
+target = "/home/danielk/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf_sim/"
+config = "/home/danielk/git/hard_target/examples/cfg/sim_test.ini"
+chnl = "sim"
+start_time = 5.0
+end_time = 7.0
+relative_time = True
+range_sample = 3665
+acc_ind = 0
+
+
+# target = "/home/danielk/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/"
+# config = "/home/danielk/git/hard_target/examples/cfg/test.ini"
+# chnl = "uhf"
+# start_time = "2021-04-12T12:15:57.5"
+# end_time = "2021-04-12T12:15:57.9"
+# relative_time = False
+# range_sample = 410
+# acc_ind = 76
 
 params = hardtarget.load_gmf_params(target, config)
 
@@ -13,25 +30,24 @@ reader = drf.DigitalRFReader(target)
 
 bounds = analysis_utils.compute_bounds(
     reader,
-    "uhf",
+    chnl,
     params["EXP"]["sample_rate"],
-    start_time="2021-04-12T12:15:57.5",
-    end_time="2021-04-12T12:15:57.9",
-    relative_time=False,
+    start_time=start_time,
+    end_time=end_time,
+    relative_time=relative_time,
 )
-range_sample = 410
-acc_ind = 76
 
 print("Range: ", params["DER"]["ranges"][range_sample]*1e-3, " km")
 print("Acceleration: ", params["DER"]["accelerations"][acc_ind]*1e-3, " km/s^2")
-# breakpoint()
+
 phasors = params["DER"]["acceleration_phasors"][acc_ind]
 rg = params["DER"]["rgs"][range_sample]
+n_ipp = params["PRO"]["n_ipp"]
 
 start_sample = bounds[0]
-delta_samples = params["EXP"]["ipp_samp"] * params["PRO"]["n_ipp"]
+delta_samples = params["EXP"]["ipp_samp"] * n_ipp
 
-z_rx = reader.read_vector_1d(start_sample, delta_samples, "uhf")
+z_rx = reader.read_vector_1d(start_sample, delta_samples, chnl)
 
 samps = np.arange(len(z_rx))
 t = samps / params["EXP"]["sample_rate"]
@@ -50,14 +66,38 @@ rx_window = np.full(rxs.shape, False, dtype=bool)
 rx_window[rg + params["DER"]["rx_window_indices"]] = True
 not_rx_window = np.logical_not(rx_window)
 
-fig = plt.figure(layout="constrained")
-spec = fig.add_gridspec(3, 2)
+xcorr = sel_rxs * txs
+echo = np.sum(xcorr.copy().reshape(-1, params["PRO"]["frequency_decimation"]), axis=-1)
+c_echo = echo * phasors
 
-axes = [
-    fig.add_subplot(spec[0, :]),
-    [fig.add_subplot(spec[1, 0]), fig.add_subplot(spec[1, 1])],
-    [fig.add_subplot(spec[2, 0]), fig.add_subplot(spec[2, 1])],
+dec_sample_rate = params["EXP"]["sample_rate"] // params["PRO"]["frequency_decimation"]
+coh_int = params["EXP"]["tx_pulse_length"] * 1e-6 * n_ipp
+sig_int = params["EXP"]["ipp"] * 1e-6 * n_ipp
+dec_sig_len = int(sig_int * dec_sample_rate)
+dec_sig_samps = np.arange(dec_sig_len)
+dec_signal_vec = np.zeros((dec_sig_len, ), dtype=np.complex64)
+
+dec_txlen = params["EXP"]["tx_pulse_samps"] // params["PRO"]["frequency_decimation"]
+dec_offset = params["DER"]["n_rx_samples"] // params["PRO"]["frequency_decimation"]
+
+base_rx_window = np.arange(dec_txlen, dtype=np.int32)
+rx_window_blocks = [
+    base_rx_window + ind * dec_offset
+    for ind in range(n_ipp)
 ]
+dec_rx_window_indices = np.concatenate(rx_window_blocks)
+
+fvec = params["DER"]["fvec"]
+
+dec_signal_vec[dec_rx_window_indices] = echo
+spec = fft.fft(dec_signal_vec, len(fvec))
+
+c_dec_signal_vec = dec_signal_vec.copy()
+c_dec_signal_vec[dec_rx_window_indices] = c_echo
+c_spec = fft.fft(c_dec_signal_vec, len(fvec))
+
+
+fig, axes = plt.subplots(3, 1)
 
 axes[0].semilogy(t[not_used_sig], np.abs(z_rx[not_used_sig]), ".k")
 axes[0].semilogy(
@@ -73,21 +113,47 @@ axes[0].semilogy(
 axes[0].semilogy(t[params["DER"]["tx_stencil"]], np.abs(z_rx[params["DER"]["tx_stencil"]]), ".r")
 axes[0].set_title("Raw signal power")
 
-axes[1][0].plot(comp_samps, np.real(sel_rxs) / np.sum(np.real(sel_rxs)), "-g", label="RX")
-axes[1][0].plot(comp_samps, np.real(txs) / np.sum(np.real(txs)), "-r", label="TX")
-axes[1][0].set_title("Stenciled signals")
-axes[1][0].legend()
+axes[1].plot(comp_samps, np.real(sel_rxs) / np.sum(np.abs(sel_rxs)), "-g", label="RX")
+axes[1].plot(comp_samps, np.real(txs) / np.sum(np.abs(txs)), "-r", alpha=0.5, label="TX")
+for ind in range(n_ipp):
+    axes[1].axvline(params["EXP"]["tx_pulse_samps"] * (ind + 1), ls="--", c="c")
+axes[1].set_title("Stenciled signals")
+axes[1].legend()
 
-axes[1][1].plot(nfft, np.real(phasors))
-axes[1][1].set_title("Acceleration phasors")
+axes[2].plot(comp_samps, np.real(xcorr), "-k")
+axes[2].plot(comp_samps, np.abs(xcorr), "--b")
+for ind in range(n_ipp):
+    axes[2].axvline(params["EXP"]["tx_pulse_samps"] * (ind + 1), ls="--", c="c")
+axes[2].set_title("Correlated echo")
 
-echo = np.sum((sel_rxs * txs).reshape(-1, params["PRO"]["frequency_decimation"]), axis=-1)
+fig, axes = plt.subplots(3, 2)
 
-axes[2][0].plot(nfft, np.real(echo), "-k")
-axes[2][1].plot(nfft, np.real(echo * phasors), "-b")
+axes[0, 0].plot(comp_samps, np.real(xcorr), "-k")
+axes[0, 0].plot(comp_samps, np.abs(xcorr), "--b")
+for ind in range(n_ipp):
+    axes[0, 0].axvline(params["EXP"]["tx_pulse_samps"] * (ind + 1), ls="--", c="c")
+axes[0, 0].set_title("Correlated echo")
 
-axes[2][0].set_title("Correlated echo")
-axes[2][1].set_title("Acceleration corrected echo")
+axes[0, 1].plot(nfft, np.real(phasors))
+for ind in range(n_ipp):
+    axes[0, 1].axvline(dec_txlen * (ind + 1), ls="--", c="c")
+axes[0, 1].set_title("Acceleration phasors")
+
+axes[1, 0].plot(nfft, np.real(echo), "-k")
+for ind in range(n_ipp):
+    axes[1, 0].axvline(dec_txlen * (ind + 1), ls="--", c="c")
+axes[1, 0].set_title("Correlated & decimated echo")
+
+axes[1, 1].plot(nfft, np.real(c_echo), "-b")
+for ind in range(n_ipp):
+    axes[1, 1].axvline(dec_txlen * (ind + 1), ls="--", c="c")
+axes[1, 1].set_title("Correlated & decimated & acceleration corrected echo")
+
+axes[2, 0].plot(fvec, np.abs(spec), "-k")
+axes[2, 0].set_title("Correlated & decimated echo spectrum")
+
+axes[2, 1].plot(fvec, np.abs(c_spec), "-b")
+axes[2, 1].set_title("Correlated & decimated & acceleration corrected echo spectrum")
 
 
 plt.show()
