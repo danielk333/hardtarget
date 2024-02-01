@@ -195,10 +195,12 @@ def compute_derived_gmf_params(params_exp, params_pro):
     tx_pulse_length = params_exp.get("tx_pulse_length", None)
     if tx_pulse_length is not None:
         tx_pulse_samps = np.round(tx_pulse_length * 1e-6 * sample_rate).astype(np.int64)
-        _assert_msg = "TX pulse lengths does not correspond to tx start and stop values"
-        assert tx_pulse_samps == T_tx_end_samp - T_tx_start_samp, _assert_msg
+        assert tx_pulse_samps == T_tx_end_samp - T_tx_start_samp, (
+            "TX pulse lengths does not correspond to tx start and stop values"
+        )
     else:
         tx_pulse_samps = T_tx_end_samp - T_tx_start_samp
+        params_exp["tx_pulse_length"] = 1e6 * (T_tx_end_samp - T_tx_start_samp) / sample_rate
     params_exp["tx_pulse_samps"] = tx_pulse_samps
 
     # Relevant rx samples
@@ -233,9 +235,21 @@ def compute_derived_gmf_params(params_exp, params_pro):
     # how many extra ipps do we need to read for coherent integration
     params_pro["n_extra"] = ipp_offset
 
+    # Decimated signals
+    dec_sample_rate = sample_rate // frequency_decimation
+    sig_int = ipp * 1e-6 * n_ipp
+    dec_sig_len = int(sig_int * dec_sample_rate)
+    dec_txlen = tx_pulse_samps // frequency_decimation
+    dec_offset = params_der["n_rx_samples"] // frequency_decimation
+    params_der["dec_signal_length"] = dec_sig_len
+
     # length of coherent integration
-    params_pro["n_fft"] = n_ipp * tx_pulse_samps
-    params_pro["decimated_n_fft"] = int(params_pro["n_fft"] / frequency_decimation)
+    params_pro["coh_int_samps"] = n_ipp * tx_pulse_samps
+    params_pro["decimated_coh_int_samps"] = int(params_pro["coh_int_samps"] / frequency_decimation)
+
+    # Length of ffts
+    params_pro["n_fft"] = int(sig_int * sample_rate)
+    params_pro["decimated_n_fft"] = dec_sig_len
 
     # frequency vector
     params_der["fvec"] = fvec = np.fft.fftfreq(
@@ -263,6 +277,21 @@ def compute_derived_gmf_params(params_exp, params_pro):
     # params_der["rx_window_blocks"] = rx_window_blocks
     params_der["rx_window_indices"] = rx_window_indices
 
+    # The following calculates the corresponding windows in the decimated signal
+    # for use for constructing the vector that FFT can operate on
+    dec_base_rx_window = np.arange(dec_txlen, dtype=np.int32)
+    dec_rx_window_blocks = [
+        dec_base_rx_window + ind * dec_offset
+        for ind in range(n_ipp)
+    ]
+    dec_rx_window_indices = np.concatenate(dec_rx_window_blocks)
+    params_der["dec_rx_window_indices"] = dec_rx_window_indices
+
+    # TODO: the sample gates can actually move as a function of velocity + acceleration
+    # so maybe the rx_window_indices should also change so we dont miss samples?
+    # but then the FFT approach stops working, so maybe we should instead pad the
+    # selectors a bit to be sure to always include the signal...
+
     # We are modelling the target at the time of the first tx-pulse scattered
     # of the target, the first sample of the coherent integration
     # is a "good enough" timestamp but its actually that
@@ -280,17 +309,22 @@ def compute_derived_gmf_params(params_exp, params_pro):
     # acceleration_resolution is in radians!
     max_time2 = np.max(times2)
     acc_interval = max_acceleration - min_acceleration
-    max_phase_change = 2.0 * np.pi * (0.5 * acc_interval / wavelength) * max_time2
-    params_pro["n_accelerations"] = int(np.ceil(max_phase_change/acceleration_resolution))
-    if params_pro["n_accelerations"] == 0:
-        params_pro["n_accelerations"] = 1
 
-    params_der["accelerations"] = np.linspace(
-        min_acceleration, max_acceleration, num=params_pro["n_accelerations"]
-    )  # m/s^2
+    # TODO: maybe not? for now make sure we have a 0 acceleration
+    assert min_acceleration <= 0 and max_acceleration >= 0, "acceleration needs to cover 0"
+
+    max_phase_change = 2.0 * np.pi * (0.5 * acc_interval / wavelength) * max_time2
+    n_acc = int(np.ceil(max_phase_change/acceleration_resolution))
+    d_acc = acc_interval / n_acc
+
+    params_der["accelerations"] = np.concatenate([
+        np.arange(min_acceleration, 0, d_acc, dtype=np.float64),
+        np.arange(0, max_acceleration, d_acc, dtype=np.float64),
+    ])  # m/s^2
+    params_pro["n_accelerations"] = len(params_der["accelerations"])
 
     params_der["acceleration_phasors"] = np.zeros(
-        [params_pro["n_accelerations"], params_pro["decimated_n_fft"]],
+        [params_pro["n_accelerations"], params_pro["decimated_coh_int_samps"]],
         dtype=np.complex64,
     )
 
