@@ -12,7 +12,7 @@ def _convert(data, km=True, monostatic=True):
     return _data
 
 
-def plot_peaks(axes, data, meta, monostatic=True, snr_dB_limit=12.0):
+def plot_peaks(axes, data, meta, monostatic=True, snr_dB_limit=15.0):
     r_inds = np.argmax(data["gmf"], axis=1)
     coh_inds = np.arange(data["gmf"].shape[0])
 
@@ -76,7 +76,7 @@ def plot_peaks(axes, data, meta, monostatic=True, snr_dB_limit=12.0):
     return axes, None
 
 
-def plot_detections(axes, data, meta, monostatic=True, snr_dB_limit=12.0):
+def plot_detections(axes, data, meta, monostatic=True, snr_dB_limit=15.0):
     r_inds = np.argmax(data["gmf"], axis=1)
     coh_inds = np.arange(data["gmf"].shape[0])
 
