@@ -337,6 +337,11 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     z_rx = z_rx[rx_stencil]
     z_tx = z_tx[tx_stencil]
 
+    # TODO: generalize a preprocess filtering of 0 tx power
+    # since it can cause unnessary slowdowns depending on experiment setup
+    # e.g. a tx signal with multiple pulses with pauses between can be faster
+    # computed by skipping the 0-tx periods inside the tx interval
+
     # conjugate, so that when matched filtering, it will cancel out phase of transmit waveform.
     # scale transmit waveform to unity power
     tx_amp2 = np.sum(np.abs(z_tx) ** 2.0)
