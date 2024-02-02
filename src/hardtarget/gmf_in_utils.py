@@ -1,5 +1,6 @@
 import configparser
 import numpy as np
+import scipy.fft as fft
 import scipy.constants
 import pathlib
 from hardtarget import drf_utils
@@ -252,7 +253,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     params_pro["decimated_n_fft"] = dec_sig_len
 
     # frequency vector
-    params_der["fvec"] = fvec = np.fft.fftfreq(
+    params_der["fvec"] = fvec = fft.fftfreq(
         params_pro["decimated_n_fft"],
         d=frequency_decimation / sample_rate,
     )  # Hz
