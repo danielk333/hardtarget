@@ -28,10 +28,17 @@ def parser_build(parser):
     parser.add_argument("--relative_time", action="store_true")
     parser.add_argument("--clobber", action="store_true", help="Override outputs")
     parser.add_argument(
-        "-g",
+        "-G",
         "--gmflib",
         choices=["numpy", "c", "cuda"],
         help="GMF implementation",
+        default=None,
+    )
+    parser.add_argument(
+        "-g",
+        "--gmf_optimize_lib",
+        choices=["numpy", "c", "cuda"],
+        help="If one wants to use a different lib for GMF fine-tuning",
         default=None,
     )
     parser.add_argument(
@@ -82,6 +89,7 @@ def main(args):
         config=args.config,
         job=job,
         gmflib=args.gmflib,
+        gmf_optimize_lib=args.gmf_optimize_lib,
         clobber=args.clobber,
         output=args.output,
         start_time=args.start_time,

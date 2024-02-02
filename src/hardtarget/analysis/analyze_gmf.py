@@ -3,7 +3,7 @@ import numpy as np
 import time
 from tqdm import tqdm
 from pathlib import Path
-from hardtarget.gmf import GMF_LIBS
+from hardtarget.gmf import GMF_GRID_LIBS, GMF_OPTIMIZE_LIBS
 from hardtarget.gmf_in_utils import load_gmf_params, GMFVariables
 from hardtarget.gmf_out_utils import GMFOutArgs, dump_gmf_out
 
@@ -38,6 +38,7 @@ def compute_gmf(
     clobber=False,
     output=None,
     gmflib=None,
+    gmf_optimize_lib=None,
 ):
     """
     Analyze data using gmf.
@@ -75,9 +76,18 @@ def compute_gmf(
     params_der = gmf_params["DER"]
 
     # override config file
+    # the gmflib parameter assumes the same lib source should be used for grid and fine tuning
+    # unless explicitly set differently
     if gmflib is not None:
-        params_pro["gmflib"] = gmflib
-    logger.info("Using GMF backend: " + params_pro["gmflib"])
+        params_pro["gmf_grid_lib"] = gmflib
+
+    if gmf_optimize_lib is not None:
+        params_pro["gmf_optimize_lib"] = gmf_optimize_lib
+    elif gmflib is not None:
+        params_pro["gmf_optimize_lib"] = gmflib
+
+    logger.info("Using GMF grid backend: " + params_pro["gmf_grid_lib"])
+    logger.info("Using GMF optimize backend: " + params_pro["gmf_optimize_lib"])
 
     # bounds
     bounds = a_utils.compute_bounds(
@@ -137,7 +147,8 @@ def compute_gmf(
         gmf_r_ind = []
         gmf_v_ind = []
         gmf_a_ind = []
-
+        peaks = []
+        peak_vals = []
         # filename outfile
         file_idx_sample = task_idx * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
 
@@ -177,6 +188,8 @@ def compute_gmf(
             gmf_r_ind.append(gmf_vars.r_ind)
             gmf_v_ind.append(gmf_vars.v_ind)
             gmf_a_ind.append(gmf_vars.a_ind)
+            peaks.append(gmf_vars.peak)
+            peak_vals.append(gmf_vars.peak_val)
             gmf_txp.append(gmf_tx)
 
             if progress and subprogress:
@@ -192,6 +205,8 @@ def compute_gmf(
         gmf_r_ind = np.stack(gmf_r_ind, axis=0)
         gmf_v_ind = np.stack(gmf_v_ind, axis=0)
         gmf_a_ind = np.stack(gmf_a_ind, axis=0)
+        peaks = np.stack(peaks, axis=0)
+        peak_vals = np.stack(peak_vals, axis=0)
 
         # log
         info = {
@@ -230,6 +245,8 @@ def compute_gmf(
                 v_vec=v_vec,
                 a_vec=a_vec,
                 g_vec=g_vec,
+                peaks=peaks,
+                peak_vals=peak_vals,
                 rgs=gmf_params["DER"]["rgs"],
                 fvec=gmf_params["DER"]["fvec"],
                 decimated_sample_times=gmf_params["DER"]["decimated_sample_times"],
@@ -305,10 +322,30 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     params_der = gmf_params["DER"]
 
     # gmf lib
-    gmf_lib_name = params_pro.get("gmflib", None)
-    if gmf_lib_name is None or gmf_lib_name not in GMF_LIBS:
-        gmf_lib_name = "c" if "c" in GMF_LIBS else "numpy"
-    gmf_lib = GMF_LIBS[gmf_lib_name]
+    gmf_lib_name = params_pro.get("gmf_grid_lib", None)
+    if gmf_lib_name is None:
+        gmf_lib_name = "c" if "c" in GMF_GRID_LIBS else "numpy"
+    elif gmf_lib_name not in GMF_GRID_LIBS:
+        raise ValueError(
+            f"Requested GMF gird lib '{gmf_lib_name}' not found in "
+            "available libs, possible compilation errors in extensions\n"
+            f"GMF_GRID_LIBS = {list(GMF_GRID_LIBS.keys())}"
+        )
+    gmf_lib = GMF_GRID_LIBS[gmf_lib_name]
+
+    if gmf_params["PRO"].get("gmf_fine_tune", True):
+        gmfo_lib_name = params_pro.get("gmf_optimize_lib", None)
+        if gmfo_lib_name is None:
+            gmfo_lib_name = "c" if "c" in GMF_OPTIMIZE_LIBS else "numpy"
+        elif gmfo_lib_name not in GMF_OPTIMIZE_LIBS:
+            raise ValueError(
+                f"Requested GMF optimize lib '{gmfo_lib_name}' not found in "
+                "available libs, possible compilation errors in extensions\n"
+                f"GMF_OPTIMIZE_LIBS = {list(GMF_OPTIMIZE_LIBS.keys())}"
+            )
+        gmfo_lib = GMF_OPTIMIZE_LIBS[gmfo_lib_name]
+    else:
+        gmfo_lib = None
 
     kwargs = {}
     if gmf_lib_name == "cuda":
@@ -326,15 +363,15 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     tx_reader, tx_channel = tx
 
     # read data vector with n_ipp + n_extra ipp's (to allow for searching across to subsequent pulses)
-    z_rx = rx_reader.read_vector_1d(start_sample, params_pro["read_length"], rx_channel)
+    z_ipp = rx_reader.read_vector_1d(start_sample, params_pro["read_length"], rx_channel)
 
     if tx_channel != rx_channel or tx_reader != rx_reader:
         z_tx = tx_reader.read_vector_1d(start_sample, params_pro["read_length"], tx_channel)
     else:
-        z_tx = np.copy(z_rx)
+        z_tx = np.copy(z_ipp)
 
     # clean ground clutter, get separate transmit waveform and echo vectors
-    z_rx = z_rx[rx_stencil]
+    z_rx = z_ipp[rx_stencil].copy()
     z_tx = z_tx[tx_stencil]
 
     # TODO: generalize a preprocess filtering of 0 tx power
@@ -354,6 +391,8 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
         r_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),
         v_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),
         a_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),
+        peak = np.full((3,), np.nan, dtype=np.float32),
+        peak_val = np.full((1,), np.nan, dtype=np.float32),
     )
 
     if tx_amp > 1.0:
@@ -364,5 +403,20 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
             gmf_params,
             **kwargs
         )
+        if gmfo_lib is not None:
+            max_ind = np.argmax(np.abs(gmf_vars.vals))
+            gmf_start = np.array([
+                gmf_params["DER"]["ranges"][max_ind],
+                gmf_params["DER"]["range_rates"][gmf_vars.v_ind[max_ind]],
+                gmf_params["DER"]["accelerations"][gmf_vars.a_ind[max_ind]],
+            ])
+            opt_result = gmfo_lib(
+                z_tx,
+                z_ipp,
+                gmf_params,
+                gmf_start,
+            )
+            gmf_vars.peak[:] = opt_result.x
+            gmf_vars.peak_val[0] = opt_result.fun
 
     return gmf_vars, tx_amp2

@@ -21,6 +21,7 @@ def collect_gmf_data(paths, mats=None, vecs=None):
         # Default mats
         mats = [
             "gmf",
+            "gmf_optimized_peak",
             "gmf_zero_frequency",
             "range_rate_index",
             "acceleration_index",
@@ -32,6 +33,7 @@ def collect_gmf_data(paths, mats=None, vecs=None):
             "range_peak",
             "range_rate_peak",
             "acceleration_peak",
+            "gmf_optimized",
             "gmf_peak",
             "tx_power",
             "t"
@@ -303,6 +305,8 @@ GMFOutArgs = namedtuple(
         "v_vec",
         "a_vec",
         "g_vec",
+        "peaks",
+        "peak_vals",
         "rgs",
         "fvec",
         "decimated_sample_times",
@@ -368,6 +372,18 @@ def define_variables(gmf_out_args):
             "data": gmf_out_args.vals,
             "dims": [("integration_index", "t"), ("ranges", "r")],
             "long_name": "Generalized Matched Filter output values",
+            # "group": "gmf"
+        },
+        "gmf_optimized_peak": {
+            "data": gmf_out_args.peaks,
+            "dims": [("integration_index", "t")],
+            "long_name": "Fine tuned range, range-rate and acceleration",
+            # "group": "gmf"
+        },
+        "gmf_optimized": {
+            "data": gmf_out_args.peak_vals,
+            "dims": [("integration_index", "t")],
+            "long_name": "Generalized Matched Filter fine tuned peak output values",
             # "group": "gmf"
         },
         "gmf_zero_frequency": {

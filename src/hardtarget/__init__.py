@@ -7,7 +7,7 @@ from . import simulation
 from . import noise
 
 # Constants and singletons
-from .gmf import GMF_LIBS
+from .gmf import GMF_GRID_LIBS, GMF_OPTIMIZE_LIBS
 from .experiments import EXP_FILES
 
 # Functions

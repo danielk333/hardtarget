@@ -20,6 +20,8 @@ GMFVariables = namedtuple(
         "r_ind",  # best fitting range
         "v_ind",  # best fitting range-rate
         "a_ind",  # best fitting range-rate change
+        "peak",  # fine-tuned peak in range, range-rate & range-rate change
+        "peak_val",  # value of fine-tuned peak
     ],
 )
 
@@ -31,7 +33,9 @@ GMFVariables = namedtuple(
 ####################################################################
 
 DEFAULT_PARAMS = {
-    "gmflib": "c",
+    "gmf_grid_lib": "c",
+    "gmf_optimize_lib": "c",
+    "gmf_fine_tune": True,
     "node_gpus": 1,
     "n_ipp": 5,
     "ipp_offset": 0,
@@ -310,6 +314,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     dec_rx_window_indices = np.concatenate(dec_rx_window_blocks)
     params_der["dec_rx_window_indices"] = dec_rx_window_indices
 
+    # TODO: check all index and time assumptions, if one was wrong the more can be...
     # TODO: the sample gates can actually move as a function of velocity + acceleration
     # so maybe the rx_window_indices should also change so we dont miss-align samples?
 

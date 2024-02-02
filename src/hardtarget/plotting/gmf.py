@@ -22,54 +22,49 @@ def plot_peaks(axes, data, meta, monostatic=True, snr_dB_limit=15.0):
             monostatic = False
 
     snr = noise.snr(data["gmf"], data["nf_range"])
+
+    # TODO: use a interpolation of nf-range to determine the SNR of the optimized results
+    # snr = noise.snr(data["gmf_optimized"], data["nf_range"])
     snr = snr[coh_inds, r_inds]
     snrdb = 10 * np.log10(snr)
 
     inds = snrdb > snr_dB_limit
     not_inds = np.logical_not(inds)
 
+    # _inds0_sty = dict(marker="x", alpha=0.5, ls="none", color="r")
     _inds_sty = dict(marker=".", ls="none", color="r")
     _not_inds_sty = dict(marker=".", ls="none", color="b")
 
-    axes[0, 0].plot(
-        data["t"][inds], _convert(data["range_peak"][inds], monostatic=monostatic), **_inds_sty
-    )
-    axes[0, 0].plot(
-        data["t"][not_inds],
-        _convert(data["range_peak"][not_inds], monostatic=monostatic),
-        **_not_inds_sty,
-    )
+    t = data["t"]
+    r = _convert(data["range_peak"], monostatic=monostatic)
+    v = _convert(data["range_rate_peak"], monostatic=monostatic)
+    a = _convert(data["acceleration_peak"], monostatic=monostatic, km=False)
+
+    # TODO: while the optimization does not work, dont plot the results
+    # r0 = _convert(data["gmf_optimized_peak"][:, 0], monostatic=monostatic)
+    # v0 = _convert(data["gmf_optimized_peak"][:, 1], monostatic=monostatic)
+    # a0 = _convert(data["gmf_optimized_peak"][:, 2], monostatic=monostatic, km=False)
+
+    axes[0, 0].plot(t[inds], r[inds], **_inds_sty)
+    # axes[0, 0].plot(t[inds], r0[inds], **_inds0_sty)
+    axes[0, 0].plot(t[not_inds], r[not_inds], **_not_inds_sty)
     axes[0, 0].set_xlabel("Time [s]")
     axes[0, 0].set_ylabel("range [km]")
 
-    axes[0, 1].plot(
-        data["t"][inds],
-        _convert(data["range_rate_peak"][inds], monostatic=monostatic),
-        **_inds_sty
-    )
-    axes[0, 1].plot(
-        data["t"][not_inds],
-        _convert(data["range_rate_peak"][not_inds], monostatic=monostatic),
-        **_not_inds_sty,
-    )
+    axes[0, 1].plot(t[inds], v[inds], **_inds_sty)
+    # axes[0, 1].plot(t[inds], v0[inds], **_inds0_sty)
+    axes[0, 1].plot(t[not_inds], v[not_inds], **_not_inds_sty)
     axes[0, 1].set_xlabel("Time [s]")
     axes[0, 1].set_ylabel("range rate [km/s]")
 
-    axes[1, 0].plot(
-        data["t"][inds],
-        _convert(data["acceleration_peak"][inds], km=False, monostatic=monostatic),
-        **_inds_sty,
-    )
-    axes[1, 0].plot(
-        data["t"][not_inds],
-        _convert(data["acceleration_peak"][not_inds], km=False, monostatic=monostatic),
-        **_not_inds_sty,
-    )
+    axes[1, 0].plot(t[inds], a[inds], **_inds_sty)
+    # axes[1, 0].plot(t[inds], a0[inds], **_inds0_sty)
+    axes[1, 0].plot(t[not_inds], a[not_inds], **_not_inds_sty)
     axes[1, 0].set_xlabel("Time [s]")
     axes[1, 0].set_ylabel("acceleration [m/s/s]")
 
-    axes[1, 1].plot(data["t"][inds], np.sqrt(snr[inds]), **_inds_sty)
-    axes[1, 1].plot(data["t"][not_inds], np.sqrt(snr[not_inds]), **_not_inds_sty)
+    axes[1, 1].plot(t[inds], np.sqrt(snr[inds]), **_inds_sty)
+    axes[1, 1].plot(t[not_inds], np.sqrt(snr[not_inds]), **_not_inds_sty)
     axes[1, 1].set_xlabel("Time [s]")
     axes[1, 1].set_ylabel("sqrt(SNR)")
 

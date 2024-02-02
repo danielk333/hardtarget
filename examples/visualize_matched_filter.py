@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy.fftpack as fft
+import scipy.fft as fft
 import hardtarget
 import hardtarget.analysis.analysis_utils as analysis_utils
 import digital_rf as drf
@@ -49,7 +49,7 @@ delta_samples = params["EXP"]["ipp_samp"] * n_ipp
 
 z_rx = reader.read_vector_1d(start_sample, delta_samples, chnl)
 
-samps = np.arange(len(z_rx))
+samps = np.arange(delta_samples)
 t = samps / params["EXP"]["sample_rate"]
 
 not_used_sig = np.full(t.shape, True, dtype=bool)
@@ -70,27 +70,15 @@ xcorr = sel_rxs * txs
 echo = np.sum(xcorr.copy().reshape(-1, params["PRO"]["frequency_decimation"]), axis=-1)
 c_echo = echo * phasors
 
-dec_sample_rate = params["EXP"]["sample_rate"] // params["PRO"]["frequency_decimation"]
-coh_int = params["EXP"]["tx_pulse_length"] * 1e-6 * n_ipp
-sig_int = params["EXP"]["ipp"] * 1e-6 * n_ipp
-dec_sig_len = int(sig_int * dec_sample_rate)
-dec_sig_samps = np.arange(dec_sig_len)
-dec_signal_vec = np.zeros((dec_sig_len, ), dtype=np.complex64)
-
 dec_txlen = params["EXP"]["tx_pulse_samps"] // params["PRO"]["frequency_decimation"]
-dec_offset = params["DER"]["n_rx_samples"] // params["PRO"]["frequency_decimation"]
-
-base_rx_window = np.arange(dec_txlen, dtype=np.int32)
-rx_window_blocks = [
-    base_rx_window + ind * dec_offset
-    for ind in range(n_ipp)
-]
-dec_rx_window_indices = np.concatenate(rx_window_blocks)
+dec_sig_samps = np.arange(params["DER"]["dec_signal_length"])
+dec_signal_vec = np.zeros((params["DER"]["dec_signal_length"], ), dtype=np.complex64)
+dec_rx_window_indices = params["DER"]["dec_rx_window_indices"]
 
 fvec = params["DER"]["fvec"]
 
 dec_signal_vec[dec_rx_window_indices] = echo
-spec = fft.fft(dec_signal_vec, len(fvec))
+spec = fft.fft(dec_signal_vec)
 
 c_dec_signal_vec = dec_signal_vec.copy()
 c_dec_signal_vec[dec_rx_window_indices] = c_echo
