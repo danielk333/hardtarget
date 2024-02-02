@@ -13,6 +13,7 @@ def parser_build(parser):
     parser.add_argument("-e", "--end_time", default=None)
     parser.add_argument("--relative_time", action="store_true")
     parser.add_argument("--chunk_size", type=int, default=0)
+    parser.add_argument("--snr_dB_limit", type=float, default=15.0)
     parser.add_argument("--not_monostatic", action="store_true")
     return parser
 
@@ -34,10 +35,22 @@ def main(args):
 
     for data, meta in data_generator:
         fig, axes = plt.subplots(2, 2)
-        gmf.plot_peaks(axes, data, meta, monostatic=not args.not_monostatic)
+        gmf.plot_peaks(
+            axes,
+            data,
+            meta,
+            monostatic=not args.not_monostatic,
+            snr_dB_limit=args.snr_dB_limit,
+        )
 
         fig, axes = plt.subplots(2, 3)
-        gmf.plot_detections(axes, data, meta, monostatic=not args.not_monostatic)
+        gmf.plot_detections(
+            axes,
+            data,
+            meta,
+            monostatic=not args.not_monostatic,
+            snr_dB_limit=args.snr_dB_limit,
+        )
 
         fig = plt.figure()
         gs = gridspec.GridSpec(2, 2, figure=fig)
