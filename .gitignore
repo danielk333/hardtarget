@@ -10,6 +10,7 @@
 
 #vs-code
 .vscode
+*.code*
 
 #drawio
 **/*.bkp
