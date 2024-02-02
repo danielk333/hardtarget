@@ -1,5 +1,6 @@
 CC = gcc
-CFLAGS = -fPIC -shared -g
+all: CFLAGS = -fPIC -shared
+debug: CFLAGS = -fPIC -shared -g
 LIBS = -lfftw3f
 INSTALL = ../hardtarget/gmf
 
@@ -9,6 +10,7 @@ OUTLIB=gmfclib$(EXT)
 INSTALLLIB=$(INSTALL)/$(OUTLIB)
 
 all: $(INSTALLLIB) $(OUTLIB)
+debug: $(INSTALLLIB) $(OUTLIB)
 
 $(OUTLIB): $(SOURCES)
 	@echo "gmfclib installation -> Linking shared library $(OUTLIB) ..."

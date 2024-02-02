@@ -1,5 +1,6 @@
 CC = nvcc
-CFLAGS = --compiler-options '-fPIC' -shared -g -G
+all: CFLAGS = --compiler-options '-fPIC' -shared
+debug: CFLAGS = --compiler-options '-fPIC' -shared -g -G
 LIBS = -lcufft
 INSTALL = ../hardtarget/gmf
 
@@ -9,6 +10,7 @@ OUTLIB=gmfcudalib$(EXT)
 INSTALLLIB=$(INSTALL)/$(OUTLIB)
 
 all: $(INSTALLLIB) $(OUTLIB)
+debug: $(INSTALLLIB) $(OUTLIB)
 
 $(OUTLIB): $(SOURCES)
 	@echo "gmfcudalib installation -> Linking shared library $(OUTLIB) ..."
