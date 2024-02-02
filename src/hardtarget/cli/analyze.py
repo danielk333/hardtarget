@@ -37,7 +37,7 @@ def parser_build(parser):
     parser.add_argument(
         "-g",
         "--gmf_optimize_lib",
-        choices=["numpy", "c", "cuda"],
+        choices=["numpy", "c", "cuda", "no"],
         help="If one wants to use a different lib for GMF fine-tuning",
         default=None,
     )

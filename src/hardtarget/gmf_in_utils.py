@@ -320,14 +320,13 @@ def compute_derived_gmf_params(params_exp, params_pro):
 
     # We are modelling the target parameters at the time of the first cycle sample
     # calculate midpoint of decimated vectors (going to highest level inds: cycle samples)
-    rx_win_cycle_inds = params_der["rx_stencil_indices"][rx_window_indices]
-    rx_win_dec = np.mean(rx_win_cycle_inds.reshape(-1, frequency_decimation), axis=-1)
+    rx_win_t = params_der["rx_stencil_indices"][rx_window_indices] / sample_rate
+    rx_win_t_dec = np.mean(rx_win_t.reshape(-1, frequency_decimation), axis=-1)
 
     # Time vector relative detected range-gate
-    times = rx_win_dec / sample_rate
-    times2 = times**2.0
-    params_der["decimated_sample_times"] = times
-    params_der["sample_times"] = rx_win_cycle_inds / sample_rate
+    times2 = rx_win_t_dec**2.0
+    params_der["decimated_sample_times"] = rx_win_t_dec
+    params_der["sample_times"] = rx_win_t
 
     # acceleration sampled with steps at the end of the coherent integration window
     # acceleration_resolution is in radians!

@@ -85,6 +85,8 @@ def compute_gmf(
         params_pro["gmf_optimize_lib"] = gmf_optimize_lib
     elif gmflib is not None:
         params_pro["gmf_optimize_lib"] = gmflib
+    if params_pro["gmf_optimize_lib"] == "no":
+        params_pro["gmf_fine_tune"] = False
 
     logger.info("Using GMF grid backend: " + params_pro["gmf_grid_lib"])
     logger.info("Using GMF optimize backend: " + params_pro["gmf_optimize_lib"])
