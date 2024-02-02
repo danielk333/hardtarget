@@ -227,7 +227,8 @@ def load_gmf_out(
 ####################################################################
 
 def dump_gmf_out(gmf_out_args, gmf_params, outfile):
-
+    # TODO: it should be an option to dump a minimalist version of the gmf_out since
+    #       it now has _a lot_ of metadata and parameters that might not be needed
     out = h5py.File(outfile, "w")
 
     # VARIABLES

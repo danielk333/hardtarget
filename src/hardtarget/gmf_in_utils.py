@@ -236,12 +236,33 @@ def compute_derived_gmf_params(params_exp, params_pro):
     # how many extra ipps do we need to read for coherent integration
     params_pro["n_extra"] = ipp_offset
 
+    # Read length to include all pulses to be searched
+    params_pro["read_length"] = (n_ipp + ipp_offset) * ipp_samp
+
+    # this stencil is used to block tx pulses and ground clutter
+    params_der["rx_stencil"] = np.full((params_pro["read_length"],), False, dtype=bool)
+    # this stencil is used to select tx pulses
+    params_der["tx_stencil"] = np.full((params_pro["read_length"],), False, dtype=bool)
+
+    # for each coherently integrated IPP, create stencils
+    for k in range(n_ipp):
+        rx0 = ((k + ipp_offset) * ipp_samp + stencil_start_samp)
+        rx1 = ((k + ipp_offset) * ipp_samp + T_rx_end_samp)
+        params_der["rx_stencil"][rx0:rx1] = True
+
+        tx0 = (k * ipp_samp + T_tx_start_samp)
+        tx1 = (k * ipp_samp + T_tx_end_samp)
+        params_der["tx_stencil"][tx0:tx1] = True
+
+    params_der["rx_stencil_indices"] = np.argwhere(params_der["rx_stencil"]).flatten()
+    params_der["tx_stencil_indices"] = np.argwhere(params_der["tx_stencil"]).flatten()
+
     # Decimated signals
     dec_sample_rate = sample_rate // frequency_decimation
-    sig_int = ipp * 1e-6 * n_ipp
+    sig_int = ipp * 1e-6 * (n_ipp + ipp_offset)
     dec_sig_len = int(sig_int * dec_sample_rate)
     dec_txlen = tx_pulse_samps // frequency_decimation
-    dec_offset = params_der["n_rx_samples"] // frequency_decimation
+    dec_ipp_samp = ipp_samp // frequency_decimation
     params_der["dec_signal_length"] = dec_sig_len
 
     # length of coherent integration
@@ -266,7 +287,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     params_der["range_rates"] = range_rates  # m/s
     params_pro["n_range_rates"] = len(range_rates)
 
-    # cyclic range gate selector
+    # cyclic range gate selector - in the index space of stenciled RX signals
     # TODO: this can be generalized for a-periodic codes ect
     base_rx_window = np.arange(params_exp["tx_pulse_samps"], dtype=np.int32)
     rx_window_blocks = [
@@ -280,31 +301,28 @@ def compute_derived_gmf_params(params_exp, params_pro):
 
     # The following calculates the corresponding windows in the decimated signal
     # for use for constructing the vector that FFT can operate on
+    #  - in the index ipp cycle, not of stenciled RX signals
     dec_base_rx_window = np.arange(dec_txlen, dtype=np.int32)
     dec_rx_window_blocks = [
-        dec_base_rx_window + ind * dec_offset
+        dec_base_rx_window + ind * dec_ipp_samp
         for ind in range(n_ipp)
     ]
     dec_rx_window_indices = np.concatenate(dec_rx_window_blocks)
     params_der["dec_rx_window_indices"] = dec_rx_window_indices
 
     # TODO: the sample gates can actually move as a function of velocity + acceleration
-    # so maybe the rx_window_indices should also change so we dont miss samples?
-    # but then the FFT approach stops working, so maybe we should instead pad the
-    # selectors a bit to be sure to always include the signal...
+    # so maybe the rx_window_indices should also change so we dont miss-align samples?
 
-    # We are modelling the target at the time of the first tx-pulse scattered
-    # of the target, the first sample of the coherent integration
-    # is a "good enough" timestamp but its actually that
-    # + (range_gate + stencil_start_samp)/2 for monostatic
-
-    # calculate midpoint of decimated vectors
-    rx_win_dec = np.mean(rx_window_indices.copy().reshape(-1, frequency_decimation), axis=-1)
+    # We are modelling the target parameters at the time of the first cycle sample
+    # calculate midpoint of decimated vectors (going to highest level inds: cycle samples)
+    rx_win_cycle_inds = params_der["rx_stencil_indices"][rx_window_indices]
+    rx_win_dec = np.mean(rx_win_cycle_inds.reshape(-1, frequency_decimation), axis=-1)
 
     # Time vector relative detected range-gate
     times = rx_win_dec / sample_rate
     times2 = times**2.0
     params_der["decimated_sample_times"] = times
+    params_der["sample_times"] = rx_win_cycle_inds / sample_rate
 
     # acceleration sampled with steps at the end of the coherent integration window
     # acceleration_resolution is in radians!
@@ -334,24 +352,6 @@ def compute_derived_gmf_params(params_exp, params_pro):
         params_der["acceleration_phasors"][ai, :] = np.exp(
             -1j * 2.0 * np.pi * (doppler_sign * 0.5 * acc / wavelength) * times2
         )
-
-    # Read length to include all pulses to be searched
-    params_pro["read_length"] = (n_ipp + ipp_offset) * ipp_samp
-
-    # this stencil is used to block tx pulses and ground clutter
-    params_der["rx_stencil"] = np.full((params_pro["read_length"],), False, dtype=bool)
-    # this stencil is used to select tx pulses
-    params_der["tx_stencil"] = np.full((params_pro["read_length"],), False, dtype=bool)
-
-    # for each coherently integrated IPP, create stencils
-    for k in range(n_ipp):
-        rx0 = ((k + ipp_offset) * ipp_samp + stencil_start_samp)
-        rx1 = ((k + ipp_offset) * ipp_samp + T_rx_end_samp)
-        params_der["rx_stencil"][rx0:rx1] = True
-
-        tx0 = (k * ipp_samp + T_tx_start_samp)
-        tx1 = (k * ipp_samp + T_tx_end_samp)
-        params_der["tx_stencil"][tx0:tx1] = True
 
     reduce_axis = [
         params_pro["reduce_range"],
