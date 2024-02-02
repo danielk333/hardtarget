@@ -1,5 +1,5 @@
 import numpy as np
-import scipy.fftpack as fft
+import scipy.fft as fft
 
 
 def gmfnp(z_tx, z_rx, gmf_variables, gmf_params):
