@@ -192,7 +192,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     ipp_samp = np.round(ipp * 1e-6 * sample_rate).astype(np.int64)
     params_exp["ipp_samp"] = ipp_samp
 
-    # Use np.round and case to int to avoid floating point errors in floor
+    # Use np.round and cast to int to avoid floating point errors in floor
     T_rx_start_samp = np.round(rx_start * 1e-6 * sample_rate).astype(np.int64)
     T_rx_end_samp = np.round(rx_end * 1e-6 * sample_rate).astype(np.int64)
     T_tx_start_samp = np.round(tx_start * 1e-6 * sample_rate).astype(np.int64)
@@ -226,13 +226,15 @@ def compute_derived_gmf_params(params_exp, params_pro):
     # reset range gates
     # range gates to search through
     # range gates are relative to tx start
-    rgs = np.arange(min_range_gate, max_range_gate, range_gate_step, dtype=np.int32)
+    _rgs = np.arange(min_range_gate, max_range_gate, range_gate_step, dtype=np.int32)
     # total propagation range
     # TODO - assumes config round_trip_range is True
-    ranges = (rgs - T_tx_start_samp) * scipy.constants.c / sample_rate  # m
+    ranges = (_rgs - T_tx_start_samp) * scipy.constants.c / sample_rate  # m
 
     # make relative the stencil start
-    rgs -= stencil_start_samp
+    rgs = _rgs - stencil_start_samp
+    params_der["abs_rgs"] = _rgs
+    params_der["dec_rgs"] = (_rgs / frequency_decimation).astype(np.int32)
     params_der["rgs"] = rgs
     params_der["ranges"] = ranges
     params_pro["n_ranges"] = len(ranges)
@@ -262,23 +264,26 @@ def compute_derived_gmf_params(params_exp, params_pro):
     params_der["tx_stencil_indices"] = np.argwhere(params_der["tx_stencil"]).flatten()
 
     # Decimated signals
-    dec_sample_rate = sample_rate // frequency_decimation
-    sig_int = ipp * 1e-6 * (n_ipp + ipp_offset)
-    dec_sig_len = int(sig_int * dec_sample_rate)
-    dec_txlen = tx_pulse_samps // frequency_decimation
-    dec_ipp_samp = ipp_samp // frequency_decimation
+    dec_sample_rate = np.round(sample_rate / frequency_decimation).astype(np.int64)
+    total_signal_length = ipp * 1e-6 * (n_ipp + ipp_offset)
+    dec_sig_len = np.round(total_signal_length * dec_sample_rate).astype(np.int64)
+    dec_txlen = np.round(tx_pulse_samps / frequency_decimation).astype(np.int64)
+    dec_ipp_samp = np.round(ipp_samp / frequency_decimation).astype(np.int64)
+    dec_T_tx_start_samp = np.round(T_tx_start_samp / frequency_decimation).astype(np.int64)
     params_der["dec_signal_length"] = dec_sig_len
 
     # length of coherent integration
     params_pro["coh_int_samps"] = n_ipp * tx_pulse_samps
-    params_pro["decimated_coh_int_samps"] = int(params_pro["coh_int_samps"] / frequency_decimation)
+    params_pro["decimated_coh_int_samps"] = np.round(
+        params_pro["coh_int_samps"] / frequency_decimation
+    ).astype(np.int64)
 
     # Length of ffts
-    params_pro["n_fft"] = int(sig_int * sample_rate)
+    # params_pro["n_fft"] = np.round(total_signal_length * sample_rate).astype(np.int64)
     params_pro["decimated_n_fft"] = dec_sig_len
 
     # frequency vector
-    params_der["fvec"] = fvec = fft.fftfreq(
+    params_der["fvec"] = fft.fftfreq(
         params_pro["decimated_n_fft"],
         d=frequency_decimation / sample_rate,
     )  # Hz
@@ -287,7 +292,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     wavelength = scipy.constants.c / (radar_frequency * 1e6)
     params_exp["wavelength"] = wavelength
 
-    range_rates = doppler_sign * wavelength * fvec
+    range_rates = doppler_sign * wavelength * params_der["fvec"]
     params_der["range_rates"] = range_rates  # m/s
     params_pro["n_range_rates"] = len(range_rates)
 
@@ -306,9 +311,9 @@ def compute_derived_gmf_params(params_exp, params_pro):
     # The following calculates the corresponding windows in the decimated signal
     # for use for constructing the vector that FFT can operate on
     #  - in the index ipp cycle, not of stenciled RX signals
-    dec_base_rx_window = np.arange(dec_txlen, dtype=np.int32)
+    dec_base_rx_window = np.arange(dec_txlen, dtype=np.int32) + dec_T_tx_start_samp
     dec_rx_window_blocks = [
-        dec_base_rx_window + ind * dec_ipp_samp
+        dec_base_rx_window + (ind + ipp_offset) * dec_ipp_samp
         for ind in range(n_ipp)
     ]
     dec_rx_window_indices = np.concatenate(dec_rx_window_blocks)
@@ -337,7 +342,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     assert min_acceleration <= 0 and max_acceleration >= 0, "acceleration needs to cover 0"
 
     max_phase_change = 2.0 * np.pi * (0.5 * acc_interval / wavelength) * max_time2
-    n_acc = int(np.ceil(max_phase_change/acceleration_resolution))
+    n_acc = np.ceil(max_phase_change/acceleration_resolution).astype(np.int64)
     d_acc = acc_interval / n_acc
 
     params_der["accelerations"] = np.concatenate([
