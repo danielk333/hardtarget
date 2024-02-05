@@ -50,8 +50,8 @@ def gmfnp(z_tx, z_rx, gmf_variables, gmf_params):
             _gmfo = np.abs(fft.fft(decimated_signal)) ** 2
             mi = np.argmax(_gmfo)
             if ai == 0:
-                # gmf_dc_vec is the range-dependent noise floor
                 # zero-frequency (DC) component in scipy.fft.fft output[0] according to docs
+                # used to get range-dependent noise floor
                 gmf_variables.dc[ri] = _gmfo[0]
 
             if _gmfo[mi] > gmf_variables.vals[ri]:
@@ -70,11 +70,7 @@ def gmfnp_optimize(z_tx, z_ipp, gmf_params, gmf_start):
     Here z_ipp is the entire rx sample vector, not the stenciled one as the
     stencils are done by the gmf forward model
 
-    # TODO: is this reasoning correct?
-    This step can actually do sub-range-gate resolution because of possible
-    gate-hopping (if the target is halfway trough a gate, causing a gate shift in
-    the last integrated ipp that would not have occured if it was at the start of
-    the gate, the value at half the gate will have a higher gmf value)
+    # TODO: make this function stable and working
     """
     def neg_gmf_direct(x, sample_t, wavelength, sample_rate, z_tx, z_ipp):
         r = x[0] + x[1]*sample_t + 0.5*x[2]*sample_t**2.0
@@ -126,5 +122,26 @@ def gmfnp_no_reduce(z_tx, z_rx, gmf_variables, gmf_params):
             if ai == 0:
                 # gmf_dc_vec is the range-dependent noise floor
                 gmf_variables.dc[ri] = _gmfo[0]
-
-            gmf_variables.vals[ri, :, ai] = _gmfo
+            indexing = tuple(
+                z
+                for zi, z in enumerate([ri, 0, ai])
+                if not gmf_params["PRO"]["reduce_axis"][zi]
+            )
+            if gmf_params["PRO"]["reduce_axis"][1]:
+                vi = np.argmax(_gmfo)
+                current_val = _gmfo[vi]
+                old_val = gmf_variables.vals[*indexing]
+                if current_val > old_val:
+                    gmf_variables.vals[*indexing] = current_val
+                    gmf_variables.r_ind[*indexing] = ri
+                    gmf_variables.v_ind[*indexing] = vi
+                    gmf_variables.a_ind[*indexing] = ai
+            else:
+                for vi in range(len(_gmfo)):
+                    current_val = _gmfo[vi]
+                    old_val = gmf_variables.vals[*indexing]
+                    if current_val > old_val:
+                        gmf_variables.vals[*indexing] = current_val
+                        gmf_variables.r_ind[*indexing] = ri
+                        gmf_variables.v_ind[*indexing] = vi
+                        gmf_variables.a_ind[*indexing] = ai
