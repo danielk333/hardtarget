@@ -197,13 +197,13 @@ def define_variables(gmf_out_args):
             "data": gmf_out_args.vals,
             "dims": [("integration_index", "t"), ("ranges", "r")],
             "long_name": "Generalized Matched Filter output values",
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "gmf_zero_frequency": {
             "data": gmf_out_args.dc,
             "dims": [("integration_index", "t"), ("ranges", "r")],
             "long_name": "Range dependant noise floor (0-frequency gmf output)",
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "range_rate_index": {
             "data": gmf_out_args.v_ind,
@@ -211,7 +211,7 @@ def define_variables(gmf_out_args):
             "long_name": (
                 "If range_rate is reduced, contains the best range rate index "
                 "for each left over axis"),
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "acceleration_index": {
             "data": gmf_out_args.a_ind,
@@ -219,38 +219,38 @@ def define_variables(gmf_out_args):
             "long_name": (
                 "If acceleration is reduced, contains the best acceleration "
                 "index for each left over axis"),
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "tx_power": {
             "data": gmf_out_args.txp,
             "dims": [("integration_index", "t")],
             "long_name": "Measured transmitted power",
             "units": "W",
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "range_peak": {
             "data": gmf_out_args.r_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Range at peak GMF",
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "range_rate_peak": {
             "data": gmf_out_args.v_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Range rate at peak GMF",
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "acceleration_peak": {
             "data": gmf_out_args.a_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Acceleration at peak GMF",
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "gmf_peak": {
             "data": gmf_out_args.g_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Peak GMF",
-            #"group": "gmf"
+            # "group": "gmf"
         },
         "rgs": {
             "data": gmf_out_args.rgs,

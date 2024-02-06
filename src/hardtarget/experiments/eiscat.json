@@ -1,0 +1,555 @@
+[
+    {
+        "date": "20101125",
+        "experiment": "leo_sat_1.0l_EI",
+        "type": "32",
+        "hours": 0.30,
+        "size": 1.83
+    },
+    {
+        "date": "20101125",
+        "experiment": "leo_sat_1.0l_EI",
+        "type": "42",
+        "hours": 0.50,
+        "size": 3.15
+    },
+    {
+        "date": "20101128",
+        "experiment": "leo_sat_1.0u_EI",
+        "type": "UHF",
+        "hours": 0.00,
+        "size": 0.01
+    },
+    {
+        "date": "20101129",
+        "experiment": "leo_sat_1.0u_EI",
+        "type": "UHF",
+        "hours": 1.40,
+        "size": 9.43
+    },
+    {
+        "date": "20101201",
+        "experiment": "leo_sat_1.0u_EI",
+        "type": "UHF",
+        "hours": 9.70,
+        "size": 63.90
+    },
+    {
+        "date": "20101202",
+        "experiment": "leo_sat_1.0u_EI",
+        "type": "UHF",
+        "hours": 1.10,
+        "size": 7.13
+    },
+    {
+        "date": "20101203",
+        "experiment": "leo_sat_1.0u_EI",
+        "type": "UHF",
+        "hours": 7.80,
+        "size": 51.55
+    },
+    {
+        "date": "20101204",
+        "experiment": "leo_sat_1.0u_EI",
+        "type": "UHF",
+        "hours": 5.60,
+        "size": 36.69
+    },
+    {
+        "date": "20120616",
+        "experiment": "leo_sat_1.0u_EI",
+        "type": "UHF",
+        "hours": 0.00,
+        "size": 0.05
+    },
+    {
+        "date": "20121109",
+        "experiment": "leo_sat_1.0u_EI",
+        "type": "UHF",
+        "hours": 1.40,
+        "size": 8.14
+    },
+    {
+        "date": "20121113",
+        "experiment": "leo_sat_1.0u_EI",
+        "type": "UHF",
+        "hours": 0.20,
+        "size": 1.10
+    },
+    {
+        "date": "20150923",
+        "experiment": "leo_bpark_2.0u_EI",
+        "type": "UHF",
+        "hours": 2.00,
+        "size": 12.15
+    },
+    {
+        "date": "20151019",
+        "experiment": "leo_bpark_2.0_CN",
+        "type": "32",
+        "hours": 13.00,
+        "size": 105.60
+    },
+    {
+        "date": "20151020",
+        "experiment": "leo_bpark_2.0_CN",
+        "type": "32",
+        "hours": 11.00,
+        "size": 82.67
+    },
+    {
+        "date": "20151022",
+        "experiment": "leo_bpark_2.1u_CN",
+        "type": "UHF",
+        "hours": 11.00,
+        "size": 71.84
+    },
+    {
+        "date": "20151022",
+        "experiment": "leo_bpark_2.0_CN",
+        "type": "32",
+        "hours": 13.00,
+        "size": 105.33
+    },
+    {
+        "date": "20151023",
+        "experiment": "leo_bpark_2.0_CN",
+        "type": "32",
+        "hours": 5.00,
+        "size": 37.41
+    },
+    {
+        "date": "20151027",
+        "experiment": "leo_bpark_2.2_EI",
+        "type": "42",
+        "hours": 1.00,
+        "size": 7.29
+    },
+    {
+        "date": "20160906",
+        "experiment": "leo_pwait_2.3u_3P",
+        "type": "UHF",
+        "hours": 12.00,
+        "size": 78.57
+    },
+    {
+        "date": "20160906",
+        "experiment": "leo_pwait_2.3v_3P",
+        "type": "VHF",
+        "hours": 1.90,
+        "size": 27.19
+    },
+    {
+        "date": "20160906",
+        "experiment": "leo_pwait_2.3r_3P",
+        "type": "KIR",
+        "hours": 2.00,
+        "size": 6.82
+    },
+    {
+        "date": "20160906",
+        "experiment": "leo_pwait_2.3r_3P",
+        "type": "SOD",
+        "hours": 2.00,
+        "size": 6.83
+    },
+    {
+        "date": "20160919",
+        "experiment": "leo_bpark_2.3v_EI",
+        "type": "VHF",
+        "hours": 0.10,
+        "size": 1.79
+    },
+    {
+        "date": "20160921",
+        "experiment": "leo_pwait_2.3v_3P",
+        "type": "VHF",
+        "hours": 0.20,
+        "size": 2.19
+    },
+    {
+        "date": "20160921",
+        "experiment": "leo_pwait_2.3u_3P",
+        "type": "UHF",
+        "hours": 0.20,
+        "size": 1.28
+    },
+    {
+        "date": "20161003",
+        "experiment": "leo_bpark_2.1u_CN",
+        "type": "UHF",
+        "hours": 13.50,
+        "size": 94.24
+    },
+    {
+        "date": "20161004",
+        "experiment": "leo_bpark_2.1u_CN",
+        "type": "UHF",
+        "hours": 24.00,
+        "size": 162.29
+    },
+    {
+        "date": "20161005",
+        "experiment": "leo_bpark_2.1u_CN",
+        "type": "UHF",
+        "hours": 10.50,
+        "size": 68.29
+    },
+    {
+        "date": "20161021",
+        "experiment": "leo_bpark_2.5u_3P",
+        "type": "UHF",
+        "hours": 0.10,
+        "size": 1.77
+    },
+    {
+        "date": "20161021",
+        "experiment": "leo_bpark_2.4u_3P",
+        "type": "UHF",
+        "hours": 0.30,
+        "size": 1.94
+    },
+    {
+        "date": "20161022",
+        "experiment": "leo_pwait_2.4u_3P",
+        "type": "UHF",
+        "hours": 2.80,
+        "size": 18.00
+    },
+    {
+        "date": "20161022",
+        "experiment": "leo_pwait_2.5u_3P",
+        "type": "UHF",
+        "hours": 1.10,
+        "size": 18.49
+    },
+    {
+        "date": "20161023",
+        "experiment": "leo_bpark_2.5u_EI",
+        "type": "UHF",
+        "hours": 0.00,
+        "size": 0.11
+    },
+    {
+        "date": "20161031",
+        "experiment": "leo_pwait_2.4u_3P",
+        "type": "UHF",
+        "hours": 0.70,
+        "size": 4.79
+    },
+    {
+        "date": "20161101",
+        "experiment": "leo_pwait_2.4u_3P",
+        "type": "UHF",
+        "hours": 0.90,
+        "size": 3.11
+    },
+    {
+        "date": "20161206",
+        "experiment": "leo_bpark_2.2_EI",
+        "type": "32",
+        "hours": 2.00,
+        "size": 15.08
+    },
+    {
+        "date": "20170113",
+        "experiment": "leo_bpark_2.2_NI",
+        "type": "32",
+        "hours": 16.00,
+        "size": 119.63
+    },
+    {
+        "date": "20180104",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 12.00,
+        "size": 85.23
+    },
+    {
+        "date": "20180104",
+        "experiment": "leo_bpark_2.2_NO",
+        "type": "32",
+        "hours": 12.00,
+        "size": 97.27
+    },
+    {
+        "date": "20180105",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 12.00,
+        "size": 79.13
+    },
+    {
+        "date": "20180105",
+        "experiment": "leo_bpark_2.2_NO",
+        "type": "32",
+        "hours": 12.00,
+        "size": 89.42
+    },
+    {
+        "date": "20180201",
+        "experiment": "leo_bpark_2.2_NI",
+        "type": "32",
+        "hours": 7.00,
+        "size": 52.51
+    },
+    {
+        "date": "20180202",
+        "experiment": "leo_bpark_2.2_NI",
+        "type": "32",
+        "hours": 6.00,
+        "size": 44.86
+    },
+    {
+        "date": "20181213",
+        "experiment": "leo_bpark_2.2_NO",
+        "type": "32",
+        "hours": 0.00,
+        "size": 0.22
+    },
+    {
+        "date": "20181213",
+        "experiment": "leo_bpark_2.2_NI",
+        "type": "32",
+        "hours": 12.70,
+        "size": 96.71
+    },
+    {
+        "date": "20190402",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 12.70,
+        "size": 90.61
+    },
+    {
+        "date": "20190403",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 12.10,
+        "size": 80.01
+    },
+    {
+        "date": "20190405",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 4.00,
+        "size": 26.51
+    },
+    {
+        "date": "20190606",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 11.70,
+        "size": 83.35
+    },
+    {
+        "date": "20190607",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 12.50,
+        "size": 81.49
+    },
+    {
+        "date": "20191216",
+        "experiment": "leo_bpark_2.2_NI",
+        "type": "32",
+        "hours": 7.00,
+        "size": 51.96
+    },
+    {
+        "date": "20191217",
+        "experiment": "leo_bpark_2.2_NI",
+        "type": "32",
+        "hours": 7.20,
+        "size": 53.05
+    },
+    {
+        "date": "20201205",
+        "experiment": "leo_bpark_2.2_NI",
+        "type": "32",
+        "hours": 14.00,
+        "size": 113.12
+    },
+    {
+        "date": "20201206",
+        "experiment": "leo_bpark_2.2_NI",
+        "type": "32",
+        "hours": 7.00,
+        "size": 57.27
+    },
+    {
+        "date": "20210412",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 12.10,
+        "size": 88.15
+    },
+    {
+        "date": "20210413",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 12.00,
+        "size": 81.07
+    },
+    {
+        "date": "20211119",
+        "experiment": "leo_bpark_2.2_SW",
+        "type": "32",
+        "hours": 5.30,
+        "size": 46.75
+    },
+    {
+        "date": "20211120",
+        "experiment": "leo_bpark_2.2_SW",
+        "type": "32",
+        "hours": 19.00,
+        "size": 140.04
+    },
+    {
+        "date": "20211122",
+        "experiment": "leo_bpark_2.1u_SW",
+        "type": "UHF",
+        "hours": 1.20,
+        "size": 7.89
+    },
+    {
+        "date": "20211123",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 7.00,
+        "size": 47.50
+    },
+    {
+        "date": "20211123",
+        "experiment": "leo_bpark_2.2_SW",
+        "type": "32",
+        "hours": 8.00,
+        "size": 59.17
+    },
+    {
+        "date": "20211125",
+        "experiment": "leo_bpark_2.1u_SW",
+        "type": "UHF",
+        "hours": 6.90,
+        "size": 47.36
+    },
+    {
+        "date": "20211125",
+        "experiment": "leo_bpark_2.2_SW",
+        "type": "42",
+        "hours": 3.90,
+        "size": 31.58
+    },
+    {
+        "date": "20211129",
+        "experiment": "leo_bpark_2.1u_SW",
+        "type": "UHF",
+        "hours": 17.00,
+        "size": 115.60
+    },
+    {
+        "date": "20211129",
+        "experiment": "leo_bpark_2.2_SW",
+        "type": "42",
+        "hours": 7.40,
+        "size": 59.44
+    },
+    {
+        "date": "20211130",
+        "experiment": "leo_bpark_2.1u_SW",
+        "type": "UHF",
+        "hours": 7.00,
+        "size": 47.55
+    },
+    {
+        "date": "20220215",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 0.50,
+        "size": 4.33
+    },
+    {
+        "date": "20220303",
+        "experiment": "leo_bpark_2.2_NI",
+        "type": "42",
+        "hours": 7.00,
+        "size": 59.00
+    },
+    {
+        "date": "20220304",
+        "experiment": "leo_bpark_2.2_NI",
+        "type": "42",
+        "hours": 7.00,
+        "size": 59.82
+    },
+    {
+        "date": "20220405",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 12.10,
+        "size": 83.60
+    },
+    {
+        "date": "20220405",
+        "experiment": "leo_bpark_2.2_SE",
+        "type": "42",
+        "hours": 12.00,
+        "size": 110.81
+    },
+    {
+        "date": "20220406",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 13.70,
+        "size": 95.37
+    },
+    {
+        "date": "20220406",
+        "experiment": "leo_bpark_2.2_SE",
+        "type": "42",
+        "hours": 12.00,
+        "size": 102.24
+    },
+    {
+        "date": "20220408",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 0.50,
+        "size": 3.38
+    },
+    {
+        "date": "20221116",
+        "experiment": "leo_bpark_2.1u_NO",
+        "type": "UHF",
+        "hours": 4.00,
+        "size": 26.62
+    },
+    {
+        "date": "20230301",
+        "experiment": "leo_bpark_2.2_NI",
+        "type": "42",
+        "hours": 8.00,
+        "size": 63.21
+    },
+    {
+        "date": "20230301",
+        "experiment": "leo_bpark_2.2_NI",
+        "type": "32",
+        "hours": 0.90,
+        "size": 7.12
+    },
+    {
+        "date": "20230917",
+        "experiment": "leo_bpark_2.1u_SW",
+        "type": "UHF",
+        "hours": 9.60,
+        "size": 65.55
+    },
+    {
+        "date": "20230918",
+        "experiment": "leo_bpark_2.1u_SW",
+        "type": "UHF",
+        "hours": 14.30,
+        "size": 96.26
+    }
+]
