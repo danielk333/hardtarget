@@ -13,6 +13,7 @@ def parser_build(parser):
     parser.add_argument("--relative_time", action="store_true")
     parser.add_argument("--axis_units", action="store_true")
     parser.add_argument("--log", action="store_true")
+    parser.add_argument("--keep-tx", action="store_true")
     parser.add_argument(
         "--clutter_removal",
         type=float,
@@ -40,6 +41,7 @@ def main(args):
         axis_units=args.axis_units,
         log=args.log,
         clutter_removal=args.clutter_removal,
+        keep_tx=args.keep_tx,
     )
 
     plt.show()

@@ -4,6 +4,7 @@ import numpy as np
 import digital_rf as drf
 from hardtarget import drf_utils
 
+
 ####################################################################
 # DIGITAL RF READERS
 ####################################################################
@@ -125,4 +126,3 @@ def get_filepath(epoch_unix_us):
     dt = datetime.datetime.utcfromtimestamp(epoch_unix_us*1e-6)
     time_string = dt.strftime("%Y-%m-%dT%H-00-00")
     return Path(time_string) / f"gmf-{epoch_unix_us:08d}.h5"
-

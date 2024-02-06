@@ -9,7 +9,7 @@ import bz2
 import logging
 import configparser
 from pathlib import Path
-from hardtarget.experiments import EXP_FILES
+from hardtarget.experiments import load_expconfig
 
 """
 Convert Eiscat raw data to DRF format
@@ -122,18 +122,6 @@ def expinfo_split(xpinf):
         raise ValueError(f"d_ExpInfo: {xpinf} not understood: {e}")
 
 
-def load_expconfig(xpname):
-    cfg_name = xpname + ".ini"
-    assert cfg_name in EXP_FILES, "experiment not found in pre-defined configurations"
-    cfg_file = EXP_FILES[cfg_name]
-    try:
-        cfg = configparser.ConfigParser()
-        cfg.read_file(open(cfg_file, "r"))
-        return cfg
-    except Exception as e:
-        raise ValueError(f"Couldn't open config file for {xpname}:" + str(e))
-
-
 ####################################################################
 # EISCAT CONVERT
 ####################################################################
@@ -178,6 +166,7 @@ def eiscat_convert(srcdir, logger, dstdir=None, compression_level=0):
         files = [srcdir]
     else:
         files = list(all_files(srcdir))
+    files.sort()
 
     #######################################################################
     # EXTRACT META DATA
@@ -250,7 +239,7 @@ def eiscat_convert(srcdir, logger, dstdir=None, compression_level=0):
     logger.info(f"writing DRF from {n_files} input files")
     for idx, pth in enumerate(files):
         if idx + 1 == n_files or idx % 10 == 0:
-            logger.info(f"write progress {idx+1}/{n_files}")
+            logger.debug(f"write progress {idx+1}/{n_files}")
         mat = loadmat(pth)
         n0 = determine_n0(mat, cfv)
         logger.debug(f"n_samp {n0 - n_prev} (should be {n_samples})")
@@ -279,7 +268,7 @@ def eiscat_convert(srcdir, logger, dstdir=None, compression_level=0):
     #######################################################################
 
     EXP_SECTION = "Experiment"
-    meta = configparser.ConfigParser()  
+    meta = configparser.ConfigParser()
     meta.add_section(EXP_SECTION)
     exp = meta[EXP_SECTION]
     exp["name"] = expname

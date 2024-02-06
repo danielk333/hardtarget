@@ -6,13 +6,13 @@ hardtarget convert eiscat ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf \
 hardtarget gmf ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/ uhf \
     --config ./examples/cfg/test.ini \
     -o ~/data/spade/beamparks_analyzed/leo_bpark_2.1u_NO@uhf/ \
-    --progress -g cuda
+    --progress -G cuda
 
 # To re-analyze the DRF portion with the echo
 hardtarget gmf ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/ uhf \
     --config ./examples/cfg/test.ini \
     -o ~/data/spade/beamparks_analyzed/leo_bpark_2.1u_NO@uhf/ \
-    --progress -g cuda --clobber \
+    --progress -G cuda --clobber \
     -s "2021-04-12T12:15:40" -e "2021-04-12T12:16:10"
 
 

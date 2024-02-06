@@ -30,38 +30,45 @@ Choosing FFTW plan flag, citing [fftw.org docs](https://www.fftw.org/fftw3_doc/P
   Range-Velocity-Acceleration matched filter
 
   todo optimizations:
-  - avx
-  - range dependent acceleration grid. The expected acceleration is a function
-    of altitude. we only would need to search through a finite grid around
-    the expected value. This would save a lot of computation.
+    - avx
+    - range dependent acceleration grid. The expected acceleration is a function
+      of altitude. we only would need to search through a finite grid around
+      the expected value. This would save a lot of computation.
 
-    Here the input signals are complex but interpreted as floats making 
-    them 2*len long and interpreted as [ind0_re, ind0_im, ind0_re...]
+  Notes:
+    - Here the input signals are complex but interpreted as floats making 
+      them 2*len long and interpreted as [ind0_re, ind0_im, ind0_re...]
 
  */
-int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors, int n_accs, int *rgs, int n_rg,
-        int dec, float *gmf_vec, float *gmf_dc_vec, int *v_vec, int *a_vec, int *rx_window) {
+int gmf(
+    float *z_tx, int z_tx_len, float *z_rx, int z_rx_len,
+    float *acc_phasors, int n_accs, int *rgs, int n_rg,
+    int dec, float *gmf_vec, float *gmf_dc_vec, int *v_vec, 
+    int *a_vec, int *rx_window, int *dec_rx_inds, int dec_signal_len
+) {
     fftwf_complex *echo;
     fftwf_complex *in;
     fftwf_complex *out;
 
     fftwf_plan p;
-    int nfft2;
+    int echo_len;
 
-    nfft2 = (int)(z_tx_len / dec);
-    echo = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
-    in = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
-    out = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*nfft2);
+    echo_len = (int)(z_tx_len / dec);
+    echo = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*echo_len);
+    in = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*dec_signal_len);
+    out = (fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex)*dec_signal_len);
 
-    p = fftwf_plan_dft_1d(nfft2, in, out, FFTW_FORWARD, FFT_PLAN_ID);
+    p = fftwf_plan_dft_1d(dec_signal_len, in, out, FFTW_FORWARD, FFT_PLAN_ID);
 
     // for each range gate
     for (int ri = 0; ri < n_rg; ri++) {
 #ifdef ECHO
         // zero echo
-        for (int fi = 0; fi < nfft2; fi++) {
+        for (int fi = 0; fi < echo_len; fi++) {
             echo[fi][0] = 0.0;
             echo[fi][1] = 0.0;
+        }
+        for (int fi = 0; fi < dec_signal_len; fi++) {
             in[fi][0] = 0.0;
             in[fi][1] = 0.0;
         }
@@ -81,17 +88,17 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
         // add range gate dependent accelerations
         for (int ai = 0; ai < n_accs; ai++) {
 #ifdef ACC_MULT
-            int phasor_i = 2*ai*nfft2;
+            int phasor_i = 2*ai*echo_len;
             // echo*acc_phasors
             float rep, imp;
-            for (int tidx = 0; tidx < nfft2; tidx++) {
+            for (int tidx = 0; tidx < echo_len; tidx++) {
                 rep = acc_phasors[phasor_i + 2*tidx];
                 imp = acc_phasors[phasor_i + 2*tidx + 1];
 
                 // rea*reb - ima*imb
-                in[tidx][0] = echo[tidx][0]*rep - echo[tidx][1]*imp;
+                in[dec_rx_inds[tidx]][0] = echo[tidx][0]*rep - echo[tidx][1]*imp;
                 // rea*imb + ima*reb
-                in[tidx][1] = echo[tidx][0]*imp + echo[tidx][1]*rep;
+                in[dec_rx_inds[tidx]][1] = echo[tidx][0]*imp + echo[tidx][1]*rep;
             }
 #endif
 #ifdef FFT_VECTOR
@@ -100,9 +107,10 @@ int gmf(float *z_tx, int z_tx_len, float *z_rx, int z_rx_len, float *acc_phasors
 #endif
 #ifdef PEAK_SEARCH
             float gmf2;
-            for (int ti = 0; ti < nfft2; ti++) {
+            for (int ti = 0; ti < dec_signal_len; ti++) {
                 gmf2 = out[ti][0]*out[ti][0] + out[ti][1]*out[ti][1];
                 if (ai == 0 && ti == 0) {
+                    // zero-frequency (DC) component in FFTW out[0] according to docs
                     gmf_dc_vec[ri] = gmf2;
                 }
                 if (gmf2 > gmf_vec[ri]) {

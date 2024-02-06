@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 
-import numpy as n
+import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import digital_rf as drf
 import os
 import scipy.interpolate as sint
-import scipy.constants as c
-
-from ..utilities import read_vector_c81d
-from ..config import Config
+import scipy.constants as consts
 
 
 class interp_fun:
@@ -20,8 +17,8 @@ class interp_fun:
         self.mints = mints
 
     def rfun(self, t):
-        print(n.min(t))
-        idx = n.where((n.min(t) >= self.t0) & (n.min(t) < self.t1))[0]
+        print(np.min(t))
+        idx = np.where((np.min(t) >= self.t0) & (np.min(t) < self.t1))[0]
         print(idx)
         idx = idx[0]
         o = self.pfs[idx](t - self.mints[idx])
@@ -46,28 +43,28 @@ class raw_sim:
         self.sr = int(sr)
         self.ipp = int(ipp)
         self.n_bits = int(pulse_len / bit_len)
-        self.wavelength = c.c / self.freq
+        self.wavelength = consts.c / self.freq
         self.code = code
-        n.random.seed(code_seed)
+        np.random.seed(code_seed)
 
     def interp_funs(self, t, r, dt=1.0):
-        self.n_t = int(n.floor((n.max(t) - n.min(t)) / dt))
+        self.n_t = int(np.floor((np.max(t) - np.min(t)) / dt))
 
-        t0 = n.arange(self.n_t) * dt + n.min(t) - 0.1
+        t0 = np.arange(self.n_t) * dt + np.min(t) - 0.1
         t1 = t0 + dt
-        t1[-1] = n.max(t) + 0.1
+        t1[-1] = np.max(t) + 0.1
         pfs = []
         mints = []
 
         for i in range(self.n_t):
-            tidx = n.where((t > t0[i]) & (t < t1[i]))[0]
+            tidx = np.where((t > t0[i]) & (t < t1[i]))[0]
             print(i)
             print(tidx)
             print(t0[i])
             print(t1[i])
-            mint = n.min(t[tidx])
-            p = n.polyfit(t[tidx] - mint, r[tidx], 2)
-            pf = n.poly1d(p)
+            mint = np.min(t[tidx])
+            p = np.polyfit(t[tidx] - mint, r[tidx], 2)
+            pf = np.poly1d(p)
             pfs.append(pf)
             mints.append(mint)
         return interp_fun(t0, t1, pfs, mints)
@@ -83,8 +80,8 @@ class raw_sim:
 
         t = d["t"]
 
-        min_t = n.min(t)
-        max_t = n.max(t)
+        min_t = np.min(t)
+        max_t = np.max(t)
         delta_t = max_t - min_t
 
         # how many ipps do we simulate
@@ -110,13 +107,13 @@ class raw_sim:
                         #                        rfun=sint.interp1d(po["t"],po["range"],kind="cubic")
                         snrfun = sint.interp1d(po["t"], po["snr"])
                         rrfun = sint.interp1d(po["t"], po["range_rate"])
-                        rrdt = n.diff(po["t"])[0]
-                        rrrfun = sint.interp1d(po["t"], n.gradient(po["range_rate"], rrdt))
+                        rrdt = np.diff(po["t"])[0]
+                        rrrfun = sint.interp1d(po["t"], np.gradient(po["range_rate"], rrdt))
                         #
                         passes.append(
                             {
-                                "t0": n.min(po["t"]),
-                                "t1": n.max(po["t"]),
+                                "t0": np.min(po["t"]),
+                                "t1": np.max(po["t"]),
                                 "oid": oi,
                                 "rxi": rxi,
                                 "po": po,
@@ -138,7 +135,7 @@ class raw_sim:
         arrs = []
 
         # samples since 1970 of first data sample
-        i0 = int(n.min(t) * self.sr)
+        i0 = int(np.min(t) * self.sr)
 
         # create tx channel
         tx_chdir = "%s/tx" % (dirname)
@@ -148,7 +145,7 @@ class raw_sim:
         # digital rf write object
         tx_dwo = drf.DigitalRFWriter(
             tx_chdir,  # directory
-            n.complex64,  # dtype
+            np.complex64,  # dtype
             3600,  # subdir_cadence_secs
             1000,  # file_cadence_millisecs
             i0,  # start_global_index
@@ -162,7 +159,7 @@ class raw_sim:
             True,  # is_continuous
             True,
         )  # marching_periods
-        txz = n.zeros(self.ipp, dtype=n.complex64)
+        txz = np.zeros(self.ipp, dtype=np.complex64)
 
         for rxi in range(n_rx):
             chdir = "%s/ch%03d" % (dirname, rxi)
@@ -170,7 +167,7 @@ class raw_sim:
             os.system("mkdir -p %s" % (chdir))
             dwo = drf.DigitalRFWriter(
                 chdir,  # directory
-                n.complex64,  # dtype
+                np.complex64,  # dtype
                 3600,  # subdir_cadence_secs
                 1000,  # file_cadence_millisecs
                 i0,  # start_global_index
@@ -184,7 +181,7 @@ class raw_sim:
                 True,  # is_continuous
                 True,
             )  # marching_periods
-            arr = n.zeros(self.ipp, dtype=n.complex64)
+            arr = np.zeros(self.ipp, dtype=np.complex64)
             dwos.append(dwo)
             arrs.append(arr)
 
@@ -192,7 +189,7 @@ class raw_sim:
 
         # time vector
         # self.ipp in the number of samples in an ipp
-        tipp = n.arange(self.ipp + 1, dtype=n.float64) / float(self.sr)
+        tipp = np.arange(self.ipp + 1, dtype=np.float64) / float(self.sr)
 
         print("n_rx %d" % (n_rx))
         print("generating tx")
@@ -202,8 +199,8 @@ class raw_sim:
             txz[:] = 0.0
             for bi in range(self.n_bits):
                 if self.code:
-                    txz[(bi * self.bit_len) : (bi * self.bit_len + self.bit_len)] = n.complex64(
-                        n.sign(n.random.randn(1))
+                    txz[(bi * self.bit_len) : (bi * self.bit_len + self.bit_len)] = np.complex64(
+                        np.sign(np.random.randn(1))
                     )
                 else:
                     txz[(bi * self.bit_len) : (bi * self.bit_len + self.bit_len)] = 1.0
@@ -233,12 +230,12 @@ class raw_sim:
                     rdelta = po["rfun"].rfun(tnow + tipp)
 
                     rdelta = rdelta - rdelta[0]
-                    phase = n.mod(2.0 * n.pi * rdelta / self.wavelength, 2 * n.pi)
-                    csin = n.exp(1j * phase) * n.exp(1j * po["phase"])
-                    po["phase"] = n.angle(csin[-1])
+                    phase = np.mod(2.0 * np.pi * rdelta / self.wavelength, 2 * np.pi)
+                    csin = np.exp(1j * phase) * np.exp(1j * po["phase"])
+                    po["phase"] = np.angle(csin[-1])
 
                     # total propagation range in samples
-                    rs = int(n.round((po["rfun"].rfun(tnow) / c.c) * self.sr))
+                    rs = int(np.round((po["rfun"].rfun(tnow) / consts.c) * self.sr))
 
                     print(
                         "pass visible! t=%1.2f rs %d rxi %d oid %d r %1.2f rr %1.2f rrr %1.2f"
@@ -276,27 +273,11 @@ class raw_sim:
             dwos[rxi].close()
 
 
-class Simulator(Config):
+def hardtarget_simulation(config):
     """
     Simulate some raw voltage
     """
-
-    @classmethod
-    def get_default(cls):
-        return {
-            "sim_opts": {
-                "r0": 1000e3,
-                "v0": 2e3,
-                "a0": 80.0,
-                "ipp": 10000,
-                "tx_len": 2000,
-                "bit_len": 100,
-                "n_ipp": 100,
-                "freq": 230e6,
-                "sr": 1000000,
-                "snr": 30,
-            }
-        }
+    
 
     def _set_values(self):
         self.dirname = self["sim_opts"]["dirname"]
@@ -311,7 +292,7 @@ class Simulator(Config):
         self.tx_len = int(self["sim_opts"]["tx_len"])
         self.bit_len = int(self["sim_opts"]["bit_len"])
         self.snr = float(self["sim_opts"]["snr"])
-        self.wavelength = c.c / float(self["sim_opts"]["freq"])
+        self.wavelength = consts.c / float(self["sim_opts"]["freq"])
         self.n_bits = int(self.tx_len / self.bit_len)  # self['int(tx_len/bit_len)']
 
     def __init__(self, dir):
@@ -329,7 +310,7 @@ class Simulator(Config):
         # digital rf write object
         tx_dwo = drf.DigitalRFWriter(
             tx_chdir,  # directory
-            n.complex64,  # dtype
+            np.complex64,  # dtype
             3600,  # subdir_cadence_secs
             100,  # file_cadence_millisecs
             i0,  # start_global_index
@@ -344,7 +325,7 @@ class Simulator(Config):
             True,
         )  # marching_periods
 
-        txz = n.zeros(self.ipp, dtype=n.complex64)
+        txz = np.zeros(self.ipp, dtype=np.complex64)
 
         rxi = 0
         chdir = "%s/ch%03d" % (self.dirname, rxi)
@@ -353,7 +334,7 @@ class Simulator(Config):
 
         dwo = drf.DigitalRFWriter(
             chdir,  # directory
-            n.complex64,  # dtype
+            np.complex64,  # dtype
             3600,  # subdir_cadence_secs
             100,  # file_cadence_millisecs
             i0,  # start_global_index
@@ -368,9 +349,9 @@ class Simulator(Config):
             True,
         )  # marching_periods
 
-        rxz = n.zeros(self.ipp, dtype=n.complex64)
+        rxz = np.zeros(self.ipp, dtype=np.complex64)
 
-        tipp = n.arange(self.ipp + 1, dtype=n.float64) / float(self.sr)
+        tipp = np.arange(self.ipp + 1, dtype=np.float64) / float(self.sr)
 
         tx_pwr = 1.0
 
@@ -384,25 +365,25 @@ class Simulator(Config):
             txz[:] = 0.0
             for bi in range(self.n_bits):
                 # random phase code
-                txz[(bi * self.bit_len) : (bi * self.bit_len + self.bit_len)] = n.complex64(
-                    n.sign(n.random.randn(1))
+                txz[(bi * self.bit_len) : (bi * self.bit_len + self.bit_len)] = np.complex64(
+                    np.sign(np.random.randn(1))
                 )
 
-            tx_dwo.rf_write(n.array(txz, dtype=n.complex64))
+            tx_dwo.rf_write(np.array(txz, dtype=np.complex64))
 
             rvec = self.r0 + self.v0 * (tipp + tnow) + 0.5 * self.a0 * (tipp + tnow) ** 2.0
-            rg = int(self.sr * rvec[0] / c.c)
+            rg = int(self.sr * rvec[0] / consts.c)
 
             #            print("%d %d %1.2f %1.2f"%(i,rg,tnow,self.v0+self.a0*(tipp[0]+tnow)))
-            phase = n.fmod(2.0 * n.pi * rvec / self.wavelength, 2.0 * n.pi)
-            echo = n.roll(txz, rg) * n.exp(1j * phase[0 : self.ipp])
+            phase = np.fmod(2.0 * np.pi * rvec / self.wavelength, 2.0 * np.pi)
+            echo = np.roll(txz, rg) * np.exp(1j * phase[0 : self.ipp])
 
-            noise = n.array(
-                n.random.randn(self.ipp) + 1j * n.random.randn(self.ipp), dtype=n.complex64
-            ) * (n.sqrt(noise_pwr) / n.sqrt(2.0))
+            noise = np.array(
+                np.random.randn(self.ipp) + 1j * np.random.randn(self.ipp), dtype=np.complex64
+            ) * (np.sqrt(noise_pwr) / np.sqrt(2.0))
             rxz[:] = echo + noise
 
-            dwo.rf_write(n.array(rxz, dtype=n.complex64))
+            dwo.rf_write(np.array(rxz, dtype=np.complex64))
 
 
 if __name__ == "__main__":

@@ -30,6 +30,8 @@ if __libpath__.is_file():
         ctypes.POINTER(ctypes.c_int),
         ctypes.POINTER(ctypes.c_int),
         ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.c_int,
         ctypes.c_int,
     ]
 
@@ -50,6 +52,8 @@ def gmfcu(z_tx, z_rx, gmf_variables, gmf_params, gpu_id=0):
     rgs = gmf_params["DER"]["rgs"]
     frequency_decimation = gmf_params["PRO"]["frequency_decimation"]
     rx_window_indices = gmf_params["DER"]["rx_window_indices"]
+    dec_rx_window_indices = gmf_params["DER"]["dec_rx_window_indices"]
+    dec_signal_len = gmf_params["DER"]["dec_signal_length"]
 
     error_code = gmfcudalib.gmf(
         z_tx.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
@@ -66,6 +70,8 @@ def gmfcu(z_tx, z_rx, gmf_variables, gmf_params, gpu_id=0):
         gmf_variables.v_ind.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
         gmf_variables.a_ind.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
         rx_window_indices.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        dec_rx_window_indices.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        dec_signal_len,
         gpu_id,
     )
     assert error_code == 0, f"GMF CUDA-function returned error {error_code}"

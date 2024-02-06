@@ -16,6 +16,7 @@ def rti(
     end_time=None,
     relative_time=False,
     clutter_removal=0,
+    keep_tx=False,
     axis_units=False,
     log=False,
     colorbar=True,
@@ -89,11 +90,12 @@ def rti(
     samp_vec = samp_vec[T_rx_start_samp:T_rx_end_samp]
 
     # Remove tx-signal (if it exists) and null calibration signal
-    if T_rx_start_samp < T_tx_end_samp:
-        data_vec = data_vec[samp_vec > T_tx_end_samp, :]
-        rt_vec = rt_vec[samp_vec > T_tx_end_samp]
-        samp_vec = samp_vec[samp_vec > T_tx_end_samp]
-    data_vec[T_cal_start_samp:T_cal_end_samp, :] = 0
+    if not keep_tx:
+        if T_rx_start_samp < T_tx_end_samp:
+            data_vec = data_vec[samp_vec > T_tx_end_samp, :]
+            rt_vec = rt_vec[samp_vec > T_tx_end_samp]
+            samp_vec = samp_vec[samp_vec > T_tx_end_samp]
+        data_vec[T_cal_start_samp:T_cal_end_samp, :] = 0
 
     if clutter_removal > 0:
         clutter_removal_samp = np.round(clutter_removal * sample_rate).astype(np.int64)
