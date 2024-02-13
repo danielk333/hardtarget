@@ -1,7 +1,12 @@
-from .gmf_numpy import gmfnp, gmfnp_optimize
+from .gmf_numpy import gmfnp, gmfnp_daf, gmfnp_optimize
+
+# For dev reasons
+from .gmf_numpy import gmfnp_no_reduce
 
 GMF_GRID_LIBS = {
     "numpy": gmfnp,
+    "numpy_daf": gmfnp_daf,
+    "gmfnp_no_reduce": gmfnp_no_reduce,
 }
 
 GMF_OPTIMIZE_LIBS = {
