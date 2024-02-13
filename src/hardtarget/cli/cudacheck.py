@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 
-import subprocess
-import os
-
 from .commands import add_command
 
 
@@ -11,19 +8,8 @@ def parser_build(parser):
 
 
 def main(args):
-
-    dirpath = os.path.dirname(os.path.realpath(__file__))
-    srcfile = os.path.join(dirpath, "cudacheck.cu")
-
-    print("Checking Cuda... ")
-    subprocess.run(["mkdir", "-p", "/tmp"])
-    subprocess.run(["nvcc", srcfile, "-o", "/tmp/hello"])
-    result = subprocess.run(["/tmp/hello"], stdout=subprocess.PIPE, text=True)
-    subprocess.run(["rm", "/tmp/hello"])
-    if result.stdout == "Hello World!\n":
-        print("Cuda is running! (and compatible hardware detected)")
-    else:
-        print("Cuda is NOT running!")
+    import hardtarget.gmf.gmf_cuda as gcu
+    gcu.print_cuda_devices()
 
 
 add_command(
@@ -31,7 +17,7 @@ add_command(
     function=main,
     parser_build=parser_build,
     add_parser_args=dict(
-        description="Script for printing drf metadata.",
+        description="Script for checking cuda devices.",
     ),
 )
 
