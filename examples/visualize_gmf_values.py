@@ -1,6 +1,6 @@
 import hardtarget
 import matplotlib.pyplot as plt
-import hardtarget.analysis.analysis_utils as analysis_utils
+import hardtarget.analysis.utils as a_utils
 import hardtarget.analysis.analyze_gmf as analyze_gmf
 import digital_rf as drf
 from matplotlib.animation import FuncAnimation
@@ -30,7 +30,7 @@ params = hardtarget.load_gmf_params(target, config)
 reader = drf.DigitalRFReader(target)
 
 
-bounds = analysis_utils.compute_bounds(
+bounds = a_utils.compute_bounds(
     reader,
     chnl,
     params["EXP"]["sample_rate"],

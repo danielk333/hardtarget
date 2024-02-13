@@ -17,9 +17,9 @@ range0 = 2000e3
 vel0 = 0.4e3
 acel0 = -0.20e3
 
-# gmflib = "cuda"
+gmflib = "cuda"
 # gmflib = "numpy"
-gmflib = "numpy_daf"
+# gmflib = "numpy_daf"
 
 base_path = pathlib.Path("/home/danielk/data/spade")
 drf_path = base_path / "beamparks_raw" / "leo_bpark_2.1u_NO@uhf_drf_sim"

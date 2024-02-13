@@ -4,8 +4,7 @@ import time
 from tqdm import tqdm
 from pathlib import Path
 from hardtarget.gmf import GMF_GRID_LIBS, GMF_OPTIMIZE_LIBS
-from hardtarget.gmf_in_utils import load_gmf_params, choose_gmf_implementation
-from hardtarget.gmf_out_utils import GMFOutArgs, GMFVariables, dump_gmf_out, stack_gmf_vars
+from hardtarget.configuration import load_gmf_params, choose_gmf_implementation
 
 try:
     from mpi4py import MPI
@@ -14,7 +13,7 @@ except ImportError:
 finally:
     comm = MPI.COMM_WORLD
 
-from hardtarget.analysis import analysis_utils as a_utils
+from . import utils
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +65,8 @@ def compute_gmf(
     """
 
     # load data sources
-    rx_srcdir, rx_reader, rx_chnl = a_utils.load_source(rx)
-    tx_srcdir, tx_reader, tx_chnl = a_utils.load_source(tx)
+    rx_srcdir, rx_reader, rx_chnl = utils.load_source(rx)
+    tx_srcdir, tx_reader, tx_chnl = utils.load_source(tx)
 
     # gmf params
     gmf_params = load_gmf_params(rx_srcdir, config)
@@ -92,7 +91,7 @@ def compute_gmf(
     logger.info("Using GMF optimize backend: " + params_pro["gmf_optimize_lib"])
 
     # bounds
-    bounds = a_utils.compute_bounds(
+    bounds = utils.compute_bounds(
         rx_reader,
         rx_chnl,
         params_exp["sample_rate"],
@@ -109,10 +108,12 @@ def compute_gmf(
     ipp_samp = params_exp["ipp_samp"]
 
     # tasks
-    total_tasks = a_utils.compute_total_tasks(ipp, n_ipp,
-                                              num_cohints_per_file,
-                                              bounds)
-    job_tasks = a_utils.compute_job_tasks(job, total_tasks)
+    total_tasks = utils.compute_total_tasks(
+        ipp, n_ipp,
+        num_cohints_per_file,
+        bounds,
+    )
+    job_tasks = utils.compute_job_tasks(job, total_tasks)
     tasks_skipped = 0
 
     logger.info(f"starting job {job['idx']}/{job['N']} with {len(job_tasks)} tasks")
@@ -150,7 +151,7 @@ def compute_gmf(
         # filenames are in unix time microseconds
         epoch_unix = file_idx_sample / sample_rate
         epoch_unix_us = epoch_unix.astype("int64")*1000000
-        filepath = a_utils.get_filepath(epoch_unix_us)
+        filepath = utils.get_filepath(epoch_unix_us)
 
         # write to file if output is defined
         if output is not None:
@@ -195,7 +196,7 @@ def compute_gmf(
 
         ts1 = time.time()
 
-        all_gmf_vars = stack_gmf_vars(all_gmf_vars)
+        all_gmf_vars = utils.stack_gmf_vars(all_gmf_vars)
 
         # log
         info = {
@@ -218,7 +219,7 @@ def compute_gmf(
             # DUMP TO FILE
             sample_numbers = np.arange(gmf_params["PRO"]["read_length"])
 
-            gmf_out_args = GMFOutArgs(
+            gmf_out_args = utils.GMFOutArgs(
                 num_cohints_per_file=num_cohints_per_file,
                 ranges=gmf_params["DER"]["ranges"],
                 range_rates=gmf_params["DER"]["range_rates"],
@@ -244,7 +245,7 @@ def compute_gmf(
                 rx_window_indices=gmf_params["DER"]["rx_window_indices"],
                 epoch=epoch_unix)
 
-            dump_gmf_out(gmf_out_args, gmf_params, outfile)
+            utils.dump_gmf_out(gmf_out_args, gmf_params, outfile)
             results["files"].append(filepath.name)
         else:
             # write dict
@@ -299,7 +300,7 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
 
     Returns
     -------
-    gmf_vars : hardtarget.gmf_utils.GMFVariables
+    gmf_vars : hardtarget.analysis.utils.GMFVariables
         Named tuple container for compacting the variables set by the GMF function.
     tx_amp2 : float
         Squared summed tx amplitude
@@ -346,7 +347,7 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     tx_amp = np.sqrt(tx_pwr)
     z_tx = np.conj(z_tx) / tx_amp
 
-    gmf_vars = GMFVariables(
+    gmf_vars = utils.GMFVariables(
         vals = np.zeros(params_pro["gmf_size"], dtype=np.float32),
         dc = np.zeros(params_pro["n_ranges"], dtype=np.float32),
         v_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),

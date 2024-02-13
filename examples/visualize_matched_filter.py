@@ -52,8 +52,8 @@ params_exp = {
     "code": hardtarget.load_radar_code("leo_bpark"),
 }
 params_exp["radar_frequency"] = params_exp["frequency"]
-params_pro = hardtarget.gmf_in_utils.load_gmf_processing_params(config_path)
-params_exp, params_pro, params_der = hardtarget.gmf_in_utils.compute_derived_gmf_params(
+params_pro = hardtarget.configuration.load_gmf_processing_params(config_path)
+params_exp, params_pro, params_der = hardtarget.configuration.compute_derived_gmf_params(
     params_exp, params_pro
 )
 params = {

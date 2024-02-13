@@ -1,6 +1,6 @@
 import h5py
 from .commands import add_command
-from hardtarget.gmf_out_utils import inspect_h5_node, all_gmf_h5_files
+from hardtarget.analysis.utils import inspect_h5_node, all_gmf_h5_files
 
 ################################################################
 # MAIN
