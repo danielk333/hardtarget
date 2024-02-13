@@ -277,7 +277,6 @@ def eiscat_convert(srcdir, logger, dstdir=None, compression_level=0):
     # forward values from experiment config file
     props = [
         "sample_rate", "ipp", "file_secs", "tx_pulse_length",
-        "doppler_sign", "round_trip_range",
         "rx_channel", "rx_start", "rx_end",
         "tx_channel", "tx_start", "tx_end",
         "cal_on", "cal_off"

@@ -262,6 +262,7 @@ def dump_gmf_out(gmf_out_args, gmf_params, outfile):
         if "units" in item:
             ds.attrs["units"] = item["units"]
 
+    # TODO: these should be saved as variables so they can be documented
     # EXPERIMENT PARAMS
     if "experiment" not in out:
         out.create_group("experiment")
@@ -324,6 +325,7 @@ GMFOutArgs = namedtuple(
 ####################################################################
 
 def define_variables(gmf_out_args):
+    # TODO: make this be able to save arbitrary reduce configs
 
     integration_index = np.arange(gmf_out_args.num_cohints_per_file, dtype=np.int64)
     rx_window_index = np.arange(len(gmf_out_args.rx_window_indices))

@@ -12,7 +12,6 @@ STRING_PROPS = ["name", "version", "rx_channel", "tx_channel"]
 FLOAT_PROPS = [
     "tx_pulse_length",
     "file_secs",
-    "doppler_sign",
     "rx_start",
     "rx_end",
     "tx_start",
@@ -22,7 +21,7 @@ FLOAT_PROPS = [
     "radar_frequency",
 ]
 INT_PROPS = ["sample_rate", "ipp"]
-BOOL_PROPS = ["round_trip_range"]
+BOOL_PROPS = []
 SECTIONS = ["Experiment"]
 
 

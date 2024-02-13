@@ -160,7 +160,6 @@ def simulate_drf(
         "sample_rate",
         "ipp",
         "tx_pulse_length",
-        "round_trip_range",
         "rx_start",
         "rx_end",
         "tx_start",
