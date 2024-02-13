@@ -60,7 +60,75 @@ def gmfnp(z_tx, z_rx, gmf_variables, gmf_params):
                 gmf_variables.v_ind[ri] = mi
                 # index of acceleration that gives highest integrated energy at this range gate
                 gmf_variables.a_ind[ri] = ai
-    # Finished!
+
+
+def gmfnp_daf(z_tx, z_rx, gmf_variables, gmf_params):
+    """Development version of GMF using discrete ambiguity function spectrum to speed up acceleration search
+    """
+    rgs = gmf_params["DER"]["rgs"]
+    frequency_decimation = gmf_params["PRO"]["frequency_decimation"]
+    rx_window_indices = gmf_params["DER"]["rx_window_indices"]
+    dec_rx_window_indices = gmf_params["DER"]["dec_rx_window_indices"]
+    dec_signal_len = gmf_params["DER"]["dec_signal_length"]
+    sample_rate = gmf_params["EXP"]["sample_rate"]
+    global_accs = gmf_params["DER"]["accelerations"]
+
+    tau = gmf_params["EXP"]["ipp_samp"] * (gmf_params["PRO"]["n_ipp"] // 2) // frequency_decimation
+    step = 2 * tau * frequency_decimation / sample_rate
+    wavelength = gmf_params["EXP"]["wavelength"]
+    accels = fft.fftfreq(dec_signal_len - tau, d=frequency_decimation/sample_rate) * wavelength * 2 / step
+    # df_res = sample_rate / (dec_signal_len * frequency_decimation * step)
+    # dacc = df_res * wavelength * 2
+    # times2 = gmf_params["DER"]["decimated_sample_times"] ** 2
+
+    # TODO: what if we do the estimating as a sliding window instead? like choosing 5 ipps does
+    # [1,2,3,4,5], [2,3,4,5,6], ... instead of [1,2,3,4,5], [6,7,8,9,10]
+    # that would allow us to use long integrations with the high speed of the lagged FFT method
+    # while still finding the change right as it happens since we are targeting the
+    # values at the start of the integration pulse, more computation but higher resolution at the same SNR
+    # it could even be an option, IPP-step or something!
+
+    # number of range gates is input from user
+    for ri, rg in enumerate(rgs):
+        zr = z_rx[rx_window_indices + rg]
+        # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter), decimate
+        echo = np.sum((zr * z_tx).reshape(-1, frequency_decimation), axis=-1)
+        decimated_signal = np.zeros((dec_signal_len,), dtype=np.complex64)
+        decimated_signal[dec_rx_window_indices] = echo
+        _gmfo = np.abs(fft.fft(decimated_signal)) ** 2
+        gmf_variables.dc[ri] = _gmfo[0]
+
+        # breakpoint()
+
+        daf = decimated_signal[tau:] * np.conj(decimated_signal[:-tau])
+        daf_spec = np.abs(fft.fft(daf))
+
+        dspec_peak = np.argmax(daf_spec)
+        accel_est = accels[dspec_peak]
+
+        # TODO: this is better since we are not over-sampling the accelerations,
+        #    instead the global accels should be pre-set like before but using the
+        #   accels calculated above from the lagged fft
+        ais = [np.argmin(np.abs(global_accs - accel_est))]
+        acc_phasors = gmf_params["DER"]["acceleration_phasors"]
+        # accs = np.linspace(accel_est - dacc, accel_est + dacc, 10)
+        # acc_phasors = np.exp(
+        #     -1j * np.pi / wavelength * accs[:, None] * times2[None, :]
+        # )
+
+        # for ai in range(len(accs)):
+        for ai in ais:
+            decimated_signal[dec_rx_window_indices] = acc_phasors[ai] * echo
+            _gmfo = np.abs(fft.fft(decimated_signal)) ** 2
+            mi = np.argmax(_gmfo)
+
+            if _gmfo[mi] > gmf_variables.vals[ri]:
+                gmf_variables.vals[ri] = _gmfo[mi]
+                # index of doppler that gives highest integrated energy at this range gate
+                gmf_variables.v_ind[ri] = mi
+                # index of acceleration that gives highest integrated energy at this range gate
+                # gmf_variables.a_ind[ri] = np.argmin(np.abs(global_accs - accs[ai]))
+                gmf_variables.a_ind[ri] = ai
 
 
 def gmfnp_optimize(z_tx, z_ipp, gmf_params, gmf_start):
@@ -77,6 +145,8 @@ def gmfnp_optimize(z_tx, z_ipp, gmf_params, gmf_start):
         t = r / constants.c
         phase = np.exp(-1j*2.0*np.pi*r/wavelength)
         model_signal = phase * z_tx
+
+        # TODO: this is actually not correct, should include timeoff set of tranmission samples
 
         samples = np.round(sample_rate * t).astype(np.int64)
         decoded_echo = z_ipp[samples] * model_signal
@@ -101,12 +171,16 @@ def gmfnp_optimize(z_tx, z_ipp, gmf_params, gmf_start):
 
 
 def gmfnp_no_reduce(z_tx, z_rx, gmf_variables, gmf_params):
+    """Slow development version of gmf to see otherwise reduced dimensions
+    """
     acc_phasors = gmf_params["DER"]["acceleration_phasors"]
     rgs = gmf_params["DER"]["rgs"]
     frequency_decimation = gmf_params["PRO"]["frequency_decimation"]
     rx_window_indices = gmf_params["DER"]["rx_window_indices"]
     dec_rx_window_indices = gmf_params["DER"]["dec_rx_window_indices"]
     dec_signal_len = gmf_params["DER"]["dec_signal_length"]
+
+    ra = gmf_params["PRO"]["reduce_axis"]
 
     # number of range gates is input from user
     n_acc = acc_phasors.shape[0]
@@ -122,26 +196,39 @@ def gmfnp_no_reduce(z_tx, z_rx, gmf_variables, gmf_params):
             if ai == 0:
                 # gmf_dc_vec is the range-dependent noise floor
                 gmf_variables.dc[ri] = _gmfo[0]
-            indexing = tuple(
-                z
-                for zi, z in enumerate([ri, 0, ai])
-                if not gmf_params["PRO"]["reduce_axis"][zi]
-            )
-            if gmf_params["PRO"]["reduce_axis"][1]:
+            if ra[1]:
                 vi = np.argmax(_gmfo)
-                current_val = _gmfo[vi]
-                old_val = gmf_variables.vals[*indexing]
-                if current_val > old_val:
-                    gmf_variables.vals[*indexing] = current_val
-                    gmf_variables.r_ind[*indexing] = ri
-                    gmf_variables.v_ind[*indexing] = vi
-                    gmf_variables.a_ind[*indexing] = ai
+                new_val = _gmfo[vi]
+                if ra[0]:
+                    if new_val > gmf_variables.vals[ai]:
+                        gmf_variables.vals[ai] = new_val
+                        gmf_variables.r_ind[ai] = ri
+                        gmf_variables.v_ind[ai] = vi
+                elif ra[2]:
+                    if new_val > gmf_variables.vals[ri]:
+                        gmf_variables.vals[ri] = new_val
+                        gmf_variables.v_ind[ri] = vi
+                        gmf_variables.a_ind[ri] = ai
+                else:
+                    raise NotImplementedError("")
             else:
-                for vi in range(len(_gmfo)):
-                    current_val = _gmfo[vi]
-                    old_val = gmf_variables.vals[*indexing]
-                    if current_val > old_val:
-                        gmf_variables.vals[*indexing] = current_val
-                        gmf_variables.r_ind[*indexing] = ri
-                        gmf_variables.v_ind[*indexing] = vi
-                        gmf_variables.a_ind[*indexing] = ai
+                inds = np.arange(len(_gmfo))
+                if ra[0] and ra[2]:
+                    vals = np.stack([gmf_variables.vals[:], _gmfo[:]])
+                    mi = np.argmax(vals, axis=0)
+                    gmf_variables.vals[:] = vals[mi, inds]
+                    sel = mi == 1
+                    gmf_variables.r_ind[sel] = ri
+                    gmf_variables.a_ind[sel] = ai
+                elif ra[0]:
+                    vals = np.stack([gmf_variables.vals[:, ai], _gmfo[:]])
+                    mi = np.argmax(vals, axis=0)
+                    gmf_variables.vals[:, ai] = vals[mi, inds]
+                    sel = mi == 1
+                    gmf_variables.r_ind[sel, ai] = ri
+                else:
+                    vals = np.stack([gmf_variables.vals[:, ri], _gmfo[:]])
+                    mi = np.argmax(vals, axis=0)
+                    gmf_variables.vals[:, ri] = vals[mi, inds]
+                    sel = mi == 1
+                    gmf_variables.a_ind[sel, ri] = ai

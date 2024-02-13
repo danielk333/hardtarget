@@ -1,0 +1,12 @@
+# Include c lib source
+include src/gmf_c_lib/*.c 
+include src/gmf_c_lib/*.h
+include src/gmf_c_lib/Makefile
+
+# Inlcude cuda lib source
+include src/gmf_cuda_lib/*.cu 
+include src/gmf_cuda_lib/*.h
+include src/gmf_cuda_lib/Makefile
+
+# Include docs
+graft docs

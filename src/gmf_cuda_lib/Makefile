@@ -12,6 +12,9 @@ INSTALLLIB=$(INSTALL)/$(OUTLIB)
 all: $(INSTALLLIB) $(OUTLIB)
 debug: $(INSTALLLIB) $(OUTLIB)
 
+hello_world: hello.cu
+	$(CC) $(CFLAGS) hello.cu -o hello_world
+
 $(OUTLIB): $(SOURCES)
 	@echo "gmfcudalib installation -> Linking shared library $(OUTLIB) ..."
 	$(CC) $(CFLAGS) $(LIBS) $(SOURCES) -o $(OUTLIB)

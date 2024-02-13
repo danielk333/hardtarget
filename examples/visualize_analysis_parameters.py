@@ -30,6 +30,7 @@ for ind in range(params["PRO"]["n_ipp"]):
 
 axes[0, 0].set_title("Stencils")
 axes[0, 0].legend()
+axes[0, 0].set_xlabel("Time [s]")
 
 axes[1, 0].plot(t, params["DER"]["rx_stencil"], "-b", label="RX")
 axes[1, 0].plot(t, params["DER"]["tx_stencil"], "-r", label="TX")
@@ -45,12 +46,18 @@ axes[1, 0].axvline(params["EXP"]["cal_off"] * 1e-6, c="m", **vline_st)
 axes[1, 0].set_xlim(0, params["EXP"]["ipp"] * 1e-6)
 axes[1, 0].set_title("Stencils - single")
 axes[1, 0].legend()
+axes[1, 0].set_xlabel("Time [s]")
 
+X, Y = np.meshgrid(np.arange(params["PRO"]["decimated_coh_int_samps"]), params["DER"]["accelerations"])
 
-axes[0, 1].pcolormesh(np.real(params["DER"]["acceleration_phasors"]))
+axes[0, 1].pcolormesh(X, Y, np.real(params["DER"]["acceleration_phasors"]))
+axes[0, 1].set_xlabel("Decimated sample")
+axes[0, 1].set_ylabel("Acceleration [m/s^2]")
 axes[0, 1].set_title("Acceleration phasors - real")
 
-axes[1, 1].pcolormesh(np.imag(params["DER"]["acceleration_phasors"]))
+axes[1, 1].pcolormesh(X, Y, np.imag(params["DER"]["acceleration_phasors"]))
+axes[1, 1].set_xlabel("Decimated sample")
+axes[1, 1].set_ylabel("Acceleration [m/s^2]")
 axes[1, 1].set_title("Acceleration phasors - imag")
 
 plt.show()

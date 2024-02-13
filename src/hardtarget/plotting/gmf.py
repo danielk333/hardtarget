@@ -16,11 +16,6 @@ def plot_peaks(axes, data, meta, monostatic=True, snr_dB_limit=15.0):
     r_inds = np.argmax(data["gmf"], axis=1)
     coh_inds = np.arange(data["gmf"].shape[0])
 
-    # If we want monostatic but the data is already in monostatic, dont half data again
-    if "round_trip_range" in meta["processing"]:
-        if monostatic and not meta["processing"]["round_trip_range"]:
-            monostatic = False
-
     snr = noise.snr(data["gmf"], data["nf_range"])
 
     # TODO: use a interpolation of nf-range to determine the SNR of the optimized results
@@ -81,11 +76,6 @@ def plot_detections(axes, data, meta, monostatic=True, snr_dB_limit=15.0):
 
     inds = snrdb > snr_dB_limit
 
-    # If we want monostatic but the data is already in monostatic, dont half data again
-    if "round_trip_range" in meta["processing"]:
-        if monostatic and not meta["processing"]["round_trip_range"]:
-            monostatic = False
-
     _style = dict(ls="none", marker=".")
 
     h00 = axes[0, 0].plot(
@@ -130,8 +120,8 @@ def plot_detections(axes, data, meta, monostatic=True, snr_dB_limit=15.0):
 
 def plot_map(axes, data, meta):
     # GMF
-    min_range = meta["processing"]["min_range_gate"]
-    max_range = meta["processing"]["max_range_gate"]
+    min_range = meta["processing"]["rel_min_range_gate"]
+    max_range = meta["processing"]["rel_max_range_gate"]
     gmf_data_dB = 10 * np.log10(np.abs(data["gmf"].T))
 
     range_num, coh_int_num = gmf_data_dB.shape
