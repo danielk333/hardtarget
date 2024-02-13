@@ -3,82 +3,53 @@ import numpy as np
 import scipy.fft as fft
 import scipy.constants
 import pathlib
+
 from hardtarget import drf_utils
-from collections import namedtuple
-
-
-####################################################################
-# GMF INPUT DATA
-####################################################################
-
-"""Container for compacting the variables set by the GMF function."""
-GMFVariables = namedtuple(
-    "GMFVariables",
-    [
-        "vals",  # match function values reduced over the requested axis
-        "dc",  # 0-frequency gmf output as a function of range
-        "r_ind",  # best fitting range
-        "v_ind",  # best fitting range-rate
-        "a_ind",  # best fitting range-rate change
-        "peak",  # fine-tuned peak in range, range-rate & range-rate change
-        "peak_val",  # value of fine-tuned peak
-    ],
-)
+from hardtarget.gmf import GMF_GRID_LIBS, GMF_OPTIMIZE_LIBS
 
 
 ####################################################################
 # GET GMF PROCESSING PARAMS
 #
 # NOTE: all keys have to be lower-case here due to configparser
+# NOTE: To add a new parameter that does not have a default value,
+#       use None as the value
 ####################################################################
 
 DEFAULT_PARAMS = {
-    "gmf_grid_lib": "c",
-    "gmf_optimize_lib": "c",
-    "gmf_fine_tune": True,
-    "node_gpus": 1,
-    "n_ipp": 5,
-    "ipp_offset": 0,
-    "min_range_gate": 0,
-    "max_range_gate": -1,
-    "range_gate_step": 1,
-    "frequency_decimation": 2,
-    "clutter_length": 1500,
-    "min_acceleration": -400.0,
-    "max_acceleration": 400.0,
-    "acceleration_resolution": 0.2,
-    "doppler_sign": 1.0,
-    "round_trip_range": True,
-    "num_cohints_per_file": 100,
-    "reduce_range": False,
-    "reduce_range_rate": True,
-    "reduce_acceleration": True,
+    "gmf_grid_lib": ("c", str),
+    "gmf_optimize_lib": ("c", str),
+    "gmf_fine_tune": (False, bool),
+    "node_gpus": (1, int),
+    "n_ipp": (5, int),
+    "ipp_offset": (0, int),
+    "min_range_gate": (0, int),
+    "max_range_gate": (-1, int),
+    "range_gate_step": (1, int),
+    "frequency_decimation": (1, int),
+    "clutter_length": (0, int),
+    "min_acceleration": (-200.0, float),
+    "max_acceleration": (200.0, float),
+    "acceleration_resolution": (0.2, float),
+    "num_cohints_per_file": (100, int),
 }
 
 INT_PARAM_KEYS = [
-    "node_gpus",
-    "n_ipp",
-    "ipp_offset",
-    "min_range_gate",
-    "max_range_gate",
-    "range_gate_step",
-    "frequency_decimation",
-    "clutter_length",
-    "num_cohints_per_file",
+    key
+    for key, (_, tp) in DEFAULT_PARAMS.items()
+    if tp is int
 ]
 
 BOOL_PARAM_KEYS = [
-    "round_trip_range",
-    "reduce_range",
-    "reduce_range_rate",
-    "reduce_acceleration",
+    key
+    for key, (_, tp) in DEFAULT_PARAMS.items()
+    if tp is bool
 ]
 
 FLOAT_PARAM_KEYS = [
-    "min_acceleration",
-    "max_acceleration",
-    "acceleration_resolution",
-    "doppler_sign",
+    key
+    for key, (_, tp) in DEFAULT_PARAMS.items()
+    if tp is float
 ]
 
 
@@ -88,7 +59,10 @@ FLOAT_PARAM_KEYS = [
 
 def load_gmf_processing_params(configfile=None):
 
-    d = {**DEFAULT_PARAMS}
+    d = {
+        key: val
+        for key, (val, _) in DEFAULT_PARAMS.items()
+    }
 
     assert configfile is not None, "Config file is NONE"
     cfg_pth = pathlib.Path(configfile)
@@ -100,6 +74,8 @@ def load_gmf_processing_params(configfile=None):
         config.read(configfile)
         SECTION = "signal-processing"
         for key in config[SECTION].keys():
+            if key not in DEFAULT_PARAMS:
+                raise ValueError(f"'{key}' option found in config file not a valid config parameter")
             # Convert values to specific types
             if key in INT_PARAM_KEYS:
                 d[key] = config.getint(SECTION, key)
@@ -111,12 +87,12 @@ def load_gmf_processing_params(configfile=None):
                 # string
                 d[key] = config.get(SECTION, key).strip("'").strip('"')
 
-    # GMF library implementation currently implicitly assumes reduction over
-    # range_rate and acceleration.
-    assert d["reduce_range"] is False, "Not supported: reduce_range: True"
-    assert d["reduce_range_rate"] is True, "Not supported: reduce_range_rate: False"
-    assert d["reduce_acceleration"] is True, "Not supported: reduce_acceleration: False"
-
+    not_set_params = [key for key, val in d.items() if val is None]
+    if len(not_set_params) > 0:
+        raise ValueError(
+            "Found config options without set values that does not have a default: \n"
+            f"{not_set_params}"
+        )
     return d
 
 
@@ -373,3 +349,35 @@ def compute_derived_gmf_params(params_exp, params_pro):
     return params_exp, params_pro, params_der
 
 
+####################################################################
+# CONFIG HELPERS
+####################################################################
+
+
+def choose_gmf_implementation(params_pro):
+    # gmf lib
+    gmf_lib_name = params_pro.get("gmf_grid_lib", None)
+    if gmf_lib_name is None:
+        gmf_lib_name = "c" if "c" in GMF_GRID_LIBS else "numpy"
+    elif gmf_lib_name not in GMF_GRID_LIBS:
+        raise ValueError(
+            f"Requested GMF gird lib '{gmf_lib_name}' not found in "
+            "available libs, possible compilation errors in extensions\n"
+            f"GMF_GRID_LIBS = {list(GMF_GRID_LIBS.keys())}"
+        )
+
+    # gmf optimize lib
+    if params_pro.get("gmf_fine_tune", False):
+        gmfo_lib_name = params_pro.get("gmf_optimize_lib", None)
+        if gmfo_lib_name is None:
+            gmfo_lib_name = "c" if "c" in GMF_OPTIMIZE_LIBS else "numpy"
+        elif gmfo_lib_name not in GMF_OPTIMIZE_LIBS:
+            raise ValueError(
+                f"Requested GMF optimize lib '{gmfo_lib_name}' not found in "
+                "available libs, possible compilation errors in extensions\n"
+                f"GMF_OPTIMIZE_LIBS = {list(GMF_OPTIMIZE_LIBS.keys())}"
+            )
+    else:
+        gmfo_lib_name = None
+
+    return gmf_lib_name, gmfo_lib_name

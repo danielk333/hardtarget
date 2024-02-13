@@ -4,8 +4,8 @@ import time
 from tqdm import tqdm
 from pathlib import Path
 from hardtarget.gmf import GMF_GRID_LIBS, GMF_OPTIMIZE_LIBS
-from hardtarget.gmf_in_utils import load_gmf_params, GMFVariables
-from hardtarget.gmf_out_utils import GMFOutArgs, dump_gmf_out
+from hardtarget.gmf_in_utils import load_gmf_params, choose_gmf_implementation
+from hardtarget.gmf_out_utils import GMFOutArgs, GMFVariables, dump_gmf_out, stack_gmf_vars
 
 try:
     from mpi4py import MPI
@@ -127,7 +127,7 @@ def compute_gmf(
             total=total,
         )
 
-    if comm is not None:
+    if comm is not None and job["N"] > 1:
         # Make sure all jobs start at the same time
         # Good for logging, printing and debugging reasons as setup time should
         # still be minimal compared to the actual job times
@@ -143,14 +143,7 @@ def compute_gmf(
         gpu_id = task_idx % params_pro["node_gpus"]
 
         # initialise
-        gmf_vals = []
-        gmf_dc = []
-        gmf_txp = []
-        gmf_r_ind = []
-        gmf_v_ind = []
-        gmf_a_ind = []
-        peaks = []
-        peak_vals = []
+        all_gmf_vars = []
         # filename outfile
         file_idx_sample = task_idx * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
 
@@ -191,32 +184,18 @@ def compute_gmf(
                 curr_num = str(coh_ind + 1).ljust(total_num_len, ' ')
                 progress_bar.set_description(f"Processing {curr_num}/{num_cohints} [{dots}]")
 
-            gmf_vars, gmf_tx = integrate_and_match_ipps(
+            gmf_vars = integrate_and_match_ipps(
                 (rx_reader, rx_chnl),
                 (tx_reader, tx_chnl),
                 start_sample,
                 gmf_params,
                 gpu_id=gpu_id,
             )
-            gmf_vals.append(gmf_vars.vals)
-            gmf_dc.append(gmf_vars.dc)
-            gmf_r_ind.append(gmf_vars.r_ind)
-            gmf_v_ind.append(gmf_vars.v_ind)
-            gmf_a_ind.append(gmf_vars.a_ind)
-            peaks.append(gmf_vars.peak)
-            peak_vals.append(gmf_vars.peak_val)
-            gmf_txp.append(gmf_tx)
+            all_gmf_vars.append(gmf_vars)
 
         ts1 = time.time()
 
-        gmf_vals = np.stack(gmf_vals, axis=0)
-        gmf_dc = np.stack(gmf_dc, axis=0)
-        gmf_txp = np.stack(gmf_txp, axis=0)
-        gmf_r_ind = np.stack(gmf_r_ind, axis=0)
-        gmf_v_ind = np.stack(gmf_v_ind, axis=0)
-        gmf_a_ind = np.stack(gmf_a_ind, axis=0)
-        peaks = np.stack(peaks, axis=0)
-        peak_vals = np.stack(peak_vals, axis=0)
+        all_gmf_vars = stack_gmf_vars(all_gmf_vars)
 
         # log
         info = {
@@ -229,11 +208,11 @@ def compute_gmf(
 
         coh_ints = np.arange(num_cohints)
 
-        r_inds = np.argmax(gmf_vals, axis=1)
+        r_inds = np.argmax(all_gmf_vars.vals, axis=1)
         r_vec = params_der["ranges"][r_inds]
-        v_vec = params_der["range_rates"][gmf_v_ind[coh_ints, r_inds]]
-        a_vec = params_der["accelerations"][gmf_a_ind[coh_ints, r_inds]]
-        g_vec = gmf_vals[coh_ints, r_inds]
+        v_vec = params_der["range_rates"][all_gmf_vars.v_ind[coh_ints, r_inds]]
+        a_vec = params_der["accelerations"][all_gmf_vars.a_ind[coh_ints, r_inds]]
+        g_vec = all_gmf_vars.vals[coh_ints, r_inds]
 
         if output is not None:
             # DUMP TO FILE
@@ -245,18 +224,17 @@ def compute_gmf(
                 range_rates=gmf_params["DER"]["range_rates"],
                 accelerations=gmf_params["DER"]["accelerations"],
                 sample_numbers=sample_numbers,
-                vals=gmf_vals,
-                dc=gmf_dc,
-                # r_ind=gmf_r_ind,
-                v_ind=gmf_v_ind,
-                a_ind=gmf_a_ind,
-                txp=gmf_txp,
+                vals=all_gmf_vars.vals,
+                dc=all_gmf_vars.dc,
+                v_ind=all_gmf_vars.v_ind,
+                a_ind=all_gmf_vars.a_ind,
+                txp=all_gmf_vars.tx_pwr,
                 r_vec=r_vec,
                 v_vec=v_vec,
                 a_vec=a_vec,
                 g_vec=g_vec,
-                peaks=peaks,
-                peak_vals=peak_vals,
+                peaks=all_gmf_vars.peak,
+                peak_vals=all_gmf_vars.peak_val,
                 rgs=gmf_params["DER"]["rgs"],
                 fvec=gmf_params["DER"]["fvec"],
                 decimated_sample_times=gmf_params["DER"]["decimated_sample_times"],
@@ -271,16 +249,15 @@ def compute_gmf(
         else:
             # write dict
             out = {}
-            out["gmf"] = gmf_vals
-            out["gmf_zero_frequency"] = gmf_dc
-            out["range_index"] = gmf_r_ind
-            out["range_rate_index"] = gmf_v_ind
-            out["acceleration_index"] = gmf_a_ind
+            out["gmf"] = all_gmf_vars.vals
+            out["gmf_zero_frequency"] = all_gmf_vars.dc
+            out["range_rate_index"] = all_gmf_vars.v_ind
+            out["acceleration_index"] = all_gmf_vars.a_ind
             out["range_peak"] = r_vec
             out["range_rate_peak"] = v_vec
             out["acceleration_peak"] = a_vec
             out["gmf_peak"] = g_vec
-            out["tx_power"] = gmf_txp
+            out["tx_power"] = all_gmf_vars.tx_pwr
             out["epoch_unix"] = epoch_unix
             results["data"][file_idx_sample] = out
 
@@ -331,39 +308,13 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     params_pro = gmf_params["PRO"]
     params_der = gmf_params["DER"]
 
-    # gmf lib
-    gmf_lib_name = params_pro.get("gmf_grid_lib", None)
-    if gmf_lib_name is None:
-        gmf_lib_name = "c" if "c" in GMF_GRID_LIBS else "numpy"
-    elif gmf_lib_name not in GMF_GRID_LIBS:
-        raise ValueError(
-            f"Requested GMF gird lib '{gmf_lib_name}' not found in "
-            "available libs, possible compilation errors in extensions\n"
-            f"GMF_GRID_LIBS = {list(GMF_GRID_LIBS.keys())}"
-        )
+    gmf_lib_name, gmfo_lib_name = choose_gmf_implementation(params_pro)
     gmf_lib = GMF_GRID_LIBS[gmf_lib_name]
-
-    if gmf_params["PRO"].get("gmf_fine_tune", False):
-        gmfo_lib_name = params_pro.get("gmf_optimize_lib", None)
-        if gmfo_lib_name is None:
-            gmfo_lib_name = "c" if "c" in GMF_OPTIMIZE_LIBS else "numpy"
-        elif gmfo_lib_name not in GMF_OPTIMIZE_LIBS:
-            raise ValueError(
-                f"Requested GMF optimize lib '{gmfo_lib_name}' not found in "
-                "available libs, possible compilation errors in extensions\n"
-                f"GMF_OPTIMIZE_LIBS = {list(GMF_OPTIMIZE_LIBS.keys())}"
-            )
-        gmfo_lib = GMF_OPTIMIZE_LIBS[gmfo_lib_name]
-    else:
-        gmfo_lib = None
+    gmfo_lib = GMF_OPTIMIZE_LIBS.get(gmfo_lib_name, None)
 
     kwargs = {}
     if gmf_lib_name == "cuda":
         kwargs["gpu_id"] = gpu_id
-
-    # TODO: remove this as option, keep the gmf no reduce function for development testing reasons
-    if not params_pro["reduce_range_rate"] and params_pro["reduce_acceleration"]:
-        raise NotImplementedError("reduce settings not implemented")
 
     # parameters
     rx_stencil = params_der["rx_stencil"]
@@ -391,18 +342,18 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
 
     # conjugate, so that when matched filtering, it will cancel out phase of transmit waveform.
     # scale transmit waveform to unity power
-    tx_amp2 = np.sum(np.abs(z_tx) ** 2.0)
-    tx_amp = np.sqrt(tx_amp2)
+    tx_pwr = np.sum(np.abs(z_tx) ** 2.0)
+    tx_amp = np.sqrt(tx_pwr)
     z_tx = np.conj(z_tx) / tx_amp
 
     gmf_vars = GMFVariables(
         vals = np.zeros(params_pro["gmf_size"], dtype=np.float32),
         dc = np.zeros(params_pro["n_ranges"], dtype=np.float32),
-        r_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),
         v_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),
         a_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),
         peak = np.full((3,), np.nan, dtype=np.float32),
         peak_val = np.full((1,), np.nan, dtype=np.float32),
+        tx_pwr = tx_pwr,
     )
 
     if tx_amp > 1.0:
@@ -429,4 +380,4 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
             gmf_vars.peak[:] = opt_result.x
             gmf_vars.peak_val[0] = opt_result.fun
 
-    return gmf_vars, tx_amp2
+    return gmf_vars

@@ -5,6 +5,37 @@ import datetime
 import pathlib
 import re
 
+####################################################################
+# GMF OUTPUT DATA
+####################################################################
+
+"""Container for compacting the variables set by the GMF function."""
+GMFVariables = namedtuple(
+    "GMFVariables",
+    [
+        "vals",  # match function values reduced over the requested axis
+        "dc",  # 0-frequency gmf output as a function of range
+        "v_ind",  # best fitting range-rate
+        "a_ind",  # best fitting range-rate change
+        "peak",  # fine-tuned peak in range, range-rate & range-rate change
+        "peak_val",  # value of fine-tuned peak
+        "tx_pwr",  # tx power
+    ],
+)
+
+
+def stack_gmf_vars(gmf_vars_list):
+    return GMFVariables(
+        vals = np.stack([x.vals for x in gmf_vars_list], axis=0),
+        dc = np.stack([x.dc for x in gmf_vars_list], axis=0),
+        v_ind = np.stack([x.v_ind for x in gmf_vars_list], axis=0),
+        a_ind = np.stack([x.a_ind for x in gmf_vars_list], axis=0),
+        peak = np.stack([x.peak for x in gmf_vars_list], axis=0),
+        peak_val = np.stack([x.peak_val for x in gmf_vars_list], axis=0),
+        tx_pwr = np.stack([x.tx_pwr for x in gmf_vars_list], axis=0),
+    )
+
+
 ################################################################
 # LOAD GMF OUT (H5)
 #
