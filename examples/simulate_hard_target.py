@@ -15,10 +15,11 @@ args = parser.parse_args()
 
 range0 = 2000e3
 vel0 = 0.4e3
-acel0 = -0.30e3
+acel0 = -0.20e3
 
-gmflib = "cuda"
+# gmflib = "cuda"
 # gmflib = "numpy"
+gmflib = "numpy_daf"
 
 base_path = pathlib.Path("/home/danielk/data/spade")
 drf_path = base_path / "beamparks_raw" / "leo_bpark_2.1u_NO@uhf_drf_sim"
@@ -26,7 +27,10 @@ rx_channel = "sim"
 config_path = pathlib.Path("./examples/cfg/sim_test.ini").resolve()
 output_path = base_path / "beamparks_analyzed" / f"leo_bpark_2.1u_NO@uhf_{gmflib}_sim"
 
-t = np.arange(2.5, 7.5, 0.1)
+t_start = 2.5
+echo_len = 5.0
+t_abs = np.arange(t_start, t_start + echo_len, 0.1)
+t = t_abs - t_start
 peak_SNR = 10**(25.0/10.0)
 
 simulation_params = {
@@ -41,16 +45,14 @@ simulation_data = {
     "ranges": range0 + vel0*t + acel0*0.5*t**2,
     "velocities": vel0 + t*acel0,
     "accelerations": np.ones_like(t)*acel0,
-    "snr": peak_SNR*np.exp(-(t - 5.0)**2/2.0**2),
-    "times": t,
+    "snr": peak_SNR*np.exp(-(t - echo_len/2)**2/2.0**2),
+    "times": t_abs,
 }
 
 experiment_params = {
     "sample_rate": 1000000,
     "ipp": 20000,
     "tx_pulse_length": 1920.0,
-    "doppler_sign": -1.0,
-    "round_trip_range": True,
     "tx_start": 82.0,
     "tx_end": 2002.0,
     "rx_start": 0,
@@ -70,6 +72,18 @@ if args.action in ("all", "simulate"):
 
 reader, params = hardtarget.drf_utils.load_hardtarget_drf(drf_path)
 
+all_params = hardtarget.load_gmf_params(drf_path, config_path)
+look_time_ind = np.argmin(np.abs(t - echo_len/2))
+look_time = t_abs[look_time_ind]
+range_true = simulation_data["ranges"][look_time_ind]
+range_ind = np.argmin(np.abs(all_params["DER"]["ranges"] - range_true))
+acc_ind = np.argmin(np.abs(all_params["DER"]["accelerations"] - acel0))
+
+print(f"Look at time: {look_time} s")
+print("Best range gate: ", all_params["DER"]["rel_rgs"][range_ind])
+print("Range gate: ", all_params["DER"]["ranges"][range_ind]*1e-3, " km vs ", range_true*1e-3, " km")
+print("Best range gate index: ", all_params["DER"]["rgs"][range_ind])
+
 if args.action in ("all", "analyse"):
     # process
     results = hardtarget.compute_gmf(
@@ -78,6 +92,7 @@ if args.action in ("all", "analyse"):
         config=config_path,
         job={"idx": 0, "N": 1},
         gmflib=gmflib,
+        gmf_optimize_lib="no",
         clobber=True,
         output=output_path,
         progress=True,
@@ -87,13 +102,13 @@ if args.action in ("all", "analyse"):
 if args.action in ("all", "plot"):
 
     fig, axes = plt.subplots(3, 1)
-    axes[0].plot(t, 1e-3*simulation_data["ranges"], c="red")
+    axes[0].plot(t_abs, 1e-3*simulation_data["ranges"], c="red")
     axes[0].set_xlabel("Time [s]")
     axes[0].set_ylabel("Range [km]")
-    axes[1].plot(t, 1e-3*simulation_data["velocities"], c="red")
+    axes[1].plot(t_abs, 1e-3*simulation_data["velocities"], c="red")
     axes[1].set_xlabel("Time [s]")
     axes[1].set_ylabel("Velocity [km/s]")
-    axes[2].plot(t, simulation_data["accelerations"], c="red")
+    axes[2].plot(t_abs, simulation_data["accelerations"], c="red")
     axes[2].set_xlabel("Time [s]")
     axes[2].set_ylabel("Acceleration [m/s^2]")
 
@@ -122,17 +137,17 @@ if args.action in ("all", "plot"):
         snr = snr[coh_inds, r_inds]
 
         h00 = axes[0, 0].plot(data["t"], data["range_peak"]*1e-3*0.5, c="blue")
-        axes[0, 0].plot(t, simulation_data["ranges"]*1e-3*0.5, c="red")
+        axes[0, 0].plot(t_abs, simulation_data["ranges"]*1e-3*0.5, c="red")
         axes[0, 0].set_xlabel("Time [s]")
         axes[0, 0].set_ylabel("range [km]")
 
         h01 = axes[0, 1].plot(data["t"], data["range_rate_peak"]*1e-3*0.5, c="blue")
-        axes[0, 1].plot(t, simulation_data["velocities"]*1e-3*0.5, c="red")
+        axes[0, 1].plot(t_abs, simulation_data["velocities"]*1e-3*0.5, c="red")
         axes[0, 1].set_xlabel("Time [s]")
         axes[0, 1].set_ylabel("range rate [km/s]")
 
         h10 = axes[1, 0].plot(data["t"], data["acceleration_peak"]*0.5, c="blue")
-        axes[1, 0].plot(t, simulation_data["accelerations"]*0.5, c="red")
+        axes[1, 0].plot(t_abs, simulation_data["accelerations"]*0.5, c="red")
         axes[1, 0].set_xlabel("Time [s]")
         axes[1, 0].set_ylabel("acceleration [m/s^2]")
 
