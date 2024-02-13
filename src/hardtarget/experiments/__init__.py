@@ -31,7 +31,7 @@ else:
 
 def load_radar_code(xpname):
     code_name = xpname + "_code.txt"
-    assert code_name in EXP_FILES, "radar code not found in pre-defined configurations"
+    assert code_name in EXP_FILES, f"radar code '{code_name}' not found in pre-defined configurations"
     code_file = EXP_FILES[code_name]
     try:
         with open(code_file, "r") as fh:
