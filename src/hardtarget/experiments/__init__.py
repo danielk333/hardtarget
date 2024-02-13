@@ -46,7 +46,7 @@ def load_radar_code(xpname):
 
 def load_expconfig(xpname):
     cfg_name = xpname + ".ini"
-    assert cfg_name in EXP_FILES, "experiment not found in pre-defined configurations"
+    assert cfg_name in EXP_FILES, f'experiment "{cfg_name}" not found in pre-defined configurations'
     cfg_file = EXP_FILES[cfg_name]
     try:
         cfg = configparser.ConfigParser()
