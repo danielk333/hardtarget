@@ -335,7 +335,7 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
         )
     gmf_lib = GMF_GRID_LIBS[gmf_lib_name]
 
-    if gmf_params["PRO"].get("gmf_fine_tune", True):
+    if gmf_params["PRO"].get("gmf_fine_tune", False):
         gmfo_lib_name = params_pro.get("gmf_optimize_lib", None)
         if gmfo_lib_name is None:
             gmfo_lib_name = "c" if "c" in GMF_OPTIMIZE_LIBS else "numpy"
