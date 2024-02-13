@@ -69,7 +69,7 @@ def compute_job_tasks(job, n_tasks):
 
     Examples
     --------
-    >>> get_tasks({"idx":1, "N:2"}, 8)
+    >>> get_tasks({"idx":1, "N":2}, 8)
     [1,3,5,7]
     """
     return list(range(job["idx"], n_tasks, job["N"]))
@@ -85,7 +85,7 @@ def compute_total_tasks(ipp, n_ipp, num_cohints_per_file, bounds):
       number of coherent integration periods to include in one output file
       smaller means that lower latency can be achieved
     """
-    n_tasks = int(np.floor((bounds[1] - bounds[0]) / (ipp * n_ipp)) / num_cohints_per_file)
+    n_tasks = np.ceil(np.floor((bounds[1] - bounds[0]) / (ipp * n_ipp)) / num_cohints_per_file).astype(int)
     return n_tasks
 
 

@@ -176,8 +176,21 @@ def compute_gmf(
         # TODO: in case the RAM load is too heavy, this should write directly to disk instead
         # of collecting all the data
         ts0 = time.time()
-        for i in range(num_cohints_per_file):
-            start_sample = file_idx_sample + i * ipp_samp * n_ipp
+        num_cohints = num_cohints_per_file
+        if file_idx_sample + num_cohints_per_file * ipp_samp * n_ipp > bounds[1]:
+            num_cohints = int((bounds[1] - file_idx_sample) // (ipp_samp * n_ipp))
+        start_cohind = 0
+        if file_idx_sample < bounds[0]:
+            start_cohind = int((bounds[0] - file_idx_sample) // (ipp_samp * n_ipp))
+
+        for coh_ind in range(start_cohind, num_cohints):
+            start_sample = file_idx_sample + coh_ind * ipp_samp * n_ipp
+            if progress and subprogress:
+                dots = ("."*(coh_ind % 4)).ljust(3, " ")
+                total_num_len = len(str(num_cohints_per_file))
+                curr_num = str(coh_ind + 1).ljust(total_num_len, ' ')
+                progress_bar.set_description(f"Processing {curr_num}/{num_cohints} [{dots}]")
+
             gmf_vars, gmf_tx = integrate_and_match_ipps(
                 (rx_reader, rx_chnl),
                 (tx_reader, tx_chnl),
@@ -194,11 +207,6 @@ def compute_gmf(
             peak_vals.append(gmf_vars.peak_val)
             gmf_txp.append(gmf_tx)
 
-            if progress and subprogress:
-                dots = ("."*(i % 4)).ljust(3, " ")
-                total_num_len = len(str(num_cohints_per_file))
-                curr_num = str(i + 1).ljust(total_num_len, ' ')
-                progress_bar.set_description(f"Processing {curr_num}/{num_cohints_per_file} [{dots}]")
         ts1 = time.time()
 
         gmf_vals = np.stack(gmf_vals, axis=0)
@@ -219,7 +227,7 @@ def compute_gmf(
         msg = "task_idx {task:4} time {time:1.2f} cpu/real {real:1.2f}"
         logger.debug(msg.format(**info))
 
-        coh_ints = np.arange(num_cohints_per_file)
+        coh_ints = np.arange(num_cohints)
 
         r_inds = np.argmax(gmf_vals, axis=1)
         r_vec = params_der["ranges"][r_inds]
@@ -353,7 +361,7 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     if gmf_lib_name == "cuda":
         kwargs["gpu_id"] = gpu_id
 
-    # TODO: implement this
+    # TODO: remove this as option, keep the gmf no reduce function for development testing reasons
     if not params_pro["reduce_range_rate"] and params_pro["reduce_acceleration"]:
         raise NotImplementedError("reduce settings not implemented")
 
