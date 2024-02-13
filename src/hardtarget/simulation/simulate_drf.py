@@ -28,6 +28,7 @@ def simulate_drf(
     target, sim_data, sim_params, experiment_params, compression_level=0, chnl="sim", clobber=False
 ):
     """
+    # TODO: docstring
     """
     if target is not None:
         target = pathlib.Path(target)
@@ -139,7 +140,7 @@ def simulate_drf(
             else:
                 amp0 = np.sqrt(sn0)
 
-            rx_wave = tx_wave * amp0 * np.exp(-1j * phase)
+            rx_wave = tx_wave * amp0 * np.exp(1j * phase)
             signal[rg_samp0:(rg_samp0 + T_tx_samps)] += rx_wave
 
         if target is None:
@@ -156,11 +157,16 @@ def simulate_drf(
 
     # forward values from experiment config file
     props = [
-        "sample_rate", "ipp", "tx_pulse_length",
-        "doppler_sign", "round_trip_range",
-        "rx_start", "rx_end",
-        "tx_start", "tx_end",
-        "cal_on", "cal_off"
+        "sample_rate",
+        "ipp",
+        "tx_pulse_length",
+        "round_trip_range",
+        "rx_start",
+        "rx_end",
+        "tx_start",
+        "tx_end",
+        "cal_on",
+        "cal_off",
     ]
 
     for prop in props:
