@@ -14,8 +14,9 @@ args = parser.parse_args()
 
 
 range0 = 2000e3
-vel0 = 0.4e3
-acel0 = -0.20e3
+vel0 = 0.2e3
+acel0 = 120
+dacel0 = 20
 
 # gmflib = "cuda"
 # gmflib = "c"
@@ -30,7 +31,7 @@ output_path = base_path / "beamparks_analyzed" / f"leo_bpark_2.1u_NO@uhf_{gmflib
 
 t_start = 0
 echo_len = 5.0
-t_abs = np.arange(t_start, t_start + echo_len, 0.1)
+t_abs = np.arange(t_start, t_start + echo_len + 0.1, 0.1)
 t = t_abs - t_start
 peak_SNR = 10**(15.0/10.0)
 
@@ -44,9 +45,12 @@ simulation_params = {
 }
 
 simulation_data = {
-    "ranges": range0 + vel0*t + acel0*0.5*t**2,
-    "velocities": vel0 + t*acel0,
-    "accelerations": np.ones_like(t)*acel0,
+    # "ranges": range0 + vel0*t + acel0*0.5*t**2,
+    # "velocities": vel0 + t*acel0,
+    # "accelerations": np.ones_like(t)*acel0,
+    "ranges": range0 + vel0*t + acel0*(1/2)*t**2 + dacel0*(1/6)*t**3,
+    "velocities": vel0 + acel0*t + dacel0*0.5*t**2,
+    "accelerations": acel0 + dacel0*t,
     # "snr": peak_SNR*np.exp(-(t - echo_len/2)**2/2.0**2),
     "snr": peak_SNR*np.ones_like(t),
     "times": t_abs,
@@ -76,6 +80,10 @@ if args.action in ("all", "simulate"):
 reader, params = hardtarget.drf_utils.load_hardtarget_drf(drf_path)
 
 all_params = hardtarget.load_gmf_params(drf_path, config_path)
+
+for key, val in all_params["PRO"].items():
+    print(f"{key}: {val}")
+
 look_time_ind = np.argmin(np.abs(t - echo_len/2))
 look_time = t_abs[look_time_ind]
 range_true = simulation_data["ranges"][look_time_ind]
