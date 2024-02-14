@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--ipp", type=int, default=1)
 args = parser.parse_args()
 
+raise NotImplementedError("Todo fix this example")
 
 # target = "/home/danielk/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/"
 # config = "/home/danielk/git/hard_target/examples/cfg/test.ini"
