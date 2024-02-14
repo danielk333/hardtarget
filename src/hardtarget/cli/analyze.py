@@ -30,7 +30,7 @@ def parser_build(parser):
     parser.add_argument(
         "-G",
         "--gmflib",
-        choices=["numpy", "c", "cuda"],
+        choices=["numpy", "c", "cuda", "numpy_daf"],
         help="GMF implementation",
         default=None,
     )
