@@ -12,10 +12,6 @@ def noise_generator(noise_sigma, shape):
     return noise_sigma * (np.random.randn(*shape) + 1j * np.random.randn(*shape))
 
 
-def range_function(t, range0, velocity0, acceleration0):
-    return range0 + t * velocity0 + 0.5 * t**2 * acceleration0
-
-
 def waveform_generator(t, baud_length, frequency, code, dtype=np.complex128):
     t_ind = (t // baud_length).astype(np.int64)
     signal = np.zeros(t.shape, dtype=dtype)
@@ -117,8 +113,9 @@ def simulate_drf(
         # TODO: this assumes rx streches over tx, generalize
         signal[T_tx_start_samp:T_tx_end_samp] += tx_amp0*tx_wave
 
-        if samp0 > samp_sig_t0 and samp0 < samp_sig_t1:
-            t0 = (samp0 - samp_epoch + T_tx_start_samp) / sample_rate
+        s0 = samp0 + T_tx_start_samp
+        t0 = (s0 - samp_epoch) / sample_rate
+        if s0 >= samp_sig_t0 and s0 <= samp_sig_t1:
             r0 = interp_data["ranges"](t0)
             v0 = interp_data["velocities"](t0)
             a0 = interp_data["accelerations"](t0)
@@ -132,7 +129,7 @@ def simulate_drf(
         if rg_samp0 is not None and (
             rg_samp0 >= T_rx_start_samp and rg_samp0 <= T_rx_end_samp
         ):
-            ranges = range_function(t_tx, r0, v0, a0)
+            ranges = r0 + v0*t_tx + 0.5*a0*t_tx**2
             phase = np.mod(ranges / wavelength, 1) * np.pi * 2
 
             if sim_params["noise_sigma"] > 0 and "snr" in interp_data:
