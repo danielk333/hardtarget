@@ -11,7 +11,7 @@ debug the backends developed in different programming languages.
 For example, to debug the C-implementation using GNU debugger simply
 
 ```
-gdb --args python ./examples/run_gmf_programmatically.py
+gdb --args python ./examples/run_gmf_programmatically__no_agl.py
 ```
 
 to start gdb targeting the python binary which is set to run this example.

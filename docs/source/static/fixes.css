@@ -1,0 +1,9 @@
+.sphx-glr-script-out .highlight pre,
+code {
+  background-color: var(--sh-bg-color);
+  color: var(--fg-color);
+}
+
+img.light-theme-image {
+    filter: invert(1) hue-rotate(180deg);
+}

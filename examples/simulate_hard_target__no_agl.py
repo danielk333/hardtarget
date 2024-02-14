@@ -17,8 +17,9 @@ range0 = 2000e3
 vel0 = 0.4e3
 acel0 = -0.20e3
 
-gmflib = "cuda"
-# gmflib = "numpy"
+# gmflib = "cuda"
+# gmflib = "c"
+gmflib = "numpy"
 # gmflib = "numpy_daf"
 
 base_path = pathlib.Path("/home/danielk/data/spade")
@@ -27,17 +28,18 @@ rx_channel = "sim"
 config_path = pathlib.Path("./examples/cfg/sim_test.ini").resolve()
 output_path = base_path / "beamparks_analyzed" / f"leo_bpark_2.1u_NO@uhf_{gmflib}_sim"
 
-t_start = 2.5
+t_start = 0
 echo_len = 5.0
 t_abs = np.arange(t_start, t_start + echo_len, 0.1)
 t = t_abs - t_start
-peak_SNR = 10**(25.0/10.0)
+peak_SNR = 10**(15.0/10.0)
 
 simulation_params = {
     "epoch": "2021-04-12T12:15:40",
     "start_time": 0,
     "end_time": 15.0,
     "noise_sigma": 0,
+    # "noise_sigma": 1.0,
     "tx_amp": np.sqrt(peak_SNR),
 }
 
@@ -45,7 +47,8 @@ simulation_data = {
     "ranges": range0 + vel0*t + acel0*0.5*t**2,
     "velocities": vel0 + t*acel0,
     "accelerations": np.ones_like(t)*acel0,
-    "snr": peak_SNR*np.exp(-(t - echo_len/2)**2/2.0**2),
+    # "snr": peak_SNR*np.exp(-(t - echo_len/2)**2/2.0**2),
+    "snr": peak_SNR*np.ones_like(t),
     "times": t_abs,
 }
 

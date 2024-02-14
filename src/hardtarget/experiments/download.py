@@ -1,12 +1,17 @@
 
 import requests
 import argparse
-from lxml import html
 from pathlib import Path
 import zipfile
 import tempfile
 from tqdm import tqdm
 import json
+
+try:
+    from lxml import html
+except ImportError:
+    html = None
+
 
 # Start 
 # DAY=20161021 PRODUCT=leo_bpark_2.5u_3P

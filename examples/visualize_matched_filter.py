@@ -1,10 +1,19 @@
+"""
+
+MAKE DOC HERE
+=============
+
+todo
+
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.fft as fft
 import hardtarget
 import pathlib
 
-config_path = pathlib.Path("./examples/cfg/sim_test.ini").resolve()
+config_path = pathlib.Path(".").resolve() / "cfg" / "sim_test.ini"
 
 range0 = 2000e3
 vel0 = 0.15e3
@@ -65,7 +74,7 @@ params = {
 range_ind = np.argmin(np.abs(params["DER"]["ranges"] - range_true))
 acc_ind = np.argmin(np.abs(params["DER"]["accelerations"] - acel0))
 
-print("Best range gate: ", params["DER"]["abs_rgs"][range_ind])
+print("Best range gate: ", params["DER"]["rel_rgs"][range_ind])
 print("Frequency decimation: ", params["PRO"]["frequency_decimation"])
 
 simulated_signal = hardtarget.simulation.drf(
@@ -182,13 +191,13 @@ for ind in range(n_ipp):
     axes[1, 1].axvline(dec_txlen * (ind + 1), ls="--", c="c")
 axes[1, 1].set_title("Correlated & decimated & acceleration corrected echo")
 
-# inds = np.abs(fvec) < 3e3
-# axes[2, 0].semilogy(fvec[inds], np.abs(spec[inds]), "-k")
-axes[2, 0].semilogy(fvec, np.abs(spec), "-k")
+inds = np.abs(fvec) < 3e3
+axes[2, 0].semilogy(fvec[inds], np.abs(spec[inds]), "-k")
+# axes[2, 0].semilogy(fvec, np.abs(spec), "-k")
 axes[2, 0].set_title("Correlated & decimated echo spectrum")
 
-# axes[2, 1].semilogy(fvec[inds], np.abs(c_spec[inds]), "-b")
-axes[2, 1].semilogy(fvec, np.abs(c_spec), "-b")
+axes[2, 1].semilogy(fvec[inds], np.abs(c_spec[inds]), "-b")
+# axes[2, 1].semilogy(fvec, np.abs(c_spec), "-b")
 axes[2, 1].set_title("Correlated & decimated & acceleration corrected echo spectrum")
 
 

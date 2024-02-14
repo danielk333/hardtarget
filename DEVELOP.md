@@ -1,3 +1,5 @@
+TODO: move all these into docs folder
+
 
 ### linting with flake8
 

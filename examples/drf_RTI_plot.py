@@ -1,3 +1,12 @@
+"""
+
+MAKE DOC HERE
+=============
+
+todo
+
+"""
+
 import matplotlib.pyplot as plt
 import hardtarget
 
