@@ -32,6 +32,12 @@ def parser_build(parser):
         default="0",
         help="Set the compression level (0-9) (default: 0)",
     )
+    parser.add_argument(
+        "-p",
+        "--progress",
+        action="store_true",
+        help="Show progressbar for conversion",
+    )
 
     return parser
 
@@ -41,10 +47,13 @@ def main(args):
     # Logging
     logger = logging.getLogger("eiscat_convert")
     logger.setLevel(getattr(logging, args.log_level))
-    eiscat_convert(args.input,
-                   logger,
-                   dstdir=args.output,
-                   compression_level=compression_level)
+    eiscat_convert(
+        args.input,
+        logger,
+        dstdir=args.output,
+        compression_level=compression_level,
+        progress=args.progress,
+    )
 
 
 ####################################################################
@@ -53,7 +62,6 @@ def main(args):
 
 if __name__ == "__main__":
 
-    import logging
     import argparse
 
     # Create the argument parser

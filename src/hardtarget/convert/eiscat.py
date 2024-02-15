@@ -9,6 +9,7 @@ import bz2
 import logging
 import configparser
 from pathlib import Path
+from tqdm import tqdm
 from hardtarget.experiments import load_expconfig
 
 """
@@ -127,7 +128,7 @@ def expinfo_split(xpinf):
 ####################################################################
 
 
-def eiscat_convert(srcdir, logger, dstdir=None, compression_level=0):
+def eiscat_convert(srcdir, logger, dstdir=None, compression_level=0, progress=False):
     """
     Converts folder with eiscat measurements to folder with drf files.
 
@@ -231,12 +232,16 @@ def eiscat_convert(srcdir, logger, dstdir=None, compression_level=0):
         is_complex=True,
         num_subchannels=1,
         is_continuous=True,
-        marching_periods=True,
+        marching_periods=False,
     )
 
     n_prev = n0 - n_samples
     n_files = len(files)
     logger.info(f"writing DRF from {n_files} input files")
+
+    if progress:
+        pbar = tqdm(desc="Converting files to digital_rf", total=n_files)
+
     for idx, pth in enumerate(files):
         if idx + 1 == n_files or idx % 10 == 0:
             logger.debug(f"write progress {idx+1}/{n_files}")
@@ -260,6 +265,10 @@ def eiscat_convert(srcdir, logger, dstdir=None, compression_level=0):
             logging.warning(f"unable to write samples from {pth} to file ... continuing")
             raise e
         n_prev = n0
+        if progress:
+            pbar.update(1)
+    if progress:
+        pbar.close()
 
     logging.info("Done writing DRF files")
 
