@@ -224,7 +224,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     params_pro["read_length"] = (n_ipp + ipp_offset) * ipp_samp
 
     # TODO: the new idea:
-    # 3 levels: 
+    # 3 levels:
     # 1) direct sampled signal
     # 2) rx/tx stenciled signals
     # 3) rx/tx windows selection
@@ -247,9 +247,6 @@ def compute_derived_gmf_params(params_exp, params_pro):
 
     params_der["rx_stencil_indices"] = np.argwhere(params_der["rx_stencil"]).flatten()
     params_der["tx_stencil_indices"] = np.argwhere(params_der["tx_stencil"]).flatten()
-
-    params_der["dec_rx_stencil_indices"] = params_der["rx_stencil_indices"][::frequency_decimation]//frequency_decimation
-    params_der["dec_tx_stencil_indices"] = np.argwhere(params_der["tx_stencil"]).flatten()
 
     # Decimated signals
     assert tx_pulse_samps % frequency_decimation == 0, (
@@ -344,9 +341,10 @@ def compute_derived_gmf_params(params_exp, params_pro):
     params_pro["n_accelerations"] = len(params_der["accelerations"])
 
     # precalculate phasors corresponding to different accelerations
-    params_der["acceleration_phasors"] = np.exp(
+    phasors = np.exp(
         -1j * np.pi * params_der["accelerations"][:, None] * times2[None, :] / wavelength
     )
+    params_der["acceleration_phasors"] = phasors.astype(np.complex64)
 
     params_pro["gmf_size"] = (params_pro["n_ranges"], )
     return params_exp, params_pro, params_der
