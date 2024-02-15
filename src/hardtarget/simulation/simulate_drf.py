@@ -1,15 +1,17 @@
 import numpy as np
 import scipy.constants
-import scipy.interpolate as scint
 import digital_rf as drf
 import pathlib
 import configparser
 import shutil
+import logging
 from hardtarget.version import __version__
 
+logger = logging.getLogger(__name__)
 
-def noise_generator(noise_sigma, shape):
-    return noise_sigma * (np.random.randn(*shape) + 1j * np.random.randn(*shape))
+
+def noise_generator(noise_sigma, shape, dtype=np.complex128):
+    return noise_sigma * (np.random.randn(*shape) + 1j * np.random.randn(*shape)).astype(dtype)
 
 
 def waveform_generator(t, baud_length, frequency, code, dtype=np.complex128):
@@ -21,27 +23,30 @@ def waveform_generator(t, baud_length, frequency, code, dtype=np.complex128):
 
 
 def simulate_drf(
-    target, sim_data, sim_params, experiment_params, compression_level=0, chnl="sim", clobber=False
+    output_path,
+    range_function,
+    sim_params,
+    experiment_params,
+    snr_function=None,
+    compression_level=0,
+    chnl="sim",
+    clobber=False,
+    dtype=np.complex128,
 ):
     """
     # TODO: docstring
     """
-    if target is not None:
-        target = pathlib.Path(target)
-        target.mkdir(exist_ok=True)
+    if output_path is not None:
+        output_path = pathlib.Path(output_path)
+        output_path.mkdir(exist_ok=True)
 
-        dstdir = target / chnl
+        dstdir = output_path / chnl
         if dstdir.is_dir() and clobber:
+            logger.info(f"'{dstdir}' exists and clobber is on: removing dir")
             shutil.rmtree(dstdir)
         elif dstdir.is_dir():
             raise FileExistsError(f"Directory '{dstdir}' exists")
         dstdir.mkdir(exist_ok=False)
-
-    interp_data = {}
-    for key in sim_data.keys():
-        if key == "t":
-            continue
-        interp_data[key] = scint.interp1d(sim_data["times"], sim_data[key])
 
     sample_rate = experiment_params["sample_rate"]
     codes = experiment_params["code"].shape[0]
@@ -67,19 +72,19 @@ def simulate_drf(
     samp_t1 = samp_epoch + sim_params["end_time"] * sample_rate
     samp_t1 = np.round((samp_t1 // ipp_samp) * ipp_samp).astype(np.int64)
 
-    sig_t0 = np.min(sim_data["times"])
+    sig_t0 = sim_params["target_start_time"]
     samp_sig_t0 = samp_epoch + sig_t0 * sample_rate
-    sig_t1 = np.max(sim_data["times"])
+    sig_t1 = sim_params["target_end_time"]
     samp_sig_t1 = samp_epoch + sig_t1 * sample_rate
 
     sim_pulses = int((samp_t1 - samp_t0) / ipp_samp)
 
-    if target is None:
-        simulated_signal = np.empty((samp_t1 - samp_t0,), dtype=np.complex64)
+    if output_path is None:
+        simulated_signal = np.empty((samp_t1 - samp_t0,), dtype=dtype)
     else:
         rf_writer = drf.DigitalRFWriter(
             str(dstdir),  # directory
-            np.complex64,  # dtype
+            dtype,  # dtype
             3600,  # subdir cadence secs    => one dir per hour
             1000,  # file cadence millisecs => one file per second
             samp_t0,  # start global index
@@ -90,23 +95,27 @@ def simulate_drf(
             checksum=False,
             num_subchannels=1,
             is_continuous=True,
-            marching_periods=True,
+            marching_periods=False,
         )
 
     t_tx = np.arange(T_tx_samps) / sample_rate
     for pid in range(sim_pulses):
         samp0 = pid * ipp_samp + samp_t0
-        signal = np.zeros((ipp_samp,), dtype=np.complex64)
+        signal = np.zeros((ipp_samp,), dtype=dtype)
 
         if sim_params["noise_sigma"] > 0:
-            signal[T_rx_select] += noise_generator(sim_params["noise_sigma"], (T_rx_samps,))
+            signal[T_rx_select] += noise_generator(
+                sim_params["noise_sigma"],
+                (T_rx_samps,),
+                dtype=dtype,
+            )
 
         tx_wave = waveform_generator(
             t_tx,
             experiment_params["baud_length"] * 1e-6,
             experiment_params["frequency"] * 1e6,
             experiment_params["code"][pid % codes],
-            dtype=np.complex64,
+            dtype=dtype,
         )
         tx_amp0 = sim_params["tx_amp"] if "tx_amp" in sim_params else 1.0
 
@@ -114,33 +123,26 @@ def simulate_drf(
         signal[T_tx_start_samp:T_tx_end_samp] += tx_amp0*tx_wave
 
         s0 = samp0 + T_tx_start_samp
+        s1 = s0 + T_tx_samps / sample_rate
         t0 = (s0 - samp_epoch) / sample_rate
-        if s0 >= samp_sig_t0 and s0 <= samp_sig_t1:
-            r0 = interp_data["ranges"](t0)
-            v0 = interp_data["velocities"](t0)
-            a0 = interp_data["accelerations"](t0)
-            sn0 = interp_data["snr"](t0) if "snr" in interp_data else 1.0
-
+        if s0 >= samp_sig_t0 and s1 <= samp_sig_t1:
+            r0 = range_function(np.array([t0], dtype=np.float64))[0]
+            sn0 = snr_function(t0 + t_tx) if snr_function is not None else 1.0
             rg0 = np.round((r0 / scipy.constants.c) * sample_rate).astype(np.int64)
             rg_samp0 = rg0 + T_tx_start_samp
-        else:
-            rg_samp0 = None
 
-        if rg_samp0 is not None and (
-            rg_samp0 >= T_rx_start_samp and rg_samp0 <= T_rx_end_samp
-        ):
-            ranges = r0 + v0*t_tx + 0.5*a0*t_tx**2
-            phase = np.mod(ranges / wavelength, 1) * np.pi * 2
+            if rg_samp0 >= T_rx_start_samp and rg_samp0 <= T_rx_end_samp:
+                if sim_params["noise_sigma"] > 0:
+                    amp0 = np.sqrt(sn0*2*sim_params["noise_sigma"]**2)
+                else:
+                    amp0 = np.sqrt(sn0)
+                ranges = range_function(t0 + t_tx)
+                phase = np.mod(ranges / wavelength, 1) * np.pi * 2
 
-            if sim_params["noise_sigma"] > 0 and "snr" in interp_data:
-                amp0 = np.sqrt(sn0*2*sim_params["noise_sigma"]**2)
-            else:
-                amp0 = np.sqrt(sn0)
+                rx_wave = tx_wave * amp0 * np.exp(1j * phase)
+                signal[rg_samp0:(rg_samp0 + T_tx_samps)] += rx_wave
 
-            rx_wave = tx_wave * amp0 * np.exp(1j * phase)
-            signal[rg_samp0:(rg_samp0 + T_tx_samps)] += rx_wave
-
-        if target is None:
+        if output_path is None:
             simulated_signal[(pid * ipp_samp):((pid + 1) * ipp_samp)] = signal
         else:
             rf_writer.rf_write(signal)
@@ -173,9 +175,10 @@ def simulate_drf(
     # add
     exp["radar_frequency"] = str(experiment_params["frequency"])
 
-    if target is None:
+    if output_path is None:
         return simulated_signal
     else:
+        rf_writer.close()
         # write metadata file
         metafile = dstdir.parent / "metadata.ini"
         with open(metafile, 'w') as f:

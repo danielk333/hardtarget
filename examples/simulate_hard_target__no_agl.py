@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 import pathlib
 import hardtarget
 import argparse
+import logging
+
+logger = logging.getLogger("hardtarget.example_simulation")
+hardtarget.profiling.setup_loggers(stdout=True, verbosity=1)
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -12,15 +16,9 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-
-range0 = 2000e3
-vel0 = 0.2e3
-acel0 = 120
-dacel0 = 20
-
-# gmflib = "cuda"
+gmflib = "cuda"
 # gmflib = "c"
-gmflib = "numpy"
+# gmflib = "numpy"
 # gmflib = "numpy_daf"
 
 base_path = pathlib.Path("/home/danielk/data/spade")
@@ -32,29 +30,50 @@ output_path = base_path / "beamparks_analyzed" / f"leo_bpark_2.1u_NO@uhf_{gmflib
 t_start = 0
 echo_len = 5.0
 t_abs = np.arange(t_start, t_start + echo_len + 0.1, 0.1)
-t = t_abs - t_start
+t_rel = t_abs - t_start
 peak_SNR = 10**(15.0/10.0)
 
+
+# TODO: add system for multiple targets, each with its own data function
 simulation_params = {
     "epoch": "2021-04-12T12:15:40",
     "start_time": 0,
     "end_time": 15.0,
+    "target_start_time": t_abs[0],
+    "target_end_time": t_abs[-1],
     "noise_sigma": 0,
     # "noise_sigma": 1.0,
     "tx_amp": np.sqrt(peak_SNR),
 }
 
-simulation_data = {
-    # "ranges": range0 + vel0*t + acel0*0.5*t**2,
-    # "velocities": vel0 + t*acel0,
-    # "accelerations": np.ones_like(t)*acel0,
-    "ranges": range0 + vel0*t + acel0*(1/2)*t**2 + dacel0*(1/6)*t**3,
-    "velocities": vel0 + acel0*t + dacel0*0.5*t**2,
-    "accelerations": acel0 + dacel0*t,
-    # "snr": peak_SNR*np.exp(-(t - echo_len/2)**2/2.0**2),
-    "snr": peak_SNR*np.ones_like(t),
-    "times": t_abs,
-}
+range0 = 2000e3
+vel0 = 0.4e3
+acel0 = -0.20e3
+
+sim_r = range0 + vel0*t_rel + acel0*0.5*t_rel**2
+sim_v = vel0 + acel0*t_rel
+sim_a = np.ones_like(t_rel)*acel0
+
+
+def range_function(t):
+    inds = np.logical_and(t >= t_abs[0], t <= t_abs[-1])
+    if np.any(inds):
+        _t = t - t_start
+        # return range0 + vel0*t + acel0*(1/2)*t**2 + dacel0*(1/6)*t**3
+        return range0 + vel0*_t[inds] + acel0*0.5*_t[inds]**2
+    else:
+        return np.nan
+
+
+def snr_function(t):
+    inds = np.logical_and(t >= t_abs[0], t <= t_abs[-1])
+    if np.any(inds):
+        # _t = t - t_start
+        # return peak_SNR*np.exp(-(_t - echo_len/2)**2/2.0**2)
+        return peak_SNR
+    else:
+        return np.nan
+
 
 experiment_params = {
     "sample_rate": 1000000,
@@ -75,7 +94,16 @@ for key, val in experiment_params.items():
     print(f"{key}: {val}")
 
 if args.action in ("all", "simulate"):
-    hardtarget.simulation.drf(drf_path, simulation_data, simulation_params, experiment_params, clobber=True)
+    logger.info("Simulating")
+    hardtarget.simulation.drf(
+        drf_path,
+        range_function,
+        simulation_params,
+        experiment_params,
+        snr_function=snr_function,
+        dtype=np.complex64,
+        clobber=True,
+    )
 
 reader, params = hardtarget.drf_utils.load_hardtarget_drf(drf_path)
 
@@ -84,9 +112,9 @@ all_params = hardtarget.load_gmf_params(drf_path, config_path)
 for key, val in all_params["PRO"].items():
     print(f"{key}: {val}")
 
-look_time_ind = np.argmin(np.abs(t - echo_len/2))
+look_time_ind = np.argmin(np.abs(t_abs - t_start - echo_len/2))
 look_time = t_abs[look_time_ind]
-range_true = simulation_data["ranges"][look_time_ind]
+range_true = range_function(look_time)[0]
 range_ind = np.argmin(np.abs(all_params["DER"]["ranges"] - range_true))
 acc_ind = np.argmin(np.abs(all_params["DER"]["accelerations"] - acel0))
 
@@ -96,6 +124,7 @@ print("Range gate: ", all_params["DER"]["ranges"][range_ind]*1e-3, " km vs ", ra
 print("Best range gate index: ", all_params["DER"]["rgs"][range_ind])
 
 if args.action in ("all", "analyse"):
+    logger.info("Analysing")
     # process
     results = hardtarget.compute_gmf(
         rx=(drf_path, rx_channel),
@@ -111,15 +140,16 @@ if args.action in ("all", "analyse"):
     )
 
 if args.action in ("all", "plot"):
+    logger.info("Plotting")
 
     fig, axes = plt.subplots(3, 1)
-    axes[0].plot(t_abs, 1e-3*simulation_data["ranges"], c="red")
+    axes[0].plot(t_abs, 1e-3*sim_r, c="red")
     axes[0].set_xlabel("Time [s]")
     axes[0].set_ylabel("Range [km]")
-    axes[1].plot(t_abs, 1e-3*simulation_data["velocities"], c="red")
+    axes[1].plot(t_abs, 1e-3*sim_v, c="red")
     axes[1].set_xlabel("Time [s]")
     axes[1].set_ylabel("Velocity [km/s]")
-    axes[2].plot(t_abs, simulation_data["accelerations"], c="red")
+    axes[2].plot(t_abs, sim_a, c="red")
     axes[2].set_xlabel("Time [s]")
     axes[2].set_ylabel("Acceleration [m/s^2]")
 
@@ -148,17 +178,17 @@ if args.action in ("all", "plot"):
         snr = snr[coh_inds, r_inds]
 
         h00 = axes[0, 0].plot(data["t"], data["range_peak"]*1e-3*0.5, c="blue")
-        axes[0, 0].plot(t_abs, simulation_data["ranges"]*1e-3*0.5, c="red")
+        axes[0, 0].plot(t_abs, sim_r*1e-3*0.5, c="red")
         axes[0, 0].set_xlabel("Time [s]")
         axes[0, 0].set_ylabel("range [km]")
 
         h01 = axes[0, 1].plot(data["t"], data["range_rate_peak"]*1e-3*0.5, c="blue")
-        axes[0, 1].plot(t_abs, simulation_data["velocities"]*1e-3*0.5, c="red")
+        axes[0, 1].plot(t_abs, sim_v*1e-3*0.5, c="red")
         axes[0, 1].set_xlabel("Time [s]")
         axes[0, 1].set_ylabel("range rate [km/s]")
 
         h10 = axes[1, 0].plot(data["t"], data["acceleration_peak"]*0.5, c="blue")
-        axes[1, 0].plot(t_abs, simulation_data["accelerations"]*0.5, c="red")
+        axes[1, 0].plot(t_abs, sim_a*0.5, c="red")
         axes[1, 0].set_xlabel("Time [s]")
         axes[1, 0].set_ylabel("acceleration [m/s^2]")
 
