@@ -17,7 +17,7 @@ try:
 except ImportError:
     comm = None
 
-
+PACKAGE_NAME = "hardtarget"
 PACKAGE_PATH = str(pathlib.Path(__file__).parent)
 START_TIME = None
 
@@ -104,7 +104,7 @@ def _path_to_module(path):
     if PACKAGE_PATH not in path:
         return ""
     stem = pathlib.Path(path).stem
-    path = "pyant" + os.sep + path.replace(PACKAGE_PATH, "").strip(os.sep)
+    path = PACKAGE_NAME + os.sep + path.replace(PACKAGE_PATH, "").strip(os.sep)
     module = path.split(os.sep)
     module[-1] = stem
     return ".".join(module)
@@ -130,7 +130,7 @@ def profile():
 @check_yappi
 def get_profile(modules=None):
     if modules is None:
-        modules = ["pyant"]
+        modules = [PACKAGE_NAME]
     stats = yappi.get_func_stats(
         filter_callback=lambda x: any(
             list(_path_to_module(x.module).startswith(mod) for mod in modules)
@@ -142,7 +142,7 @@ def get_profile(modules=None):
     return stats, total
 
 
-def print_profile(stats, total=None):
+def print_profile(stats, total=None, max_rows=None):
     header = [
         "Name",
         "Module",
@@ -166,6 +166,11 @@ def print_profile(stats, total=None):
         if column_sizes[ind] < 6:
             column_sizes[ind]
 
+    if max_rows is not None:
+        _stats = stats[:max_rows]
+    else:
+        _stats = stats
+
     datas = [
         (
             fn.name,
@@ -176,7 +181,7 @@ def print_profile(stats, total=None):
             fn.tavg,
             fn.ttot / total * 100,
         )
-        for fn in stats
+        for fn in _stats
     ]
     for data in datas:
         for ind in range(3):
