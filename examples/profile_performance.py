@@ -14,8 +14,9 @@ config_path = Path("./examples/cfg/test.ini").resolve()
 # Does not work if yappi is not installed
 hardtarget.profile()
 
+libs = ["numpy_daf", "cuda", "c", "numpy"]
 # Do computation
-for lib in ["c", "cuda"]:
+for lib in libs:
     # process
     results = hardtarget.compute_gmf(
         rx=(drf_path, rx_channel),
@@ -24,7 +25,7 @@ for lib in ["c", "cuda"]:
         job={"idx": 0, "N": 1},
         gmflib=lib,
         clobber=True,
-        output=None,
+        output=None,  # Then we get data back in "results instead"
         start_time=0,
         end_time=0.2,  # Just one coherent integration
         relative_time=True,
@@ -34,5 +35,5 @@ for lib in ["c", "cuda"]:
     # print and clear
     stats, total = hardtarget.get_profile()
     print(f"LIB={lib}: total time = {total:.4f} [s]")
-    hardtarget.print_profile(stats, total=total)
+    hardtarget.print_profile(stats, total=total, max_rows=5)
     hardtarget.profile_clear()

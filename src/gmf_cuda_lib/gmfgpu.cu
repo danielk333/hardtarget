@@ -110,13 +110,22 @@ static inline void check_cudaMemset(cudaError_t res, const char *name){
 /*
    This is the main code. If you have N GPUs, you can run N gmf functions in parallel.
 
+    The commented numbers are the argument numbers, useful for debugging the ctypes interface.
 */
 extern "C" int gmf(
-    float *z_tx, int z_tx_len, float *z_rx, int z_rx_len,
-    float *acc_phasors, int n_accs, int *rgs, int n_rg,
-    int dec, float *gmf_vec, float *gmf_dc_vec, int *v_vec, 
-    int *a_vec, int *rx_window, int *dec_rx_inds, int dec_signal_len,
-    int gpu_id
+    float *z_tx, int z_tx_len, // 1, 2
+    float *z_rx, int z_rx_len, // 3, 4
+    float *acc_phasors, int n_accs, // 5, 6
+    int *rgs, int n_rg, // 7, 8
+    int dec, // 9
+    float *gmf_vec, // 10
+    float *gmf_dc_vec, // 11
+    int *v_vec, // 12
+    int *a_vec, // 13
+    int *rx_window, // 14
+    int *dec_rx_inds, // 15
+    int dec_signal_len, // 16
+    int gpu_id // 17
 ) {
     cudaSetDevice(gpu_id);
     // initializing pointers to device (GPU) memory, denoted with "d_"
