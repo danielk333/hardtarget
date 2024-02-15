@@ -135,7 +135,7 @@ def compute_gmf(
         comm.barrier()
 
     # process
-    results = {"dir": output, "files": [], "out": {}}
+    results = {"dir": output, "files": [], "data": {}}
     for idx, task_idx in enumerate(job_tasks):
         # In case we are running MPI to distribute CUDA calculation
         # across multiple GPUs on multiple nodes we assume the ranks

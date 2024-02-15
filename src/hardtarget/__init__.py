@@ -17,3 +17,8 @@ from .experiments import load_expconfig, load_radar_code
 from .drf_utils import load_hardtarget_drf
 from .configuration import load_gmf_params
 from .analysis import load_gmf_out, compute_gmf
+
+# Logging
+from .profiling import setup_loggers
+# Profiling
+from .profiling import profile, profile_stop, get_profile, print_profile, profile_clear
