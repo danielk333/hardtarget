@@ -1,18 +1,7 @@
 import argparse
-import sys
 import logging
 
-try:
-    from mpi4py import MPI
-
-    comm = MPI.COMM_WORLD
-except ImportError:
-
-    class COMM_WORLD:
-        rank = 0
-        size = 1
-
-    comm = COMM_WORLD()
+from hardtarget import profiling
 
 logger = logging.getLogger(__name__)
 
@@ -46,26 +35,7 @@ def main():
     parser = build_parser()
     args = parser.parse_args()
 
-    handler = logging.StreamHandler(sys.stdout)
-    if comm.size > 1:
-        formatter = logging.Formatter(
-            f"RANK{comm.rank} - %(asctime)s %(levelname)s %(name)s - %(message)s"
-        )
-    else:
-        formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s")
-    handler.setFormatter(formatter)
-
-    lib_logger = logging.getLogger("hardtarget")
-    if args.verbose > 0:
-        lib_logger.addHandler(handler)
-        lib_logger.setLevel(logging.INFO)
-    else:
-        logger.addHandler(handler)
-        logger.setLevel(logging.WARNING)
-
-    if args.verbose > 1:
-        logger.info("Logging level set to debug")
-        lib_logger.setLevel(logging.DEBUG)
+    profiling.setup_loggers(stdout=True, verbosity=args.verbose)
 
     function = COMMANDS[args.command]["function"]
     logger.info(f"Executing command {args.command}")

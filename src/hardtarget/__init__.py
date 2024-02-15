@@ -6,6 +6,7 @@ from . import analysis
 from . import simulation
 from . import noise
 from . import configuration
+from . import profiling
 
 # Constants and singletons
 from .gmf import GMF_GRID_LIBS, GMF_OPTIMIZE_LIBS
