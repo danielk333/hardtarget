@@ -223,6 +223,13 @@ def compute_derived_gmf_params(params_exp, params_pro):
     # Read length to include all pulses to be searched
     params_pro["read_length"] = (n_ipp + ipp_offset) * ipp_samp
 
+    # TODO: the new idea:
+    # 3 levels: 
+    # 1) direct sampled signal
+    # 2) rx/tx stenciled signals
+    # 3) rx/tx windows selection
+    # decimation runs on JUST the top 1 level of direct signal
+
     # this stencil is used to block tx pulses and ground clutter
     params_der["rx_stencil"] = np.full((params_pro["read_length"],), False, dtype=bool)
     # this stencil is used to select tx pulses
@@ -240,6 +247,9 @@ def compute_derived_gmf_params(params_exp, params_pro):
 
     params_der["rx_stencil_indices"] = np.argwhere(params_der["rx_stencil"]).flatten()
     params_der["tx_stencil_indices"] = np.argwhere(params_der["tx_stencil"]).flatten()
+
+    params_der["dec_rx_stencil_indices"] = params_der["rx_stencil_indices"][::frequency_decimation]//frequency_decimation
+    params_der["dec_tx_stencil_indices"] = np.argwhere(params_der["tx_stencil"]).flatten()
 
     # Decimated signals
     assert tx_pulse_samps % frequency_decimation == 0, (
@@ -305,8 +315,8 @@ def compute_derived_gmf_params(params_exp, params_pro):
     # TODO: the sample gates can actually move as a function of velocity + acceleration
     # so maybe the rx_window_indices should also change so we dont miss-align samples?
 
-    # We are modelling the target parameters at the time of the first cycle sample
-    # calculate midpoint of decimated vectors (going to highest level inds: cycle samples)
+    # We are modelling the target parameters at the time of the first sample of the first
+    #  cycle sample (going to highest level inds: cycle samples)
     rx_win_t = params_der["rx_stencil_indices"][rx_window_indices] / sample_rate
     rx_win_t_dec = rx_win_t[::frequency_decimation]
 
@@ -333,16 +343,10 @@ def compute_derived_gmf_params(params_exp, params_pro):
     ])  # m/s^2
     params_pro["n_accelerations"] = len(params_der["accelerations"])
 
-    params_der["acceleration_phasors"] = np.zeros(
-        [params_pro["n_accelerations"], params_pro["decimated_coh_int_samps"]],
-        dtype=np.complex64,
-    )
-
     # precalculate phasors corresponding to different accelerations
-    for ai, acc in enumerate(params_der["accelerations"]):
-        params_der["acceleration_phasors"][ai, :] = np.exp(
-            -1j * np.pi / wavelength * acc * times2
-        )
+    params_der["acceleration_phasors"] = np.exp(
+        -1j * np.pi * params_der["accelerations"][:, None] * times2[None, :] / wavelength
+    )
 
     params_pro["gmf_size"] = (params_pro["n_ranges"], )
     return params_exp, params_pro, params_der
