@@ -3,6 +3,8 @@ import sysconfig
 import pathlib
 import logging
 
+from .numpy_ctypes import nptype
+
 logger = logging.getLogger(__name__)
 
 # Load the C-lib
@@ -20,19 +22,19 @@ if __libpath__.is_file():
 
     gmfcudalib.gmf.restype = ctypes.c_int
     gmfcudalib.gmf.argtypes = [
-        ctypes.POINTER(ctypes.c_float), ctypes.c_int,
-        ctypes.POINTER(ctypes.c_float), ctypes.c_int,
-        ctypes.POINTER(ctypes.c_float), ctypes.c_int,
-        ctypes.POINTER(ctypes.c_int), ctypes.c_int,
-        ctypes.c_int,
-        ctypes.POINTER(ctypes.c_float),
-        ctypes.POINTER(ctypes.c_float),
-        ctypes.POINTER(ctypes.c_int),
-        ctypes.POINTER(ctypes.c_int),
-        ctypes.POINTER(ctypes.c_int),
-        ctypes.POINTER(ctypes.c_int),
-        ctypes.c_int,
-        ctypes.c_int,
+        nptype("c8", 1), ctypes.c_int,  # 1, 2
+        nptype("c8", 1), ctypes.c_int,  # 3, 4
+        nptype("c8", 2), ctypes.c_int,  # 5, 6
+        nptype("i4", 1), ctypes.c_int,  # 7, 8
+        ctypes.c_int,  # 9
+        nptype("f4", 1, w=True),  # 10
+        nptype("f4", 1, w=True),  # 11
+        nptype("i4", 1, w=True),  # 12
+        nptype("i4", 1, w=True),  # 13
+        nptype("i4", 1),  # 14
+        nptype("i4", 1),  # 15
+        ctypes.c_int,  # 16
+        ctypes.c_int,  # 17
     ]
 
     gmfcudalib.print_devices.restype = None
@@ -56,22 +58,22 @@ def gmfcu(z_tx, z_rx, gmf_variables, gmf_params, gpu_id=0):
     dec_signal_len = gmf_params["DER"]["dec_signal_length"]
 
     error_code = gmfcudalib.gmf(
-        z_tx.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-        z_tx.size,
-        z_rx.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-        z_rx.size,
-        acc_phasors.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-        acc_phasors.shape[0],
-        rgs.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
-        rgs.size,
-        frequency_decimation,
-        gmf_variables.vals.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-        gmf_variables.dc.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-        gmf_variables.v_ind.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
-        gmf_variables.a_ind.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
-        rx_window_indices.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
-        dec_rx_window_indices.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
-        dec_signal_len,
-        gpu_id,
+        z_tx,  # 1
+        z_tx.size,  # 2
+        z_rx,  # 3
+        z_rx.size,  # 4
+        acc_phasors,  # 5
+        acc_phasors.shape[0],  # 6
+        rgs,  # 7
+        rgs.size,  # 8
+        frequency_decimation,  # 9
+        gmf_variables.vals,  # 10
+        gmf_variables.dc,  # 11
+        gmf_variables.v_ind,  # 12
+        gmf_variables.a_ind,  # 13
+        rx_window_indices,  # 14
+        dec_rx_window_indices,  # 15
+        dec_signal_len,  # 16
+        gpu_id,  # 17
     )
     assert error_code == 0, f"GMF CUDA-function returned error {error_code}"
