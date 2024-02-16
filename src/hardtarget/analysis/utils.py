@@ -5,9 +5,11 @@ import digital_rf as drf
 import h5py
 from collections import namedtuple
 import re
+import logging
 
 from hardtarget import drf_utils
 
+logger = logging.getLogger(__name__)
 
 ####################################################################
 # GMF OUTPUT DATA
@@ -114,13 +116,17 @@ def collect_gmf_data(paths, mats=None, vecs=None):
         if data is None:
             data = {}
             for key in mats:
+                logger.debug(f"Init mat {key}: {mats_data[key].shape} [{mats_data[key].dtype}]")
                 data[key] = mats_data[key]
             for key in vecs:
+                logger.debug(f"Init vec {key}: {vecs_data[key].shape} [{vecs_data[key].dtype}]")
                 data[key] = vecs_data[key]
         else:
             for key in mats:
+                logger.debug(f"Append mat {key}: {mats_data[key].shape} [{mats_data[key].dtype}]")
                 data[key] = np.append(data[key], mats_data[key], axis=0)
             for key in vecs:
+                logger.debug(f"Append vec {key}: {vecs_data[key].shape} [{vecs_data[key].dtype}]")
                 data[key] = np.append(data[key], vecs_data[key])
 
     data["nf_range"] = np.nanmedian(data["nf_vec"], axis=0)
