@@ -132,7 +132,7 @@ pip install .
 Install with additional developer dependencies
 
 ```bash
-pip install .[develop,mpi,plotting]
+pip install .[develop,mpi,plotting,profiling]
 ```
 
 It is also possible to install in developer mode, to avoid repeated reinstalling of the package after code modifications.
