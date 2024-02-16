@@ -81,13 +81,6 @@ def gmfnp_daf(z_tx, z_rx, gmf_variables, gmf_params):
     # dacc = df_res * wavelength * 2
     # times2 = gmf_params["DER"]["decimated_sample_times"] ** 2
 
-    # TODO: what if we do the estimating as a sliding window instead? like choosing 5 ipps does
-    # [1,2,3,4,5], [2,3,4,5,6], ... instead of [1,2,3,4,5], [6,7,8,9,10]
-    # that would allow us to use long integrations with the high speed of the lagged FFT method
-    # while still finding the change right as it happens since we are targeting the
-    # values at the start of the integration pulse, more computation but higher resolution at the same SNR
-    # it could even be an option, IPP-step or something!
-
     # number of range gates is input from user
     for ri, rg in enumerate(rgs):
         zr = z_rx[rx_window_indices + rg]
