@@ -4,15 +4,21 @@ hardtarget convert eiscat ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf \
 
 # To analyze the DRF
 hardtarget gmf ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/ uhf \
-    --config ./examples/cfg/test.ini \
+    --config ./examples/cfg/example_uhf_analysis.ini \
     -o ~/data/spade/beamparks_analyzed/leo_bpark_2.1u_NO@uhf/ \
     --progress -G cuda
 
 # To re-analyze the DRF portion with the echo
 hardtarget gmf ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/ uhf \
-    --config ./examples/cfg/test.ini \
-    -o ~/data/spade/beamparks_analyzed/leo_bpark_2.1u_NO@uhf/ \
+    --config ./examples/cfg/example_uhf_analysis.ini \
+    -o ~/data/spade/beamparks_analyzed/leo_bpark_2.1u_NO@uhf_cuda/ \
     --progress -G cuda --clobber \
+    -s "2021-04-12T12:15:40" -e "2021-04-12T12:16:10"
+
+mpirun -np 2 hardtarget gmf ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/ uhf \
+    --config ./examples/cfg/example_uhf_analysis.ini \
+    -o ~/data/spade/beamparks_analyzed/leo_bpark_2.1u_NO@uhf_numpy_daf/ \
+    --progress -G numpy_daf --clobber \
     -s "2021-04-12T12:15:40" -e "2021-04-12T12:16:10"
 
 
