@@ -1,7 +1,8 @@
-#!/usr/bin/env python3
+from hardtarget import plotting
+
+print(plotting)
 import matplotlib.pyplot as plt
 
-from hardtarget import plotting
 from hardtarget.drf_utils import load_hardtarget_drf
 from .commands import add_command
 
@@ -46,12 +47,3 @@ def main(args):
 
     plt.show()
 
-
-add_command(
-    name="plot_drf",
-    function=main,
-    parser_build=parser_build,
-    add_parser_args=dict(
-        description="Script for plotting drf raw data.",
-    ),
-)

@@ -1,7 +1,5 @@
-#!/usr/bin/env python
 import logging
 from hardtarget.convert.eiscat import eiscat_convert
-
 
 ####################################################################
 # SCRIPT ENTRY POINT
@@ -38,7 +36,6 @@ def parser_build(parser):
         action="store_true",
         help="Show progressbar for conversion",
     )
-
     return parser
 
 
@@ -54,22 +51,3 @@ def main(args):
         compression_level=compression_level,
         progress=args.progress,
     )
-
-
-####################################################################
-# MAIN
-####################################################################
-
-if __name__ == "__main__":
-
-    import argparse
-
-    # Create the argument parser
-    parser = argparse.ArgumentParser(
-        description="Script converting eiscat data to drf format",
-        usage="%(prog)s [options] input -o output_folder",
-    )
-    parser = parser_build(parser)
-    # Parse the arguments
-    args = parser.parse_args()
-    main(args)

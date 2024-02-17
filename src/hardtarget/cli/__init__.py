@@ -1,11 +1,13 @@
-#This is needed so that the registration is performed
-from . import convert
-from . import analyze
-from . import cudacheck
-from . import info_drf
-from . import info_gmf
-from . import plot_drf
-from . import plot_gmf
+# This is needed so that the registration is performed
+from . import cmd_convert
+from . import cmd_inspect
+from . import cmd_check
+from . import cmd_gmf
 
-#Then expose the main after registration
+# Plotting support is conditional 
+from hardtarget import plotting
+if plotting is not None: 
+    from . import cmd_plot
+
+# Then expose the main after registration
 from . commands import main

@@ -2,20 +2,18 @@ import datetime
 import numpy as np
 from collections import OrderedDict
 from hardtarget import drf_utils
-
 import pprint
-
-# import pprint
 from .commands import add_command
 
 
 def parser_build(parser):
+    """Define argparse sub parser."""
     parser.add_argument("path", help="Path to source directory with Digital_RF data")
     return parser
 
 
 def main(args):
-
+    """Argparse entrypoint."""
     drf_reader, drf_params = drf_utils.load_hardtarget_drf(args.path)
 
     d = {
@@ -45,11 +43,11 @@ def main(args):
     pprint.pprint(d)
 
 
-add_command(
-    name="info_drf",
-    function=main,
-    parser_build=parser_build,
-    add_parser_args=dict(
-        description="Script for printing drf metadata.",
-    ),
-)
+# add_command(
+#     name="info_drf",
+#     function=main,
+#     parser_build=parser_build,
+#     add_parser_args=dict(
+#         description="Script for printing drf metadata.",
+#     ),
+# )

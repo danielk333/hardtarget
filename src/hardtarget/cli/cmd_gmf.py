@@ -60,19 +60,14 @@ def main(args):
         args.end_time = float(args.end_time)
 
     # job
+    job = {"idx": 0, "N": 1}
     try:
         from mpi4py import MPI
-
         comm = MPI.COMM_WORLD
+        job["idx"] = comm.rank
+        job["N"] = comm.size
     except ImportError:
-
-        class COMM_WORLD:
-            rank = 0
-            size = 1
-
-        comm = COMM_WORLD()
-
-    job = {"idx": comm.rank, "N": comm.size}
+        pass
 
     # rx and tx
     rx = (args.rx, args.rxchnl)

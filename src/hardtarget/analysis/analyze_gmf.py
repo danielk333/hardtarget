@@ -5,14 +5,6 @@ from tqdm import tqdm
 from pathlib import Path
 from hardtarget.gmf import GMF_GRID_LIBS, GMF_OPTIMIZE_LIBS
 from hardtarget.configuration import load_gmf_params, choose_gmf_implementation
-
-try:
-    from mpi4py import MPI
-except ImportError:
-    comm = None
-finally:
-    comm = MPI.COMM_WORLD
-
 from . import utils
 
 logger = logging.getLogger(__name__)
@@ -127,12 +119,6 @@ def compute_gmf(
             desc="Processing".ljust(sub_desc_len, " ") if subprogress else "Processing",
             total=total,
         )
-
-    if comm is not None and job["N"] > 1:
-        # Make sure all jobs start at the same time
-        # Good for logging, printing and debugging reasons as setup time should
-        # still be minimal compared to the actual job times
-        comm.barrier()
 
     # process
     results = {"dir": output, "files": [], "data": {}}

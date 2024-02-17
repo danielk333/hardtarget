@@ -2,12 +2,14 @@ import h5py
 from .commands import add_command
 from hardtarget.analysis.utils import inspect_h5_node, all_gmf_h5_files
 
-################################################################
-# MAIN
-################################################################
 
+def parser_build(parser):
+    """Define argparse sub parser."""
+    parser.add_argument("path", help="Path to source directory with GMF data")
+    return parser
 
 def main(args):
+    """Argparse entrypoint."""
 
     # find all h5 files in
     files = all_gmf_h5_files(args.path)
@@ -41,21 +43,3 @@ def main(args):
                 print(f"-- {_path} (dataset) shape:{item['shape']} dtype:{item['dtype']}")
 
 
-################################################################
-# CLI INTEGRATION
-################################################################
-
-
-def parser_build(parser):
-    parser.add_argument("path", help="Path to source directory with GMF data")
-    return parser
-
-
-add_command(
-    name="info_gmf",
-    function=main,
-    parser_build=parser_build,
-    add_parser_args=dict(
-        description="Script for printing gmf metadata.",
-    ),
-)

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
@@ -62,13 +61,3 @@ def main(args):
         gmf.plot_map(axes, data, meta)
 
         plt.show()
-
-
-add_command(
-    name="plot_gmf",
-    function=main,
-    parser_build=parser_build,
-    add_parser_args=dict(
-        description="Script for plotting gmf output.",
-    ),
-)
