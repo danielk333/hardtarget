@@ -1,10 +1,6 @@
 from hardtarget import plotting
-
-print(plotting)
 import matplotlib.pyplot as plt
-
 from hardtarget.drf_utils import load_hardtarget_drf
-from .commands import add_command
 
 
 def parser_build(parser):

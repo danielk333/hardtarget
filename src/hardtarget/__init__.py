@@ -16,18 +16,16 @@ from .drf_utils import load_hardtarget_drf
 from .configuration import load_gmf_params
 from .analysis import load_gmf_out, compute_gmf
 
-# Logging
-from .profiling import setup_loggers
-
 # Plotting
 try:
     from . import plotting
 except ImportError:
     plotting = None
 
-# Profiling
+# Profiling and logging
 try:
     from . import profiling
+    from .profiling import setup_loggers
     from .profiling import profile, profile_stop, get_profile, print_profile, profile_clear
 except ImportError:
     profiling = None

@@ -135,6 +135,12 @@ Install with additional developer dependencies
 pip install .[develop,mpi,plotting,profiling]
 ```
 
+Plotting may require plotting support on system, e.g. tkinter.
+
+```bash
+sudo apt-get install python3-tk
+```
+
 It is also possible to install in developer mode, to avoid repeated reinstalling of the package after code modifications.
 
 ```bash

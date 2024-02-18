@@ -1,9 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-
 from hardtarget.plotting import gmf
 from hardtarget.analysis import load_gmf_out
-from .commands import add_command
 
 
 def parser_build(parser):
