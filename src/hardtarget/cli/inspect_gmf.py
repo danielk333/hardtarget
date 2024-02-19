@@ -1,12 +1,12 @@
 import h5py
-from .commands import add_command
 from hardtarget.analysis.utils import inspect_h5_node, all_gmf_h5_files
 
 
 def parser_build(parser):
     """Define argparse sub parser."""
-    parser.add_argument("path", help="Path to source directory with GMF data")
+    parser.add_argument("path", help="path to source directory with GMF data")
     return parser
+
 
 def main(args):
     """Argparse entrypoint."""

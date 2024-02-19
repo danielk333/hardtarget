@@ -16,17 +16,17 @@ LOGGER_NAME = "hardtarget.analysis.analyze_gmf"
 
 def parser_build(parser):
     # Add the arguments
-    parser.add_argument("rx", help="Path to source directory with rx data")
+    parser.add_argument("rx", help="path to source directory with rx data")
     parser.add_argument("rxchnl", help="RX channel")
-    parser.add_argument("--tx", help="Path to source directory with tx data")
+    parser.add_argument("--tx", help="path to source directory with tx data")
     parser.add_argument("--txchnl", help="TX channel")
-    parser.add_argument("--config", help="Path to config file for GMF processing")
-    parser.add_argument("-o", "--output", default=".", help="Path to output directory")
-    parser.add_argument("--progress", action="store_true", help="Progress bar")
+    parser.add_argument("--config", help="path to config file for GMF processing")
+    parser.add_argument("-o", "--output", default=".", help="path to output directory")
+    parser.add_argument("--progress", action="store_true", help="enable progress bar")
     parser.add_argument("-s", "--start_time", default=None)
     parser.add_argument("-e", "--end_time", default=None)
     parser.add_argument("--relative_time", action="store_true")
-    parser.add_argument("--clobber", action="store_true", help="Override outputs")
+    parser.add_argument("--clobber", action="store_true", help="override outputs")
     parser.add_argument(
         "-G",
         "--gmflib",
@@ -38,14 +38,14 @@ def parser_build(parser):
         "-g",
         "--gmf_optimize_lib",
         choices=["numpy", "c", "cuda", "no"],
-        help="If one wants to use a different lib for GMF fine-tuning",
+        help="if one wants to use a different lib for GMF fine-tuning",
         default=None,
     )
     parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="INFO",
-        help="Set the log level (default: INFO)",
+        help="set the log level (default: INFO)",
     )
     return parser
 

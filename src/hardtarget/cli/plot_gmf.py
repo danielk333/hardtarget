@@ -5,7 +5,7 @@ from hardtarget.analysis import load_gmf_out
 
 
 def parser_build(parser):
-    parser.add_argument("path", help="Path to source directory with GMF output data")
+    parser.add_argument("path", help="path to source directory with GMF output data")
     parser.add_argument("-s", "--start_time", default=None)
     parser.add_argument("-e", "--end_time", default=None)
     parser.add_argument("--relative_time", action="store_true")

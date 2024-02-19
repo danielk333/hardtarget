@@ -10,7 +10,7 @@ SOURCES = {
         "main": inspect_gmf.main,
         "parser_build": inspect_gmf.parser_build,
         "add_parser_args": {
-            "description": "Inspect GMF file",
+            "description": "inspect GMF file",
             "usage": "%(prog)s [options] path",
         },
     },
@@ -18,7 +18,7 @@ SOURCES = {
         "main": inspect_drf.main,
         "parser_build": inspect_drf.parser_build,
         "add_parser_args": {
-            "description": "Inspect DRF file",
+            "description": "inspect DRF file",
             "usage": "%(prog)s [options] path",
         },
     }

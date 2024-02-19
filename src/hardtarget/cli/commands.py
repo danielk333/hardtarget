@@ -15,12 +15,12 @@ def build_parser():
 
     # Top level functionality
     parser.add_argument('--version', action='store_true', 
-                        help='Package version')
+                        help='package version')
 
-    parser.add_argument("-v", "--verbose", help="Increase output verbosity", action="count", default=0)
+    parser.add_argument("-v", "--verbose", help="increase output verbosity", action="count", default=0)
 
     # Sub level parsers
-    subparsers = parser.add_subparsers(help="Available command line interfaces", dest="command")
+    subparsers = parser.add_subparsers(help="available command line interfaces", dest="command")
 
     for name, dat in COMMANDS.items():
         parser_builder, add_parser_args = dat["parser"]

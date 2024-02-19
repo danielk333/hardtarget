@@ -3,12 +3,11 @@ import numpy as np
 from collections import OrderedDict
 from hardtarget import drf_utils
 import pprint
-from .commands import add_command
 
 
 def parser_build(parser):
     """Define argparse sub parser."""
-    parser.add_argument("path", help="Path to source directory with Digital_RF data")
+    parser.add_argument("path", help="path to source directory with Digital_RF data")
     return parser
 
 

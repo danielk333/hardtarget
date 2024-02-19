@@ -4,7 +4,7 @@ from hardtarget.drf_utils import load_hardtarget_drf
 
 
 def parser_build(parser):
-    parser.add_argument("path", help="Path to source directory with Digital_RF data")
+    parser.add_argument("path", help="path to source directory with Digital_RF data")
     parser.add_argument("-s", "--start_time", default=None)
     parser.add_argument("-e", "--end_time", default=None)
     parser.add_argument("--relative_time", action="store_true")
@@ -15,7 +15,7 @@ def parser_build(parser):
         "--clutter_removal",
         type=float,
         default=0,
-        help="Clutter removal at start of RX signal or after end of TX signal,\
+        help="clutter removal at start of RX signal or after end of TX signal,\
              whichever comes last, in seconds",
     )
     return parser

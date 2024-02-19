@@ -18,7 +18,7 @@ SOURCES = {
 
 
 def parser_build(parser):
-    subparsers = parser.add_subparsers(help="Available source formats", dest="source")
+    subparsers = parser.add_subparsers(help="available source formats", dest="source")
     subparsers.required = True
 
     for source in SOURCES:
