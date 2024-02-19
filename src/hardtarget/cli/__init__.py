@@ -2,7 +2,7 @@
 from . import cmd_convert
 from . import cmd_inspect
 from . import cmd_check
-from . import cmd_gmf
+from . import cmd_analyse
 
 # Plotting support is conditional 
 from hardtarget import plotting

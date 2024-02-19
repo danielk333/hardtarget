@@ -1,13 +1,33 @@
 import logging
 from .commands import add_command
-from . import check_cuda
 
 logger = logging.getLogger(__name__)
 
+
+#################################################
+# CUDA CHECK COMMAND
+#################################################
+
+def cuda_parser_build(parser):
+    return parser
+
+
+def cuda_main(args):
+    try:
+        import hardtarget.gmf.gmf_cuda as gcu
+        gcu.print_cuda_devices()
+    except ImportError as e:
+        print(e)
+
+
+#################################################
+# COMMANDS
+#################################################
+
 SOURCES = {
     "cuda": {
-        "main": check_cuda.main,
-        "parser_build": check_cuda.parser_build,
+        "main": cuda_main,
+        "parser_build": cuda_parser_build,
         "add_parser_args": {
             "description": "Test target",
             "usage": "%(prog)s [options] path",
@@ -42,4 +62,3 @@ add_command(
         description="Hardtarget check tools",
     ),
 )
-

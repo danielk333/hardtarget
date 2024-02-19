@@ -2,10 +2,6 @@ import logging
 from hardtarget.convert.eiscat import eiscat_convert
 
 
-####################################################################
-# SCRIPT ENTRY POINT
-####################################################################
-
 def parser_build(parser):
     # Add the arguments
     parser.add_argument(

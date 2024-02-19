@@ -9,11 +9,6 @@ from .commands import add_command
 LOGGER_NAME = "hardtarget.analysis.analyze_gmf"
 
 
-####################################################################
-# SCRIPT ENTRY POINT
-####################################################################
-
-
 def parser_build(parser):
     # Add the arguments
     parser.add_argument("rx", help="path to source directory with rx data")
@@ -91,14 +86,14 @@ def main(args):
         end_time=args.end_time,
         relative_time=args.relative_time,
         progress=args.progress,
-        progress_position=comm.rank,
+        progress_position=job["idx"],
     )
 
     logger.info(f"produced {len(results['files'])} files")
 
 
 add_command(
-    name="gmf",
+    name="analyze",
     function=main,
     parser_build=parser_build,
     add_parser_args=dict(
@@ -113,10 +108,3 @@ add_command(
         """,
     ),
 )
-
-####################################################################
-# MAIN
-####################################################################
-
-if __name__ == "__main__":
-    main()
