@@ -7,9 +7,12 @@ docs/source/autosummary/
 docs/source/autogallery/
 docs/source/autopackages/
 docs/jupyter_execute/
+docs/source/sg_execution_times.rst
 
 # Compiled source #
 ###################
+
+compile_commands.json
 
 #Sublime
 *.sublime*
