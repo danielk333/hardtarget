@@ -21,6 +21,10 @@ if __libpath__.is_file():
     gmfclib = ctypes.cdll.LoadLibrary(__libpath__)
 
     gmfclib.gmf.restype = ctypes.c_int
+    # TODO: rename these to better names
+    # - probably gmf -> fast-gmf
+    # full amplitude domain function -> gmf
+    # discrete polynomial phase transform -> fast-dpt
     gmfclib.gmf.argtypes = [
         nptype("c8", 1), ctypes.c_int,  # 1, 2
         nptype("c8", 1), ctypes.c_int,  # 3, 4

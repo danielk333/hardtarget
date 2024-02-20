@@ -10,6 +10,28 @@
 #define ACC_MULT 1
 #define FFT_PLAN_ID FFTW_MEASURE
 
+
+/*
+TODO: IMPLEMENT THIS
+
+
+*/
+// int dpt(
+//     float *z_tx, int z_tx_len, // 1, 2
+//     float *z_rx, int z_rx_len, // 3, 4
+//     float *acc_phasors, int n_accs, // 5, 6
+//     int *rgs, int n_rg, // 7, 8
+//     int dec, // 9
+//     float *gmf_vec, // 10
+//     float *gmf_dc_vec, // 11
+//     int *v_vec, // 12
+//     int *a_vec, // 13
+//     int *rx_window, // 14
+//     int *dec_rx_inds, // 15
+//     int dec_signal_len // 16
+//     MORE INDEX HERE
+// );
+
 /*
 
 Choosing FFTW plan flag, citing [fftw.org docs](https://www.fftw.org/fftw3_doc/Planner-Flags.html):

@@ -352,6 +352,7 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
             **kwargs
         )
         if gmfo_lib is not None:
+            # TODO: remove this and move this to a separate analysis step that appends output files properly
             max_ind = np.argmax(np.abs(gmf_vars.vals))
             gmf_start = np.array([
                 gmf_params["DER"]["ranges"][max_ind],
