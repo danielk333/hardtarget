@@ -4,7 +4,9 @@ import logging
 from hardtarget.analysis import compute_gmf
 import hardtarget.global_mpi
 from .commands import add_command
+from hardtarget.gmf import get_default_method, get_avalible_libs
 
+DEFAULT_IMPL, DEFAULT_METHOD = get_default_method()
 
 LOGGER_NAME = "hardtarget.analysis.analyze_gmf"
 
@@ -23,18 +25,17 @@ def parser_build(parser):
     parser.add_argument("--relative_time", action="store_true")
     parser.add_argument("--clobber", action="store_true", help="override outputs")
     parser.add_argument(
-        "-G",
-        "--gmflib",
-        choices=["numpy", "c", "cuda", "numpy_daf"],
-        help="GMF implementation",
-        default=None,
+        "-m",
+        "--method",
+        help="GMF method",
+        default=DEFAULT_METHOD,
     )
     parser.add_argument(
-        "-g",
-        "--gmf_optimize_lib",
-        choices=["numpy", "c", "cuda", "no"],
-        help="if one wants to use a different lib for GMF fine-tuning",
-        default=None,
+        "-i",
+        "--implementation",
+        choices=["numpy", "c", "cuda"],
+        help="GMF implementation",
+        default=DEFAULT_IMPL,
     )
     parser.add_argument(
         "--log-level",
@@ -74,8 +75,8 @@ def main(args):
         tx,
         config=args.config,
         job=job,
-        gmflib=args.gmflib,
-        gmf_optimize_lib=args.gmf_optimize_lib,
+        gmf_method=args.method,
+        gmf_implementation=args.implementation,
         clobber=args.clobber,
         output=args.output,
         start_time=args.start_time,
@@ -94,12 +95,15 @@ add_command(
     parser_build=parser_build,
     add_parser_args=dict(
         description="Script analyzing eiscat drf data.",
-        usage="""
+        usage=f"""
         %(prog)s rx rxchnl --config config_file -o output_folder
 
         EXAMPLE:
 
         %(prog)s  leo_bpark_2.1u_NO@uhf/drf/ uhf
+
+        Available methods:
+        {get_avalible_libs}
 
         """,
     ),

@@ -3,8 +3,8 @@ import numpy as np
 import time
 from tqdm import tqdm
 from pathlib import Path
-from hardtarget.gmf import GMF_GRID_LIBS, GMF_OPTIMIZE_LIBS
-from hardtarget.configuration import load_gmf_params, choose_gmf_implementation
+from hardtarget.gmf import get_avalible_libs, get_estimation_method, MethodType
+from hardtarget.configuration import load_gmf_params
 from . import utils
 
 logger = logging.getLogger(__name__)
@@ -28,8 +28,8 @@ def compute_gmf(
     subprogress=True,
     clobber=False,
     output=None,
-    gmflib=None,
-    gmf_optimize_lib=None,
+    gmf_method=None,
+    gmf_implementation=None,
 ):
     """
     Analyze data using gmf.
@@ -66,21 +66,28 @@ def compute_gmf(
     params_pro = gmf_params["PRO"]
     params_der = gmf_params["DER"]
 
-    # override config file
-    # the gmflib parameter assumes the same lib source should be used for grid and fine tuning
-    # unless explicitly set differently
-    if gmflib is not None:
-        params_pro["gmf_grid_lib"] = gmflib
+    # override config file with cli arguments
+    if gmf_method is not None:
+        params_pro["gmf_method"] = gmf_method
+    else:
+        gmf_method = params_pro["gmf_method"]
+    if gmf_implementation is not None:
+        params_pro["gmf_implementation"] = gmf_implementation
+    else:
+        gmf_implementation = params_pro["gmf_implementation"]
 
-    if gmf_optimize_lib is not None:
-        params_pro["gmf_optimize_lib"] = gmf_optimize_lib
-    elif gmflib is not None:
-        params_pro["gmf_optimize_lib"] = gmflib
-    if params_pro["gmf_optimize_lib"] == "no":
-        params_pro["gmf_fine_tune"] = False
+    lib, libtype = get_estimation_method(
+        params_pro["gmf_implementation"],
+        params_pro["gmf_method"],
+    )
+    if lib is None:
+        raise ValueError(
+            f"Cannot find requested method '{gmf_method}'"
+            f"in requested implementation '{gmf_implementation}'\n"
+            + get_avalible_libs()
+        )
 
-    logger.info("Using GMF grid backend: " + params_pro["gmf_grid_lib"])
-    logger.info("Using GMF optimize backend: " + params_pro["gmf_optimize_lib"])
+    logger.info(f"Using GMF method {gmf_method} ({gmf_implementation})")
 
     # bounds
     bounds = utils.compute_bounds(
@@ -295,12 +302,21 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     params_pro = gmf_params["PRO"]
     params_der = gmf_params["DER"]
 
-    gmf_lib_name, gmfo_lib_name = choose_gmf_implementation(params_pro)
-    gmf_lib = GMF_GRID_LIBS[gmf_lib_name]
-    gmfo_lib = GMF_OPTIMIZE_LIBS.get(gmfo_lib_name, None)
+    gmf_implementation = params_pro["gmf_implementation"]
+    gmf_method = params_pro["gmf_method"]
+    lib, libtype = get_estimation_method(gmf_implementation, gmf_method)
+
+    if lib is None:
+        raise ValueError(
+            f"Cannot find requested method '{gmf_method}'"
+            f"in requested implementation '{gmf_implementation}'\n"
+            + get_avalible_libs()
+        )
+    if libtype == MethodType.optimize:
+        raise NotImplementedError(f"{libtype} is not yet implemented")
 
     kwargs = {}
-    if gmf_lib_name == "cuda":
+    if gmf_implementation == "cuda":
         kwargs["gpu_id"] = gpu_id
 
     # parameters
@@ -338,34 +354,31 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
         dc = np.zeros(params_pro["n_ranges"], dtype=np.float32),
         v_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),
         a_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),
-        peak = np.full((3,), np.nan, dtype=np.float32),
-        peak_val = np.full((1,), np.nan, dtype=np.float32),
         tx_pwr = tx_pwr,
     )
 
     if tx_amp > 1.0:
-        gmf_lib(
-            z_tx,
-            z_rx,
-            gmf_vars,
-            gmf_params,
-            **kwargs
-        )
-        if gmfo_lib is not None:
-            # TODO: remove this and move this to a separate analysis step that appends output files properly
-            max_ind = np.argmax(np.abs(gmf_vars.vals))
-            gmf_start = np.array([
-                gmf_params["DER"]["ranges"][max_ind],
-                gmf_params["DER"]["range_rates"][gmf_vars.v_ind[max_ind]],
-                gmf_params["DER"]["accelerations"][gmf_vars.a_ind[max_ind]],
-            ])
-            opt_result = gmfo_lib(
+        if libtype == MethodType.grid:
+            lib(
                 z_tx,
-                z_ipp,
+                z_rx,
+                gmf_vars,
                 gmf_params,
-                gmf_start,
+                **kwargs
             )
-            gmf_vars.peak[:] = opt_result.x
-            gmf_vars.peak_val[0] = opt_result.fun
+        # max_ind = np.argmax(np.abs(gmf_vars.vals))
+        # gmf_start = np.array([
+        #     gmf_params["DER"]["ranges"][max_ind],
+        #     gmf_params["DER"]["range_rates"][gmf_vars.v_ind[max_ind]],
+        #     gmf_params["DER"]["accelerations"][gmf_vars.a_ind[max_ind]],
+        # ])
+        # opt_result = gmfo_lib(
+        #     z_tx,
+        #     z_ipp,
+        #     gmf_params,
+        #     gmf_start,
+        # )
+        # gmf_vars.peak[:] = opt_result.x
+        # gmf_vars.peak_val[0] = opt_result.fun
 
     return gmf_vars

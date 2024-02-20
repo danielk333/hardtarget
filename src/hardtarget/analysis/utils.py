@@ -23,8 +23,6 @@ GMFVariables = namedtuple(
         "dc",  # 0-frequency gmf output as a function of range
         "v_ind",  # best fitting range-rate
         "a_ind",  # best fitting range-rate change
-        "peak",  # fine-tuned peak in range, range-rate & range-rate change
-        "peak_val",  # value of fine-tuned peak
         "tx_pwr",  # tx power
     ],
 )
@@ -36,8 +34,6 @@ def stack_gmf_vars(gmf_vars_list):
         dc = np.stack([x.dc for x in gmf_vars_list], axis=0),
         v_ind = np.stack([x.v_ind for x in gmf_vars_list], axis=0),
         a_ind = np.stack([x.a_ind for x in gmf_vars_list], axis=0),
-        peak = np.stack([x.peak for x in gmf_vars_list], axis=0),
-        peak_val = np.stack([x.peak_val for x in gmf_vars_list], axis=0),
         tx_pwr = np.stack([x.tx_pwr for x in gmf_vars_list], axis=0),
     )
 
@@ -347,8 +343,8 @@ GMFOutArgs = namedtuple(
         "v_vec",
         "a_vec",
         "g_vec",
-        "peaks",
-        "peak_vals",
+        # "peaks",
+        # "peak_vals",
         "rgs",
         "fvec",
         "decimated_sample_times",
@@ -417,18 +413,18 @@ def define_variables(gmf_out_args):
             "long_name": "Generalized Matched Filter output values",
             # "group": "gmf"
         },
-        "gmf_optimized_peak": {
-            "data": gmf_out_args.peaks,
-            "dims": [("integration_index", "t")],
-            "long_name": "Fine tuned range, range-rate and acceleration",
-            # "group": "gmf"
-        },
-        "gmf_optimized": {
-            "data": gmf_out_args.peak_vals,
-            "dims": [("integration_index", "t")],
-            "long_name": "Generalized Matched Filter fine tuned peak output values",
-            # "group": "gmf"
-        },
+        # "gmf_optimized_peak": {
+        #     "data": gmf_out_args.peaks,
+        #     "dims": [("integration_index", "t")],
+        #     "long_name": "Fine tuned range, range-rate and acceleration",
+        #     # "group": "gmf"
+        # },
+        # "gmf_optimized": {
+        #     "data": gmf_out_args.peak_vals,
+        #     "dims": [("integration_index", "t")],
+        #     "long_name": "Generalized Matched Filter fine tuned peak output values",
+        #     # "group": "gmf"
+        # },
         "gmf_zero_frequency": {
             "data": gmf_out_args.dc,
             "dims": [("integration_index", "t"), ("ranges", "r")],

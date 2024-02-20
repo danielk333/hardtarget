@@ -4,7 +4,7 @@ from .version import __version__
 from . import global_mpi
 
 # Constants and singletons
-from .gmf import GMF_GRID_LIBS, GMF_OPTIMIZE_LIBS
+from .gmf import GMF_LIBS, Impl, get_estimation_method
 from .experiments import EXP_FILES
 
 # Functions
@@ -26,10 +26,6 @@ except ImportError:
     plotting = None
 
 # Profiling and logging
-try:
-    from . import profiling
-    from .profiling import setup_loggers
-    from .profiling import profile, profile_stop, get_profile, print_profile, profile_clear
-except ImportError:
-    profiling = None
-
+from . import profiling
+from .profiling import setup_loggers
+from .profiling import profile, profile_stop, get_profile, print_profile, profile_clear

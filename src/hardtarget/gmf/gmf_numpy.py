@@ -4,7 +4,7 @@ import scipy.constants as constants
 import scipy.optimize as sco
 
 
-def gmfnp(z_tx, z_rx, gmf_variables, gmf_params):
+def fast_gmf_np(z_tx, z_rx, gmf_variables, gmf_params):
     """
     Compute the output of the Generalized Matched Filter GMF
     # TODO: Clean up these XX's and the docstring
@@ -62,7 +62,7 @@ def gmfnp(z_tx, z_rx, gmf_variables, gmf_params):
                 gmf_variables.a_ind[ri] = ai
 
 
-def gmfnp_daf(z_tx, z_rx, gmf_variables, gmf_params):
+def fast_dpt_np(z_tx, z_rx, gmf_variables, gmf_params):
     """Development version of GMF using discrete ambiguity function spectrum to speed up acceleration search
     """
     rgs = gmf_params["DER"]["rgs"]
@@ -124,7 +124,7 @@ def gmfnp_daf(z_tx, z_rx, gmf_variables, gmf_params):
                 gmf_variables.a_ind[ri] = ai
 
 
-def gmfnp_optimize(z_tx, z_ipp, gmf_params, gmf_start):
+def optimize_gmf_np(z_tx, z_ipp, gmf_params, gmf_start):
     """Maximize the Generalized Matched Filter GMF value using function
     optimization in continuous variable space.
 
@@ -163,7 +163,7 @@ def gmfnp_optimize(z_tx, z_ipp, gmf_params, gmf_start):
     return result
 
 
-def gmfnp_no_reduce(z_tx, z_rx, gmf_variables, gmf_params):
+def fast_gmf_no_reduce_np(z_tx, z_rx, gmf_variables, gmf_params):
     """Slow development version of gmf to see otherwise reduced dimensions
     """
     acc_phasors = gmf_params["DER"]["acceleration_phasors"]

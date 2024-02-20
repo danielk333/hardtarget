@@ -5,8 +5,9 @@ import scipy.constants
 import pathlib
 
 from hardtarget import drf_utils
-from hardtarget.gmf import GMF_GRID_LIBS, GMF_OPTIMIZE_LIBS
+from hardtarget.gmf import get_default_method
 
+DEFAULT_IMPL, DEFAULT_METHOD = get_default_method()
 
 ####################################################################
 # GET GMF PROCESSING PARAMS
@@ -17,9 +18,8 @@ from hardtarget.gmf import GMF_GRID_LIBS, GMF_OPTIMIZE_LIBS
 ####################################################################
 
 DEFAULT_PARAMS = {
-    "gmf_grid_lib": ("c", str),
-    "gmf_optimize_lib": ("c", str),
-    "gmf_fine_tune": (False, bool),
+    "gmf_implementation": (DEFAULT_IMPL, str),
+    "gmf_method": (DEFAULT_METHOD, str),
     "node_gpus": (1, int),
     "n_ipp": (5, int),
     "ipp_offset": (0, int),
@@ -348,37 +348,3 @@ def compute_derived_gmf_params(params_exp, params_pro):
 
     params_pro["gmf_size"] = (params_pro["n_ranges"], )
     return params_exp, params_pro, params_der
-
-
-####################################################################
-# CONFIG HELPERS
-####################################################################
-
-
-def choose_gmf_implementation(params_pro):
-    # gmf lib
-    gmf_lib_name = params_pro.get("gmf_grid_lib", None)
-    if gmf_lib_name is None:
-        gmf_lib_name = "c" if "c" in GMF_GRID_LIBS else "numpy"
-    elif gmf_lib_name not in GMF_GRID_LIBS:
-        raise ValueError(
-            f"Requested GMF gird lib '{gmf_lib_name}' not found in "
-            "available libs, possible compilation errors in extensions\n"
-            f"GMF_GRID_LIBS = {list(GMF_GRID_LIBS.keys())}"
-        )
-
-    # gmf optimize lib
-    if params_pro.get("gmf_fine_tune", False):
-        gmfo_lib_name = params_pro.get("gmf_optimize_lib", None)
-        if gmfo_lib_name is None:
-            gmfo_lib_name = "c" if "c" in GMF_OPTIMIZE_LIBS else "numpy"
-        elif gmfo_lib_name not in GMF_OPTIMIZE_LIBS:
-            raise ValueError(
-                f"Requested GMF optimize lib '{gmfo_lib_name}' not found in "
-                "available libs, possible compilation errors in extensions\n"
-                f"GMF_OPTIMIZE_LIBS = {list(GMF_OPTIMIZE_LIBS.keys())}"
-            )
-    else:
-        gmfo_lib_name = None
-
-    return gmf_lib_name, gmfo_lib_name
