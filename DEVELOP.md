@@ -1,5 +1,28 @@
 TODO: move all these into docs folder
 
+### Generating build commands
+
+To generate the `compile_commands.json` needed by the `clang` toolchain use
+Build EAR, or [Bear](https://github.com/rizsotto/Bear), and the supplied
+Makefiles by running
+
+```bash
+bear -- make 
+```
+
+in the source directories. Then to combine the json files we can use `jq`. The
+complete script would be (assuming we start in repository root)
+
+```bash
+cd src/gmf_c_lib
+bear -- make
+cd ../src/gmf_cuda_lib
+bear -- make
+cd ..
+jq -s . gmf_{c,cuda}_lib/compile_commands.json > compile_commands.json
+rm -v gmf_{c,cuda}_lib/compile_commands.json
+```
+
 
 ### linting with flake8
 
