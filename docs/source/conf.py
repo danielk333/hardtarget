@@ -16,7 +16,8 @@ import warnings
 from datetime import date
 import hardtarget
 
-ext_paths = (pathlib.Path(__file__).parent / "extensions").resolve()
+docs_src_path = pathlib.Path(__file__).parent.resolve()
+ext_paths = docs_src_path / "extensions"
 sys.path.append(str(ext_paths))
 
 # -- Project information -----------------------------------------------------
@@ -38,6 +39,7 @@ add_module_names = False
 # ones.
 extensions = [
     "numpydoc",
+    "sphinx_c_autodoc",
     "myst_nb",
     "irf.autopackages",
     "sphinx_gallery.load_style",
@@ -109,6 +111,17 @@ warnings.filterwarnings(
     message="Matplotlib is currently using agg, which is a"
     " non-GUI backend, so cannot show the figure.",
 )
+
+# -----------------------------------------------------------------------------
+# c/c++ docs
+# -----------------------------------------------------------------------------
+
+c_autodoc_roots = [
+    str(docs_src_path.parents[1] / "src" / "gmf_c_lib"),
+    str(docs_src_path.parents[1] / "src" / "gmf_cuda_lib"),
+]
+c_autodoc_compilation_database = str(docs_src_path.parents[1] / "src" / "compile_commands.json")
+
 
 # -----------------------------------------------------------------------------
 # Autosummary

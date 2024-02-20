@@ -53,7 +53,7 @@ The typical data-flow of processing
   :alt: The data flow trough different array indexing schemas
   :class: light-theme-image
 
-TODO: a flow-diagram with DAF acceleration
+TODO: a flow-diagram with DPT acceleration
 
 .. irf_autopackages:: package
    :template: autosummary/module.rst
@@ -63,11 +63,21 @@ TODO: a flow-diagram with DAF acceleration
    hardtarget
 
 
-Developing
+Extensions
 ----------
 
+GMF C implementation
+
+.. autocfunction:: gmf.c::gmf
+
+.. autocfunction:: gmf.cu::gmf
+
+
+Developing
+==========
+
 Please refer to the style and contribution guidelines documented in the
-[IRF Software Contribution Guide](https://danielk.developer.irf.se/software_contribution_guide/).
+`IRF Software Contribution Guide <https://danielk.developer.irf.se/software_contribution_guide/>`_.
 Generally external code-contributions are made trough a "Fork-and-pull"
 workflow, while internal contributions follow the branching strategy outlined
 in the contribution guide.
@@ -95,7 +105,7 @@ Then run notebooks in the appropriate folder `docs/source/notebooks` using `jupy
 pair the new notebook with a MyST file.
 
 For more information on how to pair notebooks in order to have persistent plain-text versions,
-see the [jupytext docs](https://jupytext.readthedocs.io/en/latest/paired-notebooks.html).
+see the `jupytext docs <https://jupytext.readthedocs.io/en/latest/paired-notebooks.html>`_.
 
 
 Indices and tables
