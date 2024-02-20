@@ -10,7 +10,6 @@
 #define ACC_MULT 1
 #define FFT_PLAN_ID FFTW_MEASURE
 
-
 /*
 TODO: IMPLEMENT THIS
 

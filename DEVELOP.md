@@ -19,8 +19,7 @@ bear -- make
 cd ../src/gmf_cuda_lib
 bear -- make
 cd ..
-jq -s . gmf_{c,cuda}_lib/compile_commands.json > compile_commands.json
-rm -v gmf_{c,cuda}_lib/compile_commands.json
+jq -s 'map(.[])' gmf_{c,cuda}_lib/compile_commands.json > compile_commands.json
 ```
 
 

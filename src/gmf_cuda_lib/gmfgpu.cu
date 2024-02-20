@@ -106,7 +106,6 @@ static inline void check_cudaMemset(cudaError_t res, const char *name){
     check_cuda(res, name, "set values");
 }
 
-
 /*
    This is the main code. If you have N GPUs, you can run N gmf functions in parallel.
 

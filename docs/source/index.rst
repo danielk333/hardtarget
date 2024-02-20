@@ -66,11 +66,18 @@ TODO: a flow-diagram with DPT acceleration
 Extensions
 ----------
 
+TODO: make this work, package documentation:
+- https://sphinx-c-autodoc.readthedocs.io/en/latest/configuration.html
+
+
 GMF C implementation
 
 .. autocfunction:: gmf.c::gmf
 
-.. autocfunction:: gmf.cu::gmf
+TODO: this does not work because it does not find the symbol???
+maybe because of the "extern C"
+
+.. autocfunction:: gmfgpu.cu::gmf
 
 
 Developing

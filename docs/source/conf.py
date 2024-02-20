@@ -15,6 +15,7 @@ import pathlib
 import warnings
 from datetime import date
 import hardtarget
+from clang.cindex import Config
 
 docs_src_path = pathlib.Path(__file__).parent.resolve()
 ext_paths = docs_src_path / "extensions"
@@ -101,8 +102,11 @@ sphinx_gallery_conf = {
     "examples_dirs": "../../examples",  # path to your example scripts
     "gallery_dirs": "autogallery",  # path where to save gallery generated examples
     "filename_pattern": r".*\.py",
-    "ignore_pattern": r".*__no_agl\.py",
+    # "ignore_pattern": r".*__no_agl\.py",
+    "ignore_pattern": r".*\.py",
 }
+# TODO: comment in the regular ignore pattern again again later when examples work
+
 
 # Remove matplotlib agg warnings from generated doc when using plt.show
 warnings.filterwarnings(
@@ -122,6 +126,10 @@ c_autodoc_roots = [
 ]
 c_autodoc_compilation_database = str(docs_src_path.parents[1] / "src" / "compile_commands.json")
 
+# check where is LLVM installed
+# NOTE: remember to install the clang version equal to the LLVM version installed locally
+# e.g. pip install clang==16.0.6 for arch
+Config.set_library_file("/usr/lib/libclang.so.16.0.6")
 
 # -----------------------------------------------------------------------------
 # Autosummary
