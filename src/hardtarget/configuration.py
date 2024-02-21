@@ -1,3 +1,63 @@
+"""
+
+Configuration
+=============
+
+Main module for configuring the analysis of the input data and calculating the
+relevant parameters needed for analysis.
+
+The analysis always assumes the `digital_rf` (drf) radar data consists of a
+continuous stream of signal samples. If in reality there was no samples taken
+during an interval the sample stream should be zero-padded during this time.
+As such the signal sample stream is split up into regular cycles. Each cycle
+occurs back-to-back and the time a cycle takes is called an inter-pulse-period,
+or IPP.
+
+Every analysis consists of a recived signal (RX) and a transmitted signal (TX).
+These signals can either be superimposed in the same channel or be in different
+channels in the drf structure. Either way, there are several segments within
+each cycle that we need to extract and index. Hence, there are three main levels
+of signal indices within one cycle, which we will call Index Levels (IL's):
+
+ 0) Signal samples (can be same channel)
+    - RX signal (size=IPP length)
+    - TX signal (size=IPP length)
+ 1) Stenciled samples:
+    - RX window (size=chosen reception length, i.e. all range gates)
+    - TX pulse (size=length of transmitted pulse)
+ 2) Target range-gate:
+    - RX pulse (size=length of transmitted pulse, offset by chosen range gate)
+
+Illustration of the above:
+
+    Index    : |0123456789...................................|
+    Signal   : |xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|
+    TX pulse : |--xxxxxx-------------------------------------|
+    RX window: |----------------xxxxxxxxxxxxxxxxxxxxxxxx-----|
+    RX pulse : |---------------------------xxxxxx------------|
+
+In the above example, the first sample of the TX pulse would have index 2 in
+terms of IL-0 but would have index 0 in terms of IL-1. Similarly the first
+sample of the RX pulse would have index 27 in terms of IL-0, index 11 in IL-1
+and index 0 in IL-2.
+
+Since range from a transmitter converted to time is measured from the start of
+transmission (i.e. the time between when the leading edge of the wave leaves the
+transmitter and reaches the receiver), the range gates are also always measured
+in samples relative the start of the TX pulse + 1, in terms of IL-0. Which means
+that sample of range-gate 0 has traveled the time of 1 sample. The largest range
+gate is at the end of reception, which basically means only one sample of the TX
+could be measured.
+
+
+# TODO: convenience function for converting km to range-gates given a DRF
+
+# TODO: decimation runs on JUST the top 1 level of direct signal
+
+# TODO: the current analysis might not handle partial codes, add this functionality
+
+"""
+
 import configparser
 import numpy as np
 import scipy.fft as fft
@@ -172,6 +232,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     T_rx_end_samp = np.round(rx_end * 1e-6 * sample_rate).astype(np.int64)
     T_tx_start_samp = np.round(tx_start * 1e-6 * sample_rate).astype(np.int64)
     T_tx_end_samp = np.round(tx_end * 1e-6 * sample_rate).astype(np.int64)
+
     tx_pulse_length = params_exp.get("tx_pulse_length", None)
     if tx_pulse_length is not None:
         tx_pulse_samps = np.round(tx_pulse_length * 1e-6 * sample_rate).astype(np.int64)
@@ -184,18 +245,19 @@ def compute_derived_gmf_params(params_exp, params_pro):
     params_exp["tx_pulse_samps"] = tx_pulse_samps
 
     # Relevant rx samples
-    stencil_start_samp = T_rx_start_samp if T_rx_start_samp > T_tx_end_samp else T_tx_end_samp
+    # Stencil starts at either the start of RX
+    stencil_start_samp = T_rx_start_samp
     stencil_start_samp += clutter_length
 
     params_der["n_rx_samples"] = T_rx_end_samp - stencil_start_samp
     params_der["stencil_start_samp"] = stencil_start_samp
 
-    # TODO: document range gates properly, they are a bit of a mess right now
-    # TODO: this current does not handle partial codes, add this functionality
-    rgs_min = T_tx_start_samp
-    rgs_max = T_rx_end_samp - tx_pulse_samps
-    max_range_gate += rgs_max if max_range_gate < 0 else rgs_min
-    min_range_gate += rgs_max if min_range_gate < 0 else rgs_min
+    il0_rgs_min = T_tx_start_samp + 1
+    il0_rgs_max = T_rx_end_samp
+    il0_max_range_gate = max_range_gate
+    il0_max_range_gate += il0_rgs_min if max_range_gate >= 0 else il0_rgs_max
+    il0_min_range_gate = min_range_gate
+    il0_min_range_gate += il0_rgs_min if min_range_gate >= 0 else il0_rgs_max
 
     params_pro["range_gate_offset"] = rgs_min
     params_pro["rel_min_range_gate"] = min_range_gate - rgs_min
@@ -222,13 +284,6 @@ def compute_derived_gmf_params(params_exp, params_pro):
 
     # Read length to include all pulses to be searched
     params_pro["read_length"] = (n_ipp + ipp_offset) * ipp_samp
-
-    # TODO: the new idea:
-    # 3 levels:
-    # 1) direct sampled signal
-    # 2) rx/tx stenciled signals
-    # 3) rx/tx windows selection
-    # decimation runs on JUST the top 1 level of direct signal
 
     # this stencil is used to block tx pulses and ground clutter
     params_der["rx_stencil"] = np.full((params_pro["read_length"],), False, dtype=bool)

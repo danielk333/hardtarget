@@ -96,14 +96,15 @@ add_command(
     add_parser_args=dict(
         description="Script analyzing eiscat drf data.",
         usage=f"""
-        %(prog)s rx rxchnl --config config_file -o output_folder
 
-        EXAMPLE:
+    %(prog)s rx rxchnl --config config_file -o output_folder
 
-        %(prog)s  leo_bpark_2.1u_NO@uhf/drf/ uhf
+EXAMPLE:
 
-        Available methods:
-        {get_avalible_libs}
+    %(prog)s  leo_bpark_2.1u_NO@uhf/drf/ uhf
+
+Available method implementations:
+{get_avalible_libs(indent=' '*4)}
 
         """,
     ),

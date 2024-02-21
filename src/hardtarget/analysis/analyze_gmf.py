@@ -82,9 +82,9 @@ def compute_gmf(
     )
     if lib is None:
         raise ValueError(
-            f"Cannot find requested method '{gmf_method}'"
+            f"Cannot find requested method '{gmf_method}' "
             f"in requested implementation '{gmf_implementation}'\n"
-            + get_avalible_libs()
+            f"Avalible implemented methods: \n{get_avalible_libs(indent=' '*4)}"
         )
 
     logger.info(f"Using GMF method {gmf_method} ({gmf_implementation})")

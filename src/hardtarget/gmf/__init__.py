@@ -99,14 +99,13 @@ else:
     GMF_LIBS[Impl.cuda]["fgmf"] = (gmfcu, MethodType.grid)
 
 
-def get_avalible_libs():
-    st = "Available implemented methods: \n"
-    impl_keys = [str(imp) for impl in Impl]
-    max_len = max([len(key) for key in impl_keys])
-    for key, imp in zip(impl_keys, Impl):
-        st += key.ljust(max_len, " ") + ":\n"
-        for name, mtype in GMF_LIBS[imp]:
-            st += f" - {name} ({str(mtype)} method)\n"
+def get_avalible_libs(indent=""):
+    st = ""
+    for imp in Impl:
+        st += indent + f"[{imp.value}]:\n"
+        max_name_len = max([len(name) for name in GMF_LIBS[imp]])
+        for name, (func, mtype) in GMF_LIBS[imp].items():
+            st += indent + f" - {name.ljust(max_name_len, ' ')} ({mtype.value} method)\n"
     return st
 
 
