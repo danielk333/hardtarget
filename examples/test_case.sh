@@ -2,6 +2,9 @@
 hardtarget convert eiscat ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf \
     -o ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf
 
+# check which range gates to use to measure 240 km -> 2500 km
+hardtarget check range-gates -s 240 -e 2500 ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/
+
 # To analyze the DRF
 hardtarget gmf ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/ uhf \
     --config ./examples/cfg/example_uhf_analysis.ini \

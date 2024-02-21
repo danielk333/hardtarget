@@ -6,6 +6,9 @@ from hardtarget.drf_utils import load_hardtarget_drf
 
 logger = logging.getLogger(__name__)
 
+LUNAR_DISTANCE = 3.84399e8  # m
+EARTH_RADIUS = 6.3781e6  # m
+
 
 #################################################
 # CHECK RANGE-GATES
@@ -15,7 +18,45 @@ def range_gates_parser_build(parser):
     parser.add_argument("path", help="path to source directory with DRF data")
     parser.add_argument("--start-range", "-s", default=None, help="Desired starting range in [km]")
     parser.add_argument("--end-range", "-e", default=None, help="Desired ending range in [km]")
+    parser.add_argument(
+        "-u", "--unit",
+        choices=["m", "km", "R_E", "LD", "AU"],
+        help="Unit for start and end ranges",
+        default="km",
+    )
     return parser
+
+
+def unit_to_SI(val, unit):
+    if unit == "m":
+        pass
+    elif unit == "km":
+        val *= 1e3
+    elif unit == "r_e":
+        val *= EARTH_RADIUS
+    elif unit == "ld":
+        val *= LUNAR_DISTANCE
+    elif unit == "au":
+        val *= constants.au
+    else:
+        raise ValueError(f"Unit '{unit}' not recognized, see cli description")
+    return val
+
+
+def SI_to_unit(val, unit):
+    if unit == "m":
+        pass
+    elif unit == "km":
+        val /= 1e3
+    elif unit == "r_e":
+        val /= EARTH_RADIUS
+    elif unit == "ld":
+        val /= LUNAR_DISTANCE
+    elif unit == "au":
+        val /= constants.au
+    else:
+        raise ValueError(f"Unit '{unit}' not recognized, see cli description")
+    return val
 
 
 def range_gates_main(args):
@@ -42,26 +83,26 @@ def range_gates_main(args):
     print(f" - Minimum range gate IL0 sample: {il0_rgs_min} ({rgs_min_km} km)")
     print(f" - Maximum range gate IL0 sample: {il0_rgs_max} ({rgs_max_km} km)")
     if args.start_range is not None:
-        args.start_range = float(args.start_range)
-        il0_rg0 = sample_rate*args.start_range/(constants.c*1e-3) + T_tx_start_samp
+        args.start_range = unit_to_SI(float(args.start_range), args.unit.lower())
+        il0_rg0 = sample_rate*args.start_range/constants.c + T_tx_start_samp
         il0_rg0 = np.round(il0_rg0).astype(np.int64)
         rg0_sec = (il0_rg0 - T_tx_start_samp)/sample_rate
-        rg0_km = rg0_sec*constants.c*1e-3
+        rg0_unit = SI_to_unit(rg0_sec*constants.c, args.unit.lower())
 
         rg0 = il0_rg0 - (T_tx_start_samp + 1)
-        print(f" - Requested start range ({rg0_km} km): IL0 sample {il0_rg0} (range-gate {rg0})")
+        print(f" - Requested start range ({rg0_unit} {args.unit}): IL0 sample {il0_rg0} (range-gate {rg0})")
         assert il0_rg0 <= T_rx_end_samp, "start range gate cannot be after than RX end"
         assert il0_rg0 > T_rx_start_samp, "start range gate cannot be before than RX start"
 
     if args.end_range is not None:
-        args.end_range = float(args.end_range)
-        il0_rg1 = sample_rate*args.end_range/(constants.c*1e-3) + T_tx_start_samp
+        args.end_range = unit_to_SI(float(args.end_range), args.unit.lower())
+        il0_rg1 = sample_rate*args.end_range/constants.c + T_tx_start_samp
         il0_rg1 = np.round(il0_rg1).astype(np.int64)
         rg1_sec = (il0_rg1 - T_tx_start_samp)/sample_rate
-        rg1_km = rg1_sec*constants.c*1e-3
+        rg1_unit = SI_to_unit(rg1_sec*constants.c, args.unit.lower())
 
         rg1 = il0_rg1 - (T_tx_start_samp + 1)
-        print(f" - Requested start range ({rg1_km} km): IL0 sample {il0_rg1} (range-gate {rg1})")
+        print(f" - Requested end range ({rg1_unit} {args.unit}): IL0 sample {il0_rg1} (range-gate {rg1})")
         assert il0_rg1 <= T_rx_end_samp, "end range gate cannot be after than RX end"
         assert il0_rg1 > T_rx_start_samp, "end range gate cannot be before than RX start"
 
