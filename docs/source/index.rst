@@ -4,7 +4,10 @@ hardtarget
 :Release: |release|
 :Date: |today|
 
-TODO
+
+Hardtarget is ... TODO
+
+
 
 Getting started
 -----------------

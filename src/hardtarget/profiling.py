@@ -5,17 +5,16 @@ import datetime
 import re
 import os
 import time
+from . import global_mpi
 
 try:
     import yappi
 except ImportError:
     yappi = None
 
-try:
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-except ImportError:
-    comm = None
+# if code is run by mpi, mpi is already imported)
+comm = global_mpi.get_mpi()
+
 
 PACKAGE_NAME = "hardtarget"
 PACKAGE_PATH = str(pathlib.Path(__file__).parent)

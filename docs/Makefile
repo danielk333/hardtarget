@@ -15,6 +15,11 @@ help:
 html:
 	sphinx-build -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 
+# sphinx-autobuild (pip install sphinx-autobuild)
+auto:
+	sphinx-autobuild -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+
+
 clean:
 	rm -rfv $(BUILDDIR)
 	rm -rfv $(SOURCEDIR)/autogallery
