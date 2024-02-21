@@ -2,7 +2,7 @@
 
 import logging
 from hardtarget.analysis import compute_gmf
-
+import hardtarget.global_mpi
 from .commands import add_command
 
 
@@ -54,15 +54,11 @@ def main(args):
         args.start_time = float(args.start_time)
         args.end_time = float(args.end_time)
 
+    # import mpi (in case script is run by mpi)
+    comm = hardtarget.global_mpi.import_mpi()
+
     # job
-    job = {"idx": 0, "N": 1}
-    try:
-        from mpi4py import MPI
-        comm = MPI.COMM_WORLD
-        job["idx"] = comm.rank
-        job["N"] = comm.size
-    except ImportError:
-        pass
+    job = {"idx": comm.rank, "N": comm.size}
 
     # rx and tx
     rx = (args.rx, args.rxchnl)
