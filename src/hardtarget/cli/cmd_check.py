@@ -15,8 +15,22 @@ logger = logging.getLogger(__name__)
 
 def range_gates_parser_build(parser):
     parser.add_argument("path", help="path to source directory with DRF data")
-    parser.add_argument("--start-range", "-s", default=None, help="Desired starting range in given unit")
-    parser.add_argument("--end-range", "-e", default=None, help="Desired ending range in given unit")
+    parser.add_argument(
+        "--start-range", "-s",
+        default=None, help="Desired starting range in given unit"
+    )
+    parser.add_argument(
+        "--end-range", "-e",
+        default=None, help="Desired ending range in given unit"
+    )
+    parser.add_argument(
+        "--clutter-range", "-c",
+        default=None, help=(
+            "Desired clutter location range in given unit, "
+            "calculates what range-gate is complexly free of "
+            "signal return from that range."
+        ),
+    )
     parser.add_argument(
         "-u", "--unit",
         choices=["m", "km", "R_E", "LD", "AU"],
@@ -33,10 +47,12 @@ def range_gates_main(args):
     rx_start = meta["rx_start"]
     rx_end = meta["rx_end"]
     tx_start = meta["tx_start"]
+    tx_end = meta["tx_end"]
 
     T_rx_start_samp = np.round(rx_start * 1e-6 * sample_rate).astype(np.int64)
     T_rx_end_samp = np.round(rx_end * 1e-6 * sample_rate).astype(np.int64)
     T_tx_start_samp = np.round(tx_start * 1e-6 * sample_rate).astype(np.int64)
+    T_tx_end_samp = np.round(tx_end * 1e-6 * sample_rate).astype(np.int64)
 
     il0_rgs_min = T_tx_start_samp + 1
     il0_rgs_max = T_rx_end_samp
@@ -47,9 +63,27 @@ def range_gates_main(args):
     rgs_max_sec = (il0_rgs_max - T_tx_start_samp)/sample_rate
     rgs_max_km = rgs_max_sec*constants.c*1e-3
 
+    tx_end_rg = T_tx_end_samp - (T_tx_start_samp + 1)
+    tx_end_rg_km = (tx_end_rg + 1)/sample_rate*constants.c*1e-3
+
     print(f"DRF '{args.path}':")
     print(f" - Minimum range gate IL0 sample (range-gate {rgs_min}): {il0_rgs_min} ({rgs_min_km} km)")
     print(f" - Maximum range gate IL0 sample (range-gate {rgs_max}): {il0_rgs_max} ({rgs_max_km} km)")
+    print(f" - Range-gate at TX pulse end {tx_end_rg} ({tx_end_rg_km} km)")
+
+    if args.clutter_range is not None:
+        args.clutter_range = unit_to_SI(float(args.clutter_range), args.unit.lower())
+        il0_clutter = sample_rate*args.clutter_range/constants.c + T_tx_start_samp
+        T_tx_samps = T_tx_end_samp - T_tx_start_samp
+        il0_no_clutter = il0_clutter + T_tx_samps
+        no_clutter_sec = (il0_no_clutter - T_tx_start_samp)/sample_rate
+        no_clutter_unit = SI_to_unit(no_clutter_sec*constants.c, args.unit.lower())
+        rg_no_clutter = il0_no_clutter - (T_tx_start_samp + 1)
+        print(
+            f" - Requested clutter range-gate ({no_clutter_unit} {args.unit}): "
+            f"IL0 sample {il0_no_clutter} (range-gate {rg_no_clutter})"
+        )
+
     if args.start_range is not None:
         args.start_range = unit_to_SI(float(args.start_range), args.unit.lower())
         il0_rg0 = sample_rate*args.start_range/constants.c + T_tx_start_samp
