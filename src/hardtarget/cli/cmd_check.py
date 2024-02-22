@@ -73,15 +73,16 @@ def range_gates_main(args):
 
     il0_rgs_min = T_tx_start_samp + 1
     il0_rgs_max = T_rx_end_samp
-
+    rgs_min = il0_rgs_min - (T_tx_start_samp + 1)
+    rgs_max = il0_rgs_max - (T_tx_start_samp + 1)
     rgs_min_sec = (il0_rgs_min - T_tx_start_samp)/sample_rate
     rgs_min_km = rgs_min_sec*constants.c*1e-3
     rgs_max_sec = (il0_rgs_max - T_tx_start_samp)/sample_rate
     rgs_max_km = rgs_max_sec*constants.c*1e-3
 
     print(f"DRF '{args.path}':")
-    print(f" - Minimum range gate IL0 sample: {il0_rgs_min} ({rgs_min_km} km)")
-    print(f" - Maximum range gate IL0 sample: {il0_rgs_max} ({rgs_max_km} km)")
+    print(f" - Minimum range gate IL0 sample (range-gate {rgs_min}): {il0_rgs_min} ({rgs_min_km} km)")
+    print(f" - Maximum range gate IL0 sample (range-gate {rgs_max}): {il0_rgs_max} ({rgs_max_km} km)")
     if args.start_range is not None:
         args.start_range = unit_to_SI(float(args.start_range), args.unit.lower())
         il0_rg0 = sample_rate*args.start_range/constants.c + T_tx_start_samp
