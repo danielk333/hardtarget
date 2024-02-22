@@ -29,5 +29,5 @@ hardtarget plot drf ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/ \
     -s "2021-04-12T12:15:40" -e "2021-04-12T12:16:10" --axis_units\
     --monostatic --start-range 360 --unit km --log
 
-hardtarget plot_gmf ~/data/spade/beamparks_analyzed/leo_bpark_2.1u_NO@uhf/ \
+hardtarget plot gmf ~/data/spade/beamparks_analyzed/leo_bpark_2.1u_NO@uhf/ \
     -s "2021-04-12T12:15:40" -e "2021-04-12T12:16:10"
