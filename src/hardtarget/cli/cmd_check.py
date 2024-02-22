@@ -2,12 +2,11 @@ import logging
 import numpy as np
 import scipy.constants as constants
 from .commands import add_command
+from .utils import SI_to_unit, unit_to_SI
 from hardtarget.drf_utils import load_hardtarget_drf
 
-logger = logging.getLogger(__name__)
 
-LUNAR_DISTANCE = 3.84399e8  # m
-EARTH_RADIUS = 6.3781e6  # m
+logger = logging.getLogger(__name__)
 
 
 #################################################
@@ -16,8 +15,8 @@ EARTH_RADIUS = 6.3781e6  # m
 
 def range_gates_parser_build(parser):
     parser.add_argument("path", help="path to source directory with DRF data")
-    parser.add_argument("--start-range", "-s", default=None, help="Desired starting range in [km]")
-    parser.add_argument("--end-range", "-e", default=None, help="Desired ending range in [km]")
+    parser.add_argument("--start-range", "-s", default=None, help="Desired starting range in given unit")
+    parser.add_argument("--end-range", "-e", default=None, help="Desired ending range in given unit")
     parser.add_argument(
         "-u", "--unit",
         choices=["m", "km", "R_E", "LD", "AU"],
@@ -25,38 +24,6 @@ def range_gates_parser_build(parser):
         default="km",
     )
     return parser
-
-
-def unit_to_SI(val, unit):
-    if unit == "m":
-        pass
-    elif unit == "km":
-        val *= 1e3
-    elif unit == "r_e":
-        val *= EARTH_RADIUS
-    elif unit == "ld":
-        val *= LUNAR_DISTANCE
-    elif unit == "au":
-        val *= constants.au
-    else:
-        raise ValueError(f"Unit '{unit}' not recognized, see cli description")
-    return val
-
-
-def SI_to_unit(val, unit):
-    if unit == "m":
-        pass
-    elif unit == "km":
-        val /= 1e3
-    elif unit == "r_e":
-        val /= EARTH_RADIUS
-    elif unit == "ld":
-        val /= LUNAR_DISTANCE
-    elif unit == "au":
-        val /= constants.au
-    else:
-        raise ValueError(f"Unit '{unit}' not recognized, see cli description")
-    return val
 
 
 def range_gates_main(args):

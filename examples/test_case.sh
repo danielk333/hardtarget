@@ -25,10 +25,9 @@ mpirun -np 2 hardtarget gmf ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf
     -s "2021-04-12T12:15:40" -e "2021-04-12T12:16:10"
 
 
-hardtarget plot_drf ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/ \
-    -s "2021-04-12T12:15:40" -e "2021-04-12T12:16:10" \
-    --clutter_removal 1500.0e-6 --axis_units --log
-
+hardtarget plot drf ~/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf/ \
+    -s "2021-04-12T12:15:40" -e "2021-04-12T12:16:10" --axis_units\
+    --monostatic --start-range 360 --unit km --log
 
 hardtarget plot_gmf ~/data/spade/beamparks_analyzed/leo_bpark_2.1u_NO@uhf/ \
     -s "2021-04-12T12:15:40" -e "2021-04-12T12:16:10"
