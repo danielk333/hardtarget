@@ -349,11 +349,12 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     tx_amp = np.sqrt(tx_pwr)
     z_tx = np.conj(z_tx) / tx_amp
 
+    size = (params_pro["n_ranges"], )
     gmf_vars = utils.GMFVariables(
-        vals = np.zeros(params_pro["gmf_size"], dtype=np.float32),
-        dc = np.zeros(params_pro["n_ranges"], dtype=np.float32),
-        v_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),
-        a_ind = np.full(params_pro["gmf_size"], -1, dtype=np.int32),
+        vals = np.zeros(size, dtype=np.float32),
+        dc = np.zeros(size, dtype=np.float32),
+        v_ind = np.full(size, -1, dtype=np.int32),
+        a_ind = np.full(size, -1, dtype=np.int32),
         tx_pwr = tx_pwr,
     )
 
