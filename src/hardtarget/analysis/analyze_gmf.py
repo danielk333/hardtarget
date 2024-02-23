@@ -16,21 +16,22 @@ logger = logging.getLogger(__name__)
 
 
 def compute_gmf(
-    rx,
-    tx,
-    config=None,
-    start_time=None,
-    end_time=None,
-    relative_time=False,
-    job={"idx": 1, "N": 1},
-    progress=False,
-    progress_position=0,
-    subprogress=True,
-    clobber=False,
-    output=None,
-    gmflib=None,
-    gmf_optimize_lib=None,
-):
+                rx,
+                tx,
+                config=None,
+                start_time=None,
+                end_time=None,
+                relative_time=False,
+                job={"idx": 0, "N": 1},
+                progress=False,
+                progress_position=0,
+                subprogress=True,
+                clobber=False,
+                output=None,
+                gmflib=None,
+                gmf_optimize_lib=None
+            ):
+
     """
     Analyze data using gmf.
 
@@ -38,22 +39,23 @@ def compute_gmf(
 
     Parameters
     ----------
-    rx: (drf source dir, channel name)
-    tx: (drf source dir, channel name)
-    config: path gfm config file
-    job: used to identify subset of task indexes for this job
+    :parameter rx: (drf source dir, channel name)
+    :parameter tx: (drf source dir, channel name)
+    :parameter config: path gfm config file
+    :parameter job: used to identify subset of task indexes for this job
 
     Returns
     -------
 
     # TODO: make it able to return any portion of the GMF full map
 
-    result: dict
+    :return: dict
         dir: string
             path to directory with files
         files: list
             paths to each generated file
         out: dictionary with in-memory results
+
     """
 
     # load data sources

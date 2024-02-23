@@ -1,5 +1,6 @@
 import logging
 from hardtarget.convert.eiscat import eiscat_convert
+from hardtarget.profiling import get_logging_level
 
 
 def parser_build(parser):
@@ -13,12 +14,6 @@ def parser_build(parser):
         "--output",
         help="path to output directory, default output folder 'input/drf/uhf/'",
         default=None,
-    )
-    parser.add_argument(
-        "--log-level",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        default="INFO",
-        help="set the log level (default: INFO)",
     )
     parser.add_argument(
         "-c",
@@ -39,8 +34,8 @@ def parser_build(parser):
 def main(args):
     compression_level = int(args.compression)
     # Logging
-    logger = logging.getLogger("eiscat_convert")
-    logger.setLevel(getattr(logging, args.log_level))
+    logger = logging.getLogger(__name__)
+    logger.setLevel(get_logging_level(args.verbose))
     eiscat_convert(
         args.input,
         logger,

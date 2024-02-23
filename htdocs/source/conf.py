@@ -6,9 +6,6 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-import sys
-import pathlib
-import warnings
 from datetime import date
 import hardtarget
 
@@ -29,7 +26,7 @@ extensions = [
 templates_path = ['_templates']
 exclude_patterns = []
 
-
+pygments_style = 'sphinx'
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

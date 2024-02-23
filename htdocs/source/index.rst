@@ -38,12 +38,6 @@ NORCE, IKS, ESA, EISCAT
 
 
 
-
-
-
-
-
-
 Indices and tables
 ==================
 
@@ -64,11 +58,11 @@ Indices and tables
 
 
 .. toctree::
-   :caption: Quickstart
+   :caption: Usage
    :maxdepth: 2
    :hidden:
 
-   usage
+   quickstart
 
 
 .. toctree::
@@ -86,15 +80,15 @@ Indices and tables
 
    tutorial
 
+
 .. toctree::
-   :caption: Data
+   :caption: Reference
    :maxdepth: 2
    :hidden:
 
    eiscat
    drf
    gmf
-
 
 .. toctree::
    :caption: Develop
@@ -104,9 +98,4 @@ Indices and tables
    develop
 
 
-.. toctree::
-   :caption: Reference
-   :maxdepth: 2
-   :hidden:
 
-   reference

@@ -1,11 +1,9 @@
 
 import requests
-import argparse
 from pathlib import Path
 import zipfile
 import tempfile
 from tqdm import tqdm
-import json
 
 try:
     from lxml import html
@@ -27,11 +25,14 @@ except ImportError:
 # https://rebus.eiscat.se:37009/249696;249698/leo_bpark_2.5u_3P20161021.zip
 
 
+# TODO - should get sizes from html content
+
 def get_download_nodes(product_name, day):
     """
     Extract node identifiers from download page
     """
     url = f"https://portal.eiscat.se/schedule/tape2.cgi?exp={product_name}&date={day}&dl=1"
+    print(url)
     response = requests.get(url)
     if response.status_code == 200:
         html_content = response.text
@@ -53,24 +54,24 @@ def get_download_nodes(product_name, day):
         return []
 
 
-def download(product_name, day, dst, cleanup_zip=True):
+def download(day, product_name, type, dst, cleanup_zip=True):
     """
     download and extract zip file for (product_name, day) to dst folder.
     cleanup zipfile
     """
-    product = f'{product_name}{day}'
-
-    print(f'Started: {product}')
+    product = f'{day}_{product_name}_{type}'
 
     # check if extracted result already exist
     out = Path(dst) / product
     if out.exists():
-        print(f'Completed: {out}')
+        print(f'Directory exists: {out}')
         return False
-    else:
-        # create empty directory
-        out.mkdir(parents=True, exist_ok=True)
-        print(f'Directory created: {out}')
+    
+    print(f'Started: {product}')
+
+    # create empty directory
+    out.mkdir(parents=True, exist_ok=True)
+    print(f'Directory created: {out}')
 
     # check if downloaded zipfile already exists
     temp_directory = Path(tempfile.mkdtemp())
@@ -124,20 +125,10 @@ def download(product_name, day, dst, cleanup_zip=True):
     return True
 
 
-def main():
-    """
-    Download a list of products from a json file
-    """
-    parser = argparse.ArgumentParser(description="Download to a destination folder.")
-    parser.add_argument('json', help='Json file with products to download')
-    parser.add_argument('dst', help='Destination folder for downloaded products')
-    args = parser.parse_args()
-
-    with open(args.json, "r") as f:
-        json_data = json.load(f)
-        for item in json_data:
-            download(item["experiment"], item["date"], args.dst)
-
-
 if __name__ == "__main__":
-    main()
+
+    date = "20220408"
+    name = "leo_bpark_2.1u_NO"
+    type = "uhf"
+
+    nodes = get_download_nodes(name, date)

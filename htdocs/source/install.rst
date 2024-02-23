@@ -53,8 +53,16 @@ Basic install.
    $ cd hardtarget
    (.ht) $ pip install .[plotting]
 
+Nightly build.
 
-Full install.
+.. code-block:: bash
+
+   $ git clone --branch develop git@github.com:danielk333/hardtarget.git
+   $ cd hardtarget
+   (.ht) $ pip install .
+
+
+Full developer install.
 
 .. code-block:: bash
 
