@@ -259,6 +259,10 @@ def compute_derived_gmf_params(params_exp, params_pro):
     T_rx_end_samp = np.round(rx_end * 1e-6 * sample_rate).astype(np.int64)
     T_tx_start_samp = np.round(tx_start * 1e-6 * sample_rate).astype(np.int64)
     T_tx_end_samp = np.round(tx_end * 1e-6 * sample_rate).astype(np.int64)
+    params_exp["T_rx_start_samp"] = T_rx_start_samp
+    params_exp["T_rx_end_samp"] = T_rx_end_samp
+    params_exp["T_tx_start_samp"] = T_tx_start_samp
+    params_exp["T_tx_end_samp"] = T_tx_end_samp
 
     tx_pulse_length = params_exp.get("tx_pulse_length", None)
     if tx_pulse_length is not None:
@@ -287,16 +291,25 @@ def compute_derived_gmf_params(params_exp, params_pro):
 
     # range gates are relative to tx start + 1
     il0_rgs_min = T_tx_start_samp + 1
-    il0_rgs_max = T_rx_end_samp
+    # TODO: this is one of the parts of not handling partial codes
+    il0_rgs_max = T_rx_end_samp - tx_pulse_samps
     il0_max_range_gate = rel_max_range_gate
     il0_max_range_gate += il0_rgs_min if rel_max_range_gate >= 0 else il0_rgs_max
     il0_min_range_gate = rel_min_range_gate
     il0_min_range_gate += il0_rgs_min if rel_min_range_gate >= 0 else il0_rgs_max
 
-    assert il0_max_range_gate <= T_rx_end_samp, "start range gate cannot be after than RX end"
-    assert il0_max_range_gate > T_rx_start_samp, "start range gate cannot be before than RX start"
-    assert il0_min_range_gate <= T_rx_end_samp, "end range gate cannot be after than RX end"
-    assert il0_min_range_gate > T_rx_start_samp, "end range gate cannot be before than RX start"
+    assert il0_max_range_gate <= T_rx_end_samp - tx_pulse_samps, (
+        "start range gate cannot be after than RX end"
+    )
+    assert il0_max_range_gate > T_rx_start_samp, (
+        "start range gate cannot be before than RX start"
+    )
+    assert il0_min_range_gate <= T_rx_end_samp - tx_pulse_samps, (
+        "end range gate cannot be after than RX end"
+    )
+    assert il0_min_range_gate > T_rx_start_samp, (
+        "end range gate cannot be before than RX start"
+    )
 
     min_range_gate = il0_min_range_gate - il0_rgs_min
     max_range_gate = il0_max_range_gate - il0_rgs_min
@@ -307,12 +320,14 @@ def compute_derived_gmf_params(params_exp, params_pro):
     params_pro["max_range_gate"] = max_range_gate
 
     rgs = np.arange(min_range_gate, max_range_gate, range_gate_step, dtype=np.int32)
+    il0_rgs = np.arange(il0_min_range_gate, il0_max_range_gate, range_gate_step, dtype=np.int32)
     rel_rgs = rgs - min_range_gate
     # total propagation range
     ranges = (rgs + 1) * scipy.constants.c / sample_rate  # m
     assert np.all(rgs > 0), "Computed range gates not compatible with stencils"
 
     params_der["rgs"] = rgs
+    params_der["il0_rgs"] = il0_rgs
     params_der["rel_rgs"] = rel_rgs
     params_der["ranges"] = ranges
     params_pro["n_ranges"] = len(ranges)
@@ -328,8 +343,9 @@ def compute_derived_gmf_params(params_exp, params_pro):
 
     # for each coherently integrated IPP, create stencils
     for k in range(n_ipp):
+        # start of pulse within range-gates, thus include also the entire pulse at the end
         rx0 = ((k + ipp_offset) * ipp_samp + il0_min_range_gate)
-        rx1 = ((k + ipp_offset) * ipp_samp + il0_max_range_gate)
+        rx1 = ((k + ipp_offset) * ipp_samp + il0_max_range_gate + tx_pulse_samps)
         params_der["rx_stencil"][rx0:rx1] = True
 
         tx0 = (k * ipp_samp + T_tx_start_samp)
@@ -338,6 +354,9 @@ def compute_derived_gmf_params(params_exp, params_pro):
 
     params_der["il0_rx_stencil_indices"] = np.argwhere(params_der["rx_stencil"]).flatten()
     params_der["il0_tx_stencil_indices"] = np.argwhere(params_der["tx_stencil"]).flatten()
+
+    # length of coherent integration
+    params_pro["coh_int_samps"] = len(params_der["il0_tx_stencil_indices"])
 
     # Decimated signals
     # TODO: this can probably be allowed if we truncate/pad the end or start of the decimated vector
@@ -348,21 +367,28 @@ def compute_derived_gmf_params(params_exp, params_pro):
     )
     # TODO: this can be avoided by padding the stencil and having a second 0-stencil
     # TODO: better assert messages if keep
-    assert params_pro["n_ranges"] % frequency_decimation == 0, "n_ranges not work"
-    assert ipp_samp % frequency_decimation == 0, "ipp_samp not work"
-    assert params_pro["coh_int_samps"] % frequency_decimation == 0, "coh_int_samps not work"
-
-    # length of coherent integration
-    params_pro["coh_int_samps"] = len(params_der["il0_tx_stencil_indices"])
-    params_pro["decimated_coh_int_samps"] = np.round(
-        params_pro["coh_int_samps"] / frequency_decimation
-    ).astype(np.int64)
+    assert params_pro["n_ranges"] % frequency_decimation == 0, (
+        "range-gate interval not compatible with decimation: "
+        f"{params_pro['n_ranges']} % {frequency_decimation} = "
+        f"{params_pro['n_ranges'] % frequency_decimation}"
+    )
+    assert ipp_samp % frequency_decimation == 0, (
+        "ipp-samples length not compatible with decimation: "
+        f"{ipp_samp} % {frequency_decimation} = "
+        f"{ipp_samp % frequency_decimation}"
+    )
+    assert params_pro["coh_int_samps"] % frequency_decimation == 0, (
+        "range-gate interval not compatible with decimation: "
+        f"{params_pro['coh_int_samps']} % {frequency_decimation} = "
+        f"{params_pro['coh_int_samps'] % frequency_decimation}"
+    )
 
     # cyclic range gate selector - in the index space of stenciled RX signals
     # TODO: this can be generalized for a-periodic codes ect
     base_rx_window = np.arange(params_exp["tx_pulse_samps"], dtype=np.int32)
+    d_window = params_exp["tx_pulse_samps"] + params_pro["n_ranges"]
     il1_rx_window_blocks = [
-        base_rx_window + ind * params_pro["n_ranges"]
+        base_rx_window + ind * d_window
         for ind in range(n_ipp)
     ]
     il1_rx_window_indices = np.concatenate(il1_rx_window_blocks)
@@ -389,12 +415,13 @@ def compute_derived_gmf_params(params_exp, params_pro):
 
     ########################################
     # Acceleration related parameters
-    # NOTE: we are modelling the target at
-    #       at the start of the first cycle
+    # TODO: at what time are we exactly modelling the acceleration
     ########################################
 
     # Sample times in the decimated il0d vector
     rx_win_t = np.arange(params_pro["read_length"]) / sample_rate
+    rx_win_t = rx_win_t[params_der["il0_rx_stencil_indices"]]
+    rx_win_t = rx_win_t[params_der["il1_rx_window_indices"]]
     # take the decimated times as the center-points of decimated samples
     rx_win_t_dec = np.mean(rx_win_t.reshape(-1, frequency_decimation), axis=-1)
 
@@ -409,11 +436,11 @@ def compute_derived_gmf_params(params_exp, params_pro):
     # tau_ipp
     dec_tau_samp = np.floor(ipp_samp * tau_ipp / frequency_decimation).astype(np.int64)
     step = 2 * dec_tau_samp * frequency_decimation / sample_rate
-    max_accels_len = params_pro["decimated_coh_int_samps"] - dec_tau_samp
-    dpt_accels = fft.fftfreq(max_accels_len, d=frequency_decimation/sample_rate)
+    max_accels_len = params_pro["decimated_read_length"] - dec_tau_samp
+    dpt_accels = fft.fftshift(fft.fftfreq(max_accels_len, d=frequency_decimation/sample_rate))
     dpt_accels = dpt_accels * wavelength * 2 / step
 
-    params_der["dec_tau_samp"] = dec_tau_samp
+    params_pro["dec_tau_samp"] = dec_tau_samp
 
     # filter accels
     accel_inds = np.logical_and(dpt_accels >= min_acceleration, dpt_accels <= max_acceleration)
@@ -428,6 +455,6 @@ def compute_derived_gmf_params(params_exp, params_pro):
         -1j * np.pi * params_der["accelerations"][:, None] * times2[None, :] / wavelength
     ).astype(np.complex64)
     params_der["acceleration_phasors"] = phasors
-    params_der["fgmf_acceleration_phasors"] = phasors[accel_inds, :]
+    params_der["fgmf_acceleration_phasors"] = phasors[accel_inds, :].copy()
 
     return params_exp, params_pro, params_der
