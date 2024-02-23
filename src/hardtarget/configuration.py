@@ -1,3 +1,84 @@
+"""
+
+Configuration
+=============
+
+Main module for configuring the analysis of the input data and calculating the
+relevant parameters needed for analysis.
+
+The analysis always assumes the `digital_rf` (drf) radar data consists of a
+continuous stream of signal samples. If in reality there was no samples taken
+during an interval the sample stream should be zero-padded during this time.
+As such the signal sample stream is split up into regular cycles. Each cycle
+occurs back-to-back and the time a cycle takes is called an inter-pulse-period,
+or IPP.
+
+Every analysis consists of a received signal (RX) and a transmitted signal (TX).
+These signals can either be superimposed in the same channel or be in different
+channels in the drf structure. Either way, there are several segments within
+each cycle that we need to extract and index. Hence, there are three main levels
+of signal indices within one cycle, which we will call Index Levels (IL's):
+
+ 0) Signal samples (can be same channel)
+    - RX signal (size=IPP length)
+    - TX signal (size=IPP length)
+ 0d) Decimated signal samples
+    - RX signal (size=IPP length / decimation)
+ 1) Stenciled samples:
+    - RX window (size=chosen reception length, i.e. all range gates)
+    - TX pulse (size=length of transmitted pulse)
+ 2) Target range-gate:
+    - RX pulse (size=length of transmitted pulse, offset by chosen range gate)
+
+The IL-0d is a bit of a special case as temporal decimation (piece-wise sums of
+neighbors) only maintains desirable properties (both statistical and signal
+vise) if it is done on an isochronal and continuous sample stream. As such,
+decimation operation only occurs on a level 0 signal.
+
+Illustration of the above:
+
+    IL-0     : |0123456789...................................|
+    Signal   : |xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|
+    IL-0d    : | 0  1  2  3  4  5  6  7  8  9  .  .  .  .  . |
+    Decimated: | x  x  x  x  x  x  x  x  x  x  x  x  x  x  x |
+    IL-1 tx  : |  012345                                     |
+    TX pulse : |--xxxxxx-------------------------------------|
+    IL-1 rx  : |                0123456789..............     |
+    RX window: |----------------xxxxxxxxxxxxxxxxxxxxxxxx-----|
+    IL-2     : |                           012345            |
+    RX pulse : |---------------------------xxxxxx------------|
+
+In the above example, the first sample of the TX pulse would have index 2 in
+terms of IL-0 but would have index 0 in terms of IL-1. The first sample of IL-0d
+would represent samples 0, 1, and 2 in IL-0. Similarly the first sample of the
+RX pulse would have index 27 in terms of IL-0, index 11 in IL-1 and index 0 in
+IL-2. Also, index 0, 1, and 2 in the RX pulse IL-2 would be associated with only
+index 9 in IL-0d.
+
+The general strategy for decimation is to zero-pad the target vector if the
+decimation does not evenly divide the vector.
+
+In the analysis, several of these cycles are stacked on top of each other. This
+means that when selecting the IL-1 tx samples the resulting array is no longer
+isochronal and continues but instead has a jump in the middle, e.g.
+
+    IL-1 tx  : |  012345        6789..        ......      |
+    TX pulse : |--xxxxxx--------xxxxxx--------xxxxxx------|
+
+Since range from a transmitter converted to time is measured from the start of
+transmission (i.e. the time between when the leading edge of the wave leaves the
+transmitter and reaches the receiver), the range gates are also always measured
+in samples relative the start of the TX pulse + 1, in terms of IL-0. Which means
+that sample of range-gate 0 has traveled the time of 1 sample. The largest range
+gate is at the end of reception, which basically means only one sample of the TX
+could be measured.
+
+# TODO: decimation runs on JUST the top 1 level of direct signal
+
+# TODO: the current analysis might not handle partial codes, add this functionality
+
+"""
+
 import configparser
 import numpy as np
 import scipy.fft as fft
@@ -5,8 +86,9 @@ import scipy.constants
 import pathlib
 
 from hardtarget import drf_utils
-from hardtarget.gmf import GMF_GRID_LIBS, GMF_OPTIMIZE_LIBS
+from hardtarget.gmf import get_default_method
 
+DEFAULT_IMPL, DEFAULT_METHOD = get_default_method()
 
 ####################################################################
 # GET GMF PROCESSING PARAMS
@@ -17,12 +99,12 @@ from hardtarget.gmf import GMF_GRID_LIBS, GMF_OPTIMIZE_LIBS
 ####################################################################
 
 DEFAULT_PARAMS = {
-    "gmf_grid_lib": ("c", str),
-    "gmf_optimize_lib": ("c", str),
-    "gmf_fine_tune": (False, bool),
+    "gmf_implementation": (DEFAULT_IMPL, str),
+    "gmf_method": (DEFAULT_METHOD, str),
     "node_gpus": (1, int),
-    "n_ipp": (5, int),
+    "n_ipp": (10, int),
     "ipp_offset": (0, int),
+    "dpt_ipp_delay_parameter": (5, int),
     "min_range_gate": (0, int),
     "max_range_gate": (-1, int),
     "range_gate_step": (1, int),
@@ -30,7 +112,6 @@ DEFAULT_PARAMS = {
     "clutter_length": (0, int),
     "min_acceleration": (-200.0, float),
     "max_acceleration": (200.0, float),
-    "acceleration_resolution": (0.2, float),
     "num_cohints_per_file": (100, int),
 }
 
@@ -150,28 +231,39 @@ def compute_derived_gmf_params(params_exp, params_pro):
     tx_end = params_exp["tx_end"]
 
     # gmf processing params
-    min_range_gate = params_pro["min_range_gate"]
-    max_range_gate = params_pro["max_range_gate"]
+    rel_min_range_gate = params_pro["min_range_gate"]
+    rel_max_range_gate = params_pro["max_range_gate"]
     range_gate_step = params_pro["range_gate_step"]
     n_ipp = params_pro["n_ipp"]
     ipp_offset = params_pro["ipp_offset"]
     frequency_decimation = params_pro["frequency_decimation"]
     max_acceleration = params_pro["max_acceleration"]
     min_acceleration = params_pro["min_acceleration"]
-    acceleration_resolution = params_pro["acceleration_resolution"]
-    clutter_length = params_pro["clutter_length"]
+    tau_ipp = params_pro["dpt_ipp_delay_parameter"]
 
     # compute derived params
     params_der = {}
 
+    ########################################
+    # Experiment and instrument parameters
+    ########################################
+
     ipp_samp = np.round(ipp * 1e-6 * sample_rate).astype(np.int64)
     params_exp["ipp_samp"] = ipp_samp
+
+    # how many extra ipps do we need to read for coherent integration
+    params_pro["n_extra"] = ipp_offset
 
     # Use np.round and cast to int to avoid floating point errors in floor
     T_rx_start_samp = np.round(rx_start * 1e-6 * sample_rate).astype(np.int64)
     T_rx_end_samp = np.round(rx_end * 1e-6 * sample_rate).astype(np.int64)
     T_tx_start_samp = np.round(tx_start * 1e-6 * sample_rate).astype(np.int64)
     T_tx_end_samp = np.round(tx_end * 1e-6 * sample_rate).astype(np.int64)
+    params_exp["T_rx_start_samp"] = T_rx_start_samp
+    params_exp["T_rx_end_samp"] = T_rx_end_samp
+    params_exp["T_tx_start_samp"] = T_tx_start_samp
+    params_exp["T_tx_end_samp"] = T_tx_end_samp
+
     tx_pulse_length = params_exp.get("tx_pulse_length", None)
     if tx_pulse_length is not None:
         tx_pulse_samps = np.round(tx_pulse_length * 1e-6 * sample_rate).astype(np.int64)
@@ -183,52 +275,66 @@ def compute_derived_gmf_params(params_exp, params_pro):
         params_exp["tx_pulse_length"] = 1e6 * (T_tx_end_samp - T_tx_start_samp) / sample_rate
     params_exp["tx_pulse_samps"] = tx_pulse_samps
 
-    # Relevant rx samples
-    stencil_start_samp = T_rx_start_samp if T_rx_start_samp > T_tx_end_samp else T_tx_end_samp
-    stencil_start_samp += clutter_length
+    # Read length to include all pulses to be searched
+    params_pro["read_length"] = (n_ipp + ipp_offset) * ipp_samp
+    params_pro["decimated_read_length"] = np.ceil(
+        params_pro["read_length"] / frequency_decimation
+    ).astype(np.int64)
 
-    params_der["n_rx_samples"] = T_rx_end_samp - stencil_start_samp
-    params_der["stencil_start_samp"] = stencil_start_samp
+    # range-rate is doppler-shift in hertz multiplied with wavelength
+    wavelength = scipy.constants.c / (radar_frequency * 1e6)
+    params_exp["wavelength"] = wavelength
 
-    # TODO: document range gates properly, they are a bit of a mess right now
-    # TODO: this current does not handle partial codes, add this functionality
-    rgs_min = T_tx_start_samp
-    rgs_max = T_rx_end_samp - tx_pulse_samps
-    max_range_gate += rgs_max if max_range_gate < 0 else rgs_min
-    min_range_gate += rgs_max if min_range_gate < 0 else rgs_min
+    ########################################
+    # Range related parameters
+    ########################################
 
-    params_pro["range_gate_offset"] = rgs_min
-    params_pro["rel_min_range_gate"] = min_range_gate - rgs_min
-    params_pro["rel_max_range_gate"] = max_range_gate - rgs_min
-    # reset range gates
-    # range gates to search through
-    # range gates are relative to tx start
-    _rgs = np.arange(min_range_gate, max_range_gate, range_gate_step, dtype=np.int32)
+    # range gates are relative to tx start + 1
+    il0_rgs_min = T_tx_start_samp + 1
+    # TODO: this is one of the parts of not handling partial codes
+    il0_rgs_max = T_rx_end_samp - tx_pulse_samps
+    il0_max_range_gate = rel_max_range_gate
+    il0_max_range_gate += il0_rgs_min if rel_max_range_gate >= 0 else il0_rgs_max
+    il0_min_range_gate = rel_min_range_gate
+    il0_min_range_gate += il0_rgs_min if rel_min_range_gate >= 0 else il0_rgs_max
+
+    assert il0_max_range_gate <= T_rx_end_samp - tx_pulse_samps, (
+        "start range gate cannot be after than RX end"
+    )
+    assert il0_max_range_gate > T_rx_start_samp, (
+        "start range gate cannot be before than RX start"
+    )
+    assert il0_min_range_gate <= T_rx_end_samp - tx_pulse_samps, (
+        "end range gate cannot be after than RX end"
+    )
+    assert il0_min_range_gate > T_rx_start_samp, (
+        "end range gate cannot be before than RX start"
+    )
+
+    min_range_gate = il0_min_range_gate - il0_rgs_min
+    max_range_gate = il0_max_range_gate - il0_rgs_min
+
+    params_pro["il0_min_range_gate"] = il0_min_range_gate
+    params_pro["il0_max_range_gate"] = il0_max_range_gate
+    params_pro["min_range_gate"] = min_range_gate
+    params_pro["max_range_gate"] = max_range_gate
+
+    rgs = np.arange(min_range_gate, max_range_gate, range_gate_step, dtype=np.int32)
+    il0_rgs = np.arange(il0_min_range_gate, il0_max_range_gate, range_gate_step, dtype=np.int32)
+    rel_rgs = rgs - min_range_gate
     # total propagation range
-    ranges = (_rgs - T_tx_start_samp) * scipy.constants.c / sample_rate  # m
-
-    # make relative the stencil start
-    rgs = _rgs - stencil_start_samp
+    ranges = (rgs + 1) * scipy.constants.c / sample_rate  # m
     assert np.all(rgs > 0), "Computed range gates not compatible with stencils"
 
-    params_der["rel_rgs"] = _rgs - rgs_min
-    params_der["dec_rgs"] = np.floor(_rgs / frequency_decimation).astype(np.int32)
     params_der["rgs"] = rgs
+    params_der["il0_rgs"] = il0_rgs
+    params_der["rel_rgs"] = rel_rgs
     params_der["ranges"] = ranges
     params_pro["n_ranges"] = len(ranges)
 
-    # how many extra ipps do we need to read for coherent integration
-    params_pro["n_extra"] = ipp_offset
-
-    # Read length to include all pulses to be searched
-    params_pro["read_length"] = (n_ipp + ipp_offset) * ipp_samp
-
-    # TODO: the new idea:
-    # 3 levels:
-    # 1) direct sampled signal
-    # 2) rx/tx stenciled signals
-    # 3) rx/tx windows selection
-    # decimation runs on JUST the top 1 level of direct signal
+    ########################################
+    # Signal indexing levels
+    ########################################
 
     # this stencil is used to block tx pulses and ground clutter
     params_der["rx_stencil"] = np.full((params_pro["read_length"],), False, dtype=bool)
@@ -237,148 +343,118 @@ def compute_derived_gmf_params(params_exp, params_pro):
 
     # for each coherently integrated IPP, create stencils
     for k in range(n_ipp):
-        rx0 = ((k + ipp_offset) * ipp_samp + stencil_start_samp)
-        rx1 = ((k + ipp_offset) * ipp_samp + T_rx_end_samp)
+        # start of pulse within range-gates, thus include also the entire pulse at the end
+        rx0 = ((k + ipp_offset) * ipp_samp + il0_min_range_gate)
+        rx1 = ((k + ipp_offset) * ipp_samp + il0_max_range_gate + tx_pulse_samps)
         params_der["rx_stencil"][rx0:rx1] = True
 
         tx0 = (k * ipp_samp + T_tx_start_samp)
         tx1 = (k * ipp_samp + T_tx_end_samp)
         params_der["tx_stencil"][tx0:tx1] = True
 
-    params_der["rx_stencil_indices"] = np.argwhere(params_der["rx_stencil"]).flatten()
-    params_der["tx_stencil_indices"] = np.argwhere(params_der["tx_stencil"]).flatten()
+    params_der["il0_rx_stencil_indices"] = np.argwhere(params_der["rx_stencil"]).flatten()
+    params_der["il0_tx_stencil_indices"] = np.argwhere(params_der["tx_stencil"]).flatten()
+
+    # length of coherent integration
+    params_pro["coh_int_samps"] = len(params_der["il0_tx_stencil_indices"])
 
     # Decimated signals
+    # TODO: this can probably be allowed if we truncate/pad the end or start of the decimated vector
     assert tx_pulse_samps % frequency_decimation == 0, (
         "Pulse samples should be divisible by decimation to avoid edge effects\n"
         f"tx_pulse_samps / frequency_decimation = {tx_pulse_samps}/{frequency_decimation} ="
         f"{tx_pulse_samps / frequency_decimation}"
     )
-
-    dec_sig_len = np.round(params_pro["read_length"] / frequency_decimation).astype(np.int64)
-    dec_txlen = np.round(tx_pulse_samps / frequency_decimation).astype(np.int64)
-    dec_ipp_samp = np.round(ipp_samp / frequency_decimation).astype(np.int64)
-    dec_T_tx_start_samp = np.round(T_tx_start_samp / frequency_decimation).astype(np.int64)
-    params_der["dec_signal_length"] = dec_sig_len
-
-    # length of coherent integration
-    params_pro["coh_int_samps"] = len(params_der["tx_stencil_indices"])
-    params_pro["decimated_coh_int_samps"] = np.round(
-        params_pro["coh_int_samps"] / frequency_decimation
-    ).astype(np.int64)
-
-    # Length of ffts
-    # params_pro["n_fft"] = np.round(total_signal_length * sample_rate).astype(np.int64)
-    params_pro["decimated_n_fft"] = dec_sig_len
-
-    # frequency vector
-    params_der["fvec"] = fft.fftfreq(
-        params_pro["decimated_n_fft"],
-        d=frequency_decimation / sample_rate,
-    )  # Hz
-
-    # range-rate is doppler-shift in hertz multiplied with wavelength
-    wavelength = scipy.constants.c / (radar_frequency * 1e6)
-    params_exp["wavelength"] = wavelength
-
-    range_rates = wavelength * params_der["fvec"]
-    params_der["range_rates"] = range_rates  # m/s
-    params_pro["n_range_rates"] = len(range_rates)
+    # TODO: this can be avoided by padding the stencil and having a second 0-stencil
+    # TODO: better assert messages if keep
+    assert params_pro["n_ranges"] % frequency_decimation == 0, (
+        "range-gate interval not compatible with decimation: "
+        f"{params_pro['n_ranges']} % {frequency_decimation} = "
+        f"{params_pro['n_ranges'] % frequency_decimation}"
+    )
+    assert ipp_samp % frequency_decimation == 0, (
+        "ipp-samples length not compatible with decimation: "
+        f"{ipp_samp} % {frequency_decimation} = "
+        f"{ipp_samp % frequency_decimation}"
+    )
+    assert params_pro["coh_int_samps"] % frequency_decimation == 0, (
+        "range-gate interval not compatible with decimation: "
+        f"{params_pro['coh_int_samps']} % {frequency_decimation} = "
+        f"{params_pro['coh_int_samps'] % frequency_decimation}"
+    )
 
     # cyclic range gate selector - in the index space of stenciled RX signals
     # TODO: this can be generalized for a-periodic codes ect
     base_rx_window = np.arange(params_exp["tx_pulse_samps"], dtype=np.int32)
-    rx_window_blocks = [
-        base_rx_window + ind * params_der["n_rx_samples"]
+    d_window = params_exp["tx_pulse_samps"] + params_pro["n_ranges"]
+    il1_rx_window_blocks = [
+        base_rx_window + ind * d_window
         for ind in range(n_ipp)
     ]
-    rx_window_indices = np.concatenate(rx_window_blocks)
-    # TODO: This is part of future generalization to partial codes too
-    # params_der["rx_window_blocks"] = rx_window_blocks
-    params_der["rx_window_indices"] = rx_window_indices
+    il1_rx_window_indices = np.concatenate(il1_rx_window_blocks)
+    params_der["il1_rx_window_indices"] = il1_rx_window_indices
+    il0_rx_window_indices = params_der["il0_rx_stencil_indices"][il1_rx_window_indices]
+    params_der["il0_rx_window_indices"] = il0_rx_window_indices
 
-    # The following calculates the corresponding windows in the decimated signal
-    # for use for constructing the vector that FFT can operate on
-    #  - in the index ipp cycle, not of stenciled RX signals
-    dec_base_rx_window = np.arange(dec_txlen, dtype=np.int32) + dec_T_tx_start_samp
-    dec_rx_window_blocks = [
-        dec_base_rx_window + (ind + ipp_offset) * dec_ipp_samp
-        for ind in range(n_ipp)
-    ]
-    dec_rx_window_indices = np.concatenate(dec_rx_window_blocks)
-    params_der["dec_rx_window_indices"] = dec_rx_window_indices
+    il0_dec_rx_window_indices = il0_rx_window_indices[::frequency_decimation] // frequency_decimation
+    params_der["il0_dec_rx_window_indices"] = il0_dec_rx_window_indices
 
-    # TODO: check all index and time assumptions, if one was wrong the more can be...
+    ########################################
+    # Velocity related parameters
+    ########################################
+
+    # frequency vector
+    params_der["fft_frequencies"] = fft.fftfreq(
+        params_pro["decimated_read_length"],
+        d=frequency_decimation / sample_rate,
+    )  # Hz
+
+    range_rates = wavelength * params_der["fft_frequencies"]
+    params_der["range_rates"] = range_rates  # m/s
+    params_pro["n_range_rates"] = len(range_rates)
+
+    ########################################
+    # Acceleration related parameters
+    # TODO: at what time are we exactly modelling the acceleration
+    ########################################
+
+    # Sample times in the decimated il0d vector
+    rx_win_t = np.arange(params_pro["read_length"]) / sample_rate
+    rx_win_t = rx_win_t[params_der["il0_rx_stencil_indices"]]
+    rx_win_t = rx_win_t[params_der["il1_rx_window_indices"]]
+    # take the decimated times as the center-points of decimated samples
+    rx_win_t_dec = np.mean(rx_win_t.reshape(-1, frequency_decimation), axis=-1)
+
     # TODO: the sample gates can actually move as a function of velocity + acceleration
-    # so maybe the rx_window_indices should also change so we dont miss-align samples?
-
-    # We are modelling the target parameters at the time of the first sample of the first
-    #  cycle sample (going to highest level inds: cycle samples)
-    rx_win_t = params_der["rx_stencil_indices"][rx_window_indices] / sample_rate
-    rx_win_t_dec = rx_win_t[::frequency_decimation]
+    #       so maybe the rx_window_indices should also change so we dont miss-align samples?
 
     # Time vector relative detected range-gate
     times2 = rx_win_t_dec**2.0
     params_der["decimated_sample_times"] = rx_win_t_dec
     params_der["sample_times"] = rx_win_t
 
-    # acceleration sampled with steps at the end of the coherent integration window
-    # acceleration_resolution is in radians!
-    max_time2 = np.max(times2)
-    acc_interval = max_acceleration - min_acceleration
+    # tau_ipp
+    dec_tau_samp = np.floor(ipp_samp * tau_ipp / frequency_decimation).astype(np.int64)
+    step = 2 * dec_tau_samp * frequency_decimation / sample_rate
+    max_accels_len = params_pro["decimated_read_length"] - dec_tau_samp
+    dpt_accels = fft.fftshift(fft.fftfreq(max_accels_len, d=frequency_decimation/sample_rate))
+    dpt_accels = dpt_accels * wavelength * 2 / step
 
-    # TODO: maybe not? for now make sure we have a 0 acceleration
-    assert min_acceleration <= 0 and max_acceleration >= 0, "acceleration needs to cover 0"
+    params_pro["dec_tau_samp"] = dec_tau_samp
 
-    max_phase_change = np.pi / wavelength * acc_interval * max_time2
-    n_acc = np.ceil(max_phase_change/acceleration_resolution).astype(np.int64)
-    d_acc = acc_interval / n_acc
-
-    params_der["accelerations"] = np.concatenate([
-        np.arange(min_acceleration, 0, d_acc, dtype=np.float64),
-        np.arange(0, max_acceleration, d_acc, dtype=np.float64),
-    ])  # m/s^2
-    params_pro["n_accelerations"] = len(params_der["accelerations"])
+    # filter accels
+    accel_inds = np.logical_and(dpt_accels >= min_acceleration, dpt_accels <= max_acceleration)
+    fgmf_accels = dpt_accels[accel_inds]
+    params_der["inds_accelerations"] = np.argwhere(accel_inds).flatten()
+    params_der["accelerations"] = dpt_accels  # m/s^2
+    params_der["fgmf_accelerations"] = fgmf_accels  # m/s^2
+    params_pro["n_accelerations"] = len(dpt_accels)
 
     # precalculate phasors corresponding to different accelerations
     phasors = np.exp(
         -1j * np.pi * params_der["accelerations"][:, None] * times2[None, :] / wavelength
-    )
-    params_der["acceleration_phasors"] = phasors.astype(np.complex64)
+    ).astype(np.complex64)
+    params_der["acceleration_phasors"] = phasors
+    params_der["fgmf_acceleration_phasors"] = phasors[accel_inds, :].copy()
 
-    params_pro["gmf_size"] = (params_pro["n_ranges"], )
     return params_exp, params_pro, params_der
-
-
-####################################################################
-# CONFIG HELPERS
-####################################################################
-
-
-def choose_gmf_implementation(params_pro):
-    # gmf lib
-    gmf_lib_name = params_pro.get("gmf_grid_lib", None)
-    if gmf_lib_name is None:
-        gmf_lib_name = "c" if "c" in GMF_GRID_LIBS else "numpy"
-    elif gmf_lib_name not in GMF_GRID_LIBS:
-        raise ValueError(
-            f"Requested GMF gird lib '{gmf_lib_name}' not found in "
-            "available libs, possible compilation errors in extensions\n"
-            f"GMF_GRID_LIBS = {list(GMF_GRID_LIBS.keys())}"
-        )
-
-    # gmf optimize lib
-    if params_pro.get("gmf_fine_tune", False):
-        gmfo_lib_name = params_pro.get("gmf_optimize_lib", None)
-        if gmfo_lib_name is None:
-            gmfo_lib_name = "c" if "c" in GMF_OPTIMIZE_LIBS else "numpy"
-        elif gmfo_lib_name not in GMF_OPTIMIZE_LIBS:
-            raise ValueError(
-                f"Requested GMF optimize lib '{gmfo_lib_name}' not found in "
-                "available libs, possible compilation errors in extensions\n"
-                f"GMF_OPTIMIZE_LIBS = {list(GMF_OPTIMIZE_LIBS.keys())}"
-            )
-    else:
-        gmfo_lib_name = None
-
-    return gmf_lib_name, gmfo_lib_name

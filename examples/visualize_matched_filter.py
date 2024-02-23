@@ -119,10 +119,12 @@ xcorr = sel_rxs * txs
 echo = np.sum(xcorr.copy().reshape(-1, params["PRO"]["frequency_decimation"]), axis=-1)
 c_echo = echo * phasors
 
+dec_rgs = np.floor(_rgs / frequency_decimation).astype(np.int32)
+
 dec_txlen = params["EXP"]["tx_pulse_samps"] // params["PRO"]["frequency_decimation"]
 dec_sig_samps = np.arange(params["DER"]["dec_signal_length"])
 dec_signal_vec = np.zeros((params["DER"]["dec_signal_length"], ), dtype=np.complex64)
-dec_rx_window_indices = params["DER"]["dec_rx_window_indices"] + params["DER"]["dec_rgs"][range_ind]
+dec_rx_window_indices = params["DER"]["dec_rx_window_indices"] + dec_rgs
 
 fvec = params["DER"]["fvec"]
 

@@ -4,7 +4,7 @@ import scipy.constants as constants
 import scipy.optimize as sco
 
 
-def gmfnp(z_tx, z_rx, gmf_variables, gmf_params):
+def fast_gmf_np(z_tx, z_rx, gmf_variables, gmf_params):
     """
     Compute the output of the Generalized Matched Filter GMF
     # TODO: Clean up these XX's and the docstring
@@ -30,140 +30,119 @@ def gmfnp(z_tx, z_rx, gmf_variables, gmf_params):
 
     """
 
-    acc_phasors = gmf_params["DER"]["acceleration_phasors"]
-    rgs = gmf_params["DER"]["rgs"]
+    acc_phasors = gmf_params["DER"]["fgmf_acceleration_phasors"]
+    acc_inds = gmf_params["DER"]["inds_accelerations"]
+    rel_rgs = gmf_params["DER"]["rel_rgs"]
     frequency_decimation = gmf_params["PRO"]["frequency_decimation"]
-    rx_window_indices = gmf_params["DER"]["rx_window_indices"]
-    dec_rx_window_indices = gmf_params["DER"]["dec_rx_window_indices"]
-    dec_signal_len = gmf_params["DER"]["dec_signal_length"]
+    il1_rx_win = gmf_params["DER"]["il1_rx_window_indices"]
+    il0_dec_rx_win = gmf_params["DER"]["il0_dec_rx_window_indices"]
+    dec_read_length = gmf_params["PRO"]["decimated_read_length"]
 
     # number of range gates is input from user
     n_acc = acc_phasors.shape[0]
-    for ri, rg in enumerate(rgs):
-        zr = z_rx[rx_window_indices + rg]
+    for ri, rg in enumerate(rel_rgs):
+        drg = int(rg // frequency_decimation)
+        zr = z_rx[il1_rx_win + rg]
         # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter), decimate
         echo = np.sum((zr * z_tx).reshape(-1, frequency_decimation), axis=-1)
-        decimated_signal = np.zeros((dec_signal_len,), dtype=np.complex64)
+        dec_signal = np.zeros((dec_read_length,), dtype=np.complex64)
 
         for ai in range(n_acc):
-            decimated_signal[dec_rx_window_indices] = acc_phasors[ai] * echo
-            _gmfo = np.abs(fft.fft(decimated_signal)) ** 2
-            mi = np.argmax(_gmfo)
+            dec_signal[il0_dec_rx_win + drg] = acc_phasors[ai] * echo
+            ft2 = np.abs(fft.fft(dec_signal)) ** 2
+            mi = np.argmax(ft2)
             if ai == 0:
                 # zero-frequency (DC) component in scipy.fft.fft output[0] according to docs
                 # used to get range-dependent noise floor
-                gmf_variables.dc[ri] = _gmfo[0]
+                gmf_variables.dc[ri] = ft2[0]
 
-            if _gmfo[mi] > gmf_variables.vals[ri]:
-                gmf_variables.vals[ri] = _gmfo[mi]
+            if ft2[mi] > gmf_variables.vals[ri]:
+                gmf_variables.vals[ri] = ft2[mi]
                 # index of doppler that gives highest integrated energy at this range gate
                 gmf_variables.v_ind[ri] = mi
                 # index of acceleration that gives highest integrated energy at this range gate
-                gmf_variables.a_ind[ri] = ai
+                gmf_variables.a_ind[ri] = acc_inds[ai]
 
 
-def gmfnp_daf(z_tx, z_rx, gmf_variables, gmf_params):
+def fast_dpt_np(z_tx, z_rx, gmf_variables, gmf_params):
     """Development version of GMF using discrete ambiguity function spectrum to speed up acceleration search
     """
-    rgs = gmf_params["DER"]["rgs"]
+    acc_phasors = gmf_params["DER"]["acceleration_phasors"]
+    rel_rgs = gmf_params["DER"]["rel_rgs"]
     frequency_decimation = gmf_params["PRO"]["frequency_decimation"]
-    rx_window_indices = gmf_params["DER"]["rx_window_indices"]
-    dec_rx_window_indices = gmf_params["DER"]["dec_rx_window_indices"]
-    dec_signal_len = gmf_params["DER"]["dec_signal_length"]
-    sample_rate = gmf_params["EXP"]["sample_rate"]
-    global_accs = gmf_params["DER"]["accelerations"]
+    il1_rx_win = gmf_params["DER"]["il1_rx_window_indices"]
+    il0_dec_rx_win = gmf_params["DER"]["il0_dec_rx_window_indices"]
+    dec_read_length = gmf_params["PRO"]["decimated_read_length"]
+    dec_tau_samp = gmf_params["PRO"]["dec_tau_samp"]
 
-    tau = gmf_params["EXP"]["ipp_samp"] * (gmf_params["PRO"]["n_ipp"] // 2) // frequency_decimation
-    step = 2 * tau * frequency_decimation / sample_rate
-    wavelength = gmf_params["EXP"]["wavelength"]
-    accels = fft.fftfreq(dec_signal_len - tau, d=frequency_decimation/sample_rate) * wavelength * 2 / step
-    # df_res = sample_rate / (dec_signal_len * frequency_decimation * step)
-    # dacc = df_res * wavelength * 2
-    # times2 = gmf_params["DER"]["decimated_sample_times"] ** 2
-
-    # number of range gates is input from user
-    for ri, rg in enumerate(rgs):
-        zr = z_rx[rx_window_indices + rg]
+    for ri, rg in enumerate(rel_rgs):
+        drg = int(rg // frequency_decimation)
+        zr = z_rx[il1_rx_win + rg]
         # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter), decimate
         echo = np.sum((zr * z_tx).reshape(-1, frequency_decimation), axis=-1)
-        decimated_signal = np.zeros((dec_signal_len,), dtype=np.complex64)
-        decimated_signal[dec_rx_window_indices] = echo
-        _gmfo = np.abs(fft.fft(decimated_signal)) ** 2
-        gmf_variables.dc[ri] = _gmfo[0]
+        dec_signal = np.zeros((dec_read_length,), dtype=np.complex64)
+        dec_signal[il0_dec_rx_win + drg] = echo
 
-        # breakpoint()
+        gmf_variables.dc[ri] = np.abs(np.sum(echo)) ** 2
 
-        daf = decimated_signal[tau:] * np.conj(decimated_signal[:-tau])
-        daf_spec = np.abs(fft.fft(daf))
+        dpt2 = dec_signal[dec_tau_samp:] * np.conj(dec_signal[:-dec_tau_samp])
+        dpt2_spec = np.abs(fft.fftshift(fft.fft(dpt2)))
+        dspec_peak = np.argmax(dpt2_spec)
 
-        dspec_peak = np.argmax(daf_spec)
-        accel_est = accels[dspec_peak]
+        dec_signal[il0_dec_rx_win + drg] = acc_phasors[dspec_peak] * echo
+        ft2 = np.abs(fft.fft(dec_signal)) ** 2
+        spec_peak = np.argmax(ft2)
 
-        # TODO: this is better since we are not over-sampling the accelerations,
-        #    instead the global accels should be pre-set like before but using the
-        #   accels calculated above from the lagged fft
-        ais = [np.argmin(np.abs(global_accs - accel_est))]
-        acc_phasors = gmf_params["DER"]["acceleration_phasors"]
-        # accs = np.linspace(accel_est - dacc, accel_est + dacc, 10)
-        # acc_phasors = np.exp(
-        #     -1j * np.pi / wavelength * accs[:, None] * times2[None, :]
-        # )
-
-        # for ai in range(len(accs)):
-        for ai in ais:
-            decimated_signal[dec_rx_window_indices] = acc_phasors[ai] * echo
-            _gmfo = np.abs(fft.fft(decimated_signal)) ** 2
-            mi = np.argmax(_gmfo)
-
-            if _gmfo[mi] > gmf_variables.vals[ri]:
-                gmf_variables.vals[ri] = _gmfo[mi]
-                # index of doppler that gives highest integrated energy at this range gate
-                gmf_variables.v_ind[ri] = mi
-                # index of acceleration that gives highest integrated energy at this range gate
-                # gmf_variables.a_ind[ri] = np.argmin(np.abs(global_accs - accs[ai]))
-                gmf_variables.a_ind[ri] = ai
+        gmf_variables.vals[ri] = ft2[spec_peak]
+        gmf_variables.v_ind[ri] = spec_peak
+        gmf_variables.a_ind[ri] = dspec_peak
 
 
-def gmfnp_optimize(z_tx, z_ipp, gmf_params, gmf_start):
+def optimize_gmf_np(z_tx, z_ipp, gmf_params, gmf_start):
     """Maximize the Generalized Matched Filter GMF value using function
     optimization in continuous variable space.
 
     Here z_ipp is the entire rx sample vector, not the stenciled one as the
     stencils are done by the gmf forward model
 
-    # TODO: make this function stable and working
     """
-    def neg_gmf_direct(x, sample_t, wavelength, sample_rate, z_tx, z_ipp):
-        r = x[0] + x[1]*sample_t + 0.5*x[2]*sample_t**2.0
-        t = r / constants.c
-        phase = np.exp(-1j*2.0*np.pi*r/wavelength)
-        model_signal = phase * z_tx
+    sample_inds = gmf_params["DER"]["il0_rx_window_indices"]
 
-        # TODO: this is actually not correct, should include timeoff set of tranmission samples
+    def neg_gmf_direct(x, r0, sample_inds, wavelength, sample_rate, tx0_samp, z_tx, z_ipp):
+        rg0 = np.floor((r0 / constants.c) * sample_rate).astype(np.int64) + tx0_samp
+        inds = sample_inds + rg0
 
-        samples = np.round(sample_rate * t).astype(np.int64)
-        decoded_echo = z_ipp[samples] * model_signal
+        sample_t = inds / sample_rate
+        r = r0 + x[0]*sample_t + 0.5*x[1]*sample_t**2.0
+        phase = 2.0*np.pi*np.mod(r/wavelength, 1)
+        model_signal = z_tx * np.exp(-1j*phase)
 
-        return -np.abs(np.sum(decoded_echo))
+        decoded_echo = z_ipp[inds] * model_signal
+
+        return -np.abs(np.sum(decoded_echo)) ** 2
 
     # TODO: make so that the input parameters for minimize can be customized trough the config file
     # such as optimization limits and method
     result = sco.minimize(
         neg_gmf_direct,
-        gmf_start,
+        gmf_start[1:],
         args=(
-            gmf_params["DER"]["sample_times"],
+            gmf_start[0],
+            sample_inds,
             gmf_params["EXP"]["wavelength"],
             gmf_params["EXP"]["sample_rate"],
+            gmf_params["EXP"]["T_tx_start_samp"],
             z_tx,
             z_ipp,
         ),
         method="Nelder-Mead",
+        # method="BFGS",
     )
-    return result
+    x = np.array([gmf_start[0], result.x[0], result.x[1]])
+    return x, result.fun
 
 
-def gmfnp_no_reduce(z_tx, z_rx, gmf_variables, gmf_params):
+def fast_gmf_no_reduce_np(z_tx, z_rx, gmf_variables, gmf_params):
     """Slow development version of gmf to see otherwise reduced dimensions
     """
     acc_phasors = gmf_params["DER"]["acceleration_phasors"]

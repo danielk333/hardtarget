@@ -18,8 +18,8 @@ def import_mpi():
                 _COMM.rank = 0
                 _COMM.size = 1
         _IMPORTED = True
+    return _COMM
 
 
 def get_mpi():
-    global _COMM
     return _COMM

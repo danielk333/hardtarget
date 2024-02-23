@@ -11,12 +11,22 @@ def parser_build(parser):
     parser.add_argument("--axis_units", action="store_true")
     parser.add_argument("--log", action="store_true")
     parser.add_argument("--keep-tx", action="store_true")
+    parser.add_argument("--monostatic", action="store_true")
     parser.add_argument(
-        "--clutter_removal",
-        type=float,
-        default=0,
-        help="clutter removal at start of RX signal or after end of TX signal,\
-             whichever comes last, in seconds",
+        "--start-range",
+        default=None,
+        help="Desired starting range in given unit, can have negative values",
+    )
+    parser.add_argument(
+        "--end-range",
+        default=None,
+        help="Desired ending range in given unit",
+    )
+    parser.add_argument(
+        "-u", "--unit",
+        choices=["sample", "m", "km", "R_E", "LD", "AU"],
+        help="Unit for start and end ranges, default [km]",
+        default="km",
     )
     return parser
 
@@ -27,6 +37,12 @@ def main(args):
     if args.relative_time:
         args.start_time = float(args.start_time)
         args.end_time = float(args.end_time)
+
+    if args.start_range is not None:
+        args.start_range = float(args.start_range)
+    if args.end_range is not None:
+        args.end_range = float(args.end_range)
+
     fig, ax = plt.subplots()
     ax, handles = plotting.rti(
         ax,
@@ -37,9 +53,11 @@ def main(args):
         relative_time=args.relative_time,
         axis_units=args.axis_units,
         log=args.log,
-        clutter_removal=args.clutter_removal,
+        start_range_gate=args.start_range,
+        end_range_gate=args.end_range,
+        range_gate_unit=args.unit.strip().lower(),
+        monostatic=args.monostatic,
         keep_tx=args.keep_tx,
     )
 
     plt.show()
-
