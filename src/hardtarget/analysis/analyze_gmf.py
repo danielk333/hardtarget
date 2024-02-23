@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import time
+import h5py
 from tqdm import tqdm
 from pathlib import Path
 from hardtarget.gmf import get_avalible_libs, get_estimation_method, MethodType
@@ -14,7 +15,6 @@ logger = logging.getLogger(__name__)
 # ANALYZE GMF
 ####################################################################
 
-
 def compute_gmf(
     rx,
     tx,
@@ -22,7 +22,7 @@ def compute_gmf(
     start_time=None,
     end_time=None,
     relative_time=False,
-    job={"idx": 1, "N": 1},
+    job={"idx": 0, "N": 1},
     progress=False,
     progress_position=0,
     subprogress=True,
@@ -46,7 +46,7 @@ def compute_gmf(
     Returns
     -------
 
-    # TODO: make it able to return any portion of the GMF full map
+    # TODO: this function needs to be cleaned up a bit
 
     result: dict
         dir: string
@@ -86,6 +86,14 @@ def compute_gmf(
             f"in requested implementation '{gmf_implementation}'\n"
             f"Avalible implemented methods: \n{get_avalible_libs(indent=' '*4)}"
         )
+    lib_kwargs = {}
+    # In case we are running MPI to distribute CUDA calculation
+    # across multiple GPUs on multiple nodes we assume the ranks
+    # distribute across the nodes in a linear fashion
+    # e.g. node1[rank=(0,1,2)], node2[rank=(3,4,5)] for np=6 and node_gpus=3
+    # So gpuid = rank % node_gpus = node1[gpuid=(0,1,2)], node2[gpuid=(0,1,2)]
+    if gmf_implementation == "cuda":
+        lib_kwargs["gpu_id"] = job["idx"] % params_pro["node_gpus"]
 
     logger.info(f"Using GMF method {gmf_method} ({gmf_implementation})")
 
@@ -113,28 +121,28 @@ def compute_gmf(
         bounds,
     )
     job_tasks = utils.compute_job_tasks(job, total_tasks)
+    job_cohints = len(job_tasks) * num_cohints_per_file
     tasks_skipped = 0
 
     logger.info(f"starting job {job['idx']}/{job['N']} with {len(job_tasks)} tasks")
 
     # progress
+    progress_desc = "Coherent integrations"
     if progress:
-        total = len(job_tasks)
-        sub_desc_len = 8 + 2*len(str(num_cohints_per_file))
+        total = job_cohints
+        extend_str_len = len(str(len(job_tasks)))
+        total_num = str(len(job_tasks)).ljust(extend_str_len, " ")
+        curr_num = "1".ljust(extend_str_len, " ")
+        subprog_str = f"[file {curr_num}/{total_num}]"
         progress_bar = tqdm(
             position=progress_position,
-            desc="Processing".ljust(sub_desc_len, " ") if subprogress else "Processing",
+            desc=f"{progress_desc} {subprog_str}" if subprogress else progress_desc,
             total=total,
         )
 
     # process
     results = {"dir": output, "files": [], "data": {}}
     for idx, task_idx in enumerate(job_tasks):
-        # In case we are running MPI to distribute CUDA calculation
-        # across multiple GPUs on multiple nodes we assume the ranks
-        # distribute across the nodes in a linear fashion
-        # e.g. node1[rank=(0,1,2)], node2[rank=(3,4,5)] for np=6 and node_gpus=3
-        gpu_id = task_idx % params_pro["node_gpus"]
 
         # initialise
         all_gmf_vars = []
@@ -152,12 +160,40 @@ def compute_gmf(
             # crate directory
             dirname = Path(outfile).parent
             dirname.mkdir(parents=True, exist_ok=True)
-            if outfile.is_file() and not clobber:
+
+            # if-statement from hell
+            if (
+                # if exist and not override, check if calculation is already done
+                (outfile.is_file() and not clobber)
+                and (
+                    # calculation is always already done for grid
+                    libtype == MethodType.grid
+                    or (
+                        # calculation is done for optimize if the variables exist
+                        libtype == MethodType.optimize
+                        and utils.check_for_optimize_result(outfile)
+                    )
+                )
+            ):
                 logger.debug(
                     f"job {job['idx']}/{job['N']} already done task {idx}/{len(job_tasks)}"
                 )
+                if progress:
+                    progress_bar.update(num_cohints_per_file)
                 tasks_skipped += 1
                 continue
+        if libtype == MethodType.optimize:
+            # TODO: this should be taken from a configurable variable in the h5 file
+            # this would allow for a inter-mediate step to actually go in and
+            # use the data from the entire event to inform good starting values
+            # for even points that failed to be analyzed with the grid method
+            # (since this has higher sensitivity)
+            with h5py.File(outfile, "r") as hf:
+                gmf_starts = np.stack([
+                    hf["range_peak"][()],
+                    hf["range_rate_peak"][()],
+                    hf["acceleration_peak"][()],
+                ])
 
         # process
         # TODO: in case the RAM load is too heavy, this should write directly to disk instead
@@ -172,24 +208,33 @@ def compute_gmf(
 
         for coh_ind in range(start_cohind, num_cohints):
             start_sample = file_idx_sample + coh_ind * ipp_samp * n_ipp
-            if progress and subprogress:
-                dots = ("."*(coh_ind % 4)).ljust(3, " ")
-                total_num_len = len(str(num_cohints_per_file))
-                curr_num = str(coh_ind + 1).ljust(total_num_len, ' ')
-                progress_bar.set_description(f"Processing {curr_num}/{num_cohints} [{dots}]")
-
-            gmf_vars = integrate_and_match_ipps(
-                (rx_reader, rx_chnl),
-                (tx_reader, tx_chnl),
-                start_sample,
-                gmf_params,
-                gpu_id=gpu_id,
-            )
-            all_gmf_vars.append(gmf_vars)
+            if progress:
+                progress_bar.update(1)
+            if libtype == MethodType.grid:
+                gmf_vars = grid_integrate_and_match_ipps(
+                    rx=(rx_reader, rx_chnl),
+                    tx=(tx_reader, tx_chnl),
+                    start_sample=start_sample,
+                    gmf_params=gmf_params,
+                    gmf_lib=lib,
+                    lib_kwargs=lib_kwargs,
+                )
+                all_gmf_vars.append(gmf_vars)
+            elif libtype == MethodType.optimize:
+                gmf_vars = optimize_integrate_and_match_ipps(
+                    rx=(rx_reader, rx_chnl),
+                    tx=(tx_reader, tx_chnl),
+                    start_sample=start_sample,
+                    gmf_start=gmf_starts[:, coh_ind],
+                    gmf_params=gmf_params,
+                    gmf_lib=lib,
+                    lib_kwargs=lib_kwargs,
+                )
+                all_gmf_vars.append(gmf_vars)
 
         ts1 = time.time()
 
-        all_gmf_vars = utils.stack_gmf_vars(all_gmf_vars)
+        all_gmf_vars = utils.stack_gmf_vars(all_gmf_vars, libtype)
 
         # log
         info = {
@@ -200,17 +245,15 @@ def compute_gmf(
         msg = "task_idx {task:4} time {time:1.2f} cpu/real {real:1.2f}"
         logger.debug(msg.format(**info))
 
-        coh_ints = np.arange(num_cohints)
-
-        r_inds = np.argmax(all_gmf_vars.vals, axis=1)
-        r_vec = params_der["ranges"][r_inds]
-        v_vec = params_der["range_rates"][all_gmf_vars.v_ind[coh_ints, r_inds]]
-        a_vec = params_der["accelerations"][all_gmf_vars.a_ind[coh_ints, r_inds]]
-        g_vec = all_gmf_vars.vals[coh_ints, r_inds]
-
-        if output is not None:
-            # DUMP TO FILE
+        if libtype == MethodType.grid:
             sample_numbers = np.arange(gmf_params["PRO"]["read_length"])
+            coh_ints = np.arange(num_cohints)
+
+            r_inds = np.argmax(all_gmf_vars.vals, axis=1)
+            r_vec = params_der["ranges"][r_inds]
+            v_vec = params_der["range_rates"][all_gmf_vars.v_ind[coh_ints, r_inds]]
+            a_vec = params_der["accelerations"][all_gmf_vars.a_ind[coh_ints, r_inds]]
+            g_vec = all_gmf_vars.vals[coh_ints, r_inds]
 
             gmf_out_args = utils.GMFOutArgs(
                 num_cohints_per_file=num_cohints_per_file,
@@ -227,37 +270,43 @@ def compute_gmf(
                 v_vec=v_vec,
                 a_vec=a_vec,
                 g_vec=g_vec,
+                epoch=epoch_unix,
+            )
+        elif libtype == MethodType.optimize:
+            gmf_out_args = utils.GMFOptimizeOutArgs(
                 peaks=all_gmf_vars.peak,
                 peak_vals=all_gmf_vars.peak_val,
-                rgs=gmf_params["DER"]["rgs"],
-                fvec=gmf_params["DER"]["fvec"],
-                decimated_sample_times=gmf_params["DER"]["decimated_sample_times"],
-                acceleration_phasors=gmf_params["DER"]["acceleration_phasors"],
-                rx_stencil=gmf_params["DER"]["rx_stencil"],
-                tx_stencil=gmf_params["DER"]["tx_stencil"],
-                rx_window_indices=gmf_params["DER"]["rx_window_indices"],
-                epoch=epoch_unix)
+            )
 
-            utils.dump_gmf_out(gmf_out_args, gmf_params, outfile)
+        if output is not None:
+            # DUMP TO FILE
+
+            # TODO: this might actually be a whole lot cleaner with just a class that can carry
+            # the definitions, code, formatting, appending, ect with it
+            # Then this if else thing is replaced by the fact that the class instance is different
+            # with different implementation for the same method, extracting out common functions
+            # outside the class
+            if libtype == MethodType.grid:
+                utils.dump_gmf_out(gmf_out_args, gmf_params, outfile, mode="w", meta=True)
+            elif libtype == MethodType.optimize:
+                utils.dump_gmf_out(gmf_out_args, gmf_params, outfile, clobber=clobber, mode="a", meta=False)
             results["files"].append(filepath.name)
         else:
             # write dict
-            out = {}
-            out["gmf"] = all_gmf_vars.vals
-            out["gmf_zero_frequency"] = all_gmf_vars.dc
-            out["range_rate_index"] = all_gmf_vars.v_ind
-            out["acceleration_index"] = all_gmf_vars.a_ind
-            out["range_peak"] = r_vec
-            out["range_rate_peak"] = v_vec
-            out["acceleration_peak"] = a_vec
-            out["gmf_peak"] = g_vec
-            out["tx_power"] = all_gmf_vars.tx_pwr
-            out["epoch_unix"] = epoch_unix
-            results["data"][file_idx_sample] = out
+            if isinstance(gmf_out_args, utils.GMFOutArgs):
+                data_variables = utils.define_grid_variables(gmf_out_args).items()
+            elif isinstance(gmf_out_args, utils.GMFOptimizeOutArgs):
+                data_variables = utils.define_optimize_variables(gmf_out_args).items()
+
+            results["data"][file_idx_sample] = data_variables
 
         # progress
         if progress:
-            progress_bar.update(1 + tasks_skipped)
+            curr_num = f"{idx + 2}".ljust(extend_str_len, " ")
+            subprog_str = f"[file {curr_num}/{total_num}]"
+            progress_bar.set_description(
+                f"{progress_desc} {subprog_str}" if subprogress else progress_desc,
+            )
             tasks_skipped = 0
     if progress:
         progress_bar.close()
@@ -271,7 +320,38 @@ def compute_gmf(
 ####################################################################
 
 
-def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
+def extract_signals(rx, tx, start_sample, gmf_params):
+    """Extract the signals needed to analyse the data
+
+    TODO: docstring
+    """
+
+    params_pro = gmf_params["PRO"]
+    params_der = gmf_params["DER"]
+
+    # parameters
+    rx_stencil = params_der["rx_stencil"]
+    tx_stencil = params_der["tx_stencil"]
+
+    rx_reader, rx_channel = rx
+    tx_reader, tx_channel = tx
+
+    # read data vector with n_ipp + n_extra ipp's (to allow for searching across to subsequent pulses)
+    z_ipp = rx_reader.read_vector_1d(start_sample, params_pro["read_length"], rx_channel)
+
+    if tx_channel != rx_channel or tx_reader != rx_reader:
+        z_tx = tx_reader.read_vector_1d(start_sample, params_pro["read_length"], tx_channel)
+    else:
+        z_tx = np.copy(z_ipp)
+
+    # clean ground clutter, get separate transmit waveform and echo vectors
+    z_rx = z_ipp[rx_stencil].copy()
+    z_tx = z_tx[tx_stencil]
+
+    return z_tx, z_rx, z_ipp
+
+
+def grid_integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gmf_lib, lib_kwargs):
     """
     TODO: clean up this and all other docstrings when structure is done
 
@@ -299,45 +379,7 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
         Squared summed tx amplitude
     """
 
-    params_pro = gmf_params["PRO"]
-    params_der = gmf_params["DER"]
-
-    gmf_implementation = params_pro["gmf_implementation"]
-    gmf_method = params_pro["gmf_method"]
-    lib, libtype = get_estimation_method(gmf_implementation, gmf_method)
-
-    if lib is None:
-        raise ValueError(
-            f"Cannot find requested method '{gmf_method}'"
-            f"in requested implementation '{gmf_implementation}'\n"
-            + get_avalible_libs()
-        )
-    if libtype == MethodType.optimize:
-        raise NotImplementedError(f"{libtype} is not yet implemented")
-
-    kwargs = {}
-    if gmf_implementation == "cuda":
-        kwargs["gpu_id"] = gpu_id
-
-    # parameters
-    rx_stencil = params_der["rx_stencil"]
-    tx_stencil = params_der["tx_stencil"]
-
-    rx_reader, rx_channel = rx
-    tx_reader, tx_channel = tx
-
-    # read data vector with n_ipp + n_extra ipp's (to allow for searching across to subsequent pulses)
-    z_ipp = rx_reader.read_vector_1d(start_sample, params_pro["read_length"], rx_channel)
-
-    if tx_channel != rx_channel or tx_reader != rx_reader:
-        z_tx = tx_reader.read_vector_1d(start_sample, params_pro["read_length"], tx_channel)
-    else:
-        z_tx = np.copy(z_ipp)
-
-    # clean ground clutter, get separate transmit waveform and echo vectors
-    z_rx = z_ipp[rx_stencil].copy()
-    z_tx = z_tx[tx_stencil]
-
+    z_tx, z_rx, z_ipp = extract_signals(rx, tx, start_sample, gmf_params)
     # TODO: generalize a preprocess filtering of 0 tx power
     # since it can cause unnessary slowdowns depending on experiment setup
     # e.g. a tx signal with multiple pulses with pauses between can be faster
@@ -349,7 +391,7 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     tx_amp = np.sqrt(tx_pwr)
     z_tx = np.conj(z_tx) / tx_amp
 
-    size = (params_pro["n_ranges"], )
+    size = (gmf_params["PRO"]["n_ranges"], )
     gmf_vars = utils.GMFVariables(
         vals = np.zeros(size, dtype=np.float32),
         dc = np.zeros(size, dtype=np.float32),
@@ -359,27 +401,43 @@ def integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gpu_id=0):
     )
 
     if tx_amp > 1.0:
-        if libtype == MethodType.grid:
-            lib(
-                z_tx,
-                z_rx,
-                gmf_vars,
-                gmf_params,
-                **kwargs
-            )
-        # max_ind = np.argmax(np.abs(gmf_vars.vals))
-        # gmf_start = np.array([
-        #     gmf_params["DER"]["ranges"][max_ind],
-        #     gmf_params["DER"]["range_rates"][gmf_vars.v_ind[max_ind]],
-        #     gmf_params["DER"]["accelerations"][gmf_vars.a_ind[max_ind]],
-        # ])
-        # opt_result = gmfo_lib(
-        #     z_tx,
-        #     z_ipp,
-        #     gmf_params,
-        #     gmf_start,
-        # )
-        # gmf_vars.peak[:] = opt_result.x
-        # gmf_vars.peak_val[0] = opt_result.fun
+        gmf_lib(
+            z_tx,
+            z_rx,
+            gmf_vars,
+            gmf_params,
+            **lib_kwargs
+        )
+
+    return gmf_vars
+
+
+def optimize_integrate_and_match_ipps(rx, tx, start_sample, gmf_start, gmf_params, gmf_lib, lib_kwargs):
+    """
+    TODO: do this docstring
+
+    """
+
+    z_tx, z_rx, z_ipp = extract_signals(rx, tx, start_sample, gmf_params)
+
+    # conjugate, so that when matched filtering, it will cancel out phase of transmit waveform.
+    # scale transmit waveform to unity power
+    tx_pwr = np.sum(np.abs(z_tx) ** 2.0)
+    tx_amp = np.sqrt(tx_pwr)
+    z_tx = np.conj(z_tx) / tx_amp
+
+    gmf_vars = utils.GMFOptimizeVariables(
+        peak = np.zeros((3, ), dtype=np.float64),
+        peak_val = np.zeros((1, ), dtype=np.float64),
+    )
+
+    if tx_amp > 1.0:
+        gmf_vars.peak[:], gmf_vars.peak_val[0] = gmf_lib(
+            z_tx,
+            z_ipp,
+            gmf_params,
+            gmf_start,
+            **lib_kwargs
+        )
 
     return gmf_vars

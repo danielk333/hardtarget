@@ -7,6 +7,7 @@ from collections import namedtuple
 import re
 import logging
 
+from hardtarget.gmf import MethodType
 from hardtarget import drf_utils
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 # GMF OUTPUT DATA
 ####################################################################
 
-"""Container for compacting the variables set by the GMF function."""
+"""Container for compacting the variables set by the GMF Grid function."""
 GMFVariables = namedtuple(
     "GMFVariables",
     [
@@ -27,15 +28,30 @@ GMFVariables = namedtuple(
     ],
 )
 
+"""Container for compacting the variables set by the GMF Optimize function."""
+GMFOptimizeVariables = namedtuple(
+    "GMFOptimizeVariables",
+    [
+        "peak",  # peak location
+        "peak_val",  # peak magnitude
+    ],
+)
 
-def stack_gmf_vars(gmf_vars_list):
-    return GMFVariables(
-        vals = np.stack([x.vals for x in gmf_vars_list], axis=0),
-        dc = np.stack([x.dc for x in gmf_vars_list], axis=0),
-        v_ind = np.stack([x.v_ind for x in gmf_vars_list], axis=0),
-        a_ind = np.stack([x.a_ind for x in gmf_vars_list], axis=0),
-        tx_pwr = np.stack([x.tx_pwr for x in gmf_vars_list], axis=0),
-    )
+
+def stack_gmf_vars(gmf_vars_list, libtype):
+    if libtype == MethodType.grid:
+        return GMFVariables(
+            vals = np.stack([x.vals for x in gmf_vars_list], axis=0),
+            dc = np.stack([x.dc for x in gmf_vars_list], axis=0),
+            v_ind = np.stack([x.v_ind for x in gmf_vars_list], axis=0),
+            a_ind = np.stack([x.a_ind for x in gmf_vars_list], axis=0),
+            tx_pwr = np.stack([x.tx_pwr for x in gmf_vars_list], axis=0),
+        )
+    elif libtype == MethodType.optimize:
+        return GMFOptimizeVariables(
+            peak = np.stack([x.peak for x in gmf_vars_list], axis=0),
+            peak_val = np.stack([x.peak_val for x in gmf_vars_list], axis=0),
+        )
 
 
 ################################################################
@@ -43,6 +59,11 @@ def stack_gmf_vars(gmf_vars_list):
 #
 # Parse groups and datasets recursively
 ################################################################
+
+def check_for_optimize_result(file):
+    with h5py.File(file, "r") as hf:
+        check = "gmf_optimize" in hf
+    return check
 
 
 def collect_gmf_data(paths, mats=None, vecs=None):
@@ -72,6 +93,7 @@ def collect_gmf_data(paths, mats=None, vecs=None):
             "t"
         ]
     derived = ["t", "nf_vec"]
+    optional = ["gmf_optimized_peak", "gmf_optimized"]
 
     t_vec_pos = 0
     mats_data = {}
@@ -81,9 +103,13 @@ def collect_gmf_data(paths, mats=None, vecs=None):
             for key in mats:
                 if key in derived:
                     continue
+                if key not in hf and key in optional:
+                    continue
                 mats_data[key] = hf[key][()]
             for key in vecs:
                 if key in derived:
+                    continue
+                if key not in hf and key in optional:
                     continue
                 vecs_data[key] = hf[key][()]
 
@@ -92,10 +118,13 @@ def collect_gmf_data(paths, mats=None, vecs=None):
                     "ranges": hf["ranges"][()],
                     "range_rates": hf["range_rates"][()],
                     "accelerations": hf["accelerations"][()],
-                    "range_gates": hf["processing"]["rgs"][()],
+                    "range_gates": np.arange(
+                        hf["processing"].attrs["min_range_gate"],
+                        hf["processing"].attrs["min_range_gate"],
+                    ),
                 }
                 meta["processing"] = {key: val for key, val in hf["processing"].attrs.items()}
-                meta["experiment"] = {key: val for key, val in hf["processing"].attrs.items()}
+                meta["experiment"] = {key: val for key, val in hf["experiment"].attrs.items()}
                 for key, val in hf.attrs.items():
                     meta[key] = val
 
@@ -111,17 +140,17 @@ def collect_gmf_data(paths, mats=None, vecs=None):
 
         if data is None:
             data = {}
-            for key in mats:
+            for key in mats_data:
                 logger.debug(f"Init mat {key}: {mats_data[key].shape} [{mats_data[key].dtype}]")
                 data[key] = mats_data[key]
-            for key in vecs:
+            for key in vecs_data:
                 logger.debug(f"Init vec {key}: {vecs_data[key].shape} [{vecs_data[key].dtype}]")
                 data[key] = vecs_data[key]
         else:
-            for key in mats:
+            for key in mats_data:
                 logger.debug(f"Append mat {key}: {mats_data[key].shape} [{mats_data[key].dtype}]")
                 data[key] = np.append(data[key], mats_data[key], axis=0)
-            for key in vecs:
+            for key in vecs_data:
                 logger.debug(f"Append vec {key}: {vecs_data[key].shape} [{vecs_data[key].dtype}]")
                 data[key] = np.append(data[key], vecs_data[key])
 
@@ -265,14 +294,17 @@ def load_gmf_out(
 # DUMP GMF OUT
 ####################################################################
 
-def dump_gmf_out(gmf_out_args, gmf_params, outfile):
-    # TODO: it should be an option to dump a minimalist version of the gmf_out since
-    #       it now has _a lot_ of metadata and parameters that might not be needed
-    out = h5py.File(outfile, "w")
+
+def dump_gmf_out(gmf_out_args, gmf_params, outfile, clobber=False, mode="w", meta=True):
+    out = h5py.File(outfile, mode)
+
+    if isinstance(gmf_out_args, GMFOutArgs):
+        data_variables = define_grid_variables(gmf_out_args).items()
+    elif isinstance(gmf_out_args, GMFOptimizeOutArgs):
+        data_variables = define_optimize_variables(gmf_out_args).items()
 
     # VARIABLES
-    for key, item in define_variables(gmf_out_args).items():
-
+    for key, item in data_variables:
         # scale
         is_scale = "scale" in item and item["scale"]
 
@@ -284,6 +316,8 @@ def dump_gmf_out(gmf_out_args, gmf_params, outfile):
                 out.create_group(grp_name)
             target = out[grp_name]
         # create dataset
+        if clobber and key in target:
+            del target[key]
         ds = target.create_dataset(key, data=item["data"])
         # register scale
         if is_scale:
@@ -299,23 +333,24 @@ def dump_gmf_out(gmf_out_args, gmf_params, outfile):
         if "units" in item:
             ds.attrs["units"] = item["units"]
 
-    # TODO: these should be saved as variables so they can be documented
-    # EXPERIMENT PARAMS
-    if "experiment" not in out:
-        out.create_group("experiment")
-    exp_grp = out["experiment"]
-    for key, val in gmf_params["EXP"].items():
-        exp_grp.attrs[key] = val
+    if meta:
+        # TODO: these should be saved as variables so they can be documented
+        # EXPERIMENT PARAMS
+        if "experiment" not in out:
+            out.create_group("experiment")
+        exp_grp = out["experiment"]
+        for key, val in gmf_params["EXP"].items():
+            exp_grp.attrs[key] = val
 
-    # GMF PROCESSING PARAMS
-    if "processing" not in out:
-        out.create_group("processing")
-    pro_grp = out["processing"]
-    for key, val in gmf_params["PRO"].items():
-        pro_grp.attrs[key] = val
+        # GMF PROCESSING PARAMS
+        if "processing" not in out:
+            out.create_group("processing")
+        pro_grp = out["processing"]
+        for key, val in gmf_params["PRO"].items():
+            pro_grp.attrs[key] = val
 
-    # EPOCH
-    out["epoch_unix"] = gmf_out_args.epoch
+        # EPOCH
+        out["epoch_unix"] = gmf_out_args.epoch
 
     out.close()
 
@@ -343,16 +378,15 @@ GMFOutArgs = namedtuple(
         "v_vec",
         "a_vec",
         "g_vec",
-        # "peaks",
-        # "peak_vals",
-        "rgs",
-        "fvec",
-        "decimated_sample_times",
-        "acceleration_phasors",
-        "rx_stencil",
-        "tx_stencil",
-        "rx_window_indices",
         "epoch"
+    ],
+)
+
+GMFOptimizeOutArgs = namedtuple(
+    "GMFOptimizeOutArgs",
+    [
+        "peaks",
+        "peak_vals",
     ],
 )
 
@@ -361,11 +395,9 @@ GMFOutArgs = namedtuple(
 # H5 VARIABLE DEFINITIONS
 ####################################################################
 
-def define_variables(gmf_out_args):
-    # TODO: make this be able to save arbitrary reduce configs
 
+def define_grid_variables(gmf_out_args):
     integration_index = np.arange(gmf_out_args.num_cohints_per_file, dtype=np.int64)
-    rx_window_index = np.arange(len(gmf_out_args.rx_window_indices))
 
     return {
         "integration_index": {
@@ -396,40 +428,15 @@ def define_variables(gmf_out_args):
             "long_name": "Receiver sample number in radar cycle",
             "scale": True
         },
-        "decimated_sample_times": {
-            "data": gmf_out_args.decimated_sample_times,
-            "long_name": "Time of decimated receiver samples in integration cycle",
-            "units": "s",
-            "scale": True
-        },
-        "rx_window_index": {
-            "data": rx_window_index,
-            "long_name": "Index within stenciled RX windows",
-            "scale": True
-        },
         "gmf": {
             "data": gmf_out_args.vals,
             "dims": [("integration_index", "t"), ("ranges", "r")],
             "long_name": "Generalized Matched Filter output values",
-            # "group": "gmf"
         },
-        # "gmf_optimized_peak": {
-        #     "data": gmf_out_args.peaks,
-        #     "dims": [("integration_index", "t")],
-        #     "long_name": "Fine tuned range, range-rate and acceleration",
-        #     # "group": "gmf"
-        # },
-        # "gmf_optimized": {
-        #     "data": gmf_out_args.peak_vals,
-        #     "dims": [("integration_index", "t")],
-        #     "long_name": "Generalized Matched Filter fine tuned peak output values",
-        #     # "group": "gmf"
-        # },
         "gmf_zero_frequency": {
             "data": gmf_out_args.dc,
             "dims": [("integration_index", "t"), ("ranges", "r")],
             "long_name": "Range dependant noise floor (0-frequency gmf output)",
-            # "group": "gmf"
         },
         "range_rate_index": {
             "data": gmf_out_args.v_ind,
@@ -437,7 +444,6 @@ def define_variables(gmf_out_args):
             "long_name": (
                 "If range_rate is reduced, contains the best range rate index "
                 "for each left over axis"),
-            # "group": "gmf"
         },
         "acceleration_index": {
             "data": gmf_out_args.a_ind,
@@ -445,84 +451,49 @@ def define_variables(gmf_out_args):
             "long_name": (
                 "If acceleration is reduced, contains the best acceleration "
                 "index for each left over axis"),
-            # "group": "gmf"
         },
         "tx_power": {
             "data": gmf_out_args.txp,
             "dims": [("integration_index", "t")],
             "long_name": "Transmitted signal power",
-            # "units": "W", # TODO: this is not converted to real power, just signal power
-            # "group": "gmf"
         },
         "range_peak": {
             "data": gmf_out_args.r_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Range at peak GMF",
-            # "group": "gmf"
         },
         "range_rate_peak": {
             "data": gmf_out_args.v_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Range rate at peak GMF",
-            # "group": "gmf"
         },
         "acceleration_peak": {
             "data": gmf_out_args.a_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Acceleration at peak GMF",
-            # "group": "gmf"
         },
         "gmf_peak": {
             "data": gmf_out_args.g_vec,
             "dims": [("integration_index", "t")],
             "long_name": "Peak GMF",
+        },
+    }
+
+
+def define_optimize_variables(gmf_out_args):
+    return {
+        "gmf_optimized_peak": {
+            "data": gmf_out_args.peaks,
+            "dims": [("integration_index", "t")],
+            "long_name": "Fine tuned range, range-rate and acceleration",
             # "group": "gmf"
         },
-        "rgs": {
-            "data": gmf_out_args.rgs,
-            "dims": [("ranges", "r")],
-            "long_name": "Range gates in signal samples",
-            "group": "processing"
+        "gmf_optimized": {
+            "data": gmf_out_args.peak_vals,
+            "dims": [("integration_index", "t")],
+            "long_name": "Generalized Matched Filter fine tuned peak output values",
+            # "group": "gmf"
         },
-        "fvec": {
-            "data": gmf_out_args.fvec,
-            "dims": [("range_rates", "v")],
-            "long_name": "Searched doppler frequencies",
-            "group": "processing",
-            "units": "Hz"
-        },
-        "acceleration_phasors": {
-            "data": gmf_out_args.acceleration_phasors,
-            "dims": [("accelerations", "a"), ("decimated_sample_times", "t")],
-            "long_name": (
-                "Complex number representation of signal phase shift "
-                "during decimated reception due to acceleration"
-            ),
-            "group": "processing",
-        },
-        "rx_stencil": {
-            "data": gmf_out_args.rx_stencil,
-            "dims": [("sample_numbers", "samples")],
-            "long_name": "Stencil for selecting receiver samples in an integration cycle",
-            "group": "processing"
-        },
-        "tx_stencil": {
-            "data": gmf_out_args.tx_stencil,
-            "dims": [("sample_numbers", "samples")],
-            "long_name": "Stencil for selecting transmitter samples in an integration cycle",
-            "group": "processing"
-        },
-        "rx_window_indices": {
-            "data": gmf_out_args.rx_window_indices,
-            "dims": [("rx_window_index", "rx_idx")],
-            "long_name": (
-                "Template receiver sample indices for selecting the length of a "
-                "transmit signal within each radar cycle for an entire "
-                "integration cycle, offset by range gate to select all signals "
-                "from that range within each radar cycle"
-            ),
-            "group": "processing"
-        }
     }
 
 

@@ -31,11 +31,12 @@ def fast_gmf_np(z_tx, z_rx, gmf_variables, gmf_params):
     """
 
     acc_phasors = gmf_params["DER"]["fgmf_acceleration_phasors"]
+    acc_inds = gmf_params["DER"]["inds_accelerations"]
     rel_rgs = gmf_params["DER"]["rel_rgs"]
     frequency_decimation = gmf_params["PRO"]["frequency_decimation"]
     il1_rx_win = gmf_params["DER"]["il1_rx_window_indices"]
     il0_dec_rx_win = gmf_params["DER"]["il0_dec_rx_window_indices"]
-    dec_read_length = gmf_params["DER"]["decimated_read_length"]
+    dec_read_length = gmf_params["PRO"]["decimated_read_length"]
 
     # number of range gates is input from user
     n_acc = acc_phasors.shape[0]
@@ -60,7 +61,7 @@ def fast_gmf_np(z_tx, z_rx, gmf_variables, gmf_params):
                 # index of doppler that gives highest integrated energy at this range gate
                 gmf_variables.v_ind[ri] = mi
                 # index of acceleration that gives highest integrated energy at this range gate
-                gmf_variables.a_ind[ri] = ai
+                gmf_variables.a_ind[ri] = acc_inds[ai]
 
 
 def fast_dpt_np(z_tx, z_rx, gmf_variables, gmf_params):
@@ -71,8 +72,8 @@ def fast_dpt_np(z_tx, z_rx, gmf_variables, gmf_params):
     frequency_decimation = gmf_params["PRO"]["frequency_decimation"]
     il1_rx_win = gmf_params["DER"]["il1_rx_window_indices"]
     il0_dec_rx_win = gmf_params["DER"]["il0_dec_rx_window_indices"]
-    dec_read_length = gmf_params["DER"]["decimated_read_length"]
-    dec_tau_samp = gmf_params["DER"]["dec_tau_samp"]
+    dec_read_length = gmf_params["PRO"]["decimated_read_length"]
+    dec_tau_samp = gmf_params["PRO"]["dec_tau_samp"]
 
     for ri, rg in enumerate(rel_rgs):
         drg = int(rg // frequency_decimation)
@@ -80,10 +81,12 @@ def fast_dpt_np(z_tx, z_rx, gmf_variables, gmf_params):
         # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter), decimate
         echo = np.sum((zr * z_tx).reshape(-1, frequency_decimation), axis=-1)
         dec_signal = np.zeros((dec_read_length,), dtype=np.complex64)
+        dec_signal[il0_dec_rx_win + drg] = echo
+
         gmf_variables.dc[ri] = np.abs(np.sum(echo)) ** 2
 
         dpt2 = dec_signal[dec_tau_samp:] * np.conj(dec_signal[:-dec_tau_samp])
-        dpt2_spec = np.abs(fft.fft(dpt2))
+        dpt2_spec = np.abs(fft.fftshift(fft.fft(dpt2)))
         dspec_peak = np.argmax(dpt2_spec)
 
         dec_signal[il0_dec_rx_win + drg] = acc_phasors[dspec_peak] * echo
@@ -102,36 +105,41 @@ def optimize_gmf_np(z_tx, z_ipp, gmf_params, gmf_start):
     Here z_ipp is the entire rx sample vector, not the stenciled one as the
     stencils are done by the gmf forward model
 
-    # TODO: make this function stable and working
     """
-    def neg_gmf_direct(x, sample_t, wavelength, sample_rate, z_tx, z_ipp):
-        r = x[0] + x[1]*sample_t + 0.5*x[2]*sample_t**2.0
-        t = r / constants.c
-        phase = np.exp(-1j*2.0*np.pi*r/wavelength)
-        model_signal = phase * z_tx
+    sample_inds = gmf_params["DER"]["il0_rx_window_indices"]
 
-        # TODO: this is actually not correct, should include timeoff set of tranmission samples
+    def neg_gmf_direct(x, r0, sample_inds, wavelength, sample_rate, tx0_samp, z_tx, z_ipp):
+        rg0 = np.floor((r0 / constants.c) * sample_rate).astype(np.int64) + tx0_samp
+        inds = sample_inds + rg0
 
-        samples = np.round(sample_rate * t).astype(np.int64)
-        decoded_echo = z_ipp[samples] * model_signal
+        sample_t = inds / sample_rate
+        r = r0 + x[0]*sample_t + 0.5*x[1]*sample_t**2.0
+        phase = 2.0*np.pi*np.mod(r/wavelength, 1)
+        model_signal = z_tx * np.exp(-1j*phase)
 
-        return -np.abs(np.sum(decoded_echo))
+        decoded_echo = z_ipp[inds] * model_signal
+
+        return -np.abs(np.sum(decoded_echo)) ** 2
 
     # TODO: make so that the input parameters for minimize can be customized trough the config file
     # such as optimization limits and method
     result = sco.minimize(
         neg_gmf_direct,
-        gmf_start,
+        gmf_start[1:],
         args=(
-            gmf_params["DER"]["sample_times"],
+            gmf_start[0],
+            sample_inds,
             gmf_params["EXP"]["wavelength"],
             gmf_params["EXP"]["sample_rate"],
+            gmf_params["EXP"]["T_tx_start_samp"],
             z_tx,
             z_ipp,
         ),
         method="Nelder-Mead",
+        # method="BFGS",
     )
-    return result
+    x = np.array([gmf_start[0], result.x[0], result.x[1]])
+    return x, result.fun
 
 
 def fast_gmf_no_reduce_np(z_tx, z_rx, gmf_variables, gmf_params):
