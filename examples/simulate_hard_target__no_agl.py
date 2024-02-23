@@ -16,7 +16,7 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-gmflib = "cuda"
+gmfimpl, gmfmethod = ("numpy", "fdpt")
 # gmflib = "c"
 # gmflib = "numpy"
 # gmflib = "numpy_daf"
@@ -25,7 +25,7 @@ base_path = pathlib.Path("/home/danielk/data/spade")
 drf_path = base_path / "beamparks_raw" / "leo_bpark_2.1u_NO@uhf_drf_sim"
 rx_channel = "sim"
 config_path = pathlib.Path("./examples/cfg/sim_test.ini").resolve()
-output_path = base_path / "beamparks_analyzed" / f"leo_bpark_2.1u_NO@uhf_{gmflib}_sim"
+output_path = base_path / "beamparks_analyzed" / f"leo_bpark_2.1u_NO@uhf_{gmfimpl}_{gmfmethod}_sim"
 
 t_start = 0
 echo_len = 5.0
@@ -130,9 +130,8 @@ if args.action in ("all", "analyse"):
         rx=(drf_path, rx_channel),
         tx=(drf_path, rx_channel),
         config=config_path,
-        job={"idx": 0, "N": 1},
-        gmflib=gmflib,
-        gmf_optimize_lib="no",
+        gmf_method=gmfmethod,
+        gmf_implementation=gmfimpl,
         clobber=True,
         output=output_path,
         progress=True,
@@ -191,6 +190,7 @@ if args.action in ("all", "plot"):
         axes[1, 0].plot(t_abs, sim_a*0.5, c="red")
         axes[1, 0].set_xlabel("Time [s]")
         axes[1, 0].set_ylabel("acceleration [m/s^2]")
+        axes[1, 0].set_ylim([-300, 300])
 
         h11 = axes[1, 1].plot(data["t"], np.sqrt(snr))
         axes[1, 1].set_xlabel("Time [s]")
