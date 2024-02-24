@@ -94,7 +94,7 @@ else:
 try:
     from .gmf_cuda import gmfcu
 except ImportError as err:
-    logger.debug(f"GMF cuda implementations failed to import:\n {e}", exc_info=True)
+    logger.debug(f"GMF cuda implementations failed to import:\n {err}", exc_info=True)
 else:
     GMF_LIBS[Impl.cuda]["fgmf"] = (gmfcu, MethodType.grid)
 

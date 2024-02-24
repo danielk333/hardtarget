@@ -1,14 +1,24 @@
-
 import requests
 from pathlib import Path
 import zipfile
 import tempfile
 from tqdm import tqdm
+from itertools import chain
 
 try:
     from lxml import html
 except ImportError:
     html = None
+
+
+def format_bytes(size):
+    """
+    Convert bytes to a human-readable format.
+    """
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size < 1024.0:
+            return f"{size:.2f} {unit}"
+        size /= 1024.0
 
 
 # Start 
@@ -27,12 +37,11 @@ except ImportError:
 
 # TODO - should get sizes from html content
 
-def get_download_nodes(product_name, day):
+def get_download_nodes(day, product_name):
     """
     Extract node identifiers from download page
     """
     url = f"https://portal.eiscat.se/schedule/tape2.cgi?exp={product_name}&date={day}&dl=1"
-    print(url)
     response = requests.get(url)
     if response.status_code == 200:
         html_content = response.text
@@ -40,15 +49,32 @@ def get_download_nodes(product_name, day):
         # parse
         tree = html.fromstring(html_content)
         checkboxes = tree.xpath('//input[@type="checkbox"]')
+        trs = [cb.xpath('./ancestor::tr[1]') for cb in checkboxes]
+        flattened_trs = list(chain.from_iterable(trs))
 
-        def get_item(checkbox):
-            return {
-                'name': checkbox.get('name'),
-                'value': checkbox.get('value'),
-            }
-
-        items = [get_item(cb) for cb in checkboxes]
-        return [item["value"] for item in items if item["name"] == "r"]
+        nodes = []
+        for tr in flattened_trs:
+            tds = tr.xpath('.//td')
+            node = {}
+            # tds[0]
+            cb = tds[0].find('.//input[@name="r"]')
+            node['id'] = cb.get('value')
+            # tds[1]
+            node['type'] = type = tds[1].text
+            # tds[2]
+            node['start'] = tds[2].text
+            if type == "data":
+                # tds[3]
+                node['end'] = tds[3].text
+                # tds[5]
+                # NOTE: assuming number is given in KB
+                node['bytes'] = int(tds[5].text) * 1024
+            elif type == "info":
+                # tds[4]
+                tokens = tds[4].text.split(" ")
+                node["exp"] = {"type": tokens[1], "name": tokens[2]}
+            nodes.append(node)
+        return nodes
     else:
         print(f"Failed to fetch the HTML content. Status code: {response.status_code}")
         return []
@@ -67,8 +93,7 @@ def download(day, product_name, type, dst, cleanup_zip=True):
         print(f'Directory exists: {out}')
         return False
     
-    print(f'Started: {product}')
-
+    
     # create empty directory
     out.mkdir(parents=True, exist_ok=True)
     print(f'Directory created: {out}')
@@ -80,13 +105,28 @@ def download(day, product_name, type, dst, cleanup_zip=True):
         print(f"Zipfile exists: {zip_download}")
     else:
         # Fetch download nodes
-        nodes = get_download_nodes(product_name, day)
+        nodes = get_download_nodes(day, product_name)
 
+        # check that exp type is correct
+        data_nodes = [node for node in nodes if node["type"] == "data"]
+        info_nodes = [node for node in nodes if node["type"] == "info"]
+        _type = info_nodes[0]["exp"]["type"]
+        if type.casefold() != _type.casefold():
+             print(f"Mismatch experiment type, given: {type}, actual {_type}")
+             return False
+
+        # Size
+        bytes = sum([node["bytes"] for node in data_nodes])
+        size = format_bytes(bytes)
+        
         # Download
-        zip_url = f'https://rebus.eiscat.se:37009/{";".join(nodes)}/{product}.zip'
+        print(f'Download starting: {product_name} {type} {day} {size}')
+
+        node_ids = [node["id"] for node in nodes]
+        zip_url = f'https://rebus.eiscat.se:37009/{";".join(node_ids)}/{product}.zip'
         response = requests.get(zip_url, stream=True)
         if response.status_code == 200:
-            file_size = int(response.headers.get('Content-Length', 0))
+            file_size = int(response.headers.get('Content-Length', 0)) or bytes
             # Use tqdm to create a progress bar
             print(f'Zipfile: {zip_download}')
             with open(zip_download, 'wb') as file, tqdm(
@@ -127,8 +167,9 @@ def download(day, product_name, type, dst, cleanup_zip=True):
 
 if __name__ == "__main__":
 
-    date = "20220408"
+    day = "20220408"
     name = "leo_bpark_2.1u_NO"
     type = "uhf"
 
-    nodes = get_download_nodes(name, date)
+    # nodes = get_download_nodes(day , name)
+    # download(day , name, type, "/tmp")

@@ -17,7 +17,7 @@ support for script based download.
 
 .. code-block:: bash
 
-   (.ht) $ hardtarget download eiscat 20220408 leo_bpark_2.1u_NO  --o /data
+   (.ht) $ hardtarget download eiscat 20220408 leo_bpark_2.1u_NO uhf  --o /data
 
 
 The script will create a folder ``/data/20220408_leo_bpark_2.1u_NO_uhf`` containing the downloaded data.
