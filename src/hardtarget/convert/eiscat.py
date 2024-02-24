@@ -6,7 +6,6 @@ import scipy.io as sio
 import digital_rf as drf
 import numpy as np
 import bz2
-import logging
 import configparser
 from pathlib import Path
 from tqdm import tqdm
@@ -254,15 +253,15 @@ def eiscat_convert(srcdir, logger, dstdir=None, compression_level=0, progress=Fa
             try:
                 rf_writer.rf_write(np.zeros(n_pad*2, dtype=np.int16))
             except Exception:
-                logging.warning("unable to pad out for missing files ... continuing")
+                logger.warning("unable to pad out for missing files ... continuing")
 
         zz = to_i2x16(mat["d_raw"][:, 0])
         if len(zz) != n_samples:
-            logging.warning(f"found {len(zz)} samples in {pth}['d_raw'], expected {n_samples}")
+            logger.warning(f"found {len(zz)} samples in {pth}['d_raw'], expected {n_samples}")
         try:
             rf_writer.rf_write(zz)
         except Exception as e:
-            logging.warning(f"unable to write samples from {pth} to file ... continuing")
+            logger.warning(f"unable to write samples from {pth} to file ... continuing")
             raise e
         n_prev = n0
         if progress:
@@ -270,7 +269,7 @@ def eiscat_convert(srcdir, logger, dstdir=None, compression_level=0, progress=Fa
     if progress:
         pbar.close()
 
-    logging.info("Done writing DRF files")
+    logger.info("Done writing DRF files")
 
     #######################################################################
     # META DATA FILE

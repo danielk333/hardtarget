@@ -1,9 +1,11 @@
 import requests
 from pathlib import Path
 import zipfile
-import tempfile
 from tqdm import tqdm
 from itertools import chain
+import uuid
+import shutil
+import logging
 
 try:
     from lxml import html
@@ -37,11 +39,18 @@ def format_bytes(size):
 
 # TODO - should get sizes from html content
 
-def get_download_nodes(day, product_name):
+QUERY_URL = "https://portal.eiscat.se/schedule/tape2.cgi"
+DOWNLOAD_URL = "https://rebus.eiscat.se:37009"
+
+
+def get_download_nodes(day, product, logger=None):
     """
     Extract node identifiers from download page
     """
-    url = f"https://portal.eiscat.se/schedule/tape2.cgi?exp={product_name}&date={day}&dl=1"
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
+    url = f"{QUERY_URL}?exp={product}&date={day}&dl=1"
     response = requests.get(url)
     if response.status_code == 200:
         html_content = response.text
@@ -76,61 +85,81 @@ def get_download_nodes(day, product_name):
             nodes.append(node)
         return nodes
     else:
-        print(f"Failed to fetch the HTML content. Status code: {response.status_code}")
+        logger.error(f"Failed to fetch the HTML content. Status code: {response.status_code}")
         return []
 
 
-def download(day, product_name, type, dst, cleanup_zip=True):
-    """
-    download and extract zip file for (product_name, day) to dst folder.
-    cleanup zipfile
-    """
-    product = f'{day}_{product_name}_{type}'
 
-    # check if extracted result already exist
-    out = Path(dst) / product
-    if out.exists():
-        print(f'Directory exists: {out}')
+def download(day, product, type, dst, 
+             keep_zip=False, update=False, 
+             tmpdir=None, logger=None):
+    """
+    download and extract zip file for (product_name, day, type) to dst folder.
+    """
+    # logging
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
+    # destination folders
+    data_foldername = f'{product}@{type.lower()}'
+    info_foldername = f'{product}@{type.lower()}_information'
+    dst = Path(dst)
+    if not dst.is_dir():
+        logger.warning(f"DST is not a directory {dst}")
+        return False, None
+    data_dst = dst / data_foldername
+    info_dst = dst / info_foldername
+
+    # check if destination folders already exists
+    if data_dst.exists() and not update:
+        logger.warning(f'Data directory already exists: {data_dst}')
         return False
-    
-    
-    # create empty directory
-    out.mkdir(parents=True, exist_ok=True)
-    print(f'Directory created: {out}')
+    if info_dst.exists() and not update:
+        logger.warning(f'Info directory already exists: {info_dst}')
+        return False, None
 
-    # check if downloaded zipfile already exists
-    temp_directory = Path(tempfile.mkdtemp())
-    zip_download = temp_directory / f'{product}.zip'
-    if zip_download.exists():
-        print(f"Zipfile exists: {zip_download}")
+    # create temporary directory at destination
+    if tmpdir is None:
+        temp_dir = Path(dst) / f"{str(uuid.uuid4())}"
+    temp_dir.mkdir(exist_ok=True)
+
+    # zip
+    zip_filename = f"{product}{day}.zip"
+    zip_download = temp_dir / zip_filename
+    zip_dst = dst / zip_filename
+
+    # check if downloaded zipfile already exists at dst
+    if zip_dst.exists():
+        logger.info(f"Zipfile exists: {zip_dst}")
+        zip_download = zip_dst
     else:
         # Fetch download nodes
-        nodes = get_download_nodes(day, product_name)
-
-        # check that exp type is correct
+        nodes = get_download_nodes(day, product, logger=logger)
         data_nodes = [node for node in nodes if node["type"] == "data"]
         info_nodes = [node for node in nodes if node["type"] == "info"]
+
+        # check that data matches given type
         _type = info_nodes[0]["exp"]["type"]
         if type.casefold() != _type.casefold():
-             print(f"Mismatch experiment type, given: {type}, actual {_type}")
-             return False
+             logger.warning(f"Mismatch experiment type, given: {type}, actual {_type}")
+             return False, None
 
         # Size
         bytes = sum([node["bytes"] for node in data_nodes])
         size = format_bytes(bytes)
         
         # Download
-        print(f'Download starting: {product_name} {type} {day} {size}')
+        logger.info(f'Product: {product} {day} {size}')
 
         node_ids = [node["id"] for node in nodes]
-        zip_url = f'https://rebus.eiscat.se:37009/{";".join(node_ids)}/{product}.zip'
+        zip_url = f'{DOWNLOAD_URL}/{";".join(node_ids)}/{zip_filename}'
         response = requests.get(zip_url, stream=True)
         if response.status_code == 200:
             file_size = int(response.headers.get('Content-Length', 0)) or bytes
             # Use tqdm to create a progress bar
-            print(f'Zipfile: {zip_download}')
+            logger.info(f'Zipfile: {zip_download}')
             with open(zip_download, 'wb') as file, tqdm(
-                desc='Downloading',
+                desc='Download',
                 total=file_size,
                 unit='B',
                 unit_scale=True,
@@ -141,35 +170,70 @@ def download(day, product_name, type, dst, cleanup_zip=True):
                         file.write(data)
                         bar.update(len(data))
                 except KeyboardInterrupt:
-                    print('\nDownloading: terminiated')
+                    logger.warning('\nDownload: terminiated')
                     # cleanup
-                    zip_download.unlink()
-                    out.rmdir()
-                    return False
-            print(f"Downloading: success: {product}.zip")
+                    shutil.rmtree(temp_dir)
+                    return False, None
+            logger.info(f"Download: completed")
         else:
-            print(f"Downloading: fail - status code: {response.status_code}")
+            logger.info(f"Download: fail - status code: {response.status_code}")
             return False
 
-    # Extract zip file
+    # Extract zip file to random location in dst directory
     with zipfile.ZipFile(zip_download, 'r') as zip_ref:
-        zip_ref.extractall(out)
-        print(f'Unzip: {zip_download}')
+        logger.info(f'Unzip: {zip_download}')
+        zip_ref.extractall(temp_dir)
+        logger.info(f'Unzip: completed')
 
-    # Cleanup zip file
-    if zip_download.exists() and cleanup_zip:
-        zip_download.unlink()
-        print(f'Remove: {zip_download}')
+    # Move or update datafolder and infofolder
+    if data_dst.is_dir():
+        # update data
+        for subdir in (temp_dir / data_foldername).iterdir():
+            target_subdir = data_dst / subdir.name
+            if not target_subdir.exists():
+                shutil.move(subdir, target_subdir) 
+    else:
+        # mv data
+        shutil.move(temp_dir / data_foldername, dst)
 
-    print(f'Completed; {out}')
-    return True
+    if info_dst.is_dir():
+        # update info
+        for subdir in (temp_dir / info_foldername).iterdir():
+            target_subdir = info_dst / subdir.name
+            if not target_subdir.exists():
+                shutil.move(subdir, target_subdir) 
+    else:
+        # mv info
+        shutil.move(temp_dir / info_foldername, dst)
+    
+    # optionally move zipfile to dst
+    if keep_zip:
+        if not zip_dst.exists():
+            shutil.move(str(zip_download), dst)
+
+    # Cleanup tempdir
+    shutil.rmtree(temp_dir)
+            
+    # Result
+    result = {
+        "data": str(data_dst), 
+        "info": str(info_dst)
+    }
+    if keep_zip:
+        result["zip"] = str(dst / zip_filename)
+
+    logger.info(f"Completed: {str(result)}")
+    return True, result
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
 
-    day = "20220408"
-    name = "leo_bpark_2.1u_NO"
-    type = "uhf"
-
+    day = '20220408'
+    name = 'leo_bpark_2.1u_NO'
+    type = 'uhf'
+    
+    logging.basicConfig(level=logging.INFO)
+    
     # nodes = get_download_nodes(day , name)
-    # download(day , name, type, "/tmp")
+    download(day , name, type, "/tmp", 
+             update=True, keep_zip=True)
