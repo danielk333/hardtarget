@@ -4,7 +4,7 @@
 Quickstart
 ===========
 
-This page walks through the basic steps of radar analysis using Hardtarget. 
+These are the basic steps working with radar data using Hardtarget. 
 
 
 Download Eiscat radar data
@@ -17,18 +17,28 @@ support for script based download.
 
 .. code-block:: bash
 
-   (.ht) $ hardtarget download eiscat 20220408 leo_bpark_2.1u_NO uhf  --o /data
+   (.ht) $ hardtarget download eiscat 20220408 leo_bpark_2.1u_NO uhf --progress -o /data
 
 
-The script will create a folder ``/data/20220408_leo_bpark_2.1u_NO_uhf`` containing the downloaded data.
+The script will make the result available in the `/data` folder. Using the
+`--update` option, multiple downloads can be placed in the same folder hierarchy.
 
+.. code-block:: bash
+
+    (.ht) $ tree /data -L 2
+    (.ht) $ /data/
+    (.ht) $ ├── leo_bpark_2.1u_NO@uhf
+    (.ht) $ │   ├── 20220408_08
+    (.ht) $ │   └── 20220408_09
+    (.ht) $ └── leo_bpark_2.1u_NO@uhf_information
+    (.ht) $     └── 20220408
 
 
 .. note::
 
-    Download from Eiscat is geo-restricted to IP-adresses in Scandinavia.
-    Location-based download also uses a non-standard port number, which may be
-    blocked by agressive firewalls.
+    Download from Eiscat is geo-restricted to IP-addresses in Scandinavia.
+    Location-based download also uses a non-standard port number, and may be
+    blocked by an agressive firewall.
 
 
 Convert Eiscat radar data
@@ -44,7 +54,24 @@ file. Eiscat radar data may be converted to :ref:`drf` using the following scrip
 
 .. code-block:: bash
 
-   (.ht) $ hardtarget convert eiscat /data/leo_bpark_2.1u_NO20220408/leo_bpark_2.1u_NO@uhf -o /data/drf
+   (.ht) $ hardtarget convert eiscat /data/leo_bpark_2.1u_NO@uhf --progress -o /data/drf
+
+
+The script will make the result available in the given folder.
+
+.. code-block:: bash
+
+   (.ht) $ /data/drf
+   (.ht) $ ├── metadata.ini
+   (.ht) $ └── uhf
+   (.ht) $     ├── 2022-04-08T08-00-00
+   (.ht) $     ├── 2022-04-08T09-00-00
+   (.ht) $     └── drf_properties.h5
+
+
+Analyze DRF Data
+--------------------------
+
 
 
 

@@ -89,10 +89,9 @@ def get_download_nodes(day, product, logger=None):
         return []
 
 
-
 def download(day, product, type, dst, 
              keep_zip=False, update=False, 
-             tmpdir=None, logger=None):
+             tmpdir=None, logger=None, progress=False):
     """
     download and extract zip file for (product_name, day, type) to dst folder.
     """
@@ -141,49 +140,58 @@ def download(day, product, type, dst,
         # check that data matches given type
         _type = info_nodes[0]["exp"]["type"]
         if type.casefold() != _type.casefold():
-             logger.warning(f"Mismatch experiment type, given: {type}, actual {_type}")
-             return False, None
+            logger.warning(f"Mismatch experiment type, given: {type}, actual {_type}")
+            return False, None
 
         # Size
         bytes = sum([node["bytes"] for node in data_nodes])
         size = format_bytes(bytes)
-        
+
         # Download
         logger.info(f'Product: {product} {day} {size}')
 
         node_ids = [node["id"] for node in nodes]
         zip_url = f'{DOWNLOAD_URL}/{";".join(node_ids)}/{zip_filename}'
         response = requests.get(zip_url, stream=True)
+        completed = False
         if response.status_code == 200:
             file_size = int(response.headers.get('Content-Length', 0)) or bytes
-            # Use tqdm to create a progress bar
             logger.info(f'Zipfile: {zip_download}')
-            with open(zip_download, 'wb') as file, tqdm(
-                desc='Download',
-                total=file_size,
-                unit='B',
-                unit_scale=True,
-                unit_divisor=1024,
-            ) as bar:
+            # Use tqdm to create a progress bar
+            pbar = None
+            if progress:
+                pbar = tqdm(desc="Converting files to digital_rf", 
+                            total=file_size,
+                            unit='B',
+                            unit_scale=True,
+                            unit_divisor=1024
+                            )
+
+            with open(zip_download, 'wb') as file:
                 try:
                     for data in response.iter_content(chunk_size=1024):
                         file.write(data)
-                        bar.update(len(data))
+                        if progress:
+                            pbar.update(len(data))
+                    completed = True
+                    logger.info("Download: completed")
                 except KeyboardInterrupt:
                     logger.warning('\nDownload: terminiated')
                     # cleanup
                     shutil.rmtree(temp_dir)
-                    return False, None
-            logger.info(f"Download: completed")
+                if progress:
+                    pbar.close()            
         else:
             logger.info(f"Download: fail - status code: {response.status_code}")
-            return False
+
+        if not completed:
+            return False, None
 
     # Extract zip file to random location in dst directory
     with zipfile.ZipFile(zip_download, 'r') as zip_ref:
         logger.info(f'Unzip: {zip_download}')
         zip_ref.extractall(temp_dir)
-        logger.info(f'Unzip: completed')
+        logger.info('Unzip: completed')
 
     # Move or update datafolder and infofolder
     if data_dst.is_dir():
@@ -205,7 +213,7 @@ def download(day, product, type, dst,
     else:
         # mv info
         shutil.move(temp_dir / info_foldername, dst)
-    
+
     # optionally move zipfile to dst
     if keep_zip:
         if not zip_dst.exists():
@@ -213,7 +221,7 @@ def download(day, product, type, dst,
 
     # Cleanup tempdir
     shutil.rmtree(temp_dir)
-            
+
     # Result
     result = {
         "data": str(data_dst), 
@@ -231,9 +239,7 @@ if __name__ == '__main__':
     day = '20220408'
     name = 'leo_bpark_2.1u_NO'
     type = 'uhf'
-    
     logging.basicConfig(level=logging.INFO)
-    
     # nodes = get_download_nodes(day , name)
-    download(day , name, type, "/tmp", 
+    download(day, name, type, "/tmp", 
              update=True, keep_zip=True)
