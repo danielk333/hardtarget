@@ -122,7 +122,19 @@ def compute_gmf(
         bounds,
     )
     job_tasks = utils.compute_job_tasks(job, total_tasks)
-    job_cohints = len(job_tasks) * num_cohints_per_file
+    job_cohints = (len(job_tasks) - 2) * num_cohints_per_file
+
+    num_cohints = num_cohints_per_file
+    file_idx_sample = np.max(job_tasks) * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
+    if file_idx_sample + num_cohints_per_file * ipp_samp * n_ipp > bounds[1]:
+        num_cohints = int((bounds[1] - file_idx_sample) // (ipp_samp * n_ipp))
+    job_cohints += num_cohints
+    num_cohints = num_cohints_per_file
+    file_idx_sample = np.min(job_tasks) * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
+    if file_idx_sample < bounds[0]:
+        num_cohints = num_cohints_per_file - int((bounds[0] - file_idx_sample) // (ipp_samp * n_ipp))
+    job_cohints += num_cohints
+
     tasks_skipped = 0
 
     logger.info(f"starting job {job['idx']}/{job['N']} with {len(job_tasks)} tasks")
@@ -151,8 +163,9 @@ def compute_gmf(
         file_idx_sample = task_idx * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
 
         # filenames are in unix time microseconds
-        epoch_unix = file_idx_sample / sample_rate
-        epoch_unix_us = epoch_unix.astype("int64")*1000000
+        epoch_unix_us = file_idx_sample / (sample_rate/1000000)
+        epoch_unix = epoch_unix_us.astype("float128")/1000000
+        epoch_unix_us = epoch_unix_us.astype("int64")
         filepath = utils.get_filepath(epoch_unix_us)
 
         # write to file if output is defined
@@ -189,6 +202,15 @@ def compute_gmf(
             # use the data from the entire event to inform good starting values
             # for even points that failed to be analyzed with the grid method
             # (since this has higher sensitivity)
+            # TODO: this should have a "do-calculation" vector loaded too where
+            # optimization can be skiped where no event was detection in the rough analysis
+            #
+            # Then the work-flow would be
+            # 1) run hardtarget with a grid method
+            # 2) run resordan to do tresholding / clustering and set start
+            #    values and skip empty portions of data
+            # 3) run hardtarget with an optimize method to refine events and get optimal SNR
+            # 4) run resordan to create event files
             with h5py.File(outfile, "r") as hf:
                 gmf_starts = np.stack([
                     hf["range_peak"][()],
@@ -204,8 +226,10 @@ def compute_gmf(
         if file_idx_sample + num_cohints_per_file * ipp_samp * n_ipp > bounds[1]:
             num_cohints = int((bounds[1] - file_idx_sample) // (ipp_samp * n_ipp))
         start_cohind = 0
-        if file_idx_sample < bounds[0]:
-            start_cohind = int((bounds[0] - file_idx_sample) // (ipp_samp * n_ipp))
+        # TODO: until this is fixed, adaptive start interval disabled
+        # TODO: fix, this indexing gets messed up in the optimize step, need to look over
+        # if file_idx_sample < bounds[0]:
+        #     start_cohind = int((bounds[0] - file_idx_sample) // (ipp_samp * n_ipp))
 
         for coh_ind in range(start_cohind, num_cohints):
             start_sample = file_idx_sample + coh_ind * ipp_samp * n_ipp
@@ -257,7 +281,7 @@ def compute_gmf(
             g_vec = all_gmf_vars.vals[coh_ints, r_inds]
 
             gmf_out_args = utils.GMFOutArgs(
-                num_cohints_per_file=num_cohints_per_file,
+                num_cohints_per_file=num_cohints,
                 ranges=gmf_params["DER"]["ranges"],
                 range_rates=gmf_params["DER"]["range_rates"],
                 accelerations=gmf_params["DER"]["accelerations"],
@@ -303,7 +327,7 @@ def compute_gmf(
 
         # progress
         if progress:
-            curr_num = f"{idx + 2}".ljust(extend_str_len, " ")
+            curr_num = f"{idx + 1}".ljust(extend_str_len, " ")
             subprog_str = f"[file {curr_num}/{total_num}]"
             progress_bar.set_description(
                 f"{progress_desc} {subprog_str}" if subprogress else progress_desc,

@@ -95,7 +95,6 @@ def collect_gmf_data(paths, mats=None, vecs=None):
     derived = ["t", "nf_vec"]
     optional = ["gmf_optimized_peak", "gmf_optimized"]
 
-    t_vec_pos = 0
     mats_data = {}
     vecs_data = {}
     for path in paths:
@@ -127,13 +126,12 @@ def collect_gmf_data(paths, mats=None, vecs=None):
                 meta["experiment"] = {key: val for key, val in hf["experiment"].attrs.items()}
                 for key, val in hf.attrs.items():
                     meta[key] = val
-
+            epoch_unix = hf["epoch_unix"][()]
             _t_conv = (hf["processing"].attrs["n_ipp"][()] * hf["experiment"].attrs["ipp"][()]) * 1e-6
 
         # Additional useful parameters to calculate
         n_cohints = mats_data["gmf"].shape[0]
-        vecs_data["t"] = np.arange(n_cohints) * _t_conv + t_vec_pos
-        t_vec_pos = vecs_data["t"][-1] + 1
+        vecs_data["t"] = (np.arange(n_cohints) + 1) * _t_conv + epoch_unix
         nf_vec = np.nanmedian(mats_data["gmf_zero_frequency"], axis=0)
         nf_vec = nf_vec.reshape((1, nf_vec.size))
         mats_data["nf_vec"] = nf_vec
