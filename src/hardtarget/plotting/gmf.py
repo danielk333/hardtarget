@@ -69,7 +69,6 @@ def plot_peaks(axes, data, meta, monostatic=True, snr_dB_limit=15.0):
 
     axes[1, 1].plot(t[inds], np.sqrt(snr[inds]), **_inds_sty)
     axes[1, 1].plot(t[not_inds], np.sqrt(snr[not_inds]), **_not_inds_sty)
-    axes[1, 1].plot(t[not_inds], np.sqrt(snr_opt[not_inds]), **_not0_inds_sty)
     axes[1, 1].set_xlabel("Time [s]")
     axes[1, 1].set_ylabel("sqrt(SNR)")
 
@@ -81,6 +80,7 @@ def plot_peaks(axes, data, meta, monostatic=True, snr_dB_limit=15.0):
         axes[0, 1].plot(t[inds], v0[inds], **_inds0_sty)
         axes[1, 0].plot(t[inds], a0[inds], **_inds0_sty)
         axes[1, 1].plot(t[inds], np.sqrt(snr_opt[inds]), **_inds0_sty)
+        axes[1, 1].plot(t[not_inds], np.sqrt(snr_opt[not_inds]), **_not0_inds_sty)
 
     return axes, None
 
