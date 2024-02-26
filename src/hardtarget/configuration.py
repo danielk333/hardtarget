@@ -439,6 +439,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     max_accels_len = params_pro["decimated_read_length"] - dec_tau_samp
     dpt_accels = fft.fftshift(fft.fftfreq(max_accels_len, d=frequency_decimation/sample_rate))
     dpt_accels = dpt_accels * wavelength * 2 / step
+    accel_resolution = wavelength * 2 * sample_rate / (max_accels_len * frequency_decimation * step)
 
     params_pro["dec_tau_samp"] = dec_tau_samp
 
@@ -447,6 +448,7 @@ def compute_derived_gmf_params(params_exp, params_pro):
     fgmf_accels = dpt_accels[accel_inds]
     params_der["inds_accelerations"] = np.argwhere(accel_inds).flatten()
     params_der["accelerations"] = dpt_accels  # m/s^2
+    params_der["acceleration_step"] = accel_resolution
     params_der["fgmf_accelerations"] = fgmf_accels  # m/s^2
     params_pro["n_accelerations"] = len(dpt_accels)
 
