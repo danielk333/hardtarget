@@ -16,7 +16,12 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-gmfimpl, gmfmethod = ("numpy", "fdpt")
+gmfimpl_o, gmfmethod_o = (None, None)
+
+# gmfimpl, gmfmethod = ("numpy", "grid-fast-gmf")
+gmfimpl, gmfmethod = ("numpy", "grid-fast-dpt")
+# gmfimpl_o, gmfmethod_o = ("numpy", "optimize-grid-gmf")
+# gmfimpl_o, gmfmethod_o = ("numpy", "optimize-scipy-gmf")
 # gmflib = "c"
 # gmflib = "numpy"
 # gmflib = "numpy_daf"
@@ -26,6 +31,9 @@ drf_path = base_path / "beamparks_raw" / "leo_bpark_2.1u_NO@uhf_drf_sim"
 rx_channel = "sim"
 config_path = pathlib.Path("./examples/cfg/sim_test.ini").resolve()
 output_path = base_path / "beamparks_analyzed" / f"leo_bpark_2.1u_NO@uhf_{gmfimpl}_{gmfmethod}_sim"
+
+if gmfimpl_o is not None:
+    gmfimpl, gmfmethod = gmfimpl_o, gmfmethod_o
 
 t_start = 0
 echo_len = 5.0
@@ -163,6 +171,8 @@ if args.action in ("all", "plot"):
 
     data_generator = hardtarget.load_gmf_out(output_path)
     for data, meta in data_generator:
+        data["t"] -= np.min(data["t"])
+
         fig, axes = plt.subplots(2, 2)
         hardtarget.plotting.gmf.plot_peaks(axes, data, meta)
         fig, axes = plt.subplots(2, 3)
