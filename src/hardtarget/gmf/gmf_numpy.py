@@ -135,11 +135,66 @@ def optimize_gmf_np(z_tx, z_ipp, gmf_params, gmf_start):
             z_tx,
             z_ipp,
         ),
-        method="Nelder-Mead",
-        # method="BFGS",
+        # method="Nelder-Mead",
+        method="BFGS",
     )
     x = np.array([gmf_start[0], result.x[0], result.x[1]])
     return x, result.fun
+
+
+def optimize_grid_gmf_np(z_tx, z_ipp, gmf_params, gmf_start):
+    """Maximize the Generalized Matched Filter GMF value using function
+    optimization in continuous variable space.
+
+    Here z_ipp is the entire rx sample vector, not the stenciled one as the
+    stencils are done by the gmf forward model
+
+    """
+    sample_inds = gmf_params["DER"]["il0_rx_window_indices"]
+
+    r0, v0, a0 = gmf_start.tolist()
+    sample_rate = gmf_params["EXP"]["sample_rate"]
+    wavelength = gmf_params["EXP"]["wavelength"]
+    min_rg = gmf_params["PRO"]["min_range_gate"]
+    accel_res = gmf_params["DER"]["acceleration_step"]
+
+    delta_a = 2*accel_res
+    res_a = 20
+
+    max_time = gmf_params["EXP"]["ipp"]*1e-6*gmf_params["PRO"]["n_ipp"]
+    max_velocity_change = 0.5*(a0 + np.sign(a0)*delta_a*0.5)*max_time**2
+
+    delta_v = 2*max_velocity_change
+    res_v = 20
+    v_mat, a_mat = np.meshgrid(
+        np.linspace(v0 - delta_v*0.5, v0 + delta_v*0.5, num=res_v),
+        np.linspace(a0 - delta_a*0.5, a0 + delta_a*0.5, num=res_a),
+    )
+
+    rg0 = np.floor((r0 / constants.c) * sample_rate).astype(np.int64)
+    rel_rg0 = rg0 - min_rg - 1
+    inds = sample_inds + rel_rg0
+    sample_t = inds / sample_rate
+    z_rx = z_ipp[inds]
+    gmf_mat = np.zeros_like(v_mat)
+
+    for ind in range(res_v):
+        r = r0 + v_mat[:, ind, None]*sample_t[None, :] + 0.5*a_mat[:, ind, None]*sample_t[None, :]**2.0
+        phase = 2.0*np.pi*np.mod(r/wavelength, 1)
+        model_signal = z_tx[None, :] * np.exp(-1j*phase)
+
+        decoded_echo = z_rx[None, :] * model_signal
+
+        gmf_mat[:, ind] = np.abs(np.sum(decoded_echo, axis=1)) ** 2
+
+    select = np.arange(res_v)
+    a_inds = np.argmax(gmf_mat, axis=0)
+    v_ind = np.argmax(gmf_mat[a_inds, select])
+    a_ind = a_inds[v_ind]
+    x = np.array([r0, v_mat[a_ind, v_ind], a_mat[a_ind, v_ind]])
+    fun = gmf_mat[a_ind, v_ind]
+
+    return x, fun
 
 
 def fast_gmf_no_reduce_np(z_tx, z_rx, gmf_variables, gmf_params):

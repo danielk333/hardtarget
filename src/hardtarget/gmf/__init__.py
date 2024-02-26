@@ -56,6 +56,7 @@ from .gmf_numpy import (
     fast_dpt_np,
     fast_gmf_no_reduce_np,
     optimize_gmf_np,
+    optimize_grid_gmf_np,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,10 +79,17 @@ class Impl(Enum):
 
 GMF_LIBS = {imp: {} for imp in Impl}
 
+GMF_LIBS[Impl.numpy]["grid-fast-gmf"] = (fast_gmf_np, MethodType.grid)
+GMF_LIBS[Impl.numpy]["grid-fast-dpt"] = (fast_dpt_np, MethodType.grid)
+
+# Alias
 GMF_LIBS[Impl.numpy]["fgmf"] = (fast_gmf_np, MethodType.grid)
 GMF_LIBS[Impl.numpy]["fdpt"] = (fast_dpt_np, MethodType.grid)
-GMF_LIBS[Impl.numpy]["fgmf_no_reduce"] = (fast_gmf_no_reduce_np, MethodType.grid)
-GMF_LIBS[Impl.numpy]["gmf"] = (optimize_gmf_np, MethodType.optimize)
+
+GMF_LIBS[Impl.numpy]["grid-fast-no-reduce"] = (fast_gmf_no_reduce_np, MethodType.grid)
+GMF_LIBS[Impl.numpy]["optimize-scipy-gmf"] = (optimize_gmf_np, MethodType.optimize)
+GMF_LIBS[Impl.numpy]["optimize-grid-gmf"] = (optimize_grid_gmf_np, MethodType.optimize)
+
 
 
 try:
@@ -121,11 +129,11 @@ def get_default_method():
     """Default estimation method
     """
     imp = "c"
-    lib, libtype = get_estimation_method(imp, "fdpt")
+    lib, libtype = get_estimation_method(imp, "grid-fast-dpt")
     # Fallbacks
     if lib is None:
         imp = "numpy"
-        lib, libtype = get_estimation_method(imp, "fdpt")
+        lib, libtype = get_estimation_method(imp, "grid-fast-dpt")
 
     if lib is None:
         imp = None
