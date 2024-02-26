@@ -88,6 +88,11 @@ import pathlib
 from hardtarget import drf_utils
 from hardtarget.gmf import get_default_method
 
+
+class ConfigError(Exception):
+    pass
+
+
 DEFAULT_IMPL, DEFAULT_METHOD = get_default_method()
 
 ####################################################################
@@ -156,7 +161,7 @@ def load_gmf_processing_params(configfile=None):
         SECTION = "signal-processing"
         for key in config[SECTION].keys():
             if key not in DEFAULT_PARAMS:
-                raise ValueError(f"'{key}' option found in config file not a valid config parameter")
+                raise ConfigError(f"'{key}' option found in config file not a valid config parameter")
             # Convert values to specific types
             if key in INT_PARAM_KEYS:
                 d[key] = config.getint(SECTION, key)
@@ -170,8 +175,9 @@ def load_gmf_processing_params(configfile=None):
 
     not_set_params = [key for key, val in d.items() if val is None]
     if len(not_set_params) > 0:
-        raise ValueError(
-            "Found config options without set values that does not have a default: \n"
+        raise ConfigError(
+            "The following parameters are required and do not have defaults "
+            "but were not found in the config file: \n"
             f"{not_set_params}"
         )
     return d
