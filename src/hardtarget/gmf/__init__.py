@@ -83,8 +83,8 @@ GMF_LIBS[Impl.numpy]["grid-fast-gmf"] = (fast_gmf_np, MethodType.grid)
 GMF_LIBS[Impl.numpy]["grid-fast-dpt"] = (fast_dpt_np, MethodType.grid)
 
 # Alias
-GMF_LIBS[Impl.numpy]["fgmf"] = (fast_gmf_np, MethodType.grid)
-GMF_LIBS[Impl.numpy]["fdpt"] = (fast_dpt_np, MethodType.grid)
+GMF_LIBS[Impl.numpy]["fgmf"] = GMF_LIBS[Impl.numpy]["grid-fast-gmf"]
+GMF_LIBS[Impl.numpy]["fdpt"] = GMF_LIBS[Impl.numpy]["grid-fast-dpt"]
 
 GMF_LIBS[Impl.numpy]["grid-fast-no-reduce"] = (fast_gmf_no_reduce_np, MethodType.grid)
 GMF_LIBS[Impl.numpy]["optimize-scipy-gmf"] = (optimize_gmf_np, MethodType.optimize)
@@ -93,18 +93,20 @@ GMF_LIBS[Impl.numpy]["optimize-grid-gmf"] = (optimize_grid_gmf_np, MethodType.op
 
 
 try:
-    from .gmf_c import gmfc
+    from .gmf_c import fast_gmf_c
 except ImportError as err:
     logger.debug(f"GMF c implementations failed to import:\n {e}", exc_info=True)
 else:
-    GMF_LIBS[Impl.c]["fgmf"] = (gmfc, MethodType.grid)
+    GMF_LIBS[Impl.c]["grid-fast-gmf"] = (fast_gmf_c, MethodType.grid)
+    GMF_LIBS[Impl.c]["fgmf"] = GMF_LIBS[Impl.c]["grid-fast-gmf"]
 
 try:
-    from .gmf_cuda import gmfcu
+    from .gmf_cuda import fast_gmf_cuda
 except ImportError as err:
     logger.debug(f"GMF cuda implementations failed to import:\n {err}", exc_info=True)
 else:
-    GMF_LIBS[Impl.cuda]["fgmf"] = (gmfcu, MethodType.grid)
+    GMF_LIBS[Impl.cuda]["grid-fast-gmf"] = (fast_gmf_cuda, MethodType.grid)
+    GMF_LIBS[Impl.cuda]["fgmf"] = GMF_LIBS[Impl.cuda]["grid-fast-gmf"]
 
 
 def get_avalible_libs(indent=""):
