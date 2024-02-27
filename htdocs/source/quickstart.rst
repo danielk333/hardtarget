@@ -17,7 +17,7 @@ support for script based download.
 
 .. code-block:: bash
 
-   (.ht) $ hardtarget download eiscat 20220408 leo_bpark_2.1u_NO uhf --progress -o /data
+   (.ht) $ hardtarget -v download eiscat 20220408 leo_bpark_2.1u_NO uhf --progress -o /data
 
 
 The script will make the result available in the `/data` folder. Using the
@@ -54,7 +54,7 @@ file. Eiscat radar data may be converted to :ref:`drf` using the following scrip
 
 .. code-block:: bash
 
-   (.ht) $ hardtarget convert eiscat /data/leo_bpark_2.1u_NO@uhf --progress -o /data/drf
+   (.ht) $ hardtarget -v convert eiscat /data/leo_bpark_2.1u_NO@uhf --progress -o /data/drf
 
 
 The script will make the result available in the given folder.
@@ -72,6 +72,15 @@ The script will make the result available in the given folder.
 Analyze DRF Data
 --------------------------
 
+.. code-block:: bash
+
+   (.ht) $ hardtarget -v analyze 20210412/drf uhf --config ~/Dev/Git/hardtarget/examples/cfg/test.ini --progress -o 20210412/gmf -s "2021-04-12T12:15:40" -e "2021-04-12T12:16:10"  -m fgmf -i numpy
+
+
+Plot GMF Data
+--------------------------
+
+hardtarget plot gmf 20210412/gmf3 -s "2021-04-12T12:15:40" -e "2021-04-12T12:16:10"
 
 
 

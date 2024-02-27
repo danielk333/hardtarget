@@ -5,10 +5,9 @@ from hardtarget.analysis import compute_gmf
 import hardtarget.global_mpi
 from .commands import add_command
 from hardtarget.gmf import get_default_method, get_avalible_libs
+from hardtarget.profiling import get_logging_level
 
 DEFAULT_IMPL, DEFAULT_METHOD = get_default_method()
-
-LOGGER_NAME = "hardtarget.analysis.analyze_gmf"
 
 
 def parser_build(parser):
@@ -19,7 +18,7 @@ def parser_build(parser):
     parser.add_argument("--txchnl", help="TX channel")
     parser.add_argument("--config", help="path to config file for GMF processing")
     parser.add_argument("-o", "--output", default=".", help="path to output directory")
-    parser.add_argument("--progress", action="store_true", help="enable progress bar")
+    parser.add_argument("-p", "--progress", action="store_true", help="enable progress bar")
     parser.add_argument("-s", "--start_time", default=None)
     parser.add_argument("-e", "--end_time", default=None)
     parser.add_argument("--relative_time", action="store_true")
@@ -37,19 +36,14 @@ def parser_build(parser):
         help="GMF implementation",
         default=DEFAULT_IMPL,
     )
-    parser.add_argument(
-        "--log-level",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        default="INFO",
-        help="set the log level (default: INFO)",
-    )
     return parser
 
 
 def main(args):
-    # logging
-    logger = logging.getLogger(LOGGER_NAME)
-    logger.setLevel(getattr(logging, args.log_level))
+
+    # Logging
+    logger = logging.getLogger(__name__)
+    logger.setLevel(get_logging_level(args.verbose))
 
     if args.relative_time:
         args.start_time = float(args.start_time)
@@ -84,6 +78,7 @@ def main(args):
         relative_time=args.relative_time,
         progress=args.progress,
         progress_position=job["idx"],
+        logger=logger
     )
 
     logger.info(f"produced {len(results['files'])} files")

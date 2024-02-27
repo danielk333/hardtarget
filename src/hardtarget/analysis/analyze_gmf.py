@@ -8,8 +8,6 @@ from hardtarget.gmf import get_avalible_libs, get_estimation_method, MethodType
 from hardtarget.configuration import load_gmf_params
 from . import utils
 
-logger = logging.getLogger(__name__)
-
 
 ####################################################################
 # ANALYZE GMF
@@ -22,7 +20,7 @@ def compute_gmf(
     start_time=None,
     end_time=None,
     relative_time=False,
-    job={"idx": 0, "N": 1},
+    job=None,
     progress=False,
     progress_position=0,
     subprogress=True,
@@ -30,6 +28,7 @@ def compute_gmf(
     output=None,
     gmf_method=None,
     gmf_implementation=None,
+    logger=None
 ):
     """
     Analyze data using gmf.
@@ -57,6 +56,12 @@ def compute_gmf(
 
     """
 
+    if job is None:
+        job = {"idx": 0, "N": 1}
+
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
     # load data sources
     rx_srcdir, rx_reader, rx_chnl = utils.load_source(rx)
     tx_srcdir, tx_reader, tx_chnl = utils.load_source(tx)
@@ -81,6 +86,7 @@ def compute_gmf(
         params_pro["gmf_implementation"],
         params_pro["gmf_method"],
     )
+
     if lib is None:
         raise ValueError(
             f"Cannot find requested method '{gmf_method}' "
@@ -121,6 +127,7 @@ def compute_gmf(
         num_cohints_per_file,
         bounds,
     )
+
     job_tasks = utils.compute_job_tasks(job, total_tasks)
     job_cohints = (len(job_tasks) - 2) * num_cohints_per_file
 

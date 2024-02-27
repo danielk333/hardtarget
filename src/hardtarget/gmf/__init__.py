@@ -141,4 +141,9 @@ def get_default_method():
         imp = None
         logger.warning("No default estimation method set.")
 
-    return imp, lib
+    # TODO - this function should not return lib, which is a function,
+    # but not clear if hardcoded replacement is always good.
+    # return imp, lib
+    return imp, "fgmf"
+
+
