@@ -1,2 +1,2 @@
-python -m hardtarget.experiments.download examples/data/{example_data.json,}
-hardtarget convert eiscat -o examples/data/leo_bpark_2.1u_NO20220215/leo_bpark_2.1u_NO@uhf{_drf,}
+hardtarget -v download eiscat 20220215 leo_bpark_2.1u_NO uhf --update --progress -o examples/data
+hardtarget -v convert eiscat examples/data/leo_bpark_2.1u_NO@uhf --progress -o examples/data/leo_bpark_2.1u_NO@uhf_drf

@@ -160,7 +160,7 @@ def download(day, product, type, dst,
             # Use tqdm to create a progress bar
             pbar = None
             if progress:
-                pbar = tqdm(desc="Converting files to digital_rf", 
+                pbar = tqdm(desc="Downloading Eiscat raw data", 
                             total=file_size,
                             unit='B',
                             unit_scale=True,
