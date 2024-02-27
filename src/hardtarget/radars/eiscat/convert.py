@@ -9,7 +9,7 @@ import bz2
 import configparser
 from pathlib import Path
 from tqdm import tqdm
-from hardtarget.experiments import load_expconfig
+from . import load_expconfig
 
 """
 Convert Eiscat raw data to DRF format
@@ -127,7 +127,7 @@ def expinfo_split(xpinf):
 ####################################################################
 
 
-def eiscat_convert(srcdir, logger, dstdir=None, compression_level=0, progress=False):
+def convert(srcdir, logger, dstdir=None, compression_level=0, progress=False):
     """
     Converts folder with eiscat measurements to folder with drf files.
 

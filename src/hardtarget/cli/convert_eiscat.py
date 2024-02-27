@@ -1,5 +1,5 @@
 import logging
-from hardtarget.convert.eiscat import eiscat_convert
+from hardtarget.radars.eiscat import convert
 from hardtarget.profiling import get_logging_level
 
 
@@ -36,7 +36,7 @@ def main(args):
     # Logging
     logger = logging.getLogger(__name__)
     logger.setLevel(get_logging_level(args.verbose))
-    eiscat_convert(
+    convert(
         args.input,
         logger,
         dstdir=args.output,

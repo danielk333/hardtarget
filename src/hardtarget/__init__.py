@@ -5,10 +5,10 @@ from . import global_mpi
 
 # Constants and singletons
 from .gmf import GMF_LIBS, Impl, get_estimation_method
-from .experiments import EXP_FILES
+from .radars.eiscat import EXP_FILES
 
 # Functions
-from .experiments import load_expconfig, load_radar_code
+from .radars.eiscat import load_expconfig, load_radar_code
 from .drf_utils import load_hardtarget_drf
 from .configuration import load_gmf_params
 from .analysis import load_gmf_out, compute_gmf

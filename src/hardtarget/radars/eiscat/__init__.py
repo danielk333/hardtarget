@@ -8,7 +8,7 @@ EXP_FILES = {}
 # To be compatible with 3.7-8
 # as resources.files was introduced in 3.9
 if hasattr(importlib.resources, "files"):
-    _data_folder = importlib.resources.files("hardtarget.experiments")
+    _data_folder = importlib.resources.files("hardtarget.radars.eiscat")
     for file in _data_folder.iterdir():
         if not file.is_file():
             continue
@@ -18,9 +18,9 @@ if hasattr(importlib.resources, "files"):
         EXP_FILES[file.name] = file
 
 else:
-    _data_folder = importlib.resources.contents("hardtarget.experiments")
+    _data_folder = importlib.resources.contents("hardtarget.radars.eiscat")
     for fname in _data_folder:
-        with importlib.resources.path("hardtarget.experiments", fname) as file:
+        with importlib.resources.path("hardtarget.radars.eiscat", fname) as file:
             if not file.is_file():
                 continue
             if file.name.endswith(".py"):
@@ -54,3 +54,8 @@ def load_expconfig(xpname):
         return cfg
     except Exception as e:
         raise ValueError(f"Couldn't open config file for {xpname}:" + str(e))
+
+
+from .download import download
+from .convert import convert
+
