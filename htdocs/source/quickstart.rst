@@ -25,20 +25,21 @@ The script will make the result available in the `/data` folder. Using the
 
 .. code-block:: bash
 
-    (.ht) $ tree /data -L 2
-    (.ht) $ /data/
-    (.ht) $ ├── leo_bpark_2.1u_NO@uhf
-    (.ht) $ │   ├── 20220408_08
-    (.ht) $ │   └── 20220408_09
-    (.ht) $ └── leo_bpark_2.1u_NO@uhf_information
-    (.ht) $     └── 20220408
+   (.ht) $ tree /data -L 2
+   (.ht) $ /data/
+   (.ht) $ ├── leo_bpark_2.1u_NO@uhf
+   (.ht) $ │   ├── 20220408_08
+   (.ht) $ │   └── 20220408_09
+   (.ht) $ └── leo_bpark_2.1u_NO@uhf_information
+   (.ht) $     └── 20220408
 
 
 .. note::
 
-    Download from Eiscat is geo-restricted to IP-addresses in Scandinavia.
-    Location-based download also uses a non-standard port number, and may be
-    blocked by an agressive firewall.
+   The download link used in the script is geo-restricted to IP-addresses in
+   Scandinavia. Location-based download also uses a non-standard port number,
+   and may be blocked by an agressive firewall. For data access outside
+   Scandinavia, see `Eiscat Scientific Association <eiscatlink_>`_. 
 
 
 Convert Eiscat radar data
@@ -61,6 +62,7 @@ The script will make the result available in the given folder.
 
 .. code-block:: bash
 
+   (.ht) $ tree /data/drf -L 2
    (.ht) $ /data/drf
    (.ht) $ ├── metadata.ini
    (.ht) $ └── uhf
@@ -72,15 +74,33 @@ The script will make the result available in the given folder.
 Analyze DRF Data
 --------------------------
 
+Run GMF analysis using the following script. The config file `cfg.ini` describes
+processing parameters.
+
 .. code-block:: bash
 
-   (.ht) $ hardtarget -v analyze 20210412/drf uhf --config ~/Dev/Git/hardtarget/examples/cfg/test.ini --progress -o 20210412/gmf -s "2021-04-12T12:15:40" -e "2021-04-12T12:16:10"  -m fgmf -i numpy
+   (.ht) $ hardtarget -v analyze /data/drf uhf --config cfg.ini --progress -o /data/gmf
+
+The script will make the result available in the given folder.
+
+.. code-block:: bash
+
+   (.ht) $ tree /data/gmf -L 2
+   (.ht) $ 20210412/gmf
+   (.ht) $ └── 2021-04-12T12-00-00
+   (.ht) $     ├── gmf-1618229740000000.h5
+   (.ht) $     ├── .......................
+   (.ht) $     └── gmf-1618229768000000.h5
 
 
 Plot GMF Data
 --------------------------
 
-hardtarget plot gmf 20210412/gmf3 -s "2021-04-12T12:15:40" -e "2021-04-12T12:16:10"
+GMF data may be presented using the Hardtarget plotting tool.
+
+.. code-block:: bash
+
+   (.ht) $ hardtarget plot gmf /data/gmf
 
 
 
