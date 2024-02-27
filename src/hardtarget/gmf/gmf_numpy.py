@@ -36,7 +36,7 @@ def fast_gmf_np(z_tx, z_rx, gmf_variables, gmf_params):
     frequency_decimation = gmf_params["PRO"]["frequency_decimation"]
     il1_rx_win = gmf_params["DER"]["il1_rx_window_indices"]
     il0_dec_rx_win = gmf_params["DER"]["il0_dec_rx_window_indices"]
-    dec_read_length = gmf_params["PRO"]["decimated_read_length"]
+    dec_signal_len = gmf_params["PRO"]["decimated_read_length"]
 
     # number of range gates is input from user
     n_acc = acc_phasors.shape[0]
@@ -45,16 +45,14 @@ def fast_gmf_np(z_tx, z_rx, gmf_variables, gmf_params):
         zr = z_rx[il1_rx_win + rg]
         # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter), decimate
         echo = np.sum((zr * z_tx).reshape(-1, frequency_decimation), axis=-1)
-        dec_signal = np.zeros((dec_read_length,), dtype=np.complex64)
+        dec_signal = np.zeros((dec_signal_len,), dtype=np.complex64)
+        # zero-frequency (DC) is used to get range-dependent noise floor
+        gmf_variables.dc[ri] = np.abs(np.sum(echo)) ** 2
 
         for ai in range(n_acc):
             dec_signal[il0_dec_rx_win + drg] = acc_phasors[ai] * echo
             ft2 = np.abs(fft.fft(dec_signal)) ** 2
             mi = np.argmax(ft2)
-            if ai == 0:
-                # zero-frequency (DC) component in scipy.fft.fft output[0] according to docs
-                # used to get range-dependent noise floor
-                gmf_variables.dc[ri] = ft2[0]
 
             if ft2[mi] > gmf_variables.vals[ri]:
                 gmf_variables.vals[ri] = ft2[mi]

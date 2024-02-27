@@ -49,13 +49,14 @@ def print_cuda_devices():
     gmfcudalib.print_devices()
 
 
-def gmfcu(z_tx, z_rx, gmf_variables, gmf_params, gpu_id=0):
-    acc_phasors = gmf_params["DER"]["acceleration_phasors"]
-    rgs = gmf_params["DER"]["rgs"]
+def fast_gmf_cuda(z_tx, z_rx, gmf_variables, gmf_params, gpu_id=0):
+    acc_phasors = gmf_params["DER"]["fgmf_acceleration_phasors"]
+    acc_inds = gmf_params["DER"]["inds_accelerations"]
+    rel_rgs = gmf_params["DER"]["rel_rgs"]
     frequency_decimation = gmf_params["PRO"]["frequency_decimation"]
-    rx_window_indices = gmf_params["DER"]["rx_window_indices"]
-    dec_rx_window_indices = gmf_params["DER"]["dec_rx_window_indices"]
-    dec_signal_len = gmf_params["DER"]["dec_signal_length"]
+    il1_rx_win = gmf_params["DER"]["il1_rx_window_indices"]
+    il0_dec_rx_win = gmf_params["DER"]["il0_dec_rx_window_indices"].astype("i4")
+    dec_signal_len = gmf_params["PRO"]["decimated_read_length"]
 
     error_code = gmfcudalib.gmf(
         z_tx,  # 1
@@ -64,16 +65,17 @@ def gmfcu(z_tx, z_rx, gmf_variables, gmf_params, gpu_id=0):
         z_rx.size,  # 4
         acc_phasors,  # 5
         acc_phasors.shape[0],  # 6
-        rgs,  # 7
-        rgs.size,  # 8
+        rel_rgs,  # 7
+        rel_rgs.size,  # 8
         frequency_decimation,  # 9
         gmf_variables.vals,  # 10
         gmf_variables.dc,  # 11
         gmf_variables.v_ind,  # 12
         gmf_variables.a_ind,  # 13
-        rx_window_indices,  # 14
-        dec_rx_window_indices,  # 15
+        il1_rx_win,  # 14
+        il0_dec_rx_win,  # 15
         dec_signal_len,  # 16
         gpu_id,  # 17
     )
+    gmf_variables.a_ind[:] = acc_inds[gmf_variables.a_ind]
     assert error_code == 0, f"GMF CUDA-function returned error {error_code}"
