@@ -58,7 +58,8 @@ file. Eiscat radar data may be converted to :ref:`drf` using the following scrip
    (.ht) $ hardtarget -v convert eiscat /data/leo_bpark_2.1u_NO@uhf --progress -o /data/drf
 
 
-The script will make the result available in the given folder.
+The script will make the result available in the given folder. The file `metadata.ini` includes
+meta-data about the radar experiment from which the :ref:`drf` product was derived. 
 
 .. code-block:: bash
 
@@ -69,6 +70,17 @@ The script will make the result available in the given folder.
    (.ht) $     ├── 2022-04-08T08-00-00
    (.ht) $     ├── 2022-04-08T09-00-00
    (.ht) $     └── drf_properties.h5
+
+Meta-data may also be obtained using the inspect script.
+
+.. code-block:: bash
+
+   (.ht) $ hardtarget -v inspect drf /data/drf
+   (.ht) $ ...
+   (.ht) $ ... ('start', '2022-04-08 08:32:00')
+   (.ht) $ ... ('end', '2022-04-08 09:01:39.999999')
+   (.ht) $ ...
+
 
 
 Analyze DRF Data
@@ -81,7 +93,7 @@ processing parameters.
 
    (.ht) $ hardtarget -v analyze /data/drf uhf --config cfg.ini --progress -o /data/gmf
 
-The script will make the result available in the given folder.
+The script will make the result available in the given folder. 
 
 .. code-block:: bash
 
@@ -93,6 +105,15 @@ The script will make the result available in the given folder.
    (.ht) $     └── gmf-1618229768000000.h5
 
 
+For large products, analysis may take some time. It is also possible to limit
+the conversion to a time range.
+
+.. code-block:: bash
+
+   (.ht) $ hardtarget -v analyze /data/drf uhf --config cfg.ini --progress -o /data/gmf -s 2022-04-08T08:40:00 -e 2022-04-08T08:40:30
+
+
+
 Plot GMF Data
 --------------------------
 
@@ -100,7 +121,7 @@ GMF data may be presented using the Hardtarget plotting tool.
 
 .. code-block:: bash
 
-   (.ht) $ hardtarget plot gmf /data/gmf
+   (.ht) $ hardtarget plot gmf /data/gmf -s 2022-04-08T08:40:00 -e 2022-04-08T08:40:30
 
 
 

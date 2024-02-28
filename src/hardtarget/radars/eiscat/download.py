@@ -119,12 +119,14 @@ def download(day, product, type, dst,
 
     # create temporary directory at destination
     if tmpdir is None:
-        temp_dir = Path(dst) / f"{str(uuid.uuid4())}"
-    temp_dir.mkdir(exist_ok=True)
+        tmpdir = Path(dst) / f"{str(uuid.uuid4())}"
+    else:
+        tmpdir = Path(tmpdir)
+    tmpdir.mkdir(exist_ok=True)
 
     # zip
     zip_filename = f"{product}{day}.zip"
-    zip_download = temp_dir / zip_filename
+    zip_download = tmpdir / zip_filename
     zip_dst = dst / zip_filename
 
     # check if downloaded zipfile already exists at dst
@@ -156,7 +158,7 @@ def download(day, product, type, dst,
         completed = False
         if response.status_code == 200:
             file_size = int(response.headers.get('Content-Length', 0)) or bytes
-            logger.info(f'Zipfile: {zip_download}')
+            logger.info(f'Download: zipfile: {zip_download}')
             # Use tqdm to create a progress bar
             pbar = None
             if progress:
@@ -178,7 +180,7 @@ def download(day, product, type, dst,
                 except KeyboardInterrupt:
                     logger.warning('\nDownload: terminiated')
                     # cleanup
-                    shutil.rmtree(temp_dir)
+                    shutil.rmtree(tmpdir)
                 if progress:
                     pbar.close()            
         else:
@@ -190,29 +192,29 @@ def download(day, product, type, dst,
     # Extract zip file to random location in dst directory
     with zipfile.ZipFile(zip_download, 'r') as zip_ref:
         logger.info(f'Unzip: {zip_download}')
-        zip_ref.extractall(temp_dir)
+        zip_ref.extractall(tmpdir)
         logger.info('Unzip: completed')
 
     # Move or update datafolder and infofolder
     if data_dst.is_dir():
         # update data
-        for subdir in (temp_dir / data_foldername).iterdir():
+        for subdir in (tmpdir / data_foldername).iterdir():
             target_subdir = data_dst / subdir.name
             if not target_subdir.exists():
                 shutil.move(subdir, target_subdir) 
     else:
         # mv data
-        shutil.move(temp_dir / data_foldername, dst)
+        shutil.move(tmpdir / data_foldername, dst)
 
     if info_dst.is_dir():
         # update info
-        for subdir in (temp_dir / info_foldername).iterdir():
+        for subdir in (tmpdir / info_foldername).iterdir():
             target_subdir = info_dst / subdir.name
             if not target_subdir.exists():
                 shutil.move(subdir, target_subdir) 
     else:
         # mv info
-        shutil.move(temp_dir / info_foldername, dst)
+        shutil.move(tmpdir / info_foldername, dst)
 
     # optionally move zipfile to dst
     if keep_zip:
@@ -220,7 +222,7 @@ def download(day, product, type, dst,
             shutil.move(str(zip_download), dst)
 
     # Cleanup tempdir
-    shutil.rmtree(temp_dir)
+    shutil.rmtree(str(tmpdir))
 
     # Result
     result = {
