@@ -35,6 +35,7 @@ def worker_function(index, size, result_queue, datadir, tmpdir):
         chnl = item["type"]
         targetdir = Path(datadir) / f"{day}_{instrument}_{chnl}"
         targetdir.mkdir(exist_ok=True, parents=True)
+        
         # ok, result = download(day, instrument, chnl, targetdir,
         #                  keep_zip=False, update=False,
         #                  tmpdir=TMPDIR, logger=logger, progress=False)

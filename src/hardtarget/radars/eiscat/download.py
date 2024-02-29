@@ -182,7 +182,7 @@ def download(day, product, type, dst,
                     # cleanup
                     shutil.rmtree(tmpdir)
                 if progress:
-                    pbar.close()            
+                    pbar.close()        
         else:
             logger.info(f"Download: fail - status code: {response.status_code}")
 
