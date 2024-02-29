@@ -3,13 +3,23 @@ Thread-safe Task Manager
 """
 from enum import Enum
 from threading import Lock
-
+import json
 
 class TaskState(Enum):
-    READY = "ready"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    INIT = "init"
+    EXEC = "exec"
+    DONE = "done"
+    FAIL = "fail"
+
+def dump_line(task_id, state, task):
+    return f"{task_id} {state} {task}\n"
+
+def load_line(line):
+    parts = line.split()
+    task_id = parts[0]
+    state = parts[1]
+    task = ' '.join(parts[2:])
+    return task_id, state, task
 
 
 class TaskManager:
@@ -23,21 +33,30 @@ class TaskManager:
             with open(self.file_path, 'a'):  # Create the file if it doesn't exist
                 pass
 
-    def add_task(self, task_identifier):
+    def init(self, tasks_json):
+        tm.clear_tasks()
+        with open(tasks_json, "r") as f:
+            data = json.load(f)
         with self.lock:
             with open(self.file_path, 'a') as file:
-                file.write(f"{task_identifier} {TaskState.READY.value}\n")
+                for idx, item in enumerate(data):
+                    task_id = item.get("id", str(idx))
+                    task_json = json.dumps(item)
+                    line = dump_line(task_id, TaskState.INIT.value, task_json)
+                    file.write(line)
 
-    def get_task_state(self, task_identifier):
+    def get_task_state(self, task_id):
+        assert isinstance(task_id, str)
         with self.lock:
             with open(self.file_path, 'r') as file:
                 for line in file:
-                    name, state = line.strip().split()
-                    if name == task_identifier:
-                        return TaskState(state)
+                    _task_id, _state, _ = load_line(line)
+                    if _task_id == task_id:
+                        return TaskState(_state)
                 return None
 
-    def update_task_state(self, task_identifier, new_state):
+    def update_task_state(self, task_id, new_state):
+        assert isinstance(task_id, str)
         with self.lock:
             if not isinstance(new_state, TaskState):
                 print(f"Invalid state: {new_state}")
@@ -48,9 +67,10 @@ class TaskManager:
 
             with open(self.file_path, 'w') as file:
                 for line in lines:
-                    name, state = line.strip().split()
-                    if name == task_identifier:
-                        file.write(f"{task_identifier} {new_state.value}\n")
+                    _task_id, _, task_json = load_line(line)
+                    if _task_id == task_id:
+                        line = dump_line(task_id, new_state.value, task_json)
+                        file.write(line)
                     else:
                         file.write(line)
 
@@ -59,8 +79,9 @@ class TaskManager:
         with self.lock:
             with open(self.file_path, 'r') as file:
                 for line in file:
-                    name, state = line.strip().split()
-                    tasks.append((name, TaskState(state)))
+                    _task_id, state, task_json = load_line(line)
+                    task = json.loads(task_json)
+                    tasks.append((_task_id, TaskState(state), task))
         return tasks
 
     def clear_tasks(self):
@@ -73,10 +94,12 @@ if __name__ == "__main__":
 
     import argparse
 
+
     parser = argparse.ArgumentParser(description="Manage product tasks.")
-    parser.add_argument("command", choices=["get", "list", "clear"], help="Command to execute")
+    parser.add_argument("command", choices=["init", "get", "list", "clear"], help="Command to execute")
     parser.add_argument("--file", default="tasks.txt", help="Path to the tasks text file")
     parser.add_argument("--task", help="Task identifier")
+    parser.add_argument("--tasks", help="Path to JSON file with task")
 
     args = parser.parse_args()
 
@@ -88,5 +111,9 @@ if __name__ == "__main__":
     elif args.command == "clear":
         tm.clear_tasks()
     elif args.command == "list":
-        for task_identifier, state in tm.list_tasks():
-            print(f"{task_identifier}: {state.value}")
+        for task_id, state, task in tm.list_tasks():
+            print(f"{task_id}: {state.value} {task}")
+    elif args.command == "init":
+        tm.init(args.tasks)
+        
+
