@@ -6,9 +6,10 @@ from threading import Lock
 
 
 class TaskState(Enum):
-    NOT_STARTED = "not_started"
-    STARTED = "started"
+    READY = "ready"
+    RUNNING = "running"
     COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class TaskManager:
@@ -25,7 +26,7 @@ class TaskManager:
     def add_task(self, task_identifier):
         with self.lock:
             with open(self.file_path, 'a') as file:
-                file.write(f"{task_identifier} {TaskState.NOT_STARTED.value}\n")
+                file.write(f"{task_identifier} {TaskState.READY.value}\n")
 
     def get_task_state(self, task_identifier):
         with self.lock:
