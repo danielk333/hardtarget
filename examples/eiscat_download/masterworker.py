@@ -17,12 +17,14 @@ class WorkerState(Enum):
 
 class Worker:
 
-    def __init__(self, worker_id, worker_func, job_queue, result_queue, stop_event, logger=None):
+    def __init__(self, worker_id, worker_func, job_queue, result_queue, stop_event, 
+                 config={}, logger=None):
         self.id = worker_id
         self.worker_func = worker_func
         self.job_queue = job_queue
         self.result_queue = result_queue
         self.stop_event = stop_event
+        self.config = config
         self.logger = logger
         if self.logger is None:
             self.logger = logging.getLogger(__name__)
@@ -41,8 +43,7 @@ class Worker:
             if task is None:
                 continue
             try:
-                self.logger.info(f"Worker {self.id}: {task[0]}")
-
+                self.logger.info(f'Worker {self.id}: {task[0]}')
                 # Process the job (you can replace this with your actual job processing logic)
                 ok, result = self.worker_func(self, task[2])
                 # Put the result into the result queue
@@ -53,11 +54,12 @@ class Worker:
 
 class Master:
 
-    def __init__(self, num_workers, worker_func, task_file, logger=None):
+    def __init__(self, num_workers, worker_func, config={}, tasks=None, logger=None):
         self.job_queue = multiprocessing.Queue()
         self.result_queue = multiprocessing.Queue()
         self.stop_event = multiprocessing.Event()
-        self.tm = TaskManager(task_file)
+        self.config = config
+        self.tm = TaskManager(file_path=tasks)
         self.logger = logger
         if self.logger is None:
             self.logger = logging.getLogger(__name__)
@@ -68,6 +70,7 @@ class Master:
                             self.job_queue,
                             self.result_queue,
                             self.stop_event,
+                            config=self.config,
                             logger=self.logger
                             )
             return {
@@ -116,7 +119,8 @@ class Master:
             for task in batch:
                 self.tm.update_task_state(task[0], TaskState.EXEC)
                 self.job_queue.put(task)
-            self.logger.info(f"Master: put {[tup[0] for tup in batch]}")
+            if batch:
+                self.logger.info(f"Master: put {[tup[0] for tup in batch]}")
         else:
             # no more to do
             self.logger.info("Nothing more to do")
@@ -140,6 +144,7 @@ class Master:
                 self.logger.info(f"Master get {task[0]}")
                 if not ok:
                     self.tm.update_task_state(task[0], TaskState.FAIL)
+                    self.logger.error(result)
                 else:
                     self.tm.update_task_state(task[0], TaskState.DONE)
             except queue.Empty:
@@ -161,16 +166,22 @@ if __name__ == "__main__":
     def worker_func(worker, task):
         return True, "result"
 
+    # Task file is split up between workers
+    # Config is shared with all workers
     task_file = "tasks.txt"
+    config = {"dst": "/foo/bar"}
 
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    ch = logging.StreamHandler()
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
+    # ch = logging.StreamHandler()
+    # formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    # ch.setFormatter(formatter)
+    # logger.addHandler(ch)
 
-    master = Master(2, worker_func, task_file, logger=logger)
+    master = Master(2, worker_func, 
+                    config=config,
+                    tasks=task_file, 
+                    logger=logger)
     master.start_workers()
     try:
         master.run()

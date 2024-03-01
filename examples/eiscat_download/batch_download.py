@@ -1,79 +1,70 @@
 """
 Testing multiprocessing
 """
-import json
-import  multiprocessing
-import logging
-from hardtarget.radars.eiscat import download
 from pathlib import Path
+from hardtarget.radars.eiscat import download
 
 
-def load_products(jsonfile, index, size):
-    products = []
-    with open(jsonfile, "r") as f:
-        data = json.load(f)
-        products = list(enumerate(data))[index::size]
-    return products
+def process(worker, task):
+    """
+    Wrapper function for Eiscat download.
+    """
+    day = task["date"]
+    instrument = task["experiment"]
+    chnl = task["type"]
+    dst_dir = worker.config["dst"]
+    tmp_dir = worker.config["tmp"]
 
+    if not Path(dst_dir).is_dir():
+        return False, f"config['dst']> is not directory {dst_dir}"
 
-def worker_function(index, size, result_queue, datadir, tmpdir):
-    print(f"Process {index} started.")
+    if not Path(tmp_dir).exists():
+        return False, f"config['tmp']> is not directory {tmp_dir}"
 
-    # load json products
-    products = load_products(PRODUCTS_JSON, index, size)
+    target_dir = Path(dst_dir) / f"{day}-{instrument}-{chnl}"
+    target_dir.mkdir(exist_ok=True, parents=True)
 
-    # mock products
-    products = [(44, {'date': '20220408', "experiment": 'leo_bpark_2.1u_NO', "type": 'uhf'})]
-
-    # download
-    completed = []
-    for product in products:
-
-        idx, item = product
-        day = item["date"]
-        instrument = item["experiment"]
-        chnl = item["type"]
-        targetdir = Path(datadir) / f"{day}_{instrument}_{chnl}"
-        targetdir.mkdir(exist_ok=True, parents=True)
-        
-        # ok, result = download(day, instrument, chnl, targetdir,
-        #                  keep_zip=False, update=False,
-        #                  tmpdir=TMPDIR, logger=logger, progress=False)
-        ok = True
-        if ok:
-            completed.append(product)
-
-    result_queue.put(completed)
+    # Download
+    return download(day, instrument, chnl, target_dir,
+                    keep_zip=False,
+                    update=False,
+                    tmpdir=tmp_dir,
+                    logger=worker.logger,
+                    progress=True)
 
 
 if __name__ == "__main__":
 
-    N_PROCESSES = 1
-    PRODUCTS_JSON = "batch.json"
-    DATADIR = "data/"
-    TMPDIR = "/tmp"
-    # logger = logging.getLogger(__name__)
-    # logger.setLevel(logging.INFO)
+    import logging
+    from masterworker import Master
 
-    processes = []
-    result_queue = multiprocessing.Queue()
+    PROJECT_T_DISK = "/NORCE/Data/600/60090/106119 - Space Debris radar characterization"
 
-    # Start 9 processes, passing an argument to each
-    for index in range(0, N_PROCESSES):
-        args = (index, N_PROCESSES, result_queue, DATADIR, TMPDIR)
-        process = multiprocessing.Process(target=worker_function, args=args)
-        processes.append(process)
-        process.start()
+    cfg = {
+        # "tmp": f"{PROJECT_T_DISK}/scratch",
+        "tmp": "/tmp",
+        "dst": PROJECT_T_DISK
+    }
 
-    # Wait for all processes to complete
-    for process in processes:
-        process.join()
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    #formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    #ch = logging.StreamHandler()
+    #ch.setFormatter(formatter)
+    #logger.addHandler(ch)
 
-    results = []
-    while not result_queue.empty():
-        results.extend(result_queue.get())
+    WORKERS = 1
+    TASKS = "single_tasks.txt"
 
-    # sort by index
+    master = Master(WORKERS, process,
+                    config=cfg,
+                    tasks=TASKS,
+                    logger=logger)
 
-    print("All processes have completed.")
-    print(results)
+    master.start_workers()
+    try:
+        master.run()
+    except KeyboardInterrupt:
+        master.stop_workers()
+        master.join_workers()
+        print()

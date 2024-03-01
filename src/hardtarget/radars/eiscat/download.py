@@ -5,6 +5,7 @@ from tqdm import tqdm
 from itertools import chain
 import uuid
 import shutil
+import os
 import logging
 
 try:
@@ -24,8 +25,8 @@ def format_bytes(size):
 
 
 # Start 
-# DAY=20161021 PRODUCT=leo_bpark_2.5u_3P
-# url to product page
+# DAY=20161021 INSTRUMENT=leo_bpark_2.5u_3P
+# url
 # https://portal.eiscat.se/schedule/tape2.cgi?exp=leo_bpark_2.5u_3P&date=20161021
 # url to download page
 # https://portal.eiscat.se/schedule/tape2.cgi?date=20161021&exp=leo_bpark_2.5u_3P&dl=1
@@ -43,14 +44,11 @@ QUERY_URL = "https://portal.eiscat.se/schedule/tape2.cgi"
 DOWNLOAD_URL = "https://rebus.eiscat.se:37009"
 
 
-def get_download_nodes(day, product, logger=None):
+def get_download_nodes(day, instrument, logger=None):
     """
     Extract node identifiers from download page
     """
-    if logger is None:
-        logger = logging.getLogger(__name__)
-
-    url = f"{QUERY_URL}?exp={product}&date={day}&dl=1"
+    url = f"{QUERY_URL}?exp={instrument}&date={day}&dl=1"
     response = requests.get(url)
     if response.status_code == 200:
         html_content = response.text
@@ -81,167 +79,242 @@ def get_download_nodes(day, product, logger=None):
             elif type == "info":
                 # tds[4]
                 tokens = tds[4].text.split(" ")
-                node["exp"] = {"type": tokens[1], "name": tokens[2]}
+                node["exp"] = {"chnl": tokens[1], "instrument": tokens[2]}
             nodes.append(node)
         return nodes
     else:
-        logger.error(f"Failed to fetch the HTML content. Status code: {response.status_code}")
+        if logger:
+            logger.error(f"Failed to fetch the HTML content. Status code: {response.status_code}")
         return []
 
 
-def download(day, product, type, dst, 
-             keep_zip=False, update=False, 
-             tmpdir=None, logger=None, progress=False):
+def download_zip(day, instrument, chnl, dst, logger=None, progress=False):
     """
-    download and extract zip file for (product_name, day, type) to dst folder.
+    download zip file for (day, instrument, chnl) to dst folder.
     """
-    # logging
-    if logger is None:
-        logger = logging.getLogger(__name__)
-
-    # destination folders
-    data_foldername = f'{product}@{type.lower()}'
-    info_foldername = f'{product}@{type.lower()}_information'
     dst = Path(dst)
+
     if not dst.is_dir():
-        logger.warning(f"DST is not a directory {dst}")
+        if logger:
+            logger.warning(f"DST is not a directory {dst}")
         return False, None
-    data_dst = dst / data_foldername
-    info_dst = dst / info_foldername
-
-    # check if destination folders already exists
-    if data_dst.exists() and not update:
-        logger.warning(f'Data directory already exists: {data_dst}')
-        return False
-    if info_dst.exists() and not update:
-        logger.warning(f'Info directory already exists: {info_dst}')
-        return False, None
-
-    # create temporary directory at destination
-    if tmpdir is None:
-        tmpdir = Path(dst) / f"{str(uuid.uuid4())}"
-    else:
-        tmpdir = Path(tmpdir)
-    tmpdir.mkdir(exist_ok=True)
 
     # zip
-    zip_filename = f"{product}{day}.zip"
-    zip_download = tmpdir / zip_filename
-    zip_dst = dst / zip_filename
+    zip_filename = f"{instrument}-{day}-{chnl}.zip"
+    zip_download = dst / zip_filename
 
-    # check if downloaded zipfile already exists at dst
-    if zip_dst.exists():
-        logger.info(f"Zipfile exists: {zip_dst}")
-        zip_download = zip_dst
-    else:
-        # Fetch download nodes
-        nodes = get_download_nodes(day, product, logger=logger)
-        data_nodes = [node for node in nodes if node["type"] == "data"]
-        info_nodes = [node for node in nodes if node["type"] == "info"]
+    # check if downloaded zipfile already exists
+    if zip_download.exists():
+        if logger:
+            logger.info(f"Zipfile exists: {zip_download}")
+        zip_download = zip_download
+        return True, {"path": str(zip_download)}
 
-        # check that data matches given type
-        _type = info_nodes[0]["exp"]["type"]
-        if type.casefold() != _type.casefold():
-            logger.warning(f"Mismatch experiment type, given: {type}, actual {_type}")
-            return False, None
+    # Fetch download nodes
+    nodes = get_download_nodes(day, instrument, logger=logger)
+    data_nodes = [node for node in nodes if node["type"] == "data"]
+    info_nodes = [node for node in nodes if node["type"] == "info"]
 
-        # Size
-        bytes = sum([node["bytes"] for node in data_nodes])
-        size = format_bytes(bytes)
+    # check that data matches given chnl
+    _chnl = info_nodes[0]["exp"]["chnl"]
+    if chnl.casefold() != _chnl.casefold():
+        if logger:
+            logger.warning(f"Mismatch experiment chnl, given: {chnl}, actual {_chnl}")
+        return False, None
 
-        # Download
-        logger.info(f'Product: {product} {day} {size}')
+    # Size
+    bytes = sum([node["bytes"] for node in data_nodes])
+    size = format_bytes(bytes)
 
-        node_ids = [node["id"] for node in nodes]
-        zip_url = f'{DOWNLOAD_URL}/{";".join(node_ids)}/{zip_filename}'
-        response = requests.get(zip_url, stream=True)
-        completed = False
-        if response.status_code == 200:
-            file_size = int(response.headers.get('Content-Length', 0)) or bytes
+    # Download
+    if logger:
+        logger.info(f'Product: {instrument} {day} {size}')
+
+    node_ids = [node["id"] for node in nodes]
+    zip_url = f'{DOWNLOAD_URL}/{";".join(node_ids)}/{zip_filename}'
+    response = requests.get(zip_url, stream=True)
+    completed = False
+    if response.status_code == 200:
+        file_size = int(response.headers.get('Content-Length', 0)) or bytes
+        if logger:
             logger.info(f'Download: zipfile: {zip_download}')
-            # Use tqdm to create a progress bar
-            pbar = None
-            if progress:
-                pbar = tqdm(desc="Downloading Eiscat raw data", 
-                            total=file_size,
-                            unit='B',
-                            unit_scale=True,
-                            unit_divisor=1024
-                            )
+        # Use tqdm to create a progress bar
+        pbar = None
+        if progress:
+            pbar = tqdm(desc="Downloading Eiscat raw data",
+                        total=file_size,
+                        unit='B',
+                        unit_scale=True,
+                        unit_divisor=1024
+                        )
 
-            with open(zip_download, 'wb') as file:
-                try:
-                    for data in response.iter_content(chunk_size=1024):
-                        file.write(data)
-                        if progress:
-                            pbar.update(len(data))
-                    completed = True
+        with open(zip_download, 'wb') as file:
+            try:
+                for data in response.iter_content(chunk_size=1024):
+                    file.write(data)
+                    if progress:
+                        pbar.update(len(data))
+                completed = True
+                if logger:
                     logger.info("Download: completed")
-                except KeyboardInterrupt:
+            except KeyboardInterrupt:
+                if logger:
                     logger.warning('\nDownload: terminiated')
-                    # cleanup
-                    shutil.rmtree(tmpdir)
-                if progress:
-                    pbar.close()        
-        else:
+                # cleanup
+                os.remove(zip_download)
+            if progress:
+                pbar.close()
+    else:
+        if logger:
             logger.info(f"Download: fail - status code: {response.status_code}")
 
-        if not completed:
-            return False, None
+    if not completed:
+        return False, None
+    else:
+        return True, {"path": str(zip_download)}
+
+
+def extract_zip(zip_download, dst, cleanup=True, logger=None):
+
+    zip_download = Path(zip_download)
+    dst = Path(dst)
+
+    if not zip_download.is_file():
+        return False, f"Zipfile: missing {zip_download}"
+
+    if not dst.is_dir():
+        return False, f"No dst directory {dst}"
+
+    # make temporary extraction folder
+    # extract_dir = dst / str(uuid.uuid4())
+    # extract_dir.mkdir(exist_ok=True, parents=True)
+
+    if logger:
+        logger.info(f"Unzip: start {dst}")
 
     # Extract zip file to random location in dst directory
     with zipfile.ZipFile(zip_download, 'r') as zip_ref:
-        logger.info(f'Unzip: {zip_download}')
-        zip_ref.extractall(tmpdir)
-        logger.info('Unzip: completed')
+        paths = [Path(p) for p in zip_ref.namelist()]
+        rootpaths = list(set([p.parts[0] for p in paths]))
+        extract_dirs = [dst / p for p in rootpaths]
+        # could check if extracted dirs already exist
+        zip_ref.extractall(dst)
 
-    # Move or update datafolder and infofolder
-    if data_dst.is_dir():
-        # update data
-        for subdir in (tmpdir / data_foldername).iterdir():
-            target_subdir = data_dst / subdir.name
-            if not target_subdir.exists():
-                shutil.move(subdir, target_subdir) 
+    if cleanup:
+        os.remove(str(zip_download))
+
+    if logger:
+        logger.info(f"Unzip: done {extract_dirs}")
+
+    return True, {"paths": [str(p) for p in extract_dirs]}
+
+
+def move_tree(src, dst, update=False, logger=None):
+    src = Path(src)
+    dst = Path(dst)
+    if not dst.is_dir():
+        return False, f"No <dst> directory {dst}"
+
+    # move src to dst
+    if update and dst.is_dir():
+        # update
+        # move subfolders of src individually - if not exists
+        for src_subdir in src.iterdir():
+            dst_subdir = dst / src_subdir.name
+            if not dst_subdir.exists():
+                shutil.move(str(src_subdir), str(dst_subdir))
     else:
-        # mv data
-        shutil.move(tmpdir / data_foldername, dst)
+        # move
+        shutil.move(str(src), str(dst))
 
-    if info_dst.is_dir():
-        # update info
-        for subdir in (tmpdir / info_foldername).iterdir():
-            target_subdir = info_dst / subdir.name
-            if not target_subdir.exists():
-                shutil.move(subdir, target_subdir) 
-    else:
-        # mv info
-        shutil.move(tmpdir / info_foldername, dst)
+    return True, {"path": str(dst / src.name)}
 
-    # optionally move zipfile to dst
-    if keep_zip:
-        if not zip_dst.exists():
-            shutil.move(str(zip_download), dst)
 
-    # Cleanup tempdir
-    shutil.rmtree(str(tmpdir))
+def download(day, instrument, chnl, dst,
+             tmp=None, logger=None, update=False, progress=True):
+    """
+    Complete function, download, extract and move.
+    """
+    if tmp is None:
+        tmp = dst
 
-    # Result
-    result = {
-        "data": str(data_dst), 
-        "info": str(info_dst)
-    }
-    if keep_zip:
-        result["zip"] = str(dst / zip_filename)
+    tmp = Path(tmp)
+    dst = Path(dst)
 
-    logger.info(f"Completed: {str(result)}")
-    return True, result
+    if not dst.is_dir():
+        return False, f"No <dst> directory {dst}"
+
+    # check if results are already present in dst
+    if not update:
+        data_path = dst / f"{instrument}@{chnl}"
+        info_path = dst / f"{instrument}@{chnl}_information"
+        result = [str(p) for p in [data_path, info_path] if p.is_dir()]
+        if result:
+            return True, result
+
+    # download zip to tmp
+    ok, result = download_zip(day, instrument, chnl, tmp,
+                              logger=logger, progress=progress)
+
+    if not ok:
+        return False, result
+
+    # extract zip in tmp
+    zipfile = result["path"]
+    ok, result = extract_zip(zipfile, tmp, logger=logger)
+    if not ok:
+        return False, result
+
+    # move to dst
+    if tmp != dst:
+        results = []
+        for dir in result["paths"]:
+            _ok, _result = move_tree(dir, dst)
+            if _ok:
+                results.append(_result)
+
+    return ok, results
 
 
 if __name__ == '__main__':
 
     day = '20220408'
-    name = 'leo_bpark_2.1u_NO'
-    type = 'uhf'
+    instrument = 'leo_bpark_2.1u_NO'
+    chnl = 'uhf'
     logging.basicConfig(level=logging.INFO)
-    # nodes = get_download_nodes(day , name)
-    download(day, name, type, "/tmp", 
-             update=True, keep_zip=True)
+
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+
+    def test_download_nodes():
+        nodes = get_download_nodes(day, instrument)
+        import pprint
+        pprint.pprint(nodes)
+
+    def test_download_zip():
+        dst = "."
+        ok, result = download_zip(day, instrument, chnl, dst, logger=logger, progress=True)
+        print(ok, result)
+
+    def test_extract():
+        zip = "leo_bpark_2.1u_NO-20220408-uhf.zip"
+        dst = "."
+        ok, result = extract_zip(zip, dst, logger=logger)
+        print(ok, result)
+
+    def test_move():
+        dst = "3a79f529-6a94-418d-b42e-cbc676036489"
+        src = "dst"
+        ok, result = move_tree(src, dst, logger=logger)
+        print(ok, result)
+
+    def test_download():
+        tmp = "tmp"
+        dst = "dst"
+        ok, result = download(day, instrument, chnl, dst, tmp=tmp, logger=logger, progress=True)
+        print(ok, result)
+
+    # test_download_zip()
+    # test_extract()
+    # test_move()
+    test_download()
