@@ -3,7 +3,6 @@ from pathlib import Path
 import zipfile
 from tqdm import tqdm
 from itertools import chain
-import uuid
 import shutil
 import os
 import logging
