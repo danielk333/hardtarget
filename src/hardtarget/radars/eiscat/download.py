@@ -6,6 +6,7 @@ from itertools import chain
 import shutil
 import os
 import logging
+import subprocess
 
 try:
     from lxml import html
@@ -57,7 +58,7 @@ def get_download_nodes(day, instrument, logger=None):
         checkboxes = tree.xpath('//input[@type="checkbox"]')
         trs = [cb.xpath('./ancestor::tr[1]') for cb in checkboxes]
         flattened_trs = list(chain.from_iterable(trs))
-
+        product_nodes = []
         nodes = []
         for tr in flattened_trs:
             tds = tr.xpath('.//td')
@@ -80,14 +81,17 @@ def get_download_nodes(day, instrument, logger=None):
                 tokens = tds[4].text.split(" ")
                 node["exp"] = {"chnl": tokens[1], "instrument": tokens[2]}
             nodes.append(node)
-        return nodes
+            if type == "info":
+                product_nodes.append(nodes)
+                nodes = []
+        return product_nodes
     else:
         if logger:
             logger.error(f"Failed to fetch the HTML content. Status code: {response.status_code}")
         return []
 
 
-def download_zip(day, instrument, chnl, dst, logger=None, progress=False):
+def download_zip(day, instrument, chnl, dst, logger=None, progress=False, wget=True):
     """
     download zip file for (day, instrument, chnl) to dst folder.
     """
@@ -110,13 +114,21 @@ def download_zip(day, instrument, chnl, dst, logger=None, progress=False):
         return True, {"path": str(zip_download)}
 
     # Fetch download nodes
-    nodes = get_download_nodes(day, instrument, logger=logger)
-    data_nodes = [node for node in nodes if node["type"] == "data"]
-    info_nodes = [node for node in nodes if node["type"] == "info"]
+    product_nodes = get_download_nodes(day, instrument, logger=logger)
 
-    # check that data matches given chnl
-    _chnl = info_nodes[0]["exp"]["chnl"]
-    if chnl.casefold() != _chnl.casefold():
+    # select product
+    data_nodes = []
+    info_nodes = []
+    for nodes in product_nodes:
+        data_nodes = [node for node in nodes if node["type"] == "data"]
+        info_nodes = [node for node in nodes if node["type"] == "info"]
+
+        # check that data matches given chnl
+        _chnl = info_nodes[0]["exp"]["chnl"]
+        if chnl.casefold() != _chnl.casefold():
+            continue
+
+    if len(data_nodes) == 0:
         if logger:
             logger.warning(f"Mismatch experiment chnl, given: {chnl}, actual {_chnl}")
         return False, None
@@ -125,49 +137,74 @@ def download_zip(day, instrument, chnl, dst, logger=None, progress=False):
     bytes = sum([node["bytes"] for node in data_nodes])
     size = format_bytes(bytes)
 
+    # Url
+    node_ids = [node["id"] for node in nodes]
+    zip_url = f"{DOWNLOAD_URL}/{';'.join(node_ids)}/{instrument}{day}.zip"
+
     # Download
     if logger:
         logger.info(f'Product: {instrument} {day} {size}')
+        logger.info(f'Url: {zip_url}')
 
-    node_ids = [node["id"] for node in nodes]
-    zip_url = f'{DOWNLOAD_URL}/{";".join(node_ids)}/{zip_filename}'
-    response = requests.get(zip_url, stream=True)
     completed = False
-    if response.status_code == 200:
-        file_size = int(response.headers.get('Content-Length', 0)) or bytes
-        if logger:
-            logger.info(f'Download: zipfile: {zip_download}')
-        # Use tqdm to create a progress bar
-        pbar = None
-        if progress:
-            pbar = tqdm(desc="Downloading Eiscat raw data",
-                        total=file_size,
-                        unit='B',
-                        unit_scale=True,
-                        unit_divisor=1024
-                        )
+    code = None
 
-        with open(zip_download, 'wb') as file:
-            try:
-                for data in response.iter_content(chunk_size=1024):
-                    file.write(data)
-                    if progress:
-                        pbar.update(len(data))
+    if wget:
+        # WGET
+        command = ["wget", zip_url, "-P", str(dst), "-O", zip_filename]
+        if not progress:
+            command.append("-q")
+
+        try:
+            result = subprocess.run(command)
+            if result.returncode == 0:
                 completed = True
-                if logger:
-                    logger.info("Download: completed")
-            except KeyboardInterrupt:
-                if logger:
-                    logger.warning('\nDownload: terminiated')
-                # cleanup
-                os.remove(zip_download)
-            if progress:
-                pbar.close()
+            else:
+                code = result.returncode
+        except KeyboardInterrupt:
+            pass
+
     else:
-        if logger:
-            logger.info(f"Download: fail - status code: {response.status_code}")
+        # REQUESTS
+        response = requests.get(zip_url, stream=True)
+        if response.status_code == 200:
+            file_size = int(response.headers.get('Content-Length', 0)) or bytes
+            if logger:
+                logger.info(f'Download: zipfile: {zip_download}')
+            # Use tqdm to create a progress bar
+            pbar = None
+            if progress:
+                pbar = tqdm(desc="Downloading Eiscat raw data",
+                            total=file_size,
+                            unit='B',
+                            unit_scale=True,
+                            unit_divisor=1024
+                            )
+
+            with open(zip_download, 'wb') as file:
+                try:
+                    for data in response.iter_content(chunk_size=1024):
+                        file.write(data)
+                        if progress:
+                            pbar.update(len(data))
+                    completed = True
+                    if logger:
+                        logger.info("Download: completed")
+                except KeyboardInterrupt:
+                    pass
+                if progress:
+                    pbar.close()
+        else:
+            code = response.status_code
 
     if not completed:
+        # cleanup
+        os.remove(zip_download)
+        if logger:
+            if code is None:
+                logger.warning('Download: terminiated')                 
+            else:
+                logger.info(f"Download: fail - status code: {code}")
         return False, None
     else:
         return True, {"path": str(zip_download)}
@@ -291,6 +328,9 @@ if __name__ == '__main__':
         pprint.pprint(nodes)
 
     def test_download_zip():
+        day = '20101125'
+        instrument = 'leo_sat_1.0l_EI'
+        chnl = '42m'
         dst = "."
         ok, result = download_zip(day, instrument, chnl, dst, logger=logger, progress=True)
         print(ok, result)
@@ -316,4 +356,4 @@ if __name__ == '__main__':
     # test_download_zip()
     # test_extract()
     # test_move()
-    test_download()
+    # test_download()
