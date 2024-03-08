@@ -121,9 +121,6 @@ def download_zip(day, instrument, chnl, dst, logger=None, progress=False, wget=F
             logger.warning(f"No product nodes")
         return False, None
 
-    import pprint
-    pprint.pprint(product_nodes)
-
     # select product
     data_nodes = []
     info_nodes = []
