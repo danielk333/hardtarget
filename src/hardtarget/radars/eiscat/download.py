@@ -91,7 +91,7 @@ def get_download_nodes(day, instrument, logger=None):
         return []
 
 
-def download_zip(day, instrument, chnl, dst, logger=None, progress=False, wget=True):
+def download_zip(day, instrument, chnl, dst, logger=None, progress=False, wget=False):
     """
     download zip file for (day, instrument, chnl) to dst folder.
     """
@@ -116,6 +116,14 @@ def download_zip(day, instrument, chnl, dst, logger=None, progress=False, wget=T
     # Fetch download nodes
     product_nodes = get_download_nodes(day, instrument, logger=logger)
 
+    if len(product_nodes) == 0:
+        if logger:
+            logger.warning(f"No product nodes")
+        return False, None
+
+    import pprint
+    pprint.pprint(product_nodes)
+
     # select product
     data_nodes = []
     info_nodes = []
@@ -127,6 +135,9 @@ def download_zip(day, instrument, chnl, dst, logger=None, progress=False, wget=T
         _chnl = info_nodes[0]["exp"]["chnl"]
         if chnl.casefold() != _chnl.casefold():
             continue
+        else:
+            # found first
+            break
 
     if len(data_nodes) == 0:
         if logger:
