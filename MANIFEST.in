@@ -9,4 +9,7 @@ include src/gmf_cuda_lib/*.h
 include src/gmf_cuda_lib/Makefile
 
 # Include docs
-graft docs
+include docs/source/*.rst
+
+# Include examples
+# include examples/*.py
