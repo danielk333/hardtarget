@@ -66,4 +66,4 @@ Full developer install.
 
 .. code-block:: bash
 
-   (.ht) $ pip install -e .[mpi, develop, plotting, profiling]
+   (.ht) $ pip install -e .[mpi,develop,plotting,profiling]

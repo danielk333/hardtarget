@@ -40,13 +40,3 @@ def main(args):
         ))
 
     pprint.pprint(d)
-
-
-# add_command(
-#     name="info_drf",
-#     function=main,
-#     parser_build=parser_build,
-#     add_parser_args=dict(
-#         description="Script for printing drf metadata.",
-#     ),
-# )
