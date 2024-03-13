@@ -115,8 +115,7 @@ def expinfo_split(xpinf):
     """
     try:
         # host, name, versi, owner = \
-        match = re.match(r"(\w+) +(\w+)_(\d+(?:\.\d+)?[vu])_([A-Z]{2})", xpinf)
-        # return host, name, '_'.join(ver.spl, [site]), owner
+        match = re.match(r"(\w+) +(\w+)_(\d+(?:\.\d+)?[a-z]*)_(\w+)", xpinf)
         return match.groups()
     except Exception as e:
         raise ValueError(f"d_ExpInfo: {xpinf} not understood: {e}")
