@@ -113,6 +113,10 @@ def get_avalible_libs(indent=""):
     st = ""
     for imp in Impl:
         st += indent + f"[{imp.value}]:\n"
+        if len(GMF_LIBS[imp]) == 0:
+            st += "[No implementations]\n"
+            continue
+
         max_name_len = max([len(name) for name in GMF_LIBS[imp]])
         for name, (func, mtype) in GMF_LIBS[imp].items():
             st += indent + f" - {name.ljust(max_name_len, ' ')} ({mtype.value} method)\n"
