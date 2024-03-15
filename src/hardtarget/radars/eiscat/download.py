@@ -325,8 +325,7 @@ if __name__ == '__main__':
     day = '20220408'
     instrument = 'leo_bpark_2.1u_NO'
     chnl = 'uhf'
-    logging.basicConfig(level=logging.INFO)
-
+    # logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
 

@@ -121,6 +121,152 @@ def expinfo_split(xpinf):
         raise ValueError(f"d_ExpInfo: {xpinf} not understood: {e}")
 
 
+
+####################################################################
+# GET METADATA
+####################################################################
+
+def get_metadata(srcdir):
+    """
+    get metadata from src directory
+    """
+
+    # check srcdir
+    if not Path(srcdir).is_dir():
+        return
+    
+    files = list(all_files(str(srcdir)))
+    files.sort()
+
+    # extrac meta data from first file
+    pth = files[0]
+
+    # load start time from parameter block of first matlab file
+    mat = loadmat(pth)
+    upar = mat["d_parbl"][0, 41:62]
+    radar_frequency = upar[13]
+
+    # Find experiment info from first file
+    host, expname, expvers, owner = expinfo_split(str(mat["d_ExpInfo"][0]))
+
+    cfg = load_expconfig(expname)
+    cfv = cfg[expvers]  # config for this version of the experiment (mode)
+
+    return {
+        "cfv": cfv,
+        "files": files,
+        "n0": determine_n0(mat, cfv),
+        "chnl": cfv.get("rx_channel", "tbd")
+    }
+
+
+
+
+####################################################################
+# EISCAT CONVERT BATCH
+####################################################################
+
+def convert_batch(srcdir, dstdir, files, file_indexes, 
+                  compression_level=0, progress=False,
+                  logger=None):
+
+    """
+    file_indexes:
+        - list of indexes in the files list 
+
+    """
+
+
+    meta = get_metadata(srcdir)
+    if meta is None:
+        if logger:
+            logger.warning("no metadata", srcdir)
+        return False
+
+    # create dstdir/chnldir if not exists
+    dstdir = Path(dstdir)
+    if dstdir.is_file():
+        if logger:
+            logger.warning("dst dir is a file", dstdir)
+        return False
+    chnldir = dstdir / meta["chnl"]
+    chnldir.mkdir(exist_ok=True, parents=True)
+
+    # create digital rf writer
+    rf_writer = drf.DigitalRFWriter(
+        str(chnldir),  # directory
+        np.int16,  # dtype
+        3600,  # subdir cadence secs    => one dir per hour
+        1000,  # file cadence millisecs => one file per second
+        meta["n0"],  # start global index
+        meta["sample_rate"],  # sample rate numerator
+        1,  # sample rate denominator
+        uuid_str=meta["chnl"],
+        compression_level=compression_level,
+        checksum=False,
+        is_complex=True,
+        num_subchannels=1,
+        is_continuous=True,
+        marching_periods=False,
+    )
+
+    # variables
+    cfv = meta["cfv"]
+    n0 = meta["n0"]
+    n_files = len(files)
+    sample_rate = int(cfv.get("sample_rate"))  # assuming integral # samples per second
+    file_secs = float(cfv.get("file_secs"))
+    n_samples = round(file_secs * sample_rate)
+    n_prev = n0 - n_samples
+
+    # make file batch
+    batch = []
+    for idx in file_indexes:
+        if idx < 0 or n_files <= idx:
+            continue
+        batch.append(files[idx])
+
+
+    # write file batch
+    n_batch = len(batch)
+    logger.info(f"writing DRF from {n_batch} input files")
+    if progress:
+        pbar = tqdm(desc="Converting files to digital_rf", total=n_batch)
+
+    for num, file in enumerate(batch):
+        if num + 1 == n_batch or num % 10 == 0:
+            logger.debug(f"write progress {num+1}/{n_batch}")
+        mat = loadmat(file)
+        n0 = determine_n0(mat, cfv)
+        logger.debug(f"n_samp {n0 - n_prev} (should be {n_samples})")
+        if n0 - n_prev != n_samples:
+            # zero padding
+            n_pad = (n0 - n_prev) - n_samples
+            try:
+                rf_writer.rf_write(np.zeros(n_pad*2, dtype=np.int16))
+            except Exception:
+                logger.warning("unable to pad out for missing files ... continuing")
+
+        zz = to_i2x16(mat["d_raw"][:, 0])
+        if len(zz) != n_samples:
+            logger.warning(f"found {len(zz)} samples in {file}['d_raw'], expected {n_samples}")
+        try:
+            rf_writer.rf_write(zz)
+        except Exception as e:
+            logger.warning(f"unable to write samples from {file} to file ... continuing")
+            raise e
+        n_prev = n0
+        if progress:
+            pbar.update(1)
+    if progress:
+        pbar.close()
+
+    logger.info("Done writing DRF files")
+
+
+
+
+
 ####################################################################
 # EISCAT CONVERT
 ####################################################################
