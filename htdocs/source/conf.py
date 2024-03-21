@@ -21,6 +21,10 @@ author = "Daniel Kastinen, Juha Vierinen, et al."
 
 extensions = [
     'sphinx_rtd_theme',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.autosummary",
 ]
 
 templates_path = ['_templates']
@@ -34,3 +38,12 @@ pygments_style = 'sphinx'
 # html_theme = 'alabaster'
 html_theme = "sphinx_rtd_theme"
 html_static_path = ['_static']
+
+
+# -----------------------------------------------------------------------------
+# Autosummary
+# -----------------------------------------------------------------------------
+
+autosummary_generate = True
+autosummary_generate_overwrite = True
+autosummary_imported_members = False

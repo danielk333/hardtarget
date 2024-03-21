@@ -21,7 +21,7 @@ Hardtarget depends on *gcc* and *libfftw3-dev*.
    sudo apt install gcc libfftw3-dev
 
 
-It is recommended to install Hardtarget in a virtual environment, or using *conda*.
+It is recommended to install Hardtarget in a virtual environment, e.g. *virtualenv* or *conda*.
 
 .. code-block:: bash
 

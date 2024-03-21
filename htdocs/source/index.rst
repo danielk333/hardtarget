@@ -82,6 +82,14 @@ Indices and tables
 
 
 .. toctree::
+   :caption: API
+   :maxdepth: 2
+   :hidden:
+
+   api/api_eiscat.rst
+   
+
+.. toctree::
    :caption: Reference
    :maxdepth: 2
    :hidden:

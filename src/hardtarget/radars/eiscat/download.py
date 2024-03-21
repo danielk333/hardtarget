@@ -7,25 +7,18 @@ import shutil
 import os
 import logging
 import subprocess
-
-try:
-    from lxml import html
-except ImportError:
-    html = None
+from lxml import html
 
 
 def format_bytes(size):
-    """
-    Convert bytes to a human-readable format.
-    """
+    """Convert bytes to a human-readable format."""
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if size < 1024.0:
             return f"{size:.2f} {unit}"
         size /= 1024.0
 
-
 # Start 
-# DAY=20161021 INSTRUMENT=leo_bpark_2.5u_3P
+# DAY=20161021 mode=leo_bpark_2.5u_3P
 # url
 # https://portal.eiscat.se/schedule/tape2.cgi?exp=leo_bpark_2.5u_3P&date=20161021
 # url to download page
@@ -38,17 +31,13 @@ def format_bytes(size):
 # https://rebus.eiscat.se:37009/249696;249698/leo_bpark_2.5u_3P20161021.zip
 
 
-# TODO - should get sizes from html content
-
 QUERY_URL = "https://portal.eiscat.se/schedule/tape2.cgi"
 DOWNLOAD_URL = "https://rebus.eiscat.se:37009"
 
 
-def get_download_nodes(day, instrument, logger=None):
-    """
-    Extract node identifiers from download page
-    """
-    url = f"{QUERY_URL}?exp={instrument}&date={day}&dl=1"
+def get_download_nodes(day, mode, logger=None):
+    """Extract node identifiers from download page"""
+    url = f"{QUERY_URL}?exp={mode}&date={day}&dl=1"
     response = requests.get(url)
     if response.status_code == 200:
         html_content = response.text
@@ -79,7 +68,7 @@ def get_download_nodes(day, instrument, logger=None):
             elif type == "info":
                 # tds[4]
                 tokens = tds[4].text.split(" ")
-                node["exp"] = {"chnl": tokens[1], "instrument": tokens[2]}
+                node["exp"] = {"instrument": tokens[1], "mode": tokens[2]}
             nodes.append(node)
             if type == "info":
                 product_nodes.append(nodes)
@@ -91,19 +80,72 @@ def get_download_nodes(day, instrument, logger=None):
         return []
 
 
-def download_zip(day, instrument, chnl, dst, logger=None, progress=False, wget=False):
-    """
-    download zip file for (day, instrument, chnl) to dst folder.
+def download(day, mode, instrument, dst, logger=None, progress=False, wget=False):
+    """Download zip file with eiscat measurements.
+
+    Example
+    -------
+
+        download("20220408","leo_bpark_2.1u_NO", "uhf", "/data")
+
+    
+    Notes
+    -----
+
+    This implementation uses a specific download link, for which data access is
+    geo-restricted to IP-addresses in Scandinavia. The link also uses a
+    non-standard port number, so it may be blocked by an agressive firewall. For
+    data access outside Scandinavia, see https://eiscat.se/
+
+
+    Parameters
+    ----------
+
+    day : str
+        Day of experiment ("YYYYMMDD")
+    mode : str
+        Mode identifier
+    instrument: str
+        Instrument identifier
+    dst : str
+        Path to folder where downloaded zip file will be stored
+    progress : bool, False
+        Print download progress bar to stdout
+    logger : logging.Logger, None
+        Optional logger object
+    wget : bool, False
+        Use wget instead of requests for download
+
+
+    The destination directory 'dst' must exist. The triplet ('day', 'mode',
+    'instrument') must correspond to an actual dataset in the Eiscat archive.
+    Search for available datasets is possible using the Web portal
+    https://portal.eiscat.se/. If a download is interrupted by the user
+    (ctrl-c), the incomplete zip download file will be removed.
+
+
+    Returns
+    -------
+
+    str
+        The absolute path to the downloaded zip file or None.
+
+    Raises
+    ------
+
+    FileNotFoundError
+        'dst' does not exist
+    Exception
+        target product does not exist
+
     """
     dst = Path(dst)
 
     if not dst.is_dir():
-        if logger:
-            logger.warning(f"DST is not a directory {dst}")
-        return False, None
+        raise FileNotFoundError(f"<dst> '{dst}' is not a directory")
 
     # zip
-    zip_filename = f"{instrument}-{day}-{chnl}.zip"
+    zip_filename = f"{mode}-{day}-{instrument}.zip"
     zip_download = dst / zip_filename
 
     # check if downloaded zipfile already exists
@@ -111,15 +153,13 @@ def download_zip(day, instrument, chnl, dst, logger=None, progress=False, wget=F
         if logger:
             logger.info(f"Zipfile exists: {zip_download}")
         zip_download = zip_download
-        return True, {"path": str(zip_download)}
+        return str(zip_download)
 
     # Fetch download nodes
-    product_nodes = get_download_nodes(day, instrument, logger=logger)
+    product_nodes = get_download_nodes(day, mode, logger=logger)
 
     if len(product_nodes) == 0:
-        if logger:
-            logger.warning(f"No product nodes")
-        return False, None
+        raise Exception("No product nodes")
 
     # select product
     data_nodes = []
@@ -128,18 +168,21 @@ def download_zip(day, instrument, chnl, dst, logger=None, progress=False, wget=F
         data_nodes = [node for node in nodes if node["type"] == "data"]
         info_nodes = [node for node in nodes if node["type"] == "info"]
 
-        # check that data matches given chnl
-        _chnl = info_nodes[0]["exp"]["chnl"]
-        if chnl.casefold() != _chnl.casefold():
+        # check that data matches given instrument
+        _instrument = info_nodes[0]["exp"]["instrument"]
+        if instrument.casefold() != _instrument.casefold():
             continue
         else:
             # found first
             break
 
     if len(data_nodes) == 0:
-        if logger:
-            logger.warning(f"Mismatch experiment chnl, given: {chnl}, actual {_chnl}")
-        return False, None
+        msg = (
+            "Instrument mismatch, "
+            f"given: {instrument}, "
+            f"actual {_instrument}"
+        )
+        raise Exception(msg)
 
     # Size
     bytes = sum([node["bytes"] for node in data_nodes])
@@ -147,11 +190,11 @@ def download_zip(day, instrument, chnl, dst, logger=None, progress=False, wget=F
 
     # Url
     node_ids = [node["id"] for node in nodes]
-    zip_url = f"{DOWNLOAD_URL}/{';'.join(node_ids)}/{instrument}{day}.zip"
+    zip_url = f"{DOWNLOAD_URL}/{';'.join(node_ids)}/{mode}{day}.zip"
 
     # Download
     if logger:
-        logger.info(f'Product: {instrument} {day} {size}')
+        logger.info(f'Product: {mode} {day} {size}')
         logger.info(f'Url: {zip_url}')
 
     completed = False
@@ -162,7 +205,6 @@ def download_zip(day, instrument, chnl, dst, logger=None, progress=False, wget=F
         command = ["wget", zip_url, "-P", str(dst), "-O", zip_filename]
         if not progress:
             command.append("-q")
-
         try:
             result = subprocess.run(command)
             if result.returncode == 0:
@@ -210,12 +252,12 @@ def download_zip(day, instrument, chnl, dst, logger=None, progress=False, wget=F
         os.remove(zip_download)
         if logger:
             if code is None:
-                logger.warning('Download: terminiated')                 
+                logger.warning('Download: terminiated')        
             else:
                 logger.info(f"Download: fail - status code: {code}")
-        return False, None
+        return
     else:
-        return True, {"path": str(zip_download)}
+        return str(zip_download)
 
 
 def extract_zip(zip_download, dst, cleanup=True, logger=None):
@@ -274,72 +316,27 @@ def move_tree(src, dst, update=False, logger=None):
     return True, {"path": str(dst / src.name)}
 
 
-def download(day, instrument, chnl, dst,
-             tmp=None, logger=None, update=False, progress=True):
-    """
-    Complete function, download, extract and move.
-    """
-    if tmp is None:
-        tmp = dst
-
-    tmp = Path(tmp)
-    dst = Path(dst)
-
-    if not dst.is_dir():
-        return False, f"No <dst> directory {dst}"
-
-    # check if results are already present in dst
-    if not update:
-        data_path = dst / f"{instrument}@{chnl}"
-        info_path = dst / f"{instrument}@{chnl}_information"
-        result = [str(p) for p in [data_path, info_path] if p.is_dir()]
-        if result:
-            return True, result
-
-    # download zip to tmp
-    ok, result = download_zip(day, instrument, chnl, tmp,
-                              logger=logger, progress=progress)
-
-    if not ok:
-        return False, result
-
-    # extract zip in tmp
-    zipfile = result["path"]
-    ok, result = extract_zip(zipfile, tmp, logger=logger)
-    if not ok:
-        return False, result
-
-    # move to dst
-    if tmp != dst:
-        results = []
-        for dir in result["paths"]:
-            _ok, _result = move_tree(dir, dst)
-            if _ok:
-                results.append(_result)
-
-    return ok, results
-
-
 if __name__ == '__main__':
 
     day = '20220408'
-    instrument = 'leo_bpark_2.1u_NO'
-    chnl = 'uhf'
+    mode = 'leo_bpark_2.1u_NO'
+    instrument = 'uhf'
     # logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
 
     def test_download_nodes():
-        nodes = get_download_nodes(day, instrument)
+        nodes = get_download_nodes(day, mode)
         import pprint
         pprint.pprint(nodes)
 
-    def test_download_zip():
+    def test_download():
         day = '20101125'
-        instrument = 'leo_sat_1.0l_EI'
-        chnl = '42m'
+        mode = 'leo_sat_1.0l_EI'
+        instrument = '42m'
         dst = "."
-        ok, result = download_zip(day, instrument, chnl, dst, logger=logger, progress=True)
+        wget = True
+        ok, result = download(day, mode, instrument, dst, logger=logger, progress=True, wget=wget)
         print(ok, result)
 
     def test_extract():
@@ -354,13 +351,6 @@ if __name__ == '__main__':
         ok, result = move_tree(src, dst, logger=logger)
         print(ok, result)
 
-    def test_download():
-        tmp = "tmp"
-        dst = "dst"
-        ok, result = download(day, instrument, chnl, dst, tmp=tmp, logger=logger, progress=True)
-        print(ok, result)
-
-    # test_download_zip()
+    test_download()
     # test_extract()
     # test_move()
-    # test_download()

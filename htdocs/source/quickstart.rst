@@ -20,8 +20,8 @@ support for script based download.
    (.ht) $ hardtarget -v download eiscat 20220408 leo_bpark_2.1u_NO uhf --progress -o /data
 
 
-The script will make the result available in the `/data` folder. Using the
-`--update` option, multiple downloads can be placed in the same folder hierarchy.
+The script will download a zip archive to the `/data` folder. After unzip and
+removal of the zip file, two folders are available.
 
 .. code-block:: bash
 
