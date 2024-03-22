@@ -17,7 +17,7 @@ def format_bytes(size):
             return f"{size:.2f} {unit}"
         size /= 1024.0
 
-# Start 
+# Start
 # DAY=20161021 mode=leo_bpark_2.5u_3P
 # url
 # https://portal.eiscat.se/schedule/tape2.cgi?exp=leo_bpark_2.5u_3P&date=20161021
@@ -86,13 +86,15 @@ def download(day, mode, instrument, dst, logger=None, progress=False, wget=False
     Example
     -------
 
-        download("20220408","leo_bpark_2.1u_NO", "uhf", "/data")
+    .. code-block:: python
 
-    
+        path = download('20220408','leo_bpark_2.1u_NO', 'uhf', '/data')
+
+
     Notes
     -----
 
-    This implementation uses a specific download link, for which data access is
+    This function uses a specific download link, for which data access is
     geo-restricted to IP-addresses in Scandinavia. The link also uses a
     non-standard port number, so it may be blocked by an agressive firewall. For
     data access outside Scandinavia, see https://eiscat.se/
@@ -117,11 +119,10 @@ def download(day, mode, instrument, dst, logger=None, progress=False, wget=False
         Use wget instead of requests for download
 
 
-    The destination directory 'dst' must exist. The triplet ('day', 'mode',
-    'instrument') must correspond to an actual dataset in the Eiscat archive.
-    Search for available datasets is possible using the Web portal
-    https://portal.eiscat.se/. If a download is interrupted by the user
-    (ctrl-c), the incomplete zip download file will be removed.
+    The triplet ('day', 'mode', 'instrument') must correspond to an actual
+    dataset in the Eiscat archive. Search for available datasets is possible
+    using the Web portal https://portal.eiscat.se/. If a download is interrupted
+    by the user (ctrl-c), the incomplete zip download file will be removed.
 
 
     Returns
@@ -140,7 +141,6 @@ def download(day, mode, instrument, dst, logger=None, progress=False, wget=False
 
     """
     dst = Path(dst)
-
     if not dst.is_dir():
         raise FileNotFoundError(f"<dst> '{dst}' is not a directory")
 

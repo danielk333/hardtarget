@@ -9,8 +9,7 @@ def parser_build(parser):
     parser.add_argument('mode', help='Experiment mode, e.g. "leo_bpark_2.1u_NO"')
     parser.add_argument('instrument', help='Experiment instrument, e.g. "uhf|32m|42m"')
     parser.add_argument(
-        '-o',
-        '--output',
+        'dst',
         default=".",
         help='destination folder'
     )

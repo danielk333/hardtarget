@@ -49,36 +49,14 @@ Indices and tables
 
 .. Hidden TOCs
 
-.. toctree::
-   :caption: Install
-   :maxdepth: 2
-   :hidden:
-
-   install
-
 
 .. toctree::
    :caption: Usage
    :maxdepth: 2
    :hidden:
 
+   install
    quickstart
-
-
-.. toctree::
-   :caption: Concepts
-   :maxdepth: 2
-   :hidden:
-
-   concepts
-
-
-.. toctree::
-   :caption: Tutorial
-   :maxdepth: 2
-   :hidden:
-
-   tutorial
 
 
 .. toctree::

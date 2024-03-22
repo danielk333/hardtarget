@@ -17,7 +17,7 @@ support for script based download.
 
 .. code-block:: bash
 
-   (.ht) $ hardtarget -v download eiscat 20220408 leo_bpark_2.1u_NO uhf --progress -o /data
+   (.ht) $ hardtarget -v download eiscat 20220408 leo_bpark_2.1u_NO uhf /data --progress
 
 
 The script will download a zip archive to the `/data` folder. After unzip and
@@ -55,7 +55,7 @@ file. Eiscat radar data may be converted to :ref:`drf` using the following scrip
 
 .. code-block:: bash
 
-   (.ht) $ hardtarget -v convert eiscat /data/leo_bpark_2.1u_NO@uhf --progress -o /data/drf
+   (.ht) $ hardtarget -v convert eiscat /data/leo_bpark_2.1u_NO@uhf /data/drf --progress
 
 
 The script will make the result available in the given folder. The file `metadata.ini` includes
@@ -63,8 +63,8 @@ meta-data about the radar experiment from which the :ref:`drf` product was deriv
 
 .. code-block:: bash
 
-   (.ht) $ tree /data/drf -L 2
-   (.ht) $ /data/drf
+   (.ht) $ tree /data/leo_bpark_2.1u_NO@uhf_drf -L 2
+   (.ht) $ /data/leo_bpark_2.1u_NO@uhf_drf
    (.ht) $ ├── metadata.ini
    (.ht) $ └── uhf
    (.ht) $     ├── 2022-04-08T08-00-00

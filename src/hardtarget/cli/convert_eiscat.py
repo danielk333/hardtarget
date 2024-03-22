@@ -6,20 +6,30 @@ from hardtarget.profiling import get_logging_level
 def parser_build(parser):
     # Add the arguments
     parser.add_argument(
-        "input",
-        help="path to source directory, assumes folder structure 'input/2*/*.mat or *.mat.bz2'",
+        "src",
+        type=str,
+        help="path to Eiscat raw data source directory",
     )
     parser.add_argument(
-        "-o",
-        "--output",
-        help="path to output directory, default output folder 'input/drf/uhf/'",
+        "dst",
+        type=str,
+        help="path to destination directory",
         default=None,
     )
     parser.add_argument(
+        "-n",
+        "--name",
+        type=str,
+        help="name for Hardtarget DRF folder",
+        default=None,
+    )
+
+    parser.add_argument(
         "-c",
         "--compression",
-        choices=["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
-        default="0",
+        type=int,
+        choices=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        default=0,
         help="set the compression level (0-9) (default: 0)",
     )
     parser.add_argument(
@@ -32,14 +42,14 @@ def parser_build(parser):
 
 
 def main(args):
-    compression_level = int(args.compression)
     # Logging
     logger = logging.getLogger(__name__)
     logger.setLevel(get_logging_level(args.verbose))
     convert(
-        args.input,
-        logger,
-        dstdir=args.output,
-        compression_level=compression_level,
+        args.src,
+        args.dst,
+        name=args.name,
+        logger=logger,
+        compression=args.compression,
         progress=args.progress,
     )

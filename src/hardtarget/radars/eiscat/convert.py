@@ -113,110 +113,113 @@ def expinfo_split(xpinf):
 ####################################################################
 
 
-"""
-- attempts to overwrite RDF files will raise exceptions
-- no support for resuming an interrupted processing
-- output directory must be empty
-- Internal exceptions and progress printed to stdout. Possibly
-  there could be an option for keeping it silent.
-- no compression
-- support 1 file, 1 subfolder or 1 folder
-- more parameters for customized processing options
-"""
+def convert(src, dst, name=None, compression=0, progress=False, logger=None):
+    """Converts Eiscat raw data to Hardtarget DRF.
 
+    Example
+    -------
 
+    .. code-block:: python
 
-def convert(srcdir, logger, dstdir=None, compression_level=0, progress=False):
-    """Converts folder with raw data from Eiscat into Hardtarget DRF.
+        path = convert('/data/leo_bpark_2.1u_NO@uhf', '/data')
+
 
     Parameters
     ----------
-    srcdir: string
-        path to source directory
-    dstdir: string, optional
-        path to destination directory (default: same as source)
+
+    src : str
+        path to source directory (Eiscat raw data)
+    dst: str
+        path to destination directory
+    name : str, None
+        name of output directory (Hardtarget DRF)
+    compression : int [0-9], 0
+        compression level for h5 files in output
+    logger : logging.Logger, None
+        Optional logger object
+    progress : bool, False
+        Print download progress bar to stdout
+
+
+    The output (Hardtarget DRF) folder will be placed within the 'dst'
+    directory. By default, the name of the Hardtarget DRF folder is constructed
+    from the name of the 'src' directory. The name of the Hardtarget DRF folder
+    may be specified using the 'name' option. If 'name' is None, name is derived
+    from 'src' (leo_bpark_2.1u_NO@uhf -> leo_bpark_2.1u_NO@uhf_drf).
+
 
 
     Returns
     -------
 
+    str
+        The absolute path to the Hardtarget DRF folder or None.
 
-    Notes
-    -----
-    Assumes directory structure
-    - <srcdir>/<YYYYMMDD_HH>/
 
-    Files within each such directory will either be zipped (.b2z),
-    or matlab files (.mat). Zipped files are expected to
-    produce (.mat) files when extracted.
+    Raises
+    ------
 
-    Result is put in subfolder within output folder.
-    - dstdir/drf/uhf/
+    FileNotFoundError
+        'src' does not exist 'dst' does not exist
+    FileExistsError
+        'dst/name' already exists
+
     """
 
     #######################################################################
-    # SOURCE DIR
-    #
-    # support single file or folder with files
+    # CHECK SRC, DST, NAME
     #######################################################################
 
-    if Path(srcdir).is_file():
-        files = [srcdir]
-    else:
-        files = list(all_files(srcdir))
-    files.sort()
+    src = Path(src)
+    if not src.is_dir():
+        raise FileNotFoundError(str(src))
+
+    dst = Path(dst)
+    if not dst.is_dir():
+        raise FileNotFoundError(str(dst))
+
+    if name is None:
+        name = f"{src.name}_drf"
+    hdrf = dst / name
+    if hdrf.exists():
+        raise FileExistsError(str(hdrf))
+
+    # all files from Eiscat raw data product
+    files = list(all_files(src))
 
     #######################################################################
-    # EXTRACT META DATA
-    #
-    # from one file
+    # META DATA
     #######################################################################
 
-    pth = files[0]
-
-    # load start time from parameter block of first matlab file
-    mat = loadmat(pth)
+    # extract meta data from first file
+    first_file = files[0]
+    # load start time from parameter block
+    mat = loadmat(first_file)
     upar = mat["d_parbl"][0, 41:62]
     radar_frequency = upar[13]
-
-    # Find experiment info from first file
+    # load experiment info
     host, expname, expvers, owner = expinfo_split(str(mat["d_ExpInfo"][0]))
-
     cfg = load_expconfig(expname)
     cfv = cfg[expvers]  # config for this version of the experiment (mode)
     sample_rate = int(cfv.get("sample_rate"))  # assuming integral # samples per second
     file_secs = float(cfv.get("file_secs"))
     n_samples = round(file_secs * sample_rate)
-
+    # find (global) index of first raw data sample in file
     n0 = determine_n0(mat, cfv)
-
-    #######################################################################
-    # DESTINATION DIR
-    #
-    #######################################################################
-
-    if dstdir is None:
-        if Path(srcdir).is_file():
-            dstdir = Path(srcdir).parent / "drf"
-        else:
-            dstdir = Path(srcdir) / "drf"
-    else:
-        dstdir = Path(dstdir)
-
     # add channel subdirectory
     chnl = cfv.get("rx_channel", "tbd")
-    dstdir = dstdir / chnl
-    # make sure dstdir exists
-    if not dstdir.is_dir():
-        dstdir.mkdir(parents=True, exist_ok=True)
-    # make sure dstdir is empty
-    if any(dstdir.iterdir()):
-        logger.warning(f"Abort, destination directory is not empty: {str(dstdir)}")
-        return
+
+    #######################################################################
+    # WRITE DATA
+    #######################################################################
+
+    # hdrf data folder
+    data = hdrf / chnl
+    data.mkdir(parents=True, exist_ok=True)
 
     # create digital rf writer
     rf_writer = drf.DigitalRFWriter(
-        str(dstdir),  # directory
+        str(data),  # directory
         np.int16,  # dtype
         3600,  # subdir cadence secs    => one dir per hour
         1000,  # file cadence millisecs => one file per second
@@ -224,7 +227,7 @@ def convert(srcdir, logger, dstdir=None, compression_level=0, progress=False):
         sample_rate,  # sample rate numerator
         1,  # sample rate denominator
         uuid_str=cfv.get("rx_channel", "tbd"),
-        compression_level=compression_level,
+        compression_level=compression,
         checksum=False,
         is_complex=True,
         num_subchannels=1,
@@ -270,7 +273,7 @@ def convert(srcdir, logger, dstdir=None, compression_level=0, progress=False):
     logger.info("Done writing DRF files")
 
     #######################################################################
-    # META DATA FILE
+    # WRITE METADATA
     #######################################################################
 
     EXP_SECTION = "Experiment"
@@ -294,6 +297,8 @@ def convert(srcdir, logger, dstdir=None, compression_level=0, progress=False):
     exp["radar_frequency"] = str(radar_frequency)
 
     # write metadata file
-    metafile = dstdir.parent / "metadata.ini"
+    metafile = hdrf / "metadata.ini"
     with open(metafile, 'w') as f:
         meta.write(f)
+
+    return str(hdrf)
