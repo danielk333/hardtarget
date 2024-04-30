@@ -72,6 +72,8 @@ Indices and tables
    :maxdepth: 2
    :hidden:
 
+   experiment_parameters
+   signal_parameters
    drf
    gmf
 
