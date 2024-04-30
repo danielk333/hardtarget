@@ -1,2 +1,3 @@
-GMF
-===
+Hardtarget GMF
+==============
+

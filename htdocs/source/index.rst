@@ -72,7 +72,6 @@ Indices and tables
    :maxdepth: 2
    :hidden:
 
-   eiscat
    drf
    gmf
 
