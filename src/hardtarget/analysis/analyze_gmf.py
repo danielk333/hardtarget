@@ -4,7 +4,7 @@ import time
 import h5py
 from tqdm import tqdm
 from pathlib import Path
-from hardtarget.gmf import get_avalible_libs, get_estimation_method, MethodType
+from hardtarget.gmf import get_available_libs, get_estimation_method, MethodType
 from hardtarget.configuration import load_gmf_params
 from . import utils
 
@@ -91,7 +91,7 @@ def compute_gmf(
         raise ValueError(
             f"Cannot find requested method '{gmf_method}' "
             f"in requested implementation '{gmf_implementation}'\n"
-            f"Avalible implemented methods: \n{get_avalible_libs(indent=' '*4)}"
+            f"Avalible implemented methods: \n{get_available_libs(indent=' '*4)}"
         )
     lib_kwargs = {}
     # In case we are running MPI to distribute CUDA calculation
@@ -160,7 +160,34 @@ def compute_gmf(
             total=total,
         )
 
-    # process
+    # SKIP LIST
+    # pre-scan output directory to identify gmf files which have already been completed
+    # this is made into a skip list
+    # the last entry of the skip list is removed (i.e. will be reprocessed) in case it was
+    # only partially processed
+
+    def make_filepath(task_idx):
+
+        file_idx_sample = task_idx * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
+
+        # filenames are in unix time microseconds
+        epoch_unix_us = file_idx_sample / (sample_rate/1000000)
+        epoch_unix = epoch_unix_us.astype("float128")/1000000
+        epoch_unix_us = epoch_unix_us.astype("int64")
+        return utils.get_filepath(epoch_unix_us)
+
+    skip_list = []
+    for task_idx in job_tasks[:10]:
+        filepath = make_filepath(task_idx)
+        # check if file exists
+        file = Path(output) / filepath
+        if file.exists():
+            skip_list.append(filepath)
+    if skip_list:
+        skip_list.pop()
+
+
+    # MAIN LOOP
     results = {"dir": output, "files": [], "data": {}}
     for idx, task_idx in enumerate(job_tasks):
 
@@ -203,6 +230,7 @@ def compute_gmf(
                     progress_bar.update(num_cohints_per_file)
                 tasks_skipped += 1
                 continue
+
         if libtype == MethodType.optimize:
             # TODO: this should be taken from a configurable variable in the h5 file
             # this would allow for a inter-mediate step to actually go in and
@@ -224,6 +252,9 @@ def compute_gmf(
                     hf["range_rate_peak"][()],
                     hf["acceleration_peak"][()],
                 ])
+
+
+
 
         # process
         # TODO: in case the RAM load is too heavy, this should write directly to disk instead
@@ -309,6 +340,7 @@ def compute_gmf(
                 peaks=all_gmf_vars.peak,
                 peak_vals=all_gmf_vars.peak_val,
             )
+
 
         if output is not None:
             # DUMP TO FILE
