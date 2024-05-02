@@ -129,7 +129,7 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
 
     src : str
         path to source directory (Eiscat raw data)
-    dst: str
+    dst : str
         path to destination directory
     name : str, None
         name of output directory (Hardtarget DRF)

@@ -64,6 +64,7 @@ Indices and tables
 
    install
    quickstart
+   cli
 
 .. toctree::
    :caption: API

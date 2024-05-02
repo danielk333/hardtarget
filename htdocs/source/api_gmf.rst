@@ -1,13 +1,15 @@
 ..  _api_gmf:
 
-============
-GMF Analysis
-============
+================
+GMF Analysis API
+================
 
-This describes functionality related to GMF analysis.
+This describes functionality related to **GMF analysis**.
 
-..
 
-    Comment
+
+Compute GMF
+-----------
+
     ..  autofunction:: hardtarget.analysis.compute_gmf
 

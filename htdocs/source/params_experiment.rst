@@ -1,7 +1,7 @@
-..  _experimentparameters:
+..  _radarexperimentparams:
 
 =====================
-Experiment Parameters
+Radar Experiment Parameters
 =====================
 
 This describes parameters associated with a radar experiment. Experiment

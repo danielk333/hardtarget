@@ -1,7 +1,7 @@
-..  _processingparameters:
+..  _gmfprocessingparams:
 
 ============================
-Signal Processing Parameters
+GMF Processing Parameters
 ============================
 
 This describes processing paramaters used to configure :ref:`api_gmf`.

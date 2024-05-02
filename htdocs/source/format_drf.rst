@@ -18,7 +18,7 @@ self-documenting format intended for efficient data storage and random access
 for data processing. As **Digital_RF** does not allow arbitrary meta
 information, **Hardtarget_DRF** additionally specifies an extra metadata file
 **metadata.ini** at the top level of the folder tree. The metadata file defines
-key :ref:`experimentparameters` experiment parameters associatated with the
+key :ref:`radarexperimentparams` experiment parameters associatated with the
 experiment data.
 
 
