@@ -1,16 +1,13 @@
-..  _drf:
+..  _format_drf:
 
-==============
-Hardtarget DRF
-==============
+=====================
+Hardtarget DRF Format
+=====================
 
 
-
-The **Hardtarget_DRF** data format is used as input to GMF Analysis.
+This describes **Hardtarget_DRF**, the data format used by :ref:`api_gmf`.
 
  
-
-
 
 ..  _drflink: https://pypi.org/project/digital-rf/
 

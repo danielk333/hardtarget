@@ -19,10 +19,15 @@ Introduction
 What Hardtarget is, and what is it used for.
 
 
+TODO [Daniel]
+
 History
 """""""
 Hardtarget has grown out of research by ... in diverse fields,
 over some time.
+
+
+TODO [Daniel]
 
 
 Getting Help
@@ -35,6 +40,8 @@ developers <mailto:daniel.kastinen@irf.se>`_.
 Acknowledgements
 """""""""""""""""
 NORCE, IKS, ESA, EISCAT
+
+TODO [Daniel, Tom]
 
 
 
@@ -58,31 +65,30 @@ Indices and tables
    install
    quickstart
 
-
 .. toctree::
    :caption: API
    :maxdepth: 2
    :hidden:
 
-   api/api_eiscat.rst
-   
+   api_eiscat
+   api_gmf
+
+.. toctree::
+   :caption: Concepts
+   :maxdepth: 2
+   :hidden:
+
+   concept_gmf
 
 .. toctree::
    :caption: Reference
    :maxdepth: 2
    :hidden:
 
-   experiment_parameters
-   signal_parameters
-   drf
-   gmf
-
-.. toctree::
-   :caption: Develop
-   :maxdepth: 2
-   :hidden:
-
-   develop
+   params_experiment
+   params_processing
+   format_drf
+   format_gmf
 
 
 
