@@ -27,8 +27,8 @@ extensions = [
     "sphinx.ext.autosummary",
 ]
 
-html_favicon = "static/favicon.png"
-html_logo = "static/logo.png"
+html_favicon = "_static/favicon.png"
+html_logo = "_static/logo.png"
 
 templates_path = ["_templates"]
 exclude_patterns = []

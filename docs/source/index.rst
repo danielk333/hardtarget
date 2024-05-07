@@ -22,6 +22,7 @@ Introduction
 
 What Hardtarget is, and what is it used for.
 
+TODO [Daniel]
 
 Quick install
 """""""""""""
@@ -53,6 +54,7 @@ History
 Hardtarget has grown out of research by ... in diverse fields,
 over some time.
 
+TODO [Daniel]
 
 Getting Help
 """"""""""""
@@ -65,7 +67,7 @@ Acknowledgements
 """""""""""""""""
 IRF, NORCE, IKS, ESA, EISCAT
 
-
+TODO [Daniel]
 
 Indices and tables
 ==================
@@ -73,7 +75,6 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
 
 
 .. Hidden TOCs
@@ -86,31 +87,32 @@ Indices and tables
 
    install
    quickstart
-
+   cli
 
 .. toctree::
    :caption: API
    :maxdepth: 2
    :hidden:
 
-   api/api_eiscat.rst
-   
+   api_eiscat
+   api_gmf
+
+.. toctree::
+   :caption: Concepts
+   :maxdepth: 2
+   :hidden:
+
+   concept_gmf
 
 .. toctree::
    :caption: Reference
    :maxdepth: 2
    :hidden:
 
-   eiscat
-   drf
-   gmf
-
-.. toctree::
-   :caption: Develop
-   :maxdepth: 2
-   :hidden:
-
-   develop
+   params_experiment
+   params_processing
+   format_drf
+   format_gmf
 
 
 
