@@ -72,7 +72,7 @@ pages:
   script:
     - cd docs
     - make html
-    - mv build ../public
+    - mv build/html ../public
   artifacts:
     paths:
       - public
