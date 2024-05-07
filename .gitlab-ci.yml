@@ -16,10 +16,11 @@ stages:
     - pip install virtualenv
     - virtualenv venv
     - source venv/bin/activate
-    # install the package and develop dependancies
-    - pip install .[develop]
+    # Install dependancies
     - apt update
     - apt install -y pandoc gcc libfftw3-dev
+    # Install the package
+    - pip install .[develop]
 
 # Prepare the nominal usage enviornment
 .setup:
