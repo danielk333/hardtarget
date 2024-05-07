@@ -19,7 +19,7 @@ stages:
     # install the package and develop dependancies
     - pip install .[develop]
     - apt update
-    - apt install -y pandoc
+    - apt install -y pandoc gcc libfftw3-dev
 
 # Prepare the nominal usage enviornment
 .setup:
