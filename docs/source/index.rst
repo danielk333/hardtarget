@@ -1,21 +1,36 @@
-hardtarget
-==========
+.. Hardtarget documentation master file, created by
+   sphinx-quickstart on Thu Feb 22 11:50:50 2024.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
+====================================================
+Welcome to Hardtarget's documentation!
+====================================================
+
+
+.. note::
+
+   This project is under development.
+
 
 :Release: |release|
 :Date: |today|
 
 
-Hardtarget is ... TODO
+Introduction
+"""""""""""""
+
+What Hardtarget is, and what is it used for.
 
 
+Quick install
+"""""""""""""
 
-Getting started
------------------
-
-To install
+To install, ensure dependencies `gcc` and `libfftw3-dev` are installed for the 
+C implementations and/or `cuda` for the GPU implementations. Then install with
 
 .. code-block:: bash
-
+   
    pip install hardtarget
 
 or the nightly build
@@ -26,96 +41,30 @@ or the nightly build
    cd hardtarget
    pip install .
 
-
-Tutorials
----------
-
-.. toctree::
-   :maxdepth: 2
-
-   notebooks/getting_started
-
-
-Examples
----------
-
-Example gallery of the different modular functionality of the toolbox.
-
-.. toctree::
-   :maxdepth: 2
-
-   autogallery/index
-
-
-API Reference
-==============
-
-The typical data-flow of processing
-
-.. image:: static/hardtarget_gmf_arrays.svg
-  :alt: The data flow trough different array indexing schemas
-  :class: light-theme-image
-
-TODO: a flow-diagram with DPT acceleration
-
-.. irf_autopackages:: package
-   :template: autosummary/module.rst
-   :toctree: autosummary
-   :exclude: hardtarget.version
-
-   hardtarget
-
-
-Extensions
-----------
-
-TODO: make this work, package documentation:
-- https://sphinx-c-autodoc.readthedocs.io/en/latest/configuration.html
-
-
-GMF C implementation
-
-.. autocfunction:: gmf.c::gmf
-
-TODO: this does not work because it does not find the symbol???
-maybe because of the "extern C"
-
-.. autocfunction:: gmfgpu.cu::gmf
-
-
-Developing
-==========
-
-Please refer to the style and contribution guidelines documented in the
-`IRF Software Contribution Guide <https://danielk.developer.irf.se/software_contribution_guide/>`_.
-Generally external code-contributions are made trough a "Fork-and-pull"
-workflow, while internal contributions follow the branching strategy outlined
-in the contribution guide.
-
-Docs
-~~~~
-
-To make the docs, use the `Makefile` by running
+Read the CLI description
 
 .. code-block:: bash
 
-   make html
+   hardtarget -h
 
 
-Notebooks
-~~~~~~~~~
+History
+"""""""
+Hardtarget has grown out of research by ... in diverse fields,
+over some time.
 
-To develop notebooks for documentation in Jupyter-lab, install the following
 
-.. code-block:: bash
+Getting Help
+""""""""""""
+If you have questions about using Hardtarget please open a `GitHub Issue
+<https://github.com/danielk333/hardtarget/issues>`_ or email the `Hardtarget
+developers <mailto:daniel.kastinen@irf.se>`_.
 
-   pip install notebook jupytext
 
-Then run notebooks in the appropriate folder `docs/source/notebooks` using `jupyter-notebook` and
-pair the new notebook with a MyST file.
+Acknowledgements
+"""""""""""""""""
+IRF, NORCE, IKS, ESA, EISCAT
 
-For more information on how to pair notebooks in order to have persistent plain-text versions,
-see the `jupytext docs <https://jupytext.readthedocs.io/en/latest/paired-notebooks.html>`_.
 
 
 Indices and tables
@@ -124,3 +73,44 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+
+
+.. Hidden TOCs
+
+
+.. toctree::
+   :caption: Usage
+   :maxdepth: 2
+   :hidden:
+
+   install
+   quickstart
+
+
+.. toctree::
+   :caption: API
+   :maxdepth: 2
+   :hidden:
+
+   api/api_eiscat.rst
+   
+
+.. toctree::
+   :caption: Reference
+   :maxdepth: 2
+   :hidden:
+
+   eiscat
+   drf
+   gmf
+
+.. toctree::
+   :caption: Develop
+   :maxdepth: 2
+   :hidden:
+
+   develop
+
+
+
