@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-
 import logging
 from hardtarget.analysis import compute_gmf
 import hardtarget.global_mpi
 from .commands import add_command
-from hardtarget.gmf import get_default_method, get_avalible_libs
+from hardtarget.gmf import get_default_method, get_available_libs
 from hardtarget.profiling import get_logging_level
+
 
 DEFAULT_IMPL, DEFAULT_METHOD = get_default_method()
 
@@ -99,7 +99,7 @@ EXAMPLE:
     %(prog)s  leo_bpark_2.1u_NO@uhf/drf/ uhf
 
 Available method implementations:
-{get_avalible_libs(indent=' '*4)}
+{get_available_libs(indent=' '*4)}
 
         """,
     ),

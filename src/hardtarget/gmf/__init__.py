@@ -109,7 +109,7 @@ else:
     GMF_LIBS[Impl.cuda]["fgmf"] = GMF_LIBS[Impl.cuda]["grid-fast-gmf"]
 
 
-def get_avalible_libs(indent=""):
+def get_available_libs(indent=""):
     st = ""
     for imp in Impl:
         st += indent + f"[{imp.value}]:\n"
