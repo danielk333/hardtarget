@@ -49,9 +49,9 @@ Convert Eiscat radar data
 ..  _eiscatlink: https://eiscat.se/
 ..  _eiscatdownloadlink: https://portal.eiscat.se/
 
-Hardtarget expects radar data in a specific format known as :ref:`drf`. This is
+Hardtarget expects radar data in a specific format known as :ref:`format_drf`. This is
 essentially the `digital-rf <drflink_>`_ format, yet extended with an extra metadata
-file. Eiscat radar data may be converted to :ref:`drf` using the following script.
+file. Eiscat radar data may be converted to :ref:`format_drf` using the following script.
 
 .. code-block:: bash
 
@@ -59,7 +59,7 @@ file. Eiscat radar data may be converted to :ref:`drf` using the following scrip
 
 
 The script will make the result available in the given folder. The file `metadata.ini` includes
-meta-data about the radar experiment from which the :ref:`drf` product was derived. 
+meta-data about the radar experiment from which the :ref:`format_drf` product was derived. 
 
 .. code-block:: bash
 

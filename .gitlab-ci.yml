@@ -6,10 +6,6 @@ stages:
   - test
   - release
 
-# Select correct runner
-default:
-  tags:
-    - generic
 
 # Prepare the development enviornment
 .devsetup:
@@ -20,10 +16,11 @@ default:
     - pip install virtualenv
     - virtualenv venv
     - source venv/bin/activate
-    # install the package and develop dependancies
-    - pip install .[develop]
+    # Install dependancies
     - apt update
-    - apt install -y pandoc
+    - apt install -y pandoc gcc libfftw3-dev
+    # Install the package
+    - pip install .[develop]
 
 # Prepare the nominal usage enviornment
 .setup:
@@ -34,6 +31,9 @@ default:
     - pip install virtualenv
     - virtualenv venv
     - source venv/bin/activate
+    # Install dependancies
+    - apt update
+    - apt install -y gcc libfftw3-dev
     # install the package
     - pip install .
 
@@ -72,7 +72,7 @@ pages:
   script:
     - cd docs
     - make html
-    - mv build ../public
+    - mv build/html ../public
   artifacts:
     paths:
       - public

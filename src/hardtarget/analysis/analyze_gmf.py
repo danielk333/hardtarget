@@ -31,28 +31,56 @@ def compute_gmf(
     logger=None
 ):
     """
-    Analyze data using gmf.
+    Performs GMF analysis on Hardtarget DRF.
 
-    TODO: update docstrings
+    Example
+    -------
+
+    ..  code-block:: python
+
+        rx = ("/data/drf", "uhf")
+        tx = ("/data/drf", "uhf")
+        result = compute_gmf(rx, tx,
+                             config="gmf_config.ini",
+                             gmf_implementation="numpy",
+                             gmf_method="fdpt",
+                             output="/data/gmf")
 
     Parameters
     ----------
-    :parameter rx: (drf source dir, channel name)
-    :parameter tx: (drf source dir, channel name)
-    :parameter config: path gfm config file
-    :parameter job: used to identify subset of task indexes for this job
+
+    rx : tuple
+        A tuple with two strings (path, chnl)
+        - path defines directory with Hardtarget DRF
+        - chnl defines rx channel within Hardtarget DRF
+    tx : tuple
+        A tuple with two strings (path, chnl)
+        path defines directory with Hardtarget DRF
+        chnl defines tx channel within Hardtarget DRF
+    config: str
+        (optional) path to gfm config file :ref:`gmfprocessingparams`
+    gmf_implementation: str
+        (optional) implentation identifies {"numpy"|"c"|"cuda"}
+    gmf_method: str
+        (optional) method identifier {"fdpt"|"fgmf"}
+    output: str
+        (optional) path to output directory
+    job: dict
+        (optional) identify subset of internal processing tasks
+        {"idx":4, "N":10} means process task 4 from tasks [0,...,9]
+        (default) do all the work {"idx":0, "N":1}
+    progress: bool, False
+        If True, print progress bar to stdout
+    logger : logging.Logger, None
+        Optional logger object
 
     Returns
     -------
 
-    # TODO: this function needs to be cleaned up a bit
-
-    :return: dict
-        dir: string
-            path to directory with files
-        files: list
-            paths to each generated file
-        out: dictionary with in-memory results
+    dict
+        Dictionary with to entries ("path", "files")        
+        path provides path to produced :ref:`format_gmf`
+        files provides a list of gmf filenames
 
     """
 

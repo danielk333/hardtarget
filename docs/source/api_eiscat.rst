@@ -1,9 +1,10 @@
 ..  _api_eiscat:
 
 ===========
-Eiscat
+Eiscat API
 ===========
 
+This describes functionality specific to the Eiscat radar.
 
 Download
 --------

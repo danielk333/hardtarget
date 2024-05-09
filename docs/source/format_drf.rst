@@ -1,16 +1,13 @@
-..  _drf:
+..  _format_drf:
 
-==============
-Hardtarget DRF
-==============
+=====================
+Hardtarget DRF Format
+=====================
 
 
-
-The **Hardtarget_DRF** data format is used as input to GMF Analysis.
+This describes **Hardtarget_DRF**, the data format used by :ref:`api_gmf`.
 
  
-
-
 
 ..  _drflink: https://pypi.org/project/digital-rf/
 
@@ -21,7 +18,7 @@ self-documenting format intended for efficient data storage and random access
 for data processing. As **Digital_RF** does not allow arbitrary meta
 information, **Hardtarget_DRF** additionally specifies an extra metadata file
 **metadata.ini** at the top level of the folder tree. The metadata file defines
-key :ref:`experimentparameters` experiment parameters associatated with the
+key :ref:`radarexperimentparams` experiment parameters associatated with the
 experiment data.
 
 

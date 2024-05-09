@@ -1,5 +1,0 @@
-..  _signalparameters:
-
-=====================
-Signal Parameters
-=====================
