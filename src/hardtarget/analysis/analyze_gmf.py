@@ -176,17 +176,6 @@ def compute_gmf(
         epoch_unix_us = epoch_unix_us.astype("int64")
         return utils.get_filepath(epoch_unix_us)
 
-    skip_list = []
-    for task_idx in job_tasks[:10]:
-        filepath = make_filepath(task_idx)
-        # check if file exists
-        file = Path(output) / filepath
-        if file.exists():
-            skip_list.append(filepath)
-    if skip_list:
-        skip_list.pop()
-
-
     # MAIN LOOP
     results = {"dir": output, "files": [], "data": {}}
     for idx, task_idx in enumerate(job_tasks):
@@ -340,7 +329,6 @@ def compute_gmf(
                 peaks=all_gmf_vars.peak,
                 peak_vals=all_gmf_vars.peak_val,
             )
-
 
         if output is not None:
             # DUMP TO FILE
