@@ -188,22 +188,6 @@ def compute_gmf(
             total=total,
         )
 
-    # SKIP LIST
-    # pre-scan output directory to identify gmf files which have already been completed
-    # this is made into a skip list
-    # the last entry of the skip list is removed (i.e. will be reprocessed) in case it was
-    # only partially processed
-
-    def make_filepath(task_idx):
-
-        file_idx_sample = task_idx * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
-
-        # filenames are in unix time microseconds
-        epoch_unix_us = file_idx_sample / (sample_rate/1000000)
-        epoch_unix = epoch_unix_us.astype("float128")/1000000
-        epoch_unix_us = epoch_unix_us.astype("int64")
-        return utils.get_filepath(epoch_unix_us)
-
     # MAIN LOOP
     results = {"dir": output, "files": [], "data": {}}
     for idx, task_idx in enumerate(job_tasks):
