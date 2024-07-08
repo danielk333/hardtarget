@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import glob
 import re
 import itertools as it
@@ -9,7 +8,7 @@ import bz2
 import configparser
 from pathlib import Path
 from tqdm import tqdm
-from . import load_expconfig
+from hardtarget.radars.eiscat import load_expconfig
 
 """Convert Eiscat raw data to Hardtarget DRF
 
@@ -17,6 +16,12 @@ This module provides functionality for converting Eiscat raw data to
 Hardtarget DRF format.
 
 """
+
+PARBL_ELEVATION = 8
+PARBL_AZIMUTH = 9
+PARBL_END_TIME = 10
+PARBL_START_TIME = 42 # upar[1]
+PARBL_RADAR_FREQUENCY = 54 # upar[13]
 
 ####################################################################
 # COMPLEX DTYPE
@@ -65,8 +70,8 @@ def determine_n0(mat, cfv):
     """
 
     samp_rate = int(cfv.get("sample_rate"))  # assuming integral # samples per second
-    t0 = float(mat["d_parbl"][0][42])
-    tx = float(mat["d_parbl"][0][10])
+    t0 = float(mat["d_parbl"][0][PARBL_START_TIME])
+    tx = float(mat["d_parbl"][0][PARBL_END_TIME])
     n_epoch = round(t0 * samp_rate)
     N_samp = len(mat["d_raw"])  # sanity check this value?
     N_sec = N_samp / samp_rate  # number of seconds in each file
