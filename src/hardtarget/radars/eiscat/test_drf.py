@@ -1,31 +1,14 @@
 import digital_rf as drf
 import numpy as np
+import time
 from pathlib import Path
-
-# writing parameters
-sample_rate_numerator = 100 # 100 Hz sample rate - typically MUCH faster
-sample_rate_denominator = 1
-dtype_str = 'i2' # short int
-sub_cadence_secs = 4  # Number of seconds of data in a subdirectory - typically MUCH larger
-file_cadence_millisecs = 400  # Each fill will have up to 400 ms of data
-compression_level = 0 # low level of compression
-checksum = False # no checksum
-is_complex = True # complex values
-is_continuous = True
-num_subchannels = 1 # only one subchannel
-marching_periods = False # no marching periods when writing
-uuid = "Fake UUID - use a better one!"
-vector_length = 100 # number of samples written for each call - typically MUCH longer
 
 
 def get_data(vector_length):
     # data
-    data_dtype = np.dtype([('real', np.int16),('imag', np.int16)])
-    data_shape = (vector_length,)
-    arr = np.empty(data_shape, dtype=data_dtype)
-    arr['real'] = np.random.randint(-32768, 32767, size=data_shape, dtype=np.int16)
-    arr['imag'] = np.random.randint(-32768, 32767, size=data_shape, dtype=np.int16)
-    return arr
+    data_dtype = np.int16
+    data_shape = (vector_length, 2)
+    return np.random.randint(-32768, 32767, size=data_shape, dtype=np.int16)
 
 def get_pointing():
     pointing_dtype = np.dtype([('a', np.float32), ('e', np.float32)])
@@ -37,41 +20,80 @@ def get_pointing():
 
 
 
-#arr = get_pointing()
-#print(arr.dtype)
-#print(arr.shape)
-#print(arr)
-
-zz = get_data(vector_length)
-
-def to_i2x16(zz):
-    zz2x16 = np.empty((len(zz), 2), dtype=np.int16)
-    zz2x16[:, 0] = zz["real"].astype(np.int16)
-    zz2x16[:, 1] = zz["imag"].astype(np.int16)
-    return zz2x16
-
-print(zz.dtype)
-print(zz.shape)
 
 
-# get the real part from zz
+OUT = Path("drf")
+OUT.mkdir(exist_ok=True)
+
+DATA_SAMPLE_FREQUENCY_NUMERATOR = 100
+DATA_SAMPLE_FREQUENCY_DENOMINATOR = 1
+NOW = time.time()
+
+POINTING_SAMPLE_FREQUENCY_NUMERATOR = 1
+POINTING_SAMPLE_FREQUENCY_DENOMINATOR = 1
 
 
 
+# global index
+# first sample number after now
+# number of seconds since epoch * sample_rate + 1 
+DATA_SAMPLE_RATE = float(DATA_SAMPLE_FREQUENCY_NUMERATOR)/DATA_SAMPLE_FREQUENCY_DENOMINATOR
+DATA_N0 = int(NOW*DATA_SAMPLE_RATE) + 1 
+
+# data writer
+data_writer = drf.DigitalRFWriter(
+    str(OUT / "uhf"),  # destination directory
+    np.int16,  # dtype string
+    3600,  # subdir cadence secs    => one dir per hour
+    100000,  # file cadence millisecs => one file per 100 second
+    DATA_N0,  # start global index
+    DATA_SAMPLE_FREQUENCY_NUMERATOR,  # sample rate numerator
+    DATA_SAMPLE_FREQUENCY_DENOMINATOR,  # sample rate denominator
+    uuid_str="data",
+    compression_level=0,
+    checksum=False,
+    is_complex=True,
+    num_subchannels=1,
+    is_continuous=True,
+    marching_periods=False, # no marching periods while writing
+)
+
+# pointing writer
+pointing_writer = drf.DigitalRFWriter(
+    str(OUT / "pointing"),  # destination directory
+    np.float32,  # dtype string
+    3600,  # subdir cadence secs    => one dir per hour
+    100000,  # file cadence millisecs => one file per 100 second
+    DATA_N0,  # start global index
+    DATA_SAMPLE_FREQUENCY_NUMERATOR,  # sample rate numerator
+    DATA_SAMPLE_FREQUENCY_DENOMINATOR,  # sample rate denominator
+    uuid_str="data",
+    compression_level=0,
+    checksum=False,
+    is_complex=True,
+    num_subchannels=1,
+    is_continuous=True,
+    marching_periods=False, # no marching periods while writing
+)
 
 
-#print(zz[:, 0])
-
-print("to_int")
-arr = to_i2x16(zz)
-print(arr.dtype)
-print(arr.shape)
-print(arr)
 
 
+def test_write():
+    """
+    Quickly write 2 hours of data
+    """
+    VECTOR_LEN = 100
+    # 1 hz and vector length 100 means 100 seconds data per write operation.
+    # 36 * 2 write operations should be 2 hours of data 
+    for i in range(36*2):
+        data = get_data(VECTOR_LEN)
+        data_writer.rf_write(data)
 
-out = Path("tmp")
-out.mkdir(exist_ok=True)
+    # should produce 1 file per 100 sec - 36 files in each directory
 
-# write 2 hours worth of data
 
+
+if __name__ == '__main__':
+    test_write()
+    
