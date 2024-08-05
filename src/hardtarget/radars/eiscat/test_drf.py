@@ -1,6 +1,6 @@
 import numpy as np
 from hardtarget.radars.eiscat.util import EiscatDRFWriter, EiscatDRFReader
-import digital_rf as drf
+# import digital_rf as drf
 import datetime as dt
 import time
 

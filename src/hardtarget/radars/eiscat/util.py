@@ -136,7 +136,7 @@ def create_drf_writer(dst, chnl, dtype_str, ts_origin_sec,
     """
 
     # destination
-    dst = Path("drf")
+    dst = Path(dst)
     if not dst.is_dir():
         raise Exception(f"<dst> must be directory path, {dst}")
     chnldir = dst / chnl
@@ -234,8 +234,12 @@ class EiscatDRFWriter:
         
         # create dst if not exists
         self.dst = Path(dst)
-        if self.dst.exists() and not self.dst.is_dir():
-            raise Exception (f"dst {dst} exists, but is not a directory")
+        if self.dst.exists():
+            if self.dst.is_dir():
+                raise Exception (f"dst {dst} already exists, please remove")
+            else:
+                raise Exception (f"dst {dst} exists, but is not a directory")
+
         self.dst.mkdir(parents=True, exist_ok=True)
 
         # sample writer - writes one batch at a time
