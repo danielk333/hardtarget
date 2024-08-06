@@ -235,10 +235,8 @@ class EiscatDRFWriter:
         # create dst if not exists
         self.dst = Path(dst)
         if self.dst.exists():
-            if self.dst.is_dir():
-                raise Exception (f"dst {dst} already exists, please remove")
-            else:
-                raise Exception (f"dst {dst} exists, but is not a directory")
+            if not self.dst.is_dir():
+                raise Exception (f"dst {dst} is not a directory")
 
         self.dst.mkdir(parents=True, exist_ok=True)
 
@@ -265,11 +263,17 @@ class EiscatDRFWriter:
         )
 
     def write(self, sample_batch, azimuth, elevation):
+        """
+        write 
+        expects sample batch to be 
+        - shape (vector_length, 1)
+        - np.dtype([('r', '<i2'), ('i', '<i2')])
+        """
         if azimuth is None:
             azimuth = 0.0
         if elevation is None:
             elevation = 0.0
-        expected_shape = (self.sample_batch_length, 2)
+        expected_shape = (self.sample_batch_length, 1)
         ok = match_shapes(sample_batch.shape, expected_shape)
         if not ok:
             raise Exception(f"shape mismatch {sample_batch.shape}, expected {expected_shape}")
@@ -282,8 +286,9 @@ class EiscatDRFWriter:
         self.pointing_writer.close()
 
 
-
-
+####################################################################
+# EISCAT DRF READER
+####################################################################
 
 class EiscatDRFReader:
 
@@ -320,7 +325,7 @@ class EiscatDRFReader:
         self.dst = Path(dst)
         if not self.dst.is_dir():
             raise Exception (f"dst {dst} does not exist or is not a directory")
-        self.reader = drf.DigitalRFReader(dst)
+        self.reader = drf.DigitalRFReader(str(dst))
         self.chnls = self.reader.get_channels()
         if "data" not in self.chnls:
             raise Exception("missing channel data")
@@ -351,55 +356,78 @@ class EiscatDRFReader:
         return int(ts * self.get_sample_rate(chnl))
 
     def get_bounds(self):
+        """
+        return bounds for read function
+
+        NOTE: digital rf read() includes idx_last - which breaks convention
+        return (start, end) where end is first sample not in bouds
+        """
         idx_first, idx_last = self.reader.get_bounds("data")
+        idx_start = idx_first
+        idx_end = idx_last + 1
+
         if self.ts_origin_sec is not None:
             # convert to time domain
-            ts_start = self.get_ts_from_index(idx_first, chnl="data")
-            ts_end = self.get_ts_from_index(idx_last + 1 , chnl="data")
+            ts_start = self.get_ts_from_index(idx_start, chnl="data")
+            ts_end = self.get_ts_from_index(idx_end , chnl="data")
             # calculate padding in time domain
             file_cadence_millisecs = self.reader.get_properties("data")["file_cadence_millisecs"]
-            front_padding_sec = self.ts_origin_sec - ts_start 
+            front_padding_sec = self.ts_origin_sec - ts_start
+            if front_padding_sec == 0:
+                return idx_start, idx_end 
             back_padding_sec = file_cadence_millisecs/1000 - front_padding_sec
             # convert back to index domain
-            idx_first = self.get_index_from_ts(ts_start + front_padding_sec, chnl="data")
-            idx_last = self.get_index_from_ts(ts_end - back_padding_sec, chnl="data") - 1
-        return idx_first, idx_last
+            idx_start = self.get_index_from_ts(ts_start + front_padding_sec, chnl="data")
+            idx_end = self.get_index_from_ts(ts_end - back_padding_sec, chnl="data")
+
+        return idx_start, idx_end
 
     def get_ts_bounds(self):
-        idx_first, idx_last = self.get_bounds()
-        ts_start = self.get_ts_from_index(idx_first, "data")
-        ts_end = self.get_ts_from_index(idx_last + 1, "data")
+        idx_start, idx_end = self.get_bounds()
+        ts_start = self.get_ts_from_index(idx_start, "data")
+        ts_end = self.get_ts_from_index(idx_end, "data")
         return ts_start, ts_end
 
     def get_str_bounds(self):
         return [datetime_to_str(bound) for bound in self.get_ts_bounds()]
 
-    def read_pointing(self, idx_first, idx_last):
+    def read_pointing(self, idx_start, idx_end):
         """
         indexes are in data sampling domain - must be converted to indexes for pointing data
+
+        NOTE: digital rf read() includes idx_last - which breaks convention
+        this function fixes this issue, by implementing "until idx_last" semantics
+
         """
 
         # generate sample indexes for pointing values
         step = self.sample_batch_length
-        indexes = np.arange(start=idx_first, step=step, stop=idx_last + 1, dtype=np.int64)
+        indexes = np.arange(start=idx_start, step=step, stop=idx_end, dtype=np.int64)
 
         # convert to time domain
-        ts_start = self.get_ts_from_index(idx_first, "data")
-        ts_end = self.get_ts_from_index(idx_last + 1, "data")
+        ts_start = self.get_ts_from_index(idx_start, "data")
+        ts_end = self.get_ts_from_index(idx_end, "data")
 
         # convert to pointing indexes
-        idx_first = self.get_index_from_ts(ts_start, "pointing")
-        idx_last = self.get_index_from_ts(ts_end, "pointing") - 1
+        idx_start = self.get_index_from_ts(ts_start, "pointing")
+        idx_end = self.get_index_from_ts(ts_end, "pointing")
 
         # calculate pointing indexes
-        d = self.reader.read(idx_first, idx_last, "pointing")
+        # NOTE: inclusive semantics 
+        d = self.reader.read(idx_start, idx_end - 1, "pointing")
         first = next(iter(d.items()))
 
         # TODO assert that there is only one item in dict
         return first[1], indexes
 
-    def read_data(self, idx_first, idx_last):
-        d =  self.reader.read(idx_first, idx_last, "data")
+    def read_data(self, idx_start, idx_end):
+        """
+        indexes in data sampling domain
+        
+        NOTE: digital rf read() includes idx_last - which breaks convention
+        this function fixes this issue, by implementing "until idx_last" semantics
+        """
+        d =  self.reader.read(idx_start, idx_end-1, "data")
         first = next(iter(d.items()))
         return first[1]
     
