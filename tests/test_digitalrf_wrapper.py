@@ -1,16 +1,14 @@
 import pytest
-import hardtarget.radars.eiscat.util2 as drfutil
+import hardtarget.radars.eiscat.digitalrf_wrapper as drf_wrapper
 import datetime as dt
 import time
 import numpy as np
 import numpy.testing as npt
 from pathlib import Path
-import shutil
 
 ####################################################################
 # DATETIMES
 ####################################################################
-
 
 def make_ts_from_str(datetime_str):
     """
@@ -61,9 +59,8 @@ def test_eiscat_drf(tmpdir, ts_origin_sec):
     BATCH_LEN = 100
     CHNL = "data"
 
-
     # create writer
-    writer = drfutil.EiscatDRFWriter(tmpdir, CHNL,
+    writer = drf_wrapper.DigitalRFWriter(tmpdir, CHNL,
         SAMPLE_RATE_NUMERATOR,
         SAMPLE_RATE_DENOMINATOR,
         DTYPE,
@@ -95,7 +92,7 @@ def test_eiscat_drf(tmpdir, ts_origin_sec):
     writer.close()
 
     # create reader
-    reader = drfutil.EiscatDRFReader(tmpdir, CHNL)
+    reader = drf_wrapper.DigitalRFReader(tmpdir, CHNL)
 
     # read 2 hours from ts_origin_sec
     start_ts = ts_origin_sec
@@ -139,7 +136,7 @@ def test_eiscat_drf_metadata(tmpdir, ts_origin_sec):
     CHNL = "meta"
 
     # create writer
-    writer = drfutil.EiscatDRFMetadataWriter(
+    writer = drf_wrapper.DigitalMetadataWriter(
         tmpdir, CHNL,
         SAMPLE_RATE_NUMERATOR,
         SAMPLE_RATE_DENOMINATOR * BATCH_LENGTH,
@@ -160,7 +157,7 @@ def test_eiscat_drf_metadata(tmpdir, ts_origin_sec):
         writer.write(start_idx + i, azimuth, elevation)
 
     # create reader
-    reader = drfutil.EiscatDRFMetadataReader(tmpdir, CHNL)
+    reader = drf_wrapper.DigitalMetadataReader(tmpdir, CHNL)
 
     # covert to numpy array
     def convert(values):

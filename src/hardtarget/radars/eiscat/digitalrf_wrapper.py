@@ -1,12 +1,21 @@
 from pathlib import Path
-import shutil
 import digital_rf
-import numpy as np
 import datetime as dt
-import time
 
+####################################################################
+# DIGITAL_RF WRAPPER
+####################################################################
 
-class EiscatDRFWriter:
+"""
+This module provides a wrapper around reader and writer objects
+from 'digital_rf' - to provide a uniform API and correct some design issues.
+"""
+
+####################################################################
+# DIGITAL RF WRITER
+####################################################################
+
+class DigitalRFWriter:
     
     """
     Convenience wrapper around digital_rf.DigitalRFWriter 
@@ -75,10 +84,12 @@ class EiscatDRFWriter:
         self._writer.rf_write(batch)
 
 
-
+####################################################################
+# DIGITAL RF READER
+####################################################################
 
 _DRF_READERS = {} # path -> reader
-def get_drf_reader(path):
+def _get_drf_reader(path):
     global _DRF_READERS
     path = str(path)
     if path not in _DRF_READERS:
@@ -86,7 +97,7 @@ def get_drf_reader(path):
     return _DRF_READERS[path]
 
 
-class EiscatDRFReader:
+class DigitalRFReader:
 
     """
     Convenience wrapper around digital_rf.DigitalRFReader 
@@ -100,9 +111,12 @@ class EiscatDRFReader:
             raise Exception(f"<dst> must be directory path, {dst}")
 
         # setup reader
-        self._reader = get_drf_reader(dst)
+        self._reader = _get_drf_reader(dst)
+
+        # check chnl
         if chnl not in self._reader.get_channels():
             raise Exception(f"chnl {chnl} missing in {dir}") 
+
         self.chnl = chnl
         self._sample_rate = float(self._reader.get_properties(self.chnl)["samples_per_second"])
 
@@ -162,9 +176,13 @@ class EiscatDRFReader:
         return self._reader.read(idx_first, idx_last, self.chnl).items()
 
 
-class EiscatDRFMetadataWriter:
-    
 
+####################################################################
+# DIGITAL METADATA WRITER
+####################################################################
+
+class DigitalMetadataWriter:
+    
     """
     Convenience wrapper around digital_rf.DigitalMetadataWriter 
     """
@@ -176,7 +194,6 @@ class EiscatDRFMetadataWriter:
                  file_candence_secs=3600,  # 1 hour per file
                  prefix="meta",
                 ):
-
 
         # check dst
         dst = Path(dst)
@@ -217,16 +234,17 @@ class EiscatDRFMetadataWriter:
         pass
 
 
+####################################################################
+# DIGITAL METADATA READER
+####################################################################
 
-
-class EiscatDRFMetadataReader:
+class DigitalMetadataReader:
 
     """
     Convenience wrapper around digital_rf.DigitalMetadataReader 
     """
 
     def __init__(self, dst, chnl):
-
 
         # check dst and chnl
         dst = Path(dst)
@@ -240,7 +258,6 @@ class EiscatDRFMetadataReader:
         # setup reader
         self._reader = digital_rf.DigitalMetadataReader(str(metadir))
         self._sample_rate = self._reader.get_samples_per_second()
-
         self.chnl = chnl
 
 
@@ -259,7 +276,6 @@ class EiscatDRFMetadataReader:
         idx_start = idx_first
         idx_end = idx_last + 1
         return idx_start, idx_end
-
 
     def get_fields(self):
         return self._reader.get_fields()
