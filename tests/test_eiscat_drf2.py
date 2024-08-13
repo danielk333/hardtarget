@@ -1,10 +1,11 @@
 import pytest
-from hardtarget.radars.eiscat.util2 import EiscatDRFWriter, EiscatDRFReader
+import hardtarget.radars.eiscat.util2 as drfutil
 import datetime as dt
 import time
 import numpy as np
 import numpy.testing as npt
 from pathlib import Path
+import shutil
 
 ####################################################################
 # DATETIMES
@@ -28,42 +29,53 @@ TS_ORIGIN_SEC_NOW = dt.datetime.now(dt.timezone.utc).timestamp()
 
 
 ####################################################################
-# RANDOM SAMPLE DATA WRITER
+# TEST EISCAT DRF
 ####################################################################
 
-SAMPLE_RATE_NUMERATOR = 1000000 
-SAMPLE_RATE_DENOMINATOR = 1
-SAMPLE_BATCH_LENGTH = 12800000  # batch length is 12.8 seconds worth of samples
-SAMPLE_SUBDIR_CADENCE_SECS = 3600 # 1 dir per hour
-SAMPLE_FILE_CADENCE_SECS = 10 # 10 seconds per file
-
-DATADIR = Path("/tmp/eiscat/")
-DTYPE = np.int16
-BATCH_LEN = 100
-
-def write_data(drfdir, chnl, ts_origin_sec):
+@pytest.mark.parametrize("ts_origin_sec", [
+    TS_ORIGIN_SEC_ALIGNED,
+    TS_ORIGIN_SEC_MISALIGNED,
+    TS_ORIGIN_SEC_NOW
+])
+def test_eiscat_drf(tmpdir, ts_origin_sec):
     """
-    write 2 hours of random data with vectors of 100 samples
+    write 2 hours of random complex data with vectors of 100 samples
     1 Hz sample rate and vector length 100 means 100 seconds of data per write operation.
     2 hours of data is then 2*3600 samples == 2*36 write operations, 
     written data divided into 2*36 100 second files = 72 files 
+
+    read it back to verify correctness
+    1) read it back using known timestamps
+    2) read it back using data bounds reported by the reader
     """
-    datadir = drfdir / chnl
-    datadir.mkdir(parents=True, exist_ok=True)
+    # tmpdir
+    tmpdir = Path(tmpdir)
+    assert tmpdir.exists()
+
+    # setup
+    SAMPLE_RATE_NUMERATOR = 1 # 1 Hz 
+    SAMPLE_RATE_DENOMINATOR = 1
+    SUBDIR_CADENCE_SECS = 3600 # 1 dir per hour
+    FILE_CADENCE_SECS = 100 # 100 seconds per file
+    DTYPE = np.int16
+    BATCH_LEN = 100
+    CHNL = "data"
+
 
     # create writer
-    writer = EiscatDRFWriter(datadir,
+    writer = drfutil.EiscatDRFWriter(tmpdir, CHNL,
         SAMPLE_RATE_NUMERATOR,
         SAMPLE_RATE_DENOMINATOR,
         DTYPE,
         ts_origin_sec=ts_origin_sec,
-        subdir_cadence_secs=SAMPLE_SUBDIR_CADENCE_SECS,
-        file_cadence_secs=SAMPLE_FILE_CADENCE_SECS,
+        subdir_cadence_secs=SUBDIR_CADENCE_SECS,
+        file_cadence_secs=FILE_CADENCE_SECS,
         is_complex=True
     )
 
     # make random data
     def get_data(samples):
+        """make some random complex data"""
         dtype = np.dtype([('r', '<i2'), ('i', '<i2')])
         size = (samples, 1)
         real = np.random.randint(-32768, 32767, size=size, dtype='<i2')
@@ -73,66 +85,105 @@ def write_data(drfdir, chnl, ts_origin_sec):
         arr['i'] = imag
         return arr
 
-
     # write
     n_batches = 36*2
-    data = get_data(n_batches * BATCH_LEN)
+    wr_data = get_data(n_batches * BATCH_LEN)
     for i in range(n_batches):
         # write data
-        batch = data[i*BATCH_LEN: (i+1)*BATCH_LEN]
+        batch = wr_data[i*BATCH_LEN: (i+1)*BATCH_LEN]
         writer.write(batch)
     writer.close()
 
-    return data
-
-
-
-
-####################################################################
-# TEST EISCAT DRF
-####################################################################
-
-@pytest.mark.parametrize("ts_origin_sec", [
-    TS_ORIGIN_SEC_ALIGNED,
-    #TS_ORIGIN_SEC_MISALIGNED,
-    #TS_ORIGIN_SEC_NOW
-])
-def test_eiscat_drf(ts_origin_sec):
-    
-    tmpdir = Path("/tmp/eiscat")
-    chnl = "data"
-
-    assert not tmpdir.exists()
-    tmpdir.mkdir(parents=True, exist_ok=True)
-
-    # write test data
-    wr_data = write_data(tmpdir, chnl, ts_origin_sec)        
-
-    # reader
-    reader = EiscatDRFReader(tmpdir)
+    # create reader
+    reader = drfutil.EiscatDRFReader(tmpdir, CHNL)
 
     # read 2 hours from ts_origin_sec
     start_ts = ts_origin_sec
     end_ts = (dt.datetime.fromtimestamp(start_ts) + dt.timedelta(hours=2)).timestamp()
-    idx_start = reader.index_from_ts(start_ts, chnl)
-    idx_end = reader.index_from_ts(end_ts, chnl)
-
-    rd_idx, rd_data = next(iter(reader.read(idx_start, idx_end, chnl)))  
-
-    
-    import pprint
-    pprint.pprint(rd_data)
+    idx_start = reader.index_from_ts(start_ts)
+    idx_end = reader.index_from_ts(end_ts)
+    rd_idx, rd_data = next(iter(reader.read(idx_start, idx_end)))  
 
     # compare written data to read data
     npt.assert_array_equal(wr_data, rd_data)
 
     # read by bounds
-    #idx_start, idx_end = reader.get_bounds()
-    #rd_idx, rd_data = next(iter(reader.read(idx_start, idx_end, chnl)))
+    idx_start, idx_end = reader.get_bounds(ts_origin_sec=ts_origin_sec)
+    rd_idx, rd_data = next(iter(reader.read(idx_start, idx_end)))
 
     # compare written data to read data
-    #npt.assert_array_equal(wr_data, rd_data)
+    npt.assert_array_equal(wr_data, rd_data)
 
+
+
+####################################################################
+# TEST EISCAT DRF METADATA
+####################################################################
+
+
+@pytest.mark.parametrize("ts_origin_sec", [
+    TS_ORIGIN_SEC_ALIGNED,
+    TS_ORIGIN_SEC_MISALIGNED,
+    TS_ORIGIN_SEC_NOW
+])
+def test_eiscat_drf_metadata(tmpdir, ts_origin_sec):
+
+    # tmpdir
+    tmpdir = Path(tmpdir)
+    assert tmpdir.exists()
+
+    # SETUP
+    SAMPLE_RATE_NUMERATOR = 1000000 
+    SAMPLE_RATE_DENOMINATOR = 1
+    BATCH_LENGTH = 12800000  # sample batch length is 12.8 seconds worth of samples
+    CHNL = "meta"
+
+    # create writer
+    writer = drfutil.EiscatDRFMetadataWriter(
+        tmpdir, CHNL,
+        SAMPLE_RATE_NUMERATOR,
+        SAMPLE_RATE_DENOMINATOR * BATCH_LENGTH,
+    )
+
+    # random pointing data
+    def get_pointing(rows):
+        azimuth = np.random.uniform(low=0.0, high=180.0, size=(rows, 1)).astype(np.float64)
+        elevation = np.random.uniform(low=0.0, high=90.0, size=(rows, 1)).astype(np.float64)
+        return np.hstack((azimuth, elevation))
+
+    # write
+    start_idx = writer.index_from_ts(ts_origin_sec)
+    n_batches = 36*2
+    wr_pointing = get_pointing(n_batches)
+    for i in range(n_batches):
+        azimuth, elevation = wr_pointing[i]
+        writer.write(start_idx + i, azimuth, elevation)
+
+    # create reader
+    reader = drfutil.EiscatDRFMetadataReader(tmpdir, CHNL)
+
+    # covert to numpy array
+    def convert(values):
+        return np.array([(d['azimuth'], d['elevation']) for d in values], dtype=np.float64)
+
+    # read 2 hours from ts_origin_sec
+    start_ts = ts_origin_sec
+    end_ts = (dt.datetime.fromtimestamp(start_ts) + dt.timedelta(hours=2)).timestamp()
+    idx_start = reader.index_from_ts(start_ts)
+    idx_end = reader.index_from_ts(end_ts)
+
+    # read and compare
+    indexes, values = zip(*reader.read(idx_start, idx_end))
+    rd_pointing = convert(values)
+    npt.assert_array_equal(wr_pointing, rd_pointing)
+
+    # read by bounds
+    idx_start, idx_end = reader.get_bounds()
+    
+    # read and compare
+    indexes, values = zip(*reader.read(idx_start, idx_end))
+    rd_pointing = convert(values)
+    npt.assert_array_equal(wr_pointing, rd_pointing)
 
 ####################################################################
 # MAIN
