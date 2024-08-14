@@ -9,6 +9,12 @@ import datetime as dt
 """
 This module provides a wrapper around reader and writer objects
 from 'digital_rf' - to provide a uniform API and correct some design issues.
+
+NOTE - not sure if digital_rf is thread-safe with respect to concurrent
+writes to same file (e.g. adjacent blocks). 
+Also, it appears that digital_rf is not random access with respect to 
+writing (even in non-continuous mode) as it maintains and internal index 
+for next available sample.
 """
 
 ####################################################################
