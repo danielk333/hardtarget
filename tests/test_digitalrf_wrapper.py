@@ -1,5 +1,5 @@
 import pytest
-import hardtarget.radars.eiscat.digitalrf_wrapper as drf_wrapper
+import hardtarget.digitalrf_wrapper as drf_wrapper
 import datetime as dt
 import time
 import numpy as np

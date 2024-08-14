@@ -6,7 +6,7 @@ import numpy as np
 import scipy.io as sio
 import itertools as it
 from hardtarget.radars.eiscat import load_expconfig
-import hardtarget.radars.eiscat.digitalrf_wrapper as drf_wrapper
+import hardtarget.digitalrf_wrapper as drf_wrapper
 import configparser
 from tqdm import tqdm
 
@@ -342,15 +342,4 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         meta.write(f)
 
     return str(hdrf)
-
-
-
-if __name__ == '__main__':
-
-
-    DST = "/cluster/projects/p106119-SpaceDebrisRadarCharacterization/raw"
-    PRODUCT = "leo_bpark_2.1u_NO-20180104-UHF/leo_bpark_2.1u_NO@uhf"
-    SRC = Path(DST) / PRODUCT
-    DST = "/tmp/eiscat"
-    convert(SRC, DST)
 
