@@ -1,82 +1,38 @@
+from pathlib import Path
 import glob
 import re
-import itertools as it
-import scipy.io as sio
-import digital_rf as drf
-import numpy as np
 import bz2
-import configparser
-from pathlib import Path
-from tqdm import tqdm
+import numpy as np
+import scipy.io as sio
+import itertools as it
 from hardtarget.radars.eiscat import load_expconfig
+import hardtarget.radars.eiscat.digitalrf_wrapper as drf_wrapper
+import configparser
+from tqdm import tqdm
 
-"""Convert Eiscat raw data to Hardtarget DRF
-
-This module provides functionality for converting Eiscat raw data to
-Hardtarget DRF format.
-
-"""
+####################################################################
+# GLOBALS
+####################################################################
 
 PARBL_ELEVATION = 8
 PARBL_AZIMUTH = 9
 PARBL_END_TIME = 10
+PARBL_SEQUENCE = 11
 PARBL_START_TIME = 42 # upar[1]
 PARBL_RADAR_FREQUENCY = 54 # upar[13]
 
 ####################################################################
-# COMPLEX DTYPE
+# UTIL
 ####################################################################
 
-icomplex32 = np.dtype([
-    ('real', np.int16),
-    ('imag', np.int16)])
-
-
-def to_icomplex32(zz):
-    zz32 = np.empty(zz.shape, dtype=icomplex32)
-    zz32['real'] = zz.real.astype(np.int16)
-    zz32['imag'] = zz.imag.astype(np.int16)
-    return zz32
-
-
 def to_i2x16(zz):
+    """
+    convert from (N,) complex128 to (N,2) int16 
+    """
     zz2x16 = np.empty((len(zz), 2), dtype=np.int16)
     zz2x16[:, 0] = zz.real.astype(np.int16)
     zz2x16[:, 1] = zz.imag.astype(np.int16)
     return zz2x16
-
-
-####################################################################
-# MATLAB PARAMETER BLOCK
-####################################################################
-
-
-def determine_n0(mat, cfv):
-    """
-    cfv - config for this version of the experiment
-
-    find (global) index of first raw data sample in file, assuming
-    continuous sampling.
-
-    The epoch (in seconds) is the radar controller start time,
-    and is found in the first user parameter (d_parbl[42] or upar[1]).
-
-    The time (in seconds) of the last sample in the file is in d_parbl[10].
-    This is used to find the (integral) number of the current file (counting
-    from 0).
-
-    The sample number of the first sample in the file is then the sample number
-    of the epoch plus the number of this file times the number of samples in each file.
-    """
-
-    samp_rate = int(cfv.get("sample_rate"))  # assuming integral # samples per second
-    t0 = float(mat["d_parbl"][0][PARBL_START_TIME])
-    tx = float(mat["d_parbl"][0][PARBL_END_TIME])
-    n_epoch = round(t0 * samp_rate)
-    N_samp = len(mat["d_raw"])  # sanity check this value?
-    N_sec = N_samp / samp_rate  # number of seconds in each file
-    i_file = round((tx - t0) / N_sec) - 1  # -1 because parbl[10] records _end_ time of file
-    return n_epoch + N_samp * i_file
 
 
 def all_files(top):
@@ -92,12 +48,14 @@ def all_files(top):
     return it.chain(*(sorted(filter(filter_func, glob.glob(f"{dir}/{8*d}.mat*"))) for dir in dirs))
 
 
-def loadmat(pth):
-    """A version of loadmat which transparently unzips files on the fly (not in the filesystem)
+def loadmat(path):
     """
-    if pth.endswith(".mat.bz2"):
-        pth = bz2.open(pth, "rb")
-    return sio.loadmat(pth)
+    Loat matlab file.
+    Transparently unzips files on the fly (not in the filesystem)
+    """
+    if path.endswith(".mat.bz2"):
+        path = bz2.open(path, "rb")
+    return sio.loadmat(path)
 
 
 def expinfo_split(xpinf):
@@ -113,13 +71,69 @@ def expinfo_split(xpinf):
         raise ValueError(f"d_ExpInfo: {xpinf} not understood: {e}")
 
 
+def parse_matlab(mat, sample_rate, file_secs):
+
+    """
+    parse (and check) matlab file
+    sample_rate - expected sample rate
+    file_secs - expected file length in seconds
+    returns dictionary with meta information
+
+    timestamps are seconds since epoch
+    """
+    d = {
+        "sample_rate": sample_rate,
+        "file_secs": file_secs
+    }
+
+    parbl = mat["d_parbl"][0]
+
+    # expected duration of file in seconds 
+    d["duration"] = duration = float(file_secs)
+
+    # global start of recording - repeated for all files in product
+    d["ts_origin"] = ts_origin = float(parbl[PARBL_START_TIME])
+    # end time of last sample in this file
+    d["ts_end"] = ts_end = float(parbl[PARBL_END_TIME])
+    # timestamp of first sample in file
+    d["ts_start"] = ts_end - duration
+
+    # expected number of samples in file
+    d["n_samples"] = samples = int(duration * sample_rate)
+
+    # sequence number
+    # files have a hard coded sequence number 
+    # unclear if/how this number relates to timestamps
+    d["seq"] = seq = int(parbl[PARBL_SEQUENCE])
+
+    # file index - relative to ts_origin - zero indexed
+    d["file_idx"] = idx_file = round((ts_end - ts_origin) / duration) - 1
+
+    # global index of first sample in recording (t_origin)
+    d["sample_idx_origin"] = idx_origin = round(ts_origin * sample_rate)
+    # global index of first sample in file
+    d["sample_idx_start"] = idx_start = idx_origin + idx_file * samples
+    # global index of next sample after file
+    d["sample_idx_end"] = idx_start + samples    
+
+    # instrument pointing angles
+    d["elevation"] = elevation = float(parbl[PARBL_ELEVATION])
+    d["azimuth"] = azimuth = float(parbl[PARBL_AZIMUTH]) % 360
+   
+
+    return d
+
+
+
 ####################################################################
-# EISCAT CONVERT
+# CONVERT
 ####################################################################
 
 
 def convert(src, dst, name=None, compression=0, progress=False, logger=None):
-    """Converts Eiscat raw data to Hardtarget DRF.
+
+    """
+    Converts Eiscat raw data to Hardtarget DRF.
 
     Example
     -------
@@ -188,94 +202,115 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
     hdrf = dst / name
     if hdrf.exists():
         raise FileExistsError(str(hdrf))
+    hdrf.mkdir(parents=True, exist_ok=True)
 
-    # all files from Eiscat raw data product
+    #######################################################################
+    # SRC FILES
+    #######################################################################
+
+    # all files from Eiscat raw data product, in sorted order
     files = list(all_files(src))
-
+   
     #######################################################################
     # META DATA
     #######################################################################
 
-    # extract meta data from first file
-    first_file = files[0]
-    # load start time from parameter block
-    mat = loadmat(first_file)
-    upar = mat["d_parbl"][0, 41:62]
-    radar_frequency = upar[13]
-    # load experiment info
+    # load experiment info from first matlab file
+    first = files[0]
+    mat = loadmat(first)
     host, expname, expvers, owner = expinfo_split(str(mat["d_ExpInfo"][0]))
     cfg = load_expconfig(expname)
-    cfv = cfg[expvers]  # config for this version of the experiment (mode)
-    sample_rate = int(cfv.get("sample_rate"))  # assuming integral # samples per second
+    cfv = cfg[expvers]
+    sample_rate = int(cfv.get("sample_rate"))
     file_secs = float(cfv.get("file_secs"))
-    n_samples = round(file_secs * sample_rate)
-    # find (global) index of first raw data sample in file
-    n0 = determine_n0(mat, cfv)
-    # add channel subdirectory
     chnl = cfv.get("rx_channel", "tbd")
+    # start time for sampling (repeated for all files)
+    ts_origin_sec = float(mat["d_parbl"][0][PARBL_START_TIME])
+    radar_frequency = float(mat["d_parbl"][0][PARBL_RADAR_FREQUENCY])
 
     #######################################################################
-    # WRITE DATA
+    # WRITER SETUP
     #######################################################################
 
-    # hdrf data folder
-    data = hdrf / chnl
-    data.mkdir(parents=True, exist_ok=True)
-
-    # create digital rf writer
-    rf_writer = drf.DigitalRFWriter(
-        str(data),  # directory
-        np.int16,  # dtype
-        3600,  # subdir cadence secs    => one dir per hour
-        1000,  # file cadence millisecs => one file per second
-        n0,  # start global index
-        sample_rate,  # sample rate numerator
-        1,  # sample rate denominator
-        uuid_str=cfv.get("rx_channel", "tbd"),
-        compression_level=compression,
-        checksum=False,
+    # create sample writer
+    sample_writer = drf_wrapper.DigitalRFWriter(hdrf, chnl,
+        sample_rate, # sample rate numerator
+        1, # samplerate denominator
+        np.int16,
+        ts_origin_sec=ts_origin_sec,
+        subdir_cadence_secs=3600, # one dir per hour
+        file_cadence_secs=1, # one file per second
         is_complex=True,
-        num_subchannels=1,
-        is_continuous=True,
-        marching_periods=False,
+        compression_level=compression,
+        uuid_str=chnl
     )
 
-    n_prev = n0 - n_samples
+    # create pointing writer
+    pointing_writer = drf_wrapper.DigitalMetadataWriter(
+        hdrf, "pointing",
+        sample_rate, # sample rate numerator (int)
+        int(file_secs * sample_rate), # sample rate denominator (int)
+    )
+
+
+    #######################################################################
+    # WRITE
+    #######################################################################
+
+    # all data have to be written sequentially, from ts_orgin_sec
+    # files are sorted, but apparently there is no guarantee that the first
+    # file starts at ts_origin_sec, so zero padding is needed
     n_files = len(files)
-    logger.info(f"writing DRF from {n_files} input files")
+    if logger:
+        logger.info(f"writing DRF from {n_files} input files")
 
     if progress:
         pbar = tqdm(desc="Converting files to digital_rf", total=n_files)
 
-    for idx, pth in enumerate(files):
-        if idx + 1 == n_files or idx % 10 == 0:
-            logger.debug(f"write progress {idx+1}/{n_files}")
-        mat = loadmat(pth)
-        n0 = determine_n0(mat, cfv)
-        logger.debug(f"n_samp {n0 - n_prev} (should be {n_samples})")
-        if n0 - n_prev != n_samples:
-            # zero padding
-            n_pad = (n0 - n_prev) - n_samples
-            try:
-                rf_writer.rf_write(np.zeros(n_pad*2, dtype=np.int16))
-            except Exception:
-                logger.warning("unable to pad out for missing files ... continuing")
+    # convert
+    write_idx = sample_writer.index_from_ts(ts_origin_sec)
+    for file_idx, file in enumerate(files):
+        if logger:
+            if file_idx + 1 == n_files or file_idx % 10 == 0:
+                logger.debug(f"write progress {file_idx+1}/{n_files}")
 
-        zz = to_i2x16(mat["d_raw"][:, 0])
-        if len(zz) != n_samples:
-            logger.warning(f"found {len(zz)} samples in {pth}['d_raw'], expected {n_samples}")
-        try:
-            rf_writer.rf_write(zz)
-        except Exception as e:
-            logger.warning(f"unable to write samples from {pth} to file ... continuing")
-            raise e
-        n_prev = n0
+
+        mat = loadmat(file)
+        meta = parse_matlab(mat, sample_rate, file_secs)
+
+        # zero pad if start of file is ahead of write idx
+        start_idx = sample_writer.index_from_ts(meta["ts_start"])
+        if start_idx > write_idx:
+            n_pad = start_idx - write_idx
+            sample_writer.write(np.zeros(n_pad*2, dtype=np.int16))
+            # advance write index
+            write_idx += n_pad
+
+        # load data
+        data = mat["d_raw"][:, 0]
+        # make sure data is not too long
+        data = data[:meta["n_samples"]]
+
+        # write data
+        zz = to_i2x16(data)
+        sample_writer.write(zz)
+
+        # advance write_idx
+        write_idx += len(data)
+
+        # write pointing
+        idx = pointing_writer.index_from_ts(meta["ts_start"])
+        pointing_writer.write(idx, meta["azimuth"], meta["elevation"])
+
         if progress:
             pbar.update(1)
+
     if progress:
         pbar.close()
+    
+    if logger:
+        logger.info("Done writing DRF files")
 
-    logger.info("Done writing DRF files")
 
     #######################################################################
     # WRITE METADATA
@@ -307,3 +342,15 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         meta.write(f)
 
     return str(hdrf)
+
+
+
+if __name__ == '__main__':
+
+
+    DST = "/cluster/projects/p106119-SpaceDebrisRadarCharacterization/raw"
+    PRODUCT = "leo_bpark_2.1u_NO-20180104-UHF/leo_bpark_2.1u_NO@uhf"
+    SRC = Path(DST) / PRODUCT
+    DST = "/tmp/eiscat"
+    convert(SRC, DST)
+
