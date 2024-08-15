@@ -52,7 +52,6 @@ class DigitalRFWriter:
         chnldir = dst / chnl
         chnldir.mkdir(parents=True, exist_ok=True)
 
-
         # sample rate
         self._sample_rate = sample_rate_numerator / float(sample_rate_denominator)
         # use construction time as default value for ts_origin_sec
@@ -229,11 +228,7 @@ class DigitalMetadataWriter:
     def index_from_ts(self, ts):
         return int(ts * self._sample_rate)
 
-    def write(self, idx, azimuth, elevation):
-        d = {
-            "azimuth": azimuth,
-            "elevation": elevation
-        }
+    def write(self, idx, d):
         self._writer.write(idx, d)
 
     def close(self):

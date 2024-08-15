@@ -154,7 +154,8 @@ def test_eiscat_drf_metadata(tmpdir, ts_origin_sec):
     wr_pointing = get_pointing(n_batches)
     for i in range(n_batches):
         azimuth, elevation = wr_pointing[i]
-        writer.write(start_idx + i, azimuth, elevation)
+        d = {'azimuth': azimuth, 'elevation': elevation}
+        writer.write(start_idx + i, d)
 
     # create reader
     reader = drf_wrapper.DigitalMetadataReader(tmpdir, CHNL)
@@ -181,6 +182,49 @@ def test_eiscat_drf_metadata(tmpdir, ts_origin_sec):
     indexes, values = zip(*reader.read(idx_start, idx_end))
     rd_pointing = convert(values)
     npt.assert_array_equal(wr_pointing, rd_pointing)
+
+
+
+####################################################################
+# TEST METADATA CHANGE
+####################################################################
+
+def test_metadata_change(tmpdir):
+
+    # mockup metadata stream
+
+    # create writer
+    # sample rate 1 sample per 12.8 sec
+    writer = drf_wrapper.DigitalMetadataWriter(
+        tmpdir, "mock",
+        10,
+        128,
+    )
+
+    sample_rate = 10.0/128
+    samples_per_hour = 3600 * sample_rate
+
+    # write 5 samples == 64 seconds
+    writer.write(0, {"azimuth": 4})
+    writer.write(1, {"azimuth": 4})
+    writer.write(2, {"azimuth": 80})
+    writer.write(3, {"azimuth": 80})
+    writer.write(4, {"azimuth": 80})
+
+    # read back an interval where the value changes
+    reader = drf_wrapper.DigitalMetadataReader(tmpdir, "mock")
+
+    result = list(reader.read(1, 3))
+    assert len(result) == 2
+    assert result[0][1]['azimuth'] == 4
+    assert result[1][1]['azimuth'] == 80
+
+
+
+
+
+
+
 
 ####################################################################
 # MAIN
