@@ -53,7 +53,7 @@ class DigitalRFWriter:
         chnldir.mkdir(parents=True, exist_ok=True)
 
         # sample rate
-        self._sample_rate = sample_rate_numerator / float(sample_rate_denominator)
+        self.sample_rate = sample_rate_numerator / float(sample_rate_denominator)
         # use construction time as default value for ts_origin_sec
         if ts_origin_sec is None:
             ts_origin_sec = dt.now(timezone.utc).timestamp()
@@ -80,10 +80,10 @@ class DigitalRFWriter:
         self._writer.close()
 
     def ts_from_index(self, idx):
-        return self.idx / self._sample_rate
+        return self.idx / self.sample_rate
 
     def index_from_ts(self, ts):
-        return int(ts * self._sample_rate)
+        return int(ts * self.sample_rate)
 
     def write(self, batch):
         self._writer.rf_write(batch)
@@ -123,13 +123,13 @@ class DigitalRFReader:
             raise Exception(f"chnl {chnl} missing in {dir}") 
 
         self.chnl = chnl
-        self._sample_rate = float(self._reader.get_properties(self.chnl)["samples_per_second"])
+        self.sample_rate = float(self._reader.get_properties(self.chnl)["samples_per_second"])
 
     def ts_from_index(self, idx):
-        return idx / self._sample_rate
+        return idx / self.sample_rate
 
     def index_from_ts(self, ts):
-        return int(ts * self._sample_rate)
+        return int(ts * self.sample_rate)
 
     def get_bounds(self, ts_origin_sec=None):
         """
@@ -210,7 +210,7 @@ class DigitalMetadataWriter:
         metadir.mkdir(parents=True, exist_ok=True)
 
         # sample rate
-        self._sample_rate = sample_rate_numerator / float(sample_rate_denominator)
+        self.sample_rate = sample_rate_numerator / float(sample_rate_denominator)
 
         # meta data writer
         self._writer = digital_rf.DigitalMetadataWriter(
@@ -223,10 +223,10 @@ class DigitalMetadataWriter:
         )
 
     def ts_from_index(self, idx):
-        return idx / self._sample_rate
+        return idx / self.sample_rate
 
     def index_from_ts(self, ts):
-        return int(ts * self._sample_rate)
+        return int(ts * self.sample_rate)
 
     def write(self, idx, d):
         self._writer.write(idx, d)
@@ -258,15 +258,15 @@ class DigitalMetadataReader:
 
         # setup reader
         self._reader = digital_rf.DigitalMetadataReader(str(metadir))
-        self._sample_rate = self._reader.get_samples_per_second()
+        self.sample_rate = self._reader.get_samples_per_second()
         self.chnl = chnl
 
 
     def ts_from_index(self, idx):
-        return idx / self._sample_rate
+        return idx / self.sample_rate
 
     def index_from_ts(self, ts):
-        return int(ts * self._sample_rate)
+        return int(ts * self.sample_rate)
 
     def get_bounds(self, ts_origin_sec=None):
         """

@@ -201,9 +201,6 @@ def test_metadata_change(tmpdir):
         128,
     )
 
-    sample_rate = 10.0/128
-    samples_per_hour = 3600 * sample_rate
-
     # write 5 samples == 64 seconds
     writer.write(0, {"azimuth": 4})
     writer.write(1, {"azimuth": 4})
@@ -218,6 +215,19 @@ def test_metadata_change(tmpdir):
     assert len(result) == 2
     assert result[0][1]['azimuth'] == 4
     assert result[1][1]['azimuth'] == 80
+
+
+
+####################################################################
+# TEST METADATA UPSAMPLE
+####################################################################
+
+def test_metadata_upsample():
+
+    pass
+
+
+
 
 
 

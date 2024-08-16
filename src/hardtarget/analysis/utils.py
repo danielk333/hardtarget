@@ -616,3 +616,72 @@ def get_filepath(epoch_unix_us):
     dt = datetime.datetime.utcfromtimestamp(epoch_unix_us*1e-6)
     time_string = dt.strftime("%Y-%m-%dT%H-00-00")
     return Path(time_string) / f"gmf-{epoch_unix_us:08d}.h5"
+
+
+
+
+####################################################################
+# LOAD POINTING DATA
+####################################################################
+
+
+def ts_from_index(idx, sample_rate):
+    """convert from sample idx to timestamp"""
+    return idx / float(sample_rate)
+
+def index_from_ts(ts, sample_rate):
+    """convert from timestamp to sample index"""
+    return int(ts * sample_rate)
+
+def load_metadata(reader, interval, sample_rate, get_value):
+    """
+    read metadata data for time interval and upsample to sample_rate
+    """
+    # query metadata
+    idx_start = index_from_ts(interval[0], reader.sample_rate)
+    idx_end = index_from_ts(interval[1], reader.sample_rate) + 1
+    metadata_indexes, metadata_items = zip(*reader.read(idx_start, idx_end))
+
+    # convert metadata indexes to sample indexes 
+    def convert(metadata_idx):
+        ts = ts_from_index(metadata_idx, reader.sample_rate)
+        return index_from_ts(ts, sample_rate)
+    
+    # upsample metadata
+    samples_per_metadata = convert(1)
+    assert samples_per_metadata > 1
+
+    # metadata samples
+    values = np.array([get_value(d) for d in metadata_items], dtype=np.float32)
+    samples = np.repeat(values, samples_per_metadata, axis=0)
+
+    # slice samples matches time interval
+    offset = convert(metadata_indexes[0])
+    idx_start, idx_end = np.array([index_from_ts(ts, sample_rate) for ts in interval]) - offset
+    return samples[idx_start: idx_end]
+
+def load_pointing_data(reader, interval, sample_rate):
+    """
+    read pointing data for time interval and upsample to sample_rate 
+    
+    Parameters
+    ----------
+    reader: digitalrf_wrapper.DigitalMetadataReader
+        reader object for metadata stream
+    interval: [float, float]
+        timestamps in seconds since epoch
+    sample_rate: float
+        upsample metadata according to sample_rate
+
+    Returns
+    -------
+    numpy.ndarray
+        (N, 2) float array of (azimuth, elevation) tuples
+
+    """
+
+    def _get_value(item):
+        return np.array([item['azimuth'], item['elevation']])
+    
+    return load_metadata(reader, interval, sample_rate, _get_value)
+    
