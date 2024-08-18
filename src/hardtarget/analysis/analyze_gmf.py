@@ -202,7 +202,7 @@ def compute_gmf(
 
     # task rate : tasks per second
     _samples_per_task = ipp * n_ipp * num_cohints_per_file
-    _task_rate = sample_rate / samples_per_task
+    _task_rate = sample_rate / _samples_per_task
     # integration_rate : coherent integration periods per second
     _samples_per_integration = ipp * n_ipp
     _integration_rate = sample_rate / _samples_per_integration

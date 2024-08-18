@@ -654,7 +654,8 @@ def load_metadata(reader, interval, target_rate, target_value):
     # query metadata
     idx_start = index_from_ts(interval[0], reader.sample_rate)
     idx_end = index_from_ts(interval[1], reader.sample_rate) + 1
-    metadata_indexes, metadata_items = zip(*reader.read(idx_start, idx_end))
+    result = reader.read(idx_start, idx_end)
+    metadata_indexes, metadata_items = zip(*result)
 
     # convert metadata indexes to target rate indexes 
     def convert(metadata_idx):
@@ -709,6 +710,7 @@ def load_pointing_data(task_idx, path, chnl, task_rate, ts_origin, target_rate):
     try:
         # reader of pointing data
         reader = drf_wrapper.DigitalMetadataReader(path, chnl)
+        print(path)
     except:
         # no reader - generate vector of NaN data
         N = int((interval[1] - interval[0]) * target_rate)
