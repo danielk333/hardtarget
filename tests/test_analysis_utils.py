@@ -1,15 +1,22 @@
 import pytest
 from hardtarget.analysis.utils import index_from_ts, ts_from_index
-from hardtarget.analysis.utils import load_pointing_data
+from hardtarget.analysis.utils import load_metadata, load_pointing_data
+import numpy as np
 import numpy.testing as npt
+import hardtarget.digitalrf_wrapper as drf_wrapper
+from pathlib import Path
 
-def test_load_pointing_data():
+PROJECT = Path("/cluster/projects/p106119-SpaceDebrisRadarCharacterization")
+DRF = PROJECT / "drf/leo_bpark_2.1u_NO-20220408-UHF"
+
+
+def test_load_metadata():
 
     """
     test upsampling of pointing data to sample_rate
     """
     # data
-    data_sample_rate = 1000000 # samples per second
+    target_rate = 1000000 # samples per second
     # pointing 
     pointing_sample_rate = 1/12.8 # 1 sample per 12.8 seconds
 
@@ -47,16 +54,54 @@ def test_load_pointing_data():
     end_ts = origin_ts + 3*sec_per_pointing + 3
     interval = [start_ts, end_ts]
 
+
+    def target_value(item):
+        return np.array([item['azimuth'], item['elevation']])
+
     # load pointing data
-    data = load_pointing_data(reader, interval, data_sample_rate)
+    data = load_metadata(reader, interval, target_rate, target_value)
 
     # test pointing data
     assert data.ndim == 2
     rows, cols = data.shape
     assert cols == 2
-    assert rows == index_from_ts(2*sec_per_pointing, data_sample_rate)
+    assert rows == index_from_ts(2*sec_per_pointing, target_rate)
     npt.assert_array_equal(data[0], [4,15])
     npt.assert_array_equal(data[int(rows/2)], [5,16])
     npt.assert_array_equal(data[-1], [6,17])
 
+
+@pytest.mark.skipif(not DRF.exists(), reason="Local file is missing")
+def test_load_metadata():
+
+    # TODO - switch to DRF on the cluster - right now these lack pointing info
+
+    # DRF = "/cluster/home/inar/Data/hardtarget/leo_bpark_2.1u_NO@uhf_drf"
+ 
+    ipp = 20000 # inter-pulse period in samples
+    n_ipp = 10 # number of inter-pulse periods 
+    num_cohints_per_file = 10 # number of coherent intergration periods in a file
+    sample_rate = 1000000 # samples per second
+
+    # integration_rate : coherent integration periods (per second)
+    samples_per_integration = ipp * n_ipp
+    integration_rate = sample_rate / samples_per_integration
+
+    # task rate : tasks per second
+    samples_per_task = ipp * n_ipp * num_cohints_per_file
+    task_rate = sample_rate / samples_per_task
+
+    # drf reader
+    chnl = "pointing"
+    reader = drf_wrapper.DigitalRFReader(DRF, "uhf")
+
+    # specific task
+    task_idx = 273
+
+    # ts origin - timestamp assosicated with task 0
+    ts_origin = ts_from_index(reader.get_bounds()[0], reader.sample_rate)
+
+    pointing = load_pointing_data(task_idx, DRF, "pointing", task_rate, ts_origin, integration_rate)
+
+    assert len(pointing) == num_cohints_per_file
 
