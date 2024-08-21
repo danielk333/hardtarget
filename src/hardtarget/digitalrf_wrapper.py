@@ -64,7 +64,7 @@ class DigitalRFWriter:
             dtype_str,
             subdir_cadence_secs,
             file_cadence_secs * 1000,  # file_cadence_milliseconds
-            self.index_from_ts(ts_origin_sec),  # start global index
+            int(self.index_from_ts(ts_origin_sec)),  # start global index
             sample_rate_numerator,
             sample_rate_denominator,
             uuid_str=uuid_str,
@@ -83,7 +83,7 @@ class DigitalRFWriter:
         return self.idx / self.sample_rate
 
     def index_from_ts(self, ts):
-        return int(ts * self.sample_rate)
+        return ts * self.sample_rate
 
     def write(self, batch):
         self._writer.rf_write(batch)
@@ -129,7 +129,7 @@ class DigitalRFReader:
         return idx / self.sample_rate
 
     def index_from_ts(self, ts):
-        return int(ts * self.sample_rate)
+        return ts * self.sample_rate
 
     def get_bounds(self, ts_origin_sec=None):
         """
@@ -163,8 +163,8 @@ class DigitalRFReader:
                 return idx_start, idx_end 
             back_padding_sec = file_cadence_secs - front_padding_sec
             # convert back to index domain
-            idx_start = self.index_from_ts(ts_start + front_padding_sec)
-            idx_end = self.index_from_ts(ts_end - back_padding_sec)
+            idx_start = int(self.index_from_ts(ts_start + front_padding_sec))
+            idx_end = int(self.index_from_ts(ts_end - back_padding_sec))
         
         return idx_start, idx_end
 
@@ -173,9 +173,18 @@ class DigitalRFReader:
         """
         indexes in data sampling domain
         
+        TODO: reads outside bounds will either return NaN data padding, or not
+        return anything elements. This is related to the issue of bounds and
+        internal storage organization. To fix this and produce consistent 
+        results, we could truncate indexes if they go beyond bounds. This
+        suggests that ts_origin_sec should be a parameter on the reader, 
+        instead of the bounds method.
+
         NOTE: digital rf read() includes idx_last - which breaks convention
         this function fixes this issue, by implementing "until idx_last" semantics
         """
+
+
         idx_first = idx_start
         idx_last = idx_end - 1
         return self._reader.read(idx_first, idx_last, self.chnl).items()
@@ -226,7 +235,7 @@ class DigitalMetadataWriter:
         return idx / self.sample_rate
 
     def index_from_ts(self, ts):
-        return int(ts * self.sample_rate)
+        return ts * self.sample_rate
 
     def write(self, idx, d):
         self._writer.write(idx, d)
@@ -266,7 +275,7 @@ class DigitalMetadataReader:
         return idx / self.sample_rate
 
     def index_from_ts(self, ts):
-        return int(ts * self.sample_rate)
+        return ts * self.sample_rate
 
     def get_bounds(self, ts_origin_sec=None):
         """
@@ -284,6 +293,12 @@ class DigitalMetadataReader:
     def read(self, idx_start, idx_end):
         """
         Returns list of tuples (idx, metadatat)
+
+        TODO : semantics for reading non-existing data
+        should be consistent with RFdata, 
+        either to return nothing (empty collection)
+        or to generate padding. Think this is an 
+        argument for returning nothing both for reads of both RFData and Metadata
         """
         idx_first = idx_start
         idx_last = idx_end - 1

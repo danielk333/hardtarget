@@ -27,7 +27,7 @@ TS_ORIGIN_SEC_NOW = dt.datetime.now(dt.timezone.utc).timestamp()
 
 
 ####################################################################
-# TEST EISCAT DRF
+# TEST DRF
 ####################################################################
 
 @pytest.mark.parametrize("ts_origin_sec", [
@@ -35,7 +35,7 @@ TS_ORIGIN_SEC_NOW = dt.datetime.now(dt.timezone.utc).timestamp()
     TS_ORIGIN_SEC_MISALIGNED,
     TS_ORIGIN_SEC_NOW
 ])
-def test_eiscat_drf(tmpdir, ts_origin_sec):
+def test_drf(tmpdir, ts_origin_sec):
     """
     write 2 hours of random complex data with vectors of 100 samples
     1 Hz sample rate and vector length 100 means 100 seconds of data per write operation.
@@ -97,8 +97,8 @@ def test_eiscat_drf(tmpdir, ts_origin_sec):
     # read 2 hours from ts_origin_sec
     start_ts = ts_origin_sec
     end_ts = (dt.datetime.fromtimestamp(start_ts) + dt.timedelta(hours=2)).timestamp()
-    idx_start = reader.index_from_ts(start_ts)
-    idx_end = reader.index_from_ts(end_ts)
+    idx_start = int(reader.index_from_ts(start_ts))
+    idx_end = int(reader.index_from_ts(end_ts))
     rd_idx, rd_data = next(iter(reader.read(idx_start, idx_end)))  
 
     # compare written data to read data
@@ -111,10 +111,23 @@ def test_eiscat_drf(tmpdir, ts_origin_sec):
     # compare written data to read data
     npt.assert_array_equal(wr_data, rd_data)
 
+    # read outside bounds
+    # reader either returns NaN data or nothing
+    result = reader.read(idx_start - 1000, idx_start)
+
+    if len(result) == 1:
+        idx, data = next(iter(result))
+
+        dtype = np.dtype([('r', '<i2'), ('i', '<i2')])
+        val = np.iinfo(np.int16).min
+        expected_value = np.array([(val, val)], dtype=dtype)
+        expected_data = np.full(data.shape, expected_value)
+        npt.assert_array_equal(data, expected_data)
+
 
 
 ####################################################################
-# TEST EISCAT DRF METADATA
+# TEST DRF METADATA
 ####################################################################
 
 
@@ -123,11 +136,10 @@ def test_eiscat_drf(tmpdir, ts_origin_sec):
     TS_ORIGIN_SEC_MISALIGNED,
     TS_ORIGIN_SEC_NOW
 ])
-def test_eiscat_drf_metadata(tmpdir, ts_origin_sec):
+def test_drf_metadata(tmpdir, ts_origin_sec):
 
     # tmpdir
     tmpdir = Path(tmpdir)
-    assert tmpdir.exists()
 
     # SETUP
     SAMPLE_RATE_NUMERATOR = 1000000 
@@ -149,7 +161,7 @@ def test_eiscat_drf_metadata(tmpdir, ts_origin_sec):
         return np.hstack((azimuth, elevation))
 
     # write
-    start_idx = writer.index_from_ts(ts_origin_sec)
+    start_idx = int(writer.index_from_ts(ts_origin_sec))
     n_batches = 36*2
     wr_pointing = get_pointing(n_batches)
     for i in range(n_batches):
@@ -167,8 +179,8 @@ def test_eiscat_drf_metadata(tmpdir, ts_origin_sec):
     # read 2 hours from ts_origin_sec
     start_ts = ts_origin_sec
     end_ts = (dt.datetime.fromtimestamp(start_ts) + dt.timedelta(hours=2)).timestamp()
-    idx_start = reader.index_from_ts(start_ts)
-    idx_end = reader.index_from_ts(end_ts)
+    idx_start = int(reader.index_from_ts(start_ts))
+    idx_end = int(reader.index_from_ts(end_ts))
 
     # read and compare
     indexes, values = zip(*reader.read(idx_start, idx_end))
@@ -183,6 +195,13 @@ def test_eiscat_drf_metadata(tmpdir, ts_origin_sec):
     rd_pointing = convert(values)
     npt.assert_array_equal(wr_pointing, rd_pointing)
 
+    # read outside bounds
+    result = reader.read(idx_start - 1000, idx_start)
+    assert len(result) == 0
+
+    # read partial outside bounds
+    result = reader.read(idx_start - 5000, idx_end)
+    assert len(result) == n_batches
 
 
 ####################################################################
@@ -190,6 +209,10 @@ def test_eiscat_drf_metadata(tmpdir, ts_origin_sec):
 ####################################################################
 
 def test_metadata_change(tmpdir):
+
+    """
+    verify read where meta data value is changeing during read interval
+    """
 
     # mockup metadata stream
 

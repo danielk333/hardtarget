@@ -10,7 +10,7 @@ PROJECT = Path("/cluster/projects/p106119-SpaceDebrisRadarCharacterization")
 DRF = PROJECT / "drf/leo_bpark_2.1u_NO-20220408-UHF"
 
 
-def test_load_metadata():
+def test_upsample():
 
     """
     test upsampling of pointing data to sample_rate
@@ -54,7 +54,6 @@ def test_load_metadata():
     end_ts = origin_ts + 3*sec_per_pointing + 3
     interval = [start_ts, end_ts]
 
-
     def target_value(item):
         return np.array([item['azimuth'], item['elevation']])
 
@@ -72,7 +71,7 @@ def test_load_metadata():
 
 
 @pytest.mark.skipif(not DRF.exists(), reason="Local file is missing")
-def test_load_metadata():
+def test_load_pointing_data():
 
     # TODO - switch to DRF on the cluster - right now these lack pointing info
 
@@ -104,4 +103,10 @@ def test_load_metadata():
     pointing = load_pointing_data(task_idx, DRF, "pointing", task_rate, ts_origin, integration_rate)
 
     assert len(pointing) == num_cohints_per_file
+
+    # ask for data outside bounds
+    pointing = load_pointing_data(-4, DRF, "pointing", task_rate, ts_origin, integration_rate)
+    expected = np.full((num_cohints_per_file, 2), np.nan)
+    npt.assert_array_equal(pointing, expected)
+
 

@@ -629,7 +629,7 @@ def ts_from_index(idx, sample_rate, ts_origin=0):
 
 def index_from_ts(ts, sample_rate, ts_origin=0):
     """convert from timestamp to sample index"""
-    return int((ts-ts_origin) * sample_rate)
+    return (ts-ts_origin) * sample_rate
 
 def load_metadata(reader, interval, target_rate, target_value):
     """
@@ -649,31 +649,44 @@ def load_metadata(reader, interval, target_rate, target_value):
     Returns
     -------
     numpy.ndarray
-        float array of values
+        float array of values, NaN's for non-existing data
     """
-    # query metadata
-    idx_start = index_from_ts(interval[0], reader.sample_rate)
-    idx_end = index_from_ts(interval[1], reader.sample_rate) + 1
-    result = reader.read(idx_start, idx_end)
-    metadata_indexes, metadata_items = zip(*result)
-
-    # convert metadata indexes to target rate indexes 
-    def convert(metadata_idx):
-        ts = ts_from_index(metadata_idx, reader.sample_rate)
-        return index_from_ts(ts, target_rate)
     
+    # check target rate
+    _N = target_rate / reader.sample_rate
+    N = int(round(_N))
+
+    assert N == _N  and N > 0, f"Illegal target_rate {target_rate} for metadata with rate {reader.sample_rate}"
+    
+    # query metadata
+    idx_start = int(index_from_ts(interval[0], reader.sample_rate))
+    idx_end = int(index_from_ts(interval[1], reader.sample_rate)) + 1
+    result = list(reader.read(idx_start, idx_end))
+
+    # load result into fixed length list
+    expected_length = idx_end - idx_start
+    items = [None] * expected_length
+    if len(result) > 0:
+        for idx, item in result:
+            items[idx-idx_start] = item
+
     # upsample metadata
-    samples_per_metadata = convert(1)
-    assert samples_per_metadata > 1
+    values = np.array([target_value(d) for d in items], dtype=np.float32)
+    samples = np.repeat(values, N, axis=0)
 
-    # metadata samples
-    values = np.array([target_value(d) for d in metadata_items], dtype=np.float32)
-    samples = np.repeat(values, samples_per_metadata, axis=0)
-
-    # slice samples matches time interval
-    offset = convert(metadata_indexes[0])
-    idx_start, idx_end = np.array([index_from_ts(ts, target_rate) for ts in interval]) - offset
-    return samples[idx_start: idx_end]
+    # slice samples
+    # this is because the query operation above fetches all metadata values covering
+    # the time interval, which typically corresponds to a larger time interval.
+    
+    # first element in samples vector corresponds to metadata idx_start
+    ts_offset = ts_from_index(idx_start, reader.sample_rate)
+    
+    # convert timestamps to sample indexes
+    offset = index_from_ts(ts_offset, target_rate)
+    start = index_from_ts(interval[0], target_rate)
+    end = index_from_ts(interval[1], target_rate)    
+    
+    return samples[int(start-offset):int(end-offset)]
 
 
 ####################################################################
@@ -710,15 +723,18 @@ def load_pointing_data(task_idx, path, chnl, task_rate, ts_origin, target_rate):
     try:
         # reader of pointing data
         reader = drf_wrapper.DigitalMetadataReader(path, chnl)
-        print(path)
-    except:
+    except Exception as e:
+        print(e)
         # no reader - generate vector of NaN data
         N = int((interval[1] - interval[0]) * target_rate)
         return np.full((N, 2), np.nan)
 
     def target_value(item):
-        return np.array([item['azimuth'], item['elevation']])
-
+        res = np.array([np.nan, np.nan], dtype=np.float32)
+        if item is not None:
+            res[0] = item['azimuth']
+            res[1] = item['elevation']     
+        return res
 
     # load pointing data as vector
     return load_metadata(reader, interval, target_rate, target_value)
