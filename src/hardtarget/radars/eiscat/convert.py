@@ -107,10 +107,10 @@ def parse_matlab(mat, sample_rate, file_secs):
     d["seq"] = seq = int(parbl[PARBL_SEQUENCE])
 
     # file index - relative to ts_origin - zero indexed
-    d["file_idx"] = idx_file = round((ts_end - ts_origin) / duration) - 1
+    d["file_idx"] = idx_file = np.floor((ts_end - ts_origin) / duration) - 1
 
     # global index of first sample in recording (t_origin)
-    d["sample_idx_origin"] = idx_origin = round(ts_origin * sample_rate)
+    d["sample_idx_origin"] = idx_origin = np.floor(ts_origin * sample_rate)
     # global index of first sample in file
     d["sample_idx_start"] = idx_start = idx_origin + idx_file * samples
     # global index of next sample after file
@@ -252,7 +252,6 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         int(file_secs * sample_rate), # sample rate denominator (int)
     )
 
-
     #######################################################################
     # WRITE
     #######################################################################
@@ -268,23 +267,23 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         pbar = tqdm(desc="Converting files to digital_rf", total=n_files)
 
     # convert
-    write_idx = sample_writer.index_from_ts(ts_origin_sec)
-    for file_idx, file in enumerate(files):
+    write_idx = int(sample_writer.index_from_ts(ts_origin_sec))
+    for progress_idx, file in list(enumerate(files))[:10]:
         if logger:
-            if file_idx + 1 == n_files or file_idx % 10 == 0:
-                logger.debug(f"write progress {file_idx+1}/{n_files}")
-
+            if progress_idx + 1 == n_files or progress_idx % 10 == 0:
+                logger.debug(f"write progress {progress_idx+1}/{n_files}")
 
         mat = loadmat(file)
         meta = parse_matlab(mat, sample_rate, file_secs)
 
         # zero pad if start of file is ahead of write idx
-        start_idx = sample_writer.index_from_ts(meta["ts_start"])
+        start_idx = int(sample_writer.index_from_ts(meta["ts_start"]))
         if start_idx > write_idx:
             n_pad = start_idx - write_idx
             sample_writer.write(np.zeros(n_pad*2, dtype=np.int16))
             # advance write index
             write_idx += n_pad
+            print("Padding", n_pad)
 
         # load data
         data = mat["d_raw"][:, 0]
@@ -294,13 +293,19 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         # write data
         zz = to_i2x16(data)
         sample_writer.write(zz)
+        print("write_idx", write_idx)
 
         # advance write_idx
         write_idx += len(data)
 
-        # write pointing
-        idx = pointing_writer.index_from_ts(meta["ts_start"])
-        pointing_writer.write(idx, meta["azimuth"], meta["elevation"])
+        # pointing index
+        pointing_idx = pointing_writer.index_from_ts(meta["ts_start"])
+        d = {
+            'azimuth': meta['azimuth'],
+            'elevation': meta['elevation']
+        }
+        pointing_writer.write(pointing_idx, d)
+        print("pointing_idx", pointing_idx)
 
         if progress:
             pbar.update(1)
@@ -342,4 +347,12 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         meta.write(f)
 
     return str(hdrf)
+
+
+
+if __name__ == '__main__':
+    PROJECT = Path("/cluster/projects/p106119-SpaceDebrisRadarCharacterization")
+    SRC = PROJECT / "raw/leo_bpark_2.1u_NO-20220408-UHF/leo_bpark_2.1u_NO@uhf"
+    CFG = "/cluster/home/inar/Dev/Git/hardtarget/examples/cfg/test.ini"
+
 
