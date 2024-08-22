@@ -14,15 +14,14 @@ def make_ts_from_str(datetime_str):
     """
     make utc timestamp (seconds) from human readable datetime string (local time)
     """
-    specific_datetime = dt.datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S")
+    specific_datetime = dt.datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S.%f")
     # Convert to UTC (assuming the datetime is in local time)
     datetime_utc = specific_datetime.replace(tzinfo=dt.timezone.utc)
     return datetime_utc.timestamp()
 
 
-TS_ORIGIN_SEC_ALIGNED = make_ts_from_str("2024-07-10T12:00:00")
-TS_ORIGIN_SEC_MISALIGNED = make_ts_from_str("2024-07-10T12:03:03")
-TS_ORIGIN_SEC_NOW = dt.datetime.now(dt.timezone.utc).timestamp()
+TS_ORIGIN_SEC_ALIGNED = make_ts_from_str("2024-07-10T12:00:00.000")
+TS_ORIGIN_SEC_MISALIGNED = make_ts_from_str("2024-07-10T12:03:04.555")
 
 
 
@@ -32,8 +31,7 @@ TS_ORIGIN_SEC_NOW = dt.datetime.now(dt.timezone.utc).timestamp()
 
 @pytest.mark.parametrize("ts_origin_sec", [
     TS_ORIGIN_SEC_ALIGNED,
-    TS_ORIGIN_SEC_MISALIGNED,
-    TS_ORIGIN_SEC_NOW
+    TS_ORIGIN_SEC_MISALIGNED
 ])
 def test_drf(tmpdir, ts_origin_sec):
     """
@@ -92,7 +90,7 @@ def test_drf(tmpdir, ts_origin_sec):
     writer.close()
 
     # create reader
-    reader = drf_wrapper.DigitalRFReader(tmpdir, CHNL)
+    reader = drf_wrapper.DigitalRFReader(tmpdir, CHNL, ts_origin_sec=ts_origin_sec)
 
     # read 2 hours from ts_origin_sec
     start_ts = ts_origin_sec
@@ -105,7 +103,7 @@ def test_drf(tmpdir, ts_origin_sec):
     npt.assert_array_equal(wr_data, rd_data)
 
     # read by bounds
-    idx_start, idx_end = reader.get_bounds(ts_origin_sec=ts_origin_sec)
+    idx_start, idx_end = reader.get_bounds()
     rd_idx, rd_data = next(iter(reader.read(idx_start, idx_end)))
 
     # compare written data to read data
@@ -117,7 +115,6 @@ def test_drf(tmpdir, ts_origin_sec):
 
     if len(result) == 1:
         idx, data = next(iter(result))
-
         dtype = np.dtype([('r', '<i2'), ('i', '<i2')])
         val = np.iinfo(np.int16).min
         expected_value = np.array([(val, val)], dtype=dtype)
@@ -133,8 +130,7 @@ def test_drf(tmpdir, ts_origin_sec):
 
 @pytest.mark.parametrize("ts_origin_sec", [
     TS_ORIGIN_SEC_ALIGNED,
-    TS_ORIGIN_SEC_MISALIGNED,
-    TS_ORIGIN_SEC_NOW
+    TS_ORIGIN_SEC_MISALIGNED
 ])
 def test_drf_metadata(tmpdir, ts_origin_sec):
 

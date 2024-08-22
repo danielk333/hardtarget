@@ -623,13 +623,55 @@ def get_filepath(epoch_unix_us):
 ####################################################################
 
 
-def ts_from_index(idx, sample_rate, ts_origin=0):
-    """convert from sample idx to timestamp"""
-    return (idx / float(sample_rate)) + ts_origin
+def ts_from_index(idx, sample_rate, ts_offset_sec=0):
+    """
+    convert from sample idx to timestamp
+    
+    Params
+    ------
 
-def index_from_ts(ts, sample_rate, ts_origin=0):
-    """convert from timestamp to sample index"""
-    return (ts-ts_origin) * sample_rate
+    idx: int
+        sample index (first sample is index 0)
+    sample_rate: Hz
+        samples per seconds
+    ts_offset_sec: float 
+        timestamp in seconds since Epoch (1970:01:10T00:00:00) 
+        ts_offset is the timestamp corresponding to index 0,
+        by default this is 0, implying that indexing starts at Epoch (1970:01:10T00:00:00)
+    
+    Returns
+    -------
+    float:
+        timestamp corresponding to given sample index
+    
+    """    
+    return (idx / float(sample_rate)) + ts_offset_sec
+
+
+def index_from_ts(ts, sample_rate, ts_offset_sec=0):
+    """
+    convert from timestamp to sample index
+
+    Params
+    ------
+
+    ts: float
+        timestamp in seconds from Epoch (1970:01:10T00:00:00)
+    sample_rate: Hz
+        samples per seconds
+    ts_offset_sec: float 
+        timestamp in seconds since Epoch (1970:01:10T00:00:00)
+        ts_offset is the timestamp corresponding to index 0,
+        by default this is 0, implying that indexing starts at Epoch (1970:01:10T00:00:00)
+    
+    Returns
+    -------
+    float:
+        sample index (first sample is index 0)
+    """
+    return (ts-ts_offset_sec) * sample_rate
+
+
 
 def load_metadata(reader, interval, target_rate, target_value):
     """
@@ -694,7 +736,7 @@ def load_metadata(reader, interval, target_rate, target_value):
 ####################################################################
 
 
-def load_pointing_data(task_idx, path, chnl, task_rate, ts_origin, target_rate):
+def load_pointing_data(task_idx, path, chnl, task_rate, ts_offset_sec, target_rate):
 
     """
     load and upsample pointing data for specific task
@@ -707,7 +749,7 @@ def load_pointing_data(task_idx, path, chnl, task_rate, ts_origin, target_rate):
         reader object for pointing data
     task_rate: float
         tasks per second
-    ts_origin: float
+    ts_offset_sec: float
         timestamp (sec) of first task
     sample_rate: target upsample rate
 
@@ -718,7 +760,7 @@ def load_pointing_data(task_idx, path, chnl, task_rate, ts_origin, target_rate):
     """
 
     # time interval of this task 
-    interval = [ts_from_index(idx, task_rate, ts_origin=ts_origin) for idx in [task_idx, task_idx+1]]
+    interval = [ts_from_index(idx, task_rate, ts_offset_sec=ts_offset_sec) for idx in [task_idx, task_idx+1]]
 
     try:
         # reader of pointing data

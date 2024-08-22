@@ -1,6 +1,7 @@
 from pathlib import Path
 import digital_rf
 import datetime as dt
+import numpy as np
 
 ####################################################################
 # DIGITAL_RF WRAPPER
@@ -17,11 +18,110 @@ writing (even in non-continuous mode) as it maintains and internal index
 for next available sample.
 """
 
+
+####################################################################
+# UTIL
+####################################################################
+
+def ts_from_index(idx, sample_rate, ts_offset_sec=0):
+    """
+    convert from sample idx to timestamp
+    
+    Params
+    ------
+
+    idx: int
+        sample index (first sample is index 0)
+    sample_rate: Hz
+        samples per seconds
+    ts_offset_sec: float 
+        timestamp in seconds since Epoch (1970:01:10T00:00:00) 
+        ts_offset is the timestamp corresponding to index 0,
+        by default this is 0, implying that indexing starts at Epoch (1970:01:10T00:00:00)
+    
+    Returns
+    -------
+    float:
+        timestamp corresponding to given sample index
+    
+    """    
+    return (idx / float(sample_rate)) + ts_offset_sec
+
+
+def index_from_ts(ts, sample_rate, ts_offset_sec=0):
+    """
+    convert from timestamp to sample index
+
+    Params
+    ------
+
+    ts: float
+        timestamp in seconds from Epoch (1970:01:10T00:00:00)
+    sample_rate: Hz
+        samples per seconds
+    ts_offset_sec: float 
+        timestamp in seconds since Epoch (1970:01:10T00:00:00)
+        ts_offset is the timestamp corresponding to index 0,
+        by default this is 0, implying that indexing starts at Epoch (1970:01:10T00:00:00)
+    
+    Returns
+    -------
+    float:
+        sample index (first sample is index 0)
+    """
+    return (ts-ts_offset_sec) * sample_rate
+
+
+####################################################################
+# BASE INDEXED TIME SEQUENCE
+####################################################################
+
+class BaseIndexedTimeSequence:
+
+    def __init__(self, sample_rate, ts_align_sec=0, ts_offset_sec=0):
+
+        # sample rate for time sequence
+        self.sample_rate = sample_rate
+
+        # ts_offset_sec
+        # ts_offset_sec is a timestamp in seconds since Epoch
+        # ts_offset_sec defines a time offset for the index space (i.e. index 0)
+        # if ts_offset_sec is not provided, index space is assumed to start at Epoch
+        self.__ts_offset_sec = ts_offset_sec
+
+        # ts_align_sec
+        self.__ts_align_sec = ts_align_sec
+
+        # ts_align_sec is a timestamp in seconds since Epoch
+        # ts_align_sec is a timestamp associated with some index.
+        # (typically it could be the timestamp of the first sample)
+        # ts_align_sec defines the precise alignment between timestamps and index-domain.        
+        # ts_align_sec may not precisely match logical sample boundaries (which are
+        # defined by sample rate and ts_offset_sec)
+        # Essentially (ts_align_sec * sample_rate) may not produce a perfect integer, 
+        # and must therefore be floored to produce an integer index. 
+        # This discrepancy defines a static skew (in time domain), 
+        # between logical integer indexes and timestamps.
+        # if ts_align_sec is not provided, the assumption is that the skew is 0 
+
+        self.__ts_skew = 0
+        __idx_align = index_from_ts(ts_align_sec, self.sample_rate) 
+        self.__ts_skew = __idx_align - np.floor(__idx_align)
+
+    def ts_from_index(self, idx):
+        ts = ts_from_index(idx, self.sample_rate, ts_offset_sec=self.__ts_offset_sec)
+        return ts + self.__ts_skew
+
+    def index_from_ts(self, ts):
+        ts = ts - self.__ts_skew
+        return index_from_ts(ts, self.sample_rate, ts_offset_sec=self.__ts_offset_sec)
+
+
 ####################################################################
 # DIGITAL RF WRITER
 ####################################################################
 
-class DigitalRFWriter:
+class DigitalRFWriter(BaseIndexedTimeSequence):
     
     """
     Convenience wrapper around digital_rf.DigitalRFWriter 
@@ -53,10 +153,15 @@ class DigitalRFWriter:
         chnldir.mkdir(parents=True, exist_ok=True)
 
         # sample rate
-        self.sample_rate = sample_rate_numerator / float(sample_rate_denominator)
+        sample_rate = sample_rate_numerator / float(sample_rate_denominator)
+        
         # use construction time as default value for ts_origin_sec
         if ts_origin_sec is None:
             ts_origin_sec = dt.now(timezone.utc).timestamp()
+        self.ts_origin_sec = ts_origin_sec
+
+        ts_align_sec = ts_origin_sec if ts_origin_sec is not None else 0
+        super().__init__(sample_rate, ts_align_sec=ts_align_sec)
 
         # meta data writer
         self._writer = digital_rf.DigitalRFWriter(
@@ -78,13 +183,7 @@ class DigitalRFWriter:
 
     def close(self):
         self._writer.close()
-
-    def ts_from_index(self, idx):
-        return self.idx / self.sample_rate
-
-    def index_from_ts(self, ts):
-        return ts * self.sample_rate
-
+    
     def write(self, batch):
         self._writer.rf_write(batch)
 
@@ -93,45 +192,71 @@ class DigitalRFWriter:
 # DIGITAL RF READER
 ####################################################################
 
-_DRF_READERS = {} # path -> reader
-def _get_drf_reader(path):
-    global _DRF_READERS
-    path = str(path)
-    if path not in _DRF_READERS:
-        _DRF_READERS[path] = digital_rf.DigitalRFReader(path)
-    return _DRF_READERS[path]
 
-
-class DigitalRFReader:
+class DigitalRFReader(BaseIndexedTimeSequence):
 
     """
     Convenience wrapper around digital_rf.DigitalRFReader 
     """
 
-    def __init__(self, dst, chnl):
+    def __init__(self, dst, chnl, ts_origin_sec=None):
 
-        # check dst
+        """
+        Parameters
+        ----------
+
+        dst: str
+            Path to root directory
+        chnl: str
+            Name of channel (i.e. subdirectory)
+        ts_origin_sec (optional): timestamp (seconds after epoch)
+            <ts_origin_sec> used when the time sequence was initiated/written
+
+        In the writer, <ts_origin_sec> is used to define a precise starting moment
+        for the first sample in the time sequence. On the reader side, though, the time resolution
+        is by default limited to the length of a sample, which implies that the
+        the exact time-alignment of a sample can be off by e (0 <= e < sample_length).
+        This would be increasingly problematic for longer samples. This skew also matters when
+        trying to align data series with differet sample lengths.
+
+        To resolve this, provide <ts_origin_sec> used with the writer, thereby
+        supplying information which was unfortunately not persisted by the underlying framework.
+
+        So, if <ts_origin_sec> is supplied, it influences the conversion between indexes and timestamps.
+        Additionally, it helps ressolve another issue with the framework, relating to internal aspects
+        of data representation, where files are NaN padded to be fixed size. This affects <get_bounds> 
+        and <read> which cant tell exactly where data starts and may therefor return bound indexes with
+        resolutions limited to file-size, instead of samples, causing read to return padded data before the 
+        start and end of the file, unless sample writing happens to be precisely aligned with file boundaries.
+            
+        NOTE: ts_origin_sec is only needed to fix the bounds issue. If this is not fixed,
+        there should be ts_align_sec instead, similar to the MetadataReader
+
+        """
+
+        # setup reader
         dst = Path(dst)
         if not dst.is_dir():
             raise Exception(f"<dst> must be directory path, {dst}")
-
-        # setup reader
-        self._reader = _get_drf_reader(dst)
+        self._reader = digital_rf.DigitalRFReader(str(dst))
 
         # check chnl
         if chnl not in self._reader.get_channels():
             raise Exception(f"chnl {chnl} missing in {dir}") 
-
         self.chnl = chnl
-        self.sample_rate = float(self._reader.get_properties(self.chnl)["samples_per_second"])
 
-    def ts_from_index(self, idx):
-        return idx / self.sample_rate
 
-    def index_from_ts(self, ts):
-        return ts * self.sample_rate
+        sample_rate = float(self._reader.get_properties(chnl)["samples_per_second"])
 
-    def get_bounds(self, ts_origin_sec=None):
+        ts_align_sec = ts_origin_sec if ts_origin_sec is not None else 0
+        super().__init__(sample_rate, ts_align_sec=ts_align_sec)
+
+        
+        # ts_origin_sec defines the start of the first sample of the time-series
+        # used to correct issue with file alignment (see get_bounds())
+        self._ts_origin_sec = ts_origin_sec
+
+    def get_bounds(self):
         """
         return bounds for read function
 
@@ -152,13 +277,13 @@ class DigitalRFReader:
         idx_start = idx_first
         idx_end = idx_last + 1
 
-        if ts_origin_sec is not None:
+        if self._ts_origin_sec is not None:
             # convert to time domain
             ts_start = self.ts_from_index(idx_start)
             ts_end = self.ts_from_index(idx_end)
-            # calculate padding in time domain
+            # calculate file padding in time domain
             file_cadence_secs = self._reader.get_properties(self.chnl)["file_cadence_millisecs"] / 1000.0
-            front_padding_sec = ts_origin_sec - ts_start
+            front_padding_sec = (self._ts_origin_sec - ts_start) % file_cadence_secs
             if front_padding_sec == 0:
                 return idx_start, idx_end 
             back_padding_sec = file_cadence_secs - front_padding_sec
@@ -183,8 +308,6 @@ class DigitalRFReader:
         NOTE: digital rf read() includes idx_last - which breaks convention
         this function fixes this issue, by implementing "until idx_last" semantics
         """
-
-
         idx_first = idx_start
         idx_last = idx_end - 1
         return self._reader.read(idx_first, idx_last, self.chnl).items()
@@ -195,7 +318,7 @@ class DigitalRFReader:
 # DIGITAL METADATA WRITER
 ####################################################################
 
-class DigitalMetadataWriter:
+class DigitalMetadataWriter(BaseIndexedTimeSequence):
     
     """
     Convenience wrapper around digital_rf.DigitalMetadataWriter 
@@ -207,6 +330,7 @@ class DigitalMetadataWriter:
                  subdir_cadence_secs=3600,  # 1 dir per hour
                  file_candence_secs=3600,  # 1 hour per file
                  prefix="meta",
+                 ts_align_sec=0
                 ):
 
         # check dst
@@ -219,7 +343,9 @@ class DigitalMetadataWriter:
         metadir.mkdir(parents=True, exist_ok=True)
 
         # sample rate
-        self.sample_rate = sample_rate_numerator / float(sample_rate_denominator)
+        sample_rate = sample_rate_numerator / float(sample_rate_denominator)
+
+        super().__init__(sample_rate, ts_align_sec=ts_align_sec)
 
         # meta data writer
         self._writer = digital_rf.DigitalMetadataWriter(
@@ -230,12 +356,6 @@ class DigitalMetadataWriter:
             sample_rate_denominator,
             prefix
         )
-
-    def ts_from_index(self, idx):
-        return idx / self.sample_rate
-
-    def index_from_ts(self, ts):
-        return ts * self.sample_rate
 
     def write(self, idx, d):
         self._writer.write(idx, d)
@@ -248,13 +368,13 @@ class DigitalMetadataWriter:
 # DIGITAL METADATA READER
 ####################################################################
 
-class DigitalMetadataReader:
+class DigitalMetadataReader(BaseIndexedTimeSequence):
 
     """
     Convenience wrapper around digital_rf.DigitalMetadataReader 
     """
 
-    def __init__(self, dst, chnl):
+    def __init__(self, dst, chnl, ts_align_sec=0):
 
         # check dst and chnl
         dst = Path(dst)
@@ -267,20 +387,13 @@ class DigitalMetadataReader:
 
         # setup reader
         self._reader = digital_rf.DigitalMetadataReader(str(metadir))
-        self.sample_rate = self._reader.get_samples_per_second()
+        sample_rate = self._reader.get_samples_per_second()
+        super().__init__(sample_rate, ts_align_sec=ts_align_sec)
         self.chnl = chnl
 
-
-    def ts_from_index(self, idx):
-        return idx / self.sample_rate
-
-    def index_from_ts(self, ts):
-        return ts * self.sample_rate
-
-    def get_bounds(self, ts_origin_sec=None):
+    def get_bounds(self):
         """
         return bounds for read function
-        ts_origin_sec obsolete, but included only to match signature of drf reader
         """
         idx_first, idx_last = self._reader.get_bounds()
         idx_start = idx_first

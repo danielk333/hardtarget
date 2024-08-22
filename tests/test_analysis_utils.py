@@ -97,15 +97,15 @@ def test_load_pointing_data():
     # specific task
     task_idx = 273
 
-    # ts origin - timestamp assosicated with task 0
-    ts_origin = ts_from_index(reader.get_bounds()[0], reader.sample_rate)
+    # ts offset - timestamp assosicated with task 0
+    ts_offset_sec = ts_from_index(reader.get_bounds()[0], reader.sample_rate)
 
-    pointing = load_pointing_data(task_idx, DRF, "pointing", task_rate, ts_origin, integration_rate)
+    pointing = load_pointing_data(task_idx, DRF, "pointing", task_rate, ts_offset_sec, integration_rate)
 
     assert len(pointing) == num_cohints_per_file
 
     # ask for data outside bounds
-    pointing = load_pointing_data(-4, DRF, "pointing", task_rate, ts_origin, integration_rate)
+    pointing = load_pointing_data(-4, DRF, "pointing", task_rate, ts_offset_sec, integration_rate)
     expected = np.full((num_cohints_per_file, 2), np.nan)
     npt.assert_array_equal(pointing, expected)
 
