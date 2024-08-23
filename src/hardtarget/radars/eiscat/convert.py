@@ -107,13 +107,13 @@ def parse_matlab(mat, sample_rate, file_secs):
     d["seq"] = seq = int(parbl[PARBL_SEQUENCE])
 
     # file index - relative to ts_origin - zero indexed
-    d["file_idx"] = idx_file = np.floor((ts_end - ts_origin) / duration) - 1
+    d["file_idx"] = idx_file = int(np.floor((ts_end - ts_origin) / duration)) - 1
 
-    # global index of first sample in recording (t_origin)
-    d["sample_idx_origin"] = idx_origin = np.floor(ts_origin * sample_rate)
-    # global index of first sample in file
+    # index of first sample in recording (t_origin)
+    d["sample_idx_origin"] = idx_origin = int(np.floor(ts_origin * sample_rate))
+    # index of first sample in file
     d["sample_idx_start"] = idx_start = idx_origin + idx_file * samples
-    # global index of next sample after file
+    # index of next sample after file
     d["sample_idx_end"] = idx_start + samples    
 
     # instrument pointing angles
@@ -122,6 +122,35 @@ def parse_matlab(mat, sample_rate, file_secs):
    
 
     return d
+
+
+
+def determine_n0(mat, cfv):
+    """
+    cfv - config for this version of the experiment
+
+    find (global) index of first raw data sample in file, assuming
+    continuous sampling.
+
+    The epoch (in seconds) is the radar controller start time,
+    and is found in the first user parameter (d_parbl[42] or upar[1]).
+
+    The time (in seconds) of the last sample in the file is in d_parbl[10].
+    This is used to find the (integral) number of the current file (counting
+    from 0).
+
+    The sample number of the first sample in the file is then the sample number
+    of the epoch plus the number of this file times the number of samples in each file.
+    """
+
+    samp_rate = int(cfv.get("sample_rate"))  # assuming integral # samples per second
+    t0 = float(mat["d_parbl"][0][PARBL_START_TIME])
+    tx = float(mat["d_parbl"][0][PARBL_END_TIME])
+    n_epoch = round(t0 * samp_rate)
+    N_samp = len(mat["d_raw"])  # sanity check this value?
+    N_sec = N_samp / samp_rate  # number of seconds in each file
+    i_file = round((tx - t0) / N_sec) - 1  # -1 because parbl[10] records _end_ time of file
+    return n_epoch + N_samp * i_file
 
 
 
@@ -221,23 +250,55 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
     host, expname, expvers, owner = expinfo_split(str(mat["d_ExpInfo"][0]))
     cfg = load_expconfig(expname)
     cfv = cfg[expvers]
-    sample_rate = int(cfv.get("sample_rate"))
+    sample_rate = float(cfv.get("sample_rate"))
     file_secs = float(cfv.get("file_secs"))
+    samples_per_file = int(file_secs * sample_rate)
     chnl = cfv.get("rx_channel", "tbd")
-    # start time for sampling (repeated for all files)
-    ts_origin_sec = float(mat["d_parbl"][0][PARBL_START_TIME])
     radar_frequency = float(mat["d_parbl"][0][PARBL_RADAR_FREQUENCY])
+    
+    def index_of_filestart(mat):
+        """
+        Returns sample index of start of file
+        """
+        # global start time for sampling (repeated for all files)
+        ts_origin_sec = float(mat["d_parbl"][0][PARBL_START_TIME])
+        # sample index corresponding to global start time
+        idx_origin = int(np.floor(ts_origin_sec * sample_rate))
+
+        # end time of file
+        ts_endfile_sec = float(mat["d_parbl"][0][PARBL_END_TIME])
+
+        # NOTE: ts_endfile_sec can not be trusted to be precisely
+        # consistent with ts_origin_sec - in terms of samples.
+        # we use the approach of counting samples from ts_orgin_sec,
+        # relying on a fixed sample count per file
+
+        # NOTE: file_idx is a logical sequence number for files, starting from 
+        # file_idx 0 at ts_origin_sec. This does not correspond to the order of files processed.
+        # For instance, the first file might have file_idx 6, indicating that the
+        # recording only started some time after ts_origin_sec 
+        # also the inprecision in ts_endfile_sec goes away in division
+        file_idx = round((ts_endfile_sec - ts_origin_sec) / file_secs) - 1
+        # sample index for start of first file
+        return idx_origin + file_idx * samples_per_file
+
+
 
     #######################################################################
     # WRITER SETUP
     #######################################################################
+
+    # sample index start of first file
+    idx_start = index_of_filestart(mat)
+    # timestamp start of first file
+    ts_start_sec = idx_start / sample_rate
 
     # create sample writer
     sample_writer = drf_wrapper.DigitalRFWriter(hdrf, chnl,
         sample_rate, # sample rate numerator
         1, # samplerate denominator
         np.int16,
-        ts_origin_sec=ts_origin_sec,
+        ts_origin_sec=ts_start_sec,
         subdir_cadence_secs=3600, # one dir per hour
         file_cadence_secs=1, # one file per second
         is_complex=True,
@@ -248,17 +309,43 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
     # create pointing writer
     pointing_writer = drf_wrapper.DigitalMetadataWriter(
         hdrf, "pointing",
-        sample_rate, # sample rate numerator (int)
-        int(file_secs * sample_rate), # sample rate denominator (int)
+        sample_rate, # sample rate - numerator (int)
+        samples_per_file, # sample rate - denominator (int)
     )
 
     #######################################################################
     # WRITE
     #######################################################################
 
-    # all data have to be written sequentially, from ts_orgin_sec
-    # files are sorted, but apparently there is no guarantee that the first
-    # file starts at ts_origin_sec, so zero padding is needed
+    # NOTE: need to write file sequentially. Files are sorted.
+    # Also data for all files must be fixed length. If data is too short
+    # it must be padded, or truncated if too long
+    # also - there could be missing files in the sequence
+
+    def zeropad(n_pad, file):
+        try:
+            sample_writer.write(np.zeros(n_pad*2, dtype=np.int16))
+        except Exception as e:
+            err = f"unable to zero pad samples for {file}"
+            if logger:
+                logger.error(err)
+            raise e
+        if logger:
+            logger.warning(f"zero padding {n_pad} samples for {file}")
+
+    def write(data, file):
+        try:
+            sample_writer.write(data)
+        except Exception as e:
+            err = f"unable to write samples for {file}"
+            if logger:
+                logger.error(err)
+            raise e
+
+
+    # initialise writing loop
+
+    idx_prev = idx_start - samples_per_file
     n_files = len(files)
     if logger:
         logger.info(f"writing DRF from {n_files} input files")
@@ -266,53 +353,67 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
     if progress:
         pbar = tqdm(desc="Converting files to digital_rf", total=n_files)
 
-    # convert
-    write_idx = int(sample_writer.index_from_ts(ts_origin_sec))
-    for progress_idx, file in list(enumerate(files))[:10]:
+    for progress_idx, file in enumerate(files):
         if logger:
             if progress_idx + 1 == n_files or progress_idx % 10 == 0:
                 logger.debug(f"write progress {progress_idx+1}/{n_files}")
 
         mat = loadmat(file)
-        meta = parse_matlab(mat, sample_rate, file_secs)
+        # sample index
+        idx = index_of_filestart(mat)
 
-        # zero pad if start of file is ahead of write idx
-        start_idx = int(sample_writer.index_from_ts(meta["ts_start"]))
-        if start_idx > write_idx:
-            n_pad = start_idx - write_idx
-            sample_writer.write(np.zeros(n_pad*2, dtype=np.int16))
-            # advance write index
-            write_idx += n_pad
-            print("Padding", n_pad)
+        # check idx of file
+        # idx of file should be the logical continuation, samples_per_file larger
+        # than the previous index
+        # if it is not - a file could be missing - try to zero pad until where you
+        # expected to be - given this idx
+        if idx-idx_prev != samples_per_file:
+            if idx - samples_per_file > idx_prev:
+                # missing file
+                n_pad = (idx-idx_prev) - samples_per_file
+                zeropad(n_pad, file)
+            else:
+                err = f"wrong sample index from file {file}, got {idx}, expected {idx_prev + samples_per_file}"
+                if logger:
+                    logger.error(err)
+                raise Exception(err)
 
-        # load data
-        data = mat["d_raw"][:, 0]
-        # make sure data is not too long
-        data = data[:meta["n_samples"]]
+        # data
+        zz = to_i2x16(mat["d_raw"][:, 0])
+        
+        # check data
+        n_samples = len(zz)
+        if n_samples > samples_per_file:
+            # truncate
+            zz = zz[:samples_per_file]
+            if logger:
+                logger.warning(f"truncating from {n_samples} samples to {samples_per_file}")
 
         # write data
-        zz = to_i2x16(data)
-        sample_writer.write(zz)
-        print("write_idx", write_idx)
+        write(zz, file)
 
-        # advance write_idx
-        write_idx += len(data)
+        # if data was too short, zero pad
+        if n_samples < samples_per_file:
+            # zero padding
+            n_pad = samples_per_file - n_samples
+            zeropad(n_pad, file)
 
-        # pointing index
-        pointing_idx = pointing_writer.index_from_ts(meta["ts_start"])
+        # write pointing data
+        ts = sample_writer.ts_from_index(idx)
+        pointing_idx = int(pointing_writer.index_from_ts(ts))
         d = {
-            'azimuth': meta['azimuth'],
-            'elevation': meta['elevation']
+            'azimuth': float(mat["d_parbl"][0][PARBL_AZIMUTH]) % 360,
+            'elevation': float(mat["d_parbl"][0][PARBL_ELEVATION])
         }
         pointing_writer.write(pointing_idx, d)
-        print("pointing_idx", pointing_idx)
 
+        # increment idx_prev
+        idx_prev = idx
         if progress:
             pbar.update(1)
-
     if progress:
         pbar.close()
-    
+
     if logger:
         logger.info("Done writing DRF files")
 

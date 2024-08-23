@@ -284,9 +284,16 @@ class DigitalRFReader(BaseIndexedTimeSequence):
             # calculate file padding in time domain
             file_cadence_secs = self._reader.get_properties(self.chnl)["file_cadence_millisecs"] / 1000.0
             front_padding_sec = (self._ts_origin_sec - ts_start) % file_cadence_secs
+            # NOTE - back padding is only correct if written data happens to be a multiplum of file length-
+            # to make it correct - I would need a correct timestamp for the end of the writing
+            # similar to how ts_origin_sec is a correct timestamp for the start of the writing
+            back_padding_sec = file_cadence_secs - front_padding_sec
+
+            print("front_padding_sec", front_padding_sec)
+            print("back_padding_sec", back_padding_sec)
+
             if front_padding_sec == 0:
                 return idx_start, idx_end 
-            back_padding_sec = file_cadence_secs - front_padding_sec
             # convert back to index domain
             idx_start = int(self.index_from_ts(ts_start + front_padding_sec))
             idx_end = int(self.index_from_ts(ts_end - back_padding_sec))
