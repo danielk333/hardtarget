@@ -298,12 +298,13 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         sample_rate, # sample rate numerator
         1, # samplerate denominator
         np.int16,
-        ts_origin_sec=ts_start_sec,
+        idx_start,
         subdir_cadence_secs=3600, # one dir per hour
         file_cadence_secs=1, # one file per second
         is_complex=True,
         compression_level=compression,
-        uuid_str=chnl
+        uuid_str=chnl,
+        ts_align_sec=ts_start_sec
     )
 
     # create pointing writer

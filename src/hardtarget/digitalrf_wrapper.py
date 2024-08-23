@@ -1,6 +1,5 @@
 from pathlib import Path
 import digital_rf
-import datetime as dt
 import numpy as np
 
 ####################################################################
@@ -131,7 +130,7 @@ class DigitalRFWriter(BaseIndexedTimeSequence):
                  sample_rate_numerator,
                  sample_rate_denominator,
                  dtype_str,
-                 ts_origin_sec=None,
+                 start_global_index,
                  subdir_cadence_secs=3600,  # 1 dir per hour
                  file_cadence_secs=3600,  # 1 hour per file
                  compression_level=0,
@@ -140,7 +139,8 @@ class DigitalRFWriter(BaseIndexedTimeSequence):
                  num_subchannels=1,
                  is_continuous=True,
                  marching_periods=False,
-                 uuid_str=None
+                 uuid_str=None,
+                 ts_align_sec=None
                 ):
 
         # check dst
@@ -155,12 +155,6 @@ class DigitalRFWriter(BaseIndexedTimeSequence):
         # sample rate
         sample_rate = sample_rate_numerator / float(sample_rate_denominator)
         
-        # use construction time as default value for ts_origin_sec
-        if ts_origin_sec is None:
-            ts_origin_sec = dt.now(timezone.utc).timestamp()
-        self.ts_origin_sec = ts_origin_sec
-
-        ts_align_sec = ts_origin_sec if ts_origin_sec is not None else 0
         super().__init__(sample_rate, ts_align_sec=ts_align_sec)
 
         # meta data writer
@@ -169,7 +163,7 @@ class DigitalRFWriter(BaseIndexedTimeSequence):
             dtype_str,
             subdir_cadence_secs,
             file_cadence_secs * 1000,  # file_cadence_milliseconds
-            int(self.index_from_ts(ts_origin_sec)),  # start global index
+            start_global_index,  # start global index
             sample_rate_numerator,
             sample_rate_denominator,
             uuid_str=uuid_str,
@@ -199,7 +193,7 @@ class DigitalRFReader(BaseIndexedTimeSequence):
     Convenience wrapper around digital_rf.DigitalRFReader 
     """
 
-    def __init__(self, dst, chnl, ts_origin_sec=None):
+    def __init__(self, dst, chnl, ts_align_sec=0):
 
         """
         Parameters
@@ -209,29 +203,18 @@ class DigitalRFReader(BaseIndexedTimeSequence):
             Path to root directory
         chnl: str
             Name of channel (i.e. subdirectory)
-        ts_origin_sec (optional): timestamp (seconds after epoch)
-            <ts_origin_sec> used when the time sequence was initiated/written
+        ts_align_sec (optional): timestamp associated with some index
 
-        In the writer, <ts_origin_sec> is used to define a precise starting moment
+        In the writer, <start_global_index> is used to define a precise starting moment
         for the first sample in the time sequence. On the reader side, though, the time resolution
         is by default limited to the length of a sample, which implies that the
         the exact time-alignment of a sample can be off by e (0 <= e < sample_length).
         This would be increasingly problematic for longer samples. This skew also matters when
         trying to align data series with differet sample lengths.
 
-        To resolve this, provide <ts_origin_sec> used with the writer, thereby
-        supplying information which was unfortunately not persisted by the underlying framework.
-
-        So, if <ts_origin_sec> is supplied, it influences the conversion between indexes and timestamps.
-        Additionally, it helps ressolve another issue with the framework, relating to internal aspects
-        of data representation, where files are NaN padded to be fixed size. This affects <get_bounds> 
-        and <read> which cant tell exactly where data starts and may therefor return bound indexes with
-        resolutions limited to file-size, instead of samples, causing read to return padded data before the 
-        start and end of the file, unless sample writing happens to be precisely aligned with file boundaries.
-            
-        NOTE: ts_origin_sec is only needed to fix the bounds issue. If this is not fixed,
-        there should be ts_align_sec instead, similar to the MetadataReader
-
+        To resolve this, provide <ts_align_sec>, a timestamp which anchors the start of an index to
+        time domain, making it possible to calculate a skew (could for instance be the timstamp
+        associated with <start_global_index>).
         """
 
         # setup reader
@@ -248,13 +231,9 @@ class DigitalRFReader(BaseIndexedTimeSequence):
 
         sample_rate = float(self._reader.get_properties(chnl)["samples_per_second"])
 
-        ts_align_sec = ts_origin_sec if ts_origin_sec is not None else 0
-        super().__init__(sample_rate, ts_align_sec=ts_align_sec)
-
-        
-        # ts_origin_sec defines the start of the first sample of the time-series
+        # ts_align_sec defines the start of the first sample of the time-series
         # used to correct issue with file alignment (see get_bounds())
-        self._ts_origin_sec = ts_origin_sec
+        super().__init__(sample_rate, ts_align_sec=ts_align_sec)
 
     def get_bounds(self):
         """
@@ -266,38 +245,11 @@ class DigitalRFReader(BaseIndexedTimeSequence):
 
         NOTE: digital rf read() may return padded values at start and and, originating
         from internal aspects of storage organization in files
-        If ts_origin_sec is supplied, this will be used to correct this.
-
-        TODO:
-        define ts_origin_sec : is it a skew?
-
         """
 
         idx_first, idx_last = self._reader.get_bounds(self.chnl)
         idx_start = idx_first
-        idx_end = idx_last + 1
-
-        if self._ts_origin_sec is not None:
-            # convert to time domain
-            ts_start = self.ts_from_index(idx_start)
-            ts_end = self.ts_from_index(idx_end)
-            # calculate file padding in time domain
-            file_cadence_secs = self._reader.get_properties(self.chnl)["file_cadence_millisecs"] / 1000.0
-            front_padding_sec = (self._ts_origin_sec - ts_start) % file_cadence_secs
-            # NOTE - back padding is only correct if written data happens to be a multiplum of file length-
-            # to make it correct - I would need a correct timestamp for the end of the writing
-            # similar to how ts_origin_sec is a correct timestamp for the start of the writing
-            back_padding_sec = file_cadence_secs - front_padding_sec
-
-            print("front_padding_sec", front_padding_sec)
-            print("back_padding_sec", back_padding_sec)
-
-            if front_padding_sec == 0:
-                return idx_start, idx_end 
-            # convert back to index domain
-            idx_start = int(self.index_from_ts(ts_start + front_padding_sec))
-            idx_end = int(self.index_from_ts(ts_end - back_padding_sec))
-        
+        idx_end = idx_last + 1        
         return idx_start, idx_end
 
 
@@ -307,10 +259,7 @@ class DigitalRFReader(BaseIndexedTimeSequence):
         
         TODO: reads outside bounds will either return NaN data padding, or not
         return anything elements. This is related to the issue of bounds and
-        internal storage organization. To fix this and produce consistent 
-        results, we could truncate indexes if they go beyond bounds. This
-        suggests that ts_origin_sec should be a parameter on the reader, 
-        instead of the bounds method.
+        internal storage organization.
 
         NOTE: digital rf read() includes idx_last - which breaks convention
         this function fixes this issue, by implementing "until idx_last" semantics
