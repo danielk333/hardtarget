@@ -33,5 +33,5 @@ def main(args):
     logger = logging.getLogger(__name__)
     logger.setLevel(get_logging_level(args.verbose))
     # download
-    download(args.day, args.mode, args.instrument, args.output,
+    download(args.day, args.mode, args.instrument, args.dst,
              logger=logger, progress=args.progress, wget=args.wget)
