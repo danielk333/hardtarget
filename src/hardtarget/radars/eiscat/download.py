@@ -171,18 +171,14 @@ def download(day, mode, instrument, dst, logger=None, progress=False, wget=False
         # check that data matches given instrument
         _instrument = info_nodes[0]["exp"]["instrument"]
         if instrument.casefold() != _instrument.casefold():
+            # mismatch instrument
             continue
         else:
             # found first
             break
 
     if len(data_nodes) == 0:
-        msg = (
-            "Instrument mismatch, "
-            f"given: {instrument}, "
-            f"actual {_instrument}"
-        )
-        raise Exception(msg)
+        raise Exception("No data nodes for product", product_nodes)
 
     # Size
     bytes = sum([node["bytes"] for node in data_nodes])
