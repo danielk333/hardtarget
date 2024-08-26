@@ -199,7 +199,7 @@ def compute_gmf(
 
         # filenames are in unix time microseconds
         epoch_unix_us = file_idx_sample / (sample_rate/1000000)
-        epoch_unix = epoch_unix_us.astype("float128")/1000000
+        epoch_unix = epoch_unix_us.astype("float64")/1000000
         epoch_unix_us = epoch_unix_us.astype("int64")
         filepath = utils.get_filepath(epoch_unix_us)
 
