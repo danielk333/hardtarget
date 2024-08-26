@@ -281,7 +281,7 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
     if progress:
         pbar = tqdm(desc="Converting files to digital_rf", total=n_files)
 
-    for progress_idx, file in list(enumerate(files))[:1]:
+    for progress_idx, file in enumerate(files):
         if logger:
             if progress_idx + 1 == n_files or progress_idx % 10 == 0:
                 logger.debug(f"write progress {progress_idx+1}/{n_files}")
