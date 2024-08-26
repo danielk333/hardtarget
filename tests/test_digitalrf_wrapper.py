@@ -5,25 +5,14 @@ import time
 import numpy as np
 import numpy.testing as npt
 from pathlib import Path
+from hardtarget.utils import ts_from_str
 
 ####################################################################
 # DATETIMES
 ####################################################################
 
-def make_ts_from_str(datetime_str):
-    """
-    make utc timestamp (seconds) from human readable datetime string (local time)
-    """
-    specific_datetime = dt.datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S.%f")
-    # Convert to UTC (assuming the datetime is in local time)
-    datetime_utc = specific_datetime.replace(tzinfo=dt.timezone.utc)
-    return datetime_utc.timestamp()
-
-
-TS_ORIGIN_SEC_ALIGNED = make_ts_from_str("2024-07-10T12:00:00.000")
-TS_ORIGIN_SEC_MISALIGNED = make_ts_from_str("2024-07-10T12:03:04.555")
-
-
+TS_ORIGIN_SEC_ALIGNED = ts_from_str("2024-07-10T12:00:00.000")
+TS_ORIGIN_SEC_MISALIGNED = ts_from_str("2024-07-10T12:03:04.555")
 
 ####################################################################
 # TEST DRF

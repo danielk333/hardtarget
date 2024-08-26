@@ -7,7 +7,7 @@ from pathlib import Path
 from hardtarget.gmf import get_available_libs, get_estimation_method, MethodType
 from hardtarget.configuration import load_gmf_params
 import hardtarget.analysis.utils as utils
-from hardtarget.analysis.utils import index_from_ts, ts_from_index
+from hardtarget.utils import index_from_ts, ts_from_index
 
 
 

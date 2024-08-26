@@ -10,6 +10,7 @@ import logging
 from hardtarget.gmf import MethodType
 from hardtarget import drf_utils
 import hardtarget.digitalrf_wrapper as drf_wrapper
+from hardtarget.utils import index_from_ts, ts_from_index
 
 logger = logging.getLogger(__name__)
 
@@ -622,54 +623,6 @@ def get_filepath(epoch_unix_us):
 # LOAD POINTING DATA
 ####################################################################
 
-
-def ts_from_index(idx, sample_rate, ts_offset_sec=0):
-    """
-    convert from sample idx to timestamp
-    
-    Params
-    ------
-
-    idx: int
-        sample index (first sample is index 0)
-    sample_rate: Hz
-        samples per seconds
-    ts_offset_sec: float 
-        timestamp in seconds since Epoch (1970:01:10T00:00:00) 
-        ts_offset is the timestamp corresponding to index 0,
-        by default this is 0, implying that indexing starts at Epoch (1970:01:10T00:00:00)
-    
-    Returns
-    -------
-    float:
-        timestamp corresponding to given sample index
-    
-    """    
-    return (idx / float(sample_rate)) + ts_offset_sec
-
-
-def index_from_ts(ts, sample_rate, ts_offset_sec=0):
-    """
-    convert from timestamp to sample index
-
-    Params
-    ------
-
-    ts: float
-        timestamp in seconds from Epoch (1970:01:10T00:00:00)
-    sample_rate: Hz
-        samples per seconds
-    ts_offset_sec: float 
-        timestamp in seconds since Epoch (1970:01:10T00:00:00)
-        ts_offset is the timestamp corresponding to index 0,
-        by default this is 0, implying that indexing starts at Epoch (1970:01:10T00:00:00)
-    
-    Returns
-    -------
-    float:
-        sample index (first sample is index 0)
-    """
-    return (ts-ts_offset_sec) * sample_rate
 
 
 

@@ -1,5 +1,5 @@
 import pytest
-from hardtarget.analysis.utils import index_from_ts, ts_from_index
+from hardtarget.utils import index_from_ts, ts_from_index
 from hardtarget.analysis.utils import load_metadata, load_pointing_data
 import numpy as np
 import numpy.testing as npt
