@@ -6,9 +6,6 @@ import numpy.testing as npt
 import hardtarget.digitalrf_wrapper as drf_wrapper
 from pathlib import Path
 
-PROJECT = Path("/cluster/projects/p106119-SpaceDebrisRadarCharacterization")
-DRF = PROJECT / "drf/leo_bpark_2.1u_NO-20220408-UHF"
-
 
 def test_upsample():
 
@@ -70,13 +67,14 @@ def test_upsample():
     npt.assert_array_equal(data[-1], [6,17])
 
 
+# NOTE DRF on the project path currently lacks pointing info
+PROJECT = Path("/cluster/projects/p106119-SpaceDebrisRadarCharacterization")
+DRF = PROJECT / "drf/leo_bpark_2.1u_NO-20220408-UHF"
+# DRF = Path("/cluster/home/inar/Data/hardtarget/leo_bpark_2.1u_NO-20220408-UHF")
+
 @pytest.mark.skipif(not DRF.exists(), reason="Local file is missing")
 def test_load_pointing_data():
 
-    # TODO - switch to DRF on the cluster - right now these lack pointing info
-
-    # DRF = "/cluster/home/inar/Data/hardtarget/leo_bpark_2.1u_NO@uhf_drf"
- 
     ipp = 20000 # inter-pulse period in samples
     n_ipp = 10 # number of inter-pulse periods 
     num_cohints_per_file = 10 # number of coherent intergration periods in a file
@@ -102,11 +100,13 @@ def test_load_pointing_data():
 
     pointing = load_pointing_data(task_idx, DRF, "pointing", task_rate, ts_offset_sec, integration_rate)
 
+    print(pointing)
     assert len(pointing) == num_cohints_per_file
 
     # ask for data outside bounds
     pointing = load_pointing_data(-4, DRF, "pointing", task_rate, ts_offset_sec, integration_rate)
     expected = np.full((num_cohints_per_file, 2), np.nan)
     npt.assert_array_equal(pointing, expected)
+
 
 
