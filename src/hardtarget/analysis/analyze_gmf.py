@@ -205,7 +205,7 @@ def compute_gmf(
         return utils.get_filepath(epoch_unix_us)
 
     skip_list = []
-    for task_idx in job_tasks[:10]:
+    for task_idx in job_tasks:
         filepath = make_filepath(task_idx)
         # check if file exists
         file = Path(output) / filepath
