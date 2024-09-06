@@ -41,7 +41,6 @@ def get_download_nodes(day, mode, logger=None):
     response = requests.get(url)
     if response.status_code == 200:
         html_content = response.text
-
         # parse
         tree = html.fromstring(html_content)
         checkboxes = tree.xpath('//input[@type="checkbox"]')
