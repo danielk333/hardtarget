@@ -94,121 +94,6 @@ GMF = PROJECT / "gmf"
 NEWGMF = PROJECT / "test/debug-2024-09-06/ingar_gmf"
 
 
-def lookup(alist, spacing, start, end):
-    """
-    list is sorted list of regularly spaced float values
-    each float f is valid in interval [f,f+spacing)
-    start and end are float values, representing search interval [start, end),
-    where start < end
-    return indexes for elements in list whose valid interval intersects with search interval
-    """
-    assert start <= end
-    if not alist:
-        return []
-
-    if end <= alist[0]:
-        return []
-    if alist[-1] + spacing <= start:
-        return []
-
-    # iterate from left
-    # find index of rightmost element, where (val <= start)
-    start_idx = -1
-    for val in alist:
-        if val <= start:
-            start_idx += 1
-        else:
-            break
-    if start_idx == -1:
-        # leftmost (val > start)
-        start_idx = 0
-
-    # iterate from right
-    # find index of leftmost element, where (val + spacing > end)
-    n = len(alist)
-    end_idx = n
-    for val in alist[::-1]:
-        if val + spacing > end:
-            end_idx -= 1
-        else:
-            break
-    if end_idx == n:
-        # rightmost (val+spacing <= end)
-        end_idx = n - 1
-    return list(range(start_idx, end_idx + 1))
-
-
-
-def test_lookup():
-    
-
-    l = [float(n) for n in range(10)]
-    spacing = 1.0
-
-    # overlap
-    res = lookup(l, spacing, -1, 12.0)
-    assert res[0] == 0 and res[-1] == 9
-
-    # overlap
-    res = lookup(l, spacing, -1, 10.0)
-    assert res[0] == 0 and res[-1] == 9
-
-    # overlap
-    res = lookup(l, spacing, -1, 9.9)
-    assert res[0] == 0 and res[-1] == 9
-
-    # overlap
-    res = lookup(l, spacing, -1, 9.0)
-    assert res[0] == 0 and res[-1] == 9
-    
-    # not overlap
-    res = lookup(l, spacing, -1, 8.9)
-    assert res[0] == 0 and res[-1] == 8
-
-    # overlap
-    res = lookup(l, spacing, -0.1, 12)
-    assert res[0] == 0 and res[-1] == 9
-    
-    # overlap
-    res = lookup(l, spacing, 0, 12)
-    assert res[0] == 0 and res[-1] == 9
-
-    # overlap
-    res = lookup(l, spacing, 0.9, 12)
-    assert res[0] == 0 and res[-1] == 9
-
-    # not overlap
-    res = lookup(l, spacing, 1.0, 12)
-    assert res[0] == 1 and res[-1] == 9
-
-    # single hit
-    res = lookup(l, spacing, 5.2, 5.8)
-    assert res[0] == 5 and res[-1] == 5
-    assert len(res) == 1
-
-    # single hit
-    res = lookup(l, spacing, 5.2, 5.2)
-    assert res[0] == 5 and res[-1] == 5
-    assert len(res) == 1
-
-    # list with single item - hit
-    res = lookup([4], spacing, 3.2, 5.8)
-    assert res[0] == 0 and res[-1] == 0
-    assert len(res) == 1
-
-    # list with single item - hit
-    res = lookup([4], spacing, 4.9, 5.8)
-    assert res[0] == 0 and res[-1] == 0
-    assert len(res) == 1
-
-    # list with single item - miss
-    res = lookup([4], spacing, 5.0, 5.8)
-    assert len(res) == 0
-
-    # list with no items
-    res = lookup([], spacing, 5.0, 5.8)
-    assert len(res) == 0
-
 
 def test_gmf_equivalence():
     """
@@ -222,32 +107,62 @@ def test_gmf_equivalence():
     """
 
     old_gmf = GMF / PRODUCT
-
-    # need to find the correct gmf files within gmf products
-    # gmf filenames are in unix time microseconds of first sample in file
-    # gmf also has metadata which I can use
-    files = sorted(utils.all_gmf_h5_files(str(old_gmf)))
-    #with h5py.File(files[0], "r") as f:        
-    #    chnl = f["experiment"].attrs["rx_channel"]
-    #    ipp = f["experiment"].attrs["ipp"]
-    #    n_ipp = f["processing"].attrs["n_ipp"]
-    #    num_cohints_per_file = f["processing"].attrs["num_cohints_per_file"]
-
-    # make datas
-    start_ts = ts_from_str("2021-11-23T10:00:00.0")
-    end_ts = ts_from_str("2021-11-23T10:01:00.0")
-
-    def get_ts_from_path(p):
-        return float (p.name.split('-')[1].split('.')[0])
-
-    ts_list = [get_ts_from_path(f) for f in files]
+    TS = ts_from_str("2021-11-23T10:00:00.0")
 
 
+    def get_data_from_product(product, ts):
+
+        # need to find the correct gmf files within gmf products
+        # gmf filenames are in unix time microseconds of first sample in file
+        # gmf also has metadata which I can use
+        files = sorted(utils.all_gmf_h5_files(str(product)))
+
+        # choose one specific point in time
+        # find the file which covers this ts
+
+        def get_ts_from_path(p):
+            return float (p.name.split('-')[1].split('.')[0]) / 1e6
+
+        def is_relevant(f):
+            file_start_ts = get_ts_from_path(f)
+            file_end_ts = file_start_ts + 2.0
+            return file_start_ts <= ts and ts < file_end_ts
+
+        relevant_files = [f for f in files if is_relevant(f)]
+        print(relevant_files)
+        relevant_file = relevant_files[0]
+
+        file_start_ts = get_ts_from_path(relevant_file)
+        delta = ts - file_start_ts
+        print("delta", delta)
 
 
-    import pprint
-    pprint.pprint([get_ts_from_path(p) for p in files[:10]])
 
-    print(start_ts*1000000)
-    print(end_ts*1000000)
+        with h5py.File(relevant_file, "r") as f:        
+            #chnl = f["experiment"].attrs["rx_channel"]
+            #ipp = f["experiment"].attrs["ipp"]
+            #n_ipp = f["processing"].attrs["n_ipp"]
+            #num_cohints_per_file = f["processing"].attrs["num_cohints_per_file"]
+            sample_rate = f["experiment"].attrs["sample_rate"]
+            epoch = f['epoch_unix'][()]
+            print(epoch)
+
+
+            print(list(f.keys()))
+            print(f['sample_numbers'][:])
+
+            idx = index_from_ts(ts, sample_rate, ts_offset_sec=epoch)
+            print("idx", idx)
+
+
+
+        # find index correspoinding to TS
+        
+
+
+    get_data_from_product(old_gmf, TS)
+
+
+
+
 
