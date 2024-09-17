@@ -49,7 +49,8 @@ estimate for the purpose of orbit determination.
 The target will not be detectable at all unless we have the correct matched
 filter, so it seems the only option is to try **every feasible** matched
 filter, and pick the one that gives the highest gain, an approach that is
-often referred to as a **filter bank**.
+often referred to as a **filter bank**.  In the context of EISCAT Space Debris
+observations, this is referred to as the Generalized Matched Filter.
 
 Implementations
 --------
@@ -67,8 +68,8 @@ unacceptable delays.
 The Fast GMF, of FGMF
 ++++++++
 
-The processing chain developed at SGO over several years of EISCAT space
-debris observations is centered on a GMF implementation where a number of
+The processing chain developed at SGO over several years of EISCAT Space
+Debris observations is centered on a GMF implementation where a number of
 clever tricks are exploited to bring down the processing time. One important
 improvement was to realise that summing over the phase contribution caused by
 a linear motion is equivalent to a DFT, which is implemented very efficiently
@@ -90,8 +91,10 @@ literature, the kind of signal we hope to detect is referred to as a
 phase estimation** problem. We found a paper :cite:`Peleg1995` which describes
 a very efficient algorithm for estimating polynomial phase coefficients for
 the strongest target echo in a signal, one at a time, where the cost of
-extracting a single coefficient is on the order of an FFT of size equal to the
-signal's length in samples.
+extracting a single coefficient is on the order of an DFT of size equal to the
+signal's length in samples.  The algorithm is called the *Discrete
+Polynomial-phase Transform*, or DPT. Using the FFT to compute the DFTs, we name
+this the Fast DPT, or *FDPT*.
 
 
 
