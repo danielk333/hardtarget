@@ -6,7 +6,9 @@ from tqdm import tqdm
 from pathlib import Path
 from hardtarget.gmf import get_available_libs, get_estimation_method, MethodType
 from hardtarget.configuration import load_gmf_params
-from . import utils
+import hardtarget.analysis.utils as utils
+from hardtarget.utils import index_from_ts, ts_from_index
+
 
 
 ####################################################################
@@ -147,9 +149,12 @@ def compute_gmf(
     sample_rate = params_exp["sample_rate"]
     n_ipp = params_pro["n_ipp"]
     num_cohints_per_file = params_pro["num_cohints_per_file"]
-    ipp_samp = params_exp["ipp_samp"]
+    ipp_samp = params_exp["ipp_samp"] 
 
-    # tasks
+    ##########################################################
+    # TASKS
+    ##########################################################
+
     total_tasks = utils.compute_total_tasks(
         ipp, n_ipp,
         num_cohints_per_file,
@@ -174,7 +179,10 @@ def compute_gmf(
 
     logger.info(f"starting job {job['idx']}/{job['N']} with {len(job_tasks)} tasks")
 
-    # progress
+    ##########################################################
+    # PROGRESS
+    ##########################################################
+
     progress_desc = "Coherent integrations"
     if progress:
         total = job_cohints
@@ -188,11 +196,44 @@ def compute_gmf(
             total=total,
         )
 
+    ##########################################################
+    # POINTING ARGS
+    ##########################################################
+
+    # task rate : tasks per second
+    _samples_per_task = ipp * n_ipp * num_cohints_per_file
+    _task_rate = sample_rate / _samples_per_task
+    # integration_rate : coherent integration periods per second
+    _samples_per_integration = ipp * n_ipp
+    _integration_rate = sample_rate / _samples_per_integration
+    # ts_origin: timestamp (sec since epoch) assoeciated with task_idx 0 
+    # NOTE: assuming that bounds[0] is sample associated with task_idx 0
+    _ts_origin = ts_from_index(bounds[0], sample_rate)
+
+    pointing_args = (
+        rx_srcdir, # path
+        "pointing", # chnl
+        _task_rate, # task_rate
+        _ts_origin, # ts origin
+        _integration_rate, # target rate
+    )
+
+    ##########################################################
     # MAIN LOOP
+    ##########################################################
+
     results = {"dir": output, "files": [], "data": {}}
     for idx, task_idx in enumerate(job_tasks):
 
-        # initialise
+        ##############################################################
+        # POINTING
+        ##############################################################
+        pointing_vec = utils.load_pointing_data(task_idx, *pointing_args)
+
+        ##############################################################
+        # INITIALISE
+        ##############################################################
+
         all_gmf_vars = []
         # filename outfile
         file_idx_sample = task_idx * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
@@ -334,6 +375,7 @@ def compute_gmf(
                 v_vec=v_vec,
                 a_vec=a_vec,
                 g_vec=g_vec,
+                pointing_vec=pointing_vec,
                 epoch=epoch_unix,
             )
         elif libtype == MethodType.optimize:
