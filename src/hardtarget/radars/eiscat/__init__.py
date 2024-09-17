@@ -56,6 +56,7 @@ def load_expconfig(xpname):
         raise ValueError(f"Couldn't open config file for {xpname}:" + str(e))
 
 
-from .download import download
+
+from .download import download, get_download_nodes
 from .convert import convert
 

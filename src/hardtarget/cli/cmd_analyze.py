@@ -27,6 +27,7 @@ def parser_build(parser):
         "-m",
         "--method",
         help="GMF method",
+        choices=["fdpt", "fgmf"],
         default=DEFAULT_METHOD,
     )
     parser.add_argument(

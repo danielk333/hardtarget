@@ -9,6 +9,8 @@ import logging
 
 from hardtarget.gmf import MethodType
 from hardtarget import drf_utils
+import hardtarget.digitalrf_wrapper as drf_wrapper
+from hardtarget.utils import index_from_ts, ts_from_index
 
 logger = logging.getLogger(__name__)
 
@@ -376,6 +378,7 @@ GMFOutArgs = namedtuple(
         "v_vec",
         "a_vec",
         "g_vec",
+        "pointing_vec",
         "epoch"
     ],
 )
@@ -475,6 +478,11 @@ def define_grid_variables(gmf_out_args):
             "dims": [("integration_index", "t")],
             "long_name": "Peak GMF",
         },
+        "pointing": {
+            "data": gmf_out_args.pointing_vec,
+            "dims": [("integration_index", "t")],
+            "long_name": "Radar pointing data (azimuth, elevation)"
+        }
     }
 
 
@@ -504,17 +512,10 @@ def is_pair_unpackable(a):
     """Returns true if a can be unpacked to a pair of variables."""
     return True if isinstance(a, (tuple, list)) and len(a) == 2 else False
 
-
-# Cache reader instances by path
-# TODO: this is a memory leak technically since it keeps a reference of the object here without deletion
-_DRF_READERS = {}
-
-
 def load_source(src):
     """
     Load Digital_rf reader object from (srcdir, chnl)
     """
-    global _DRF_READERS
     if type(src) is not tuple:
         raise ValueError(f"tuple (path, chnl) expected, {src}")
     if not is_pair_unpackable(src):
@@ -523,9 +524,7 @@ def load_source(src):
     if path is None or not Path(path).is_dir():
         raise ValueError(f"path must be directory, {path}")
     # read cached instance
-    reader = _DRF_READERS.get(path, None)
-    if reader is None:
-        _DRF_READERS[path] = reader = drf.DigitalRFReader([str(path)])
+    reader = drf.DigitalRFReader([str(path)])
     channels = reader.get_channels()
     if chnl not in channels:
         raise ValueError(f"reader does not support channel, {chnl}")
@@ -616,3 +615,121 @@ def get_filepath(epoch_unix_us):
     dt = datetime.datetime.utcfromtimestamp(epoch_unix_us*1e-6)
     time_string = dt.strftime("%Y-%m-%dT%H-00-00")
     return Path(time_string) / f"gmf-{epoch_unix_us:08d}.h5"
+
+
+
+
+####################################################################
+# LOAD POINTING DATA
+####################################################################
+
+
+
+
+def load_metadata(reader, interval, target_rate, target_value):
+    """
+    read metadata data for time interval and upsample to sample_rate
+    
+    Parameters
+    ----------
+    reader: digitalrf_wrapper.DigitalMetadataReader
+        reader object for metadata stream
+    interval: [float, float]
+        timestamps in seconds since epoch
+    target_rate: float
+        upsample metadata according to given target_rate
+    target_value(item): function
+        return value for metadata item
+
+    Returns
+    -------
+    numpy.ndarray
+        float array of values, NaN's for non-existing data
+    """
+    
+    # check target rate
+    _N = target_rate / reader.sample_rate
+    N = int(round(_N))
+
+    assert N == _N  and N > 0, f"Illegal target_rate {target_rate} for metadata with rate {reader.sample_rate}"
+    
+    # query metadata
+    idx_start = int(index_from_ts(interval[0], reader.sample_rate))
+    idx_end = int(index_from_ts(interval[1], reader.sample_rate)) + 1
+    result = list(reader.read(idx_start, idx_end))
+
+    # load result into fixed length list
+    expected_length = idx_end - idx_start
+    items = [None] * expected_length
+    if len(result) > 0:
+        for idx, item in result:
+            items[idx-idx_start] = item
+
+    # upsample metadata
+    values = np.array([target_value(d) for d in items], dtype=np.float32)
+    samples = np.repeat(values, N, axis=0)
+
+    # slice samples
+    # this is because the query operation above fetches all metadata values covering
+    # the time interval, which typically corresponds to a larger time interval.
+    
+    # first element in samples vector corresponds to metadata idx_start
+    ts_offset = ts_from_index(idx_start, reader.sample_rate)
+    
+    # convert timestamps to sample indexes
+    offset = index_from_ts(ts_offset, target_rate)
+    start = index_from_ts(interval[0], target_rate)
+    end = index_from_ts(interval[1], target_rate)    
+    
+    return samples[int(start-offset):int(end-offset)]
+
+
+####################################################################
+# POINTING
+####################################################################
+
+
+def load_pointing_data(task_idx, path, chnl, task_rate, ts_offset_sec, target_rate):
+
+    """
+    load and upsample pointing data for specific task
+
+    Parameters
+    ----------
+    task_idx: int
+        logical task number
+    reader: digitalrf_wrapper.DigitalMetadataReader
+        reader object for pointing data
+    task_rate: float
+        tasks per second
+    ts_offset_sec: float
+        timestamp (sec) of first task
+    sample_rate: target upsample rate
+
+    Returns
+    -------
+    numpy.ndarray 
+        (N,2) (float32) of upsampled (azimuth, elevation) tuples. Nan if chnl does not exist  
+    """
+
+    # time interval of this task 
+    interval = [ts_from_index(idx, task_rate, ts_offset_sec=ts_offset_sec) for idx in [task_idx, task_idx+1]]
+
+    try:
+        # reader of pointing data
+        reader = drf_wrapper.DigitalMetadataReader(path, chnl)
+    except Exception as e:
+        print(e)
+        # no reader - generate vector of NaN data
+        N = int((interval[1] - interval[0]) * target_rate)
+        return np.full((N, 2), np.nan)
+
+    def target_value(item):
+        res = np.array([np.nan, np.nan], dtype=np.float32)
+        if item is not None:
+            res[0] = item['azimuth']
+            res[1] = item['elevation']     
+        return res
+
+    # load pointing data as vector
+    return load_metadata(reader, interval, target_rate, target_value)
