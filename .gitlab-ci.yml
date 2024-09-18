@@ -18,7 +18,7 @@ stages:
     - source venv/bin/activate
     # Install dependancies
     - apt update
-    - apt install -y pandoc gcc libfftw3-dev
+    - apt install -y pandoc gcc libfftw3-dev libhdf5-dev
     # Install the package
     - pip install .[develop]
 
@@ -33,7 +33,7 @@ stages:
     - source venv/bin/activate
     # Install dependancies
     - apt update
-    - apt install -y gcc libfftw3-dev
+    - apt install -y gcc libfftw3-dev libhdf5-dev
     # install the package
     - pip install .
 
