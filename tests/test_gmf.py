@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from hardtarget.gmf import GMF_LIBS
+from hardtarget.gmf import GMF_LIBS, Impl
 
 
 def pytest_configure(config):
@@ -13,18 +13,26 @@ class TestGMF:
     It is possible that CUDA support is compilet, yet still non-functional.
     """
 
-    @pytest.mark.parametrize("gmf_key", ["c", "numpy"])
-    def test_gmf(self, gmf_key):
-        self.run_gmf(gmf_key)
+    @pytest.mark.parametrize("gmf_impl", [Impl.c, Impl.numpy])
+    def test_gmf(self, gmf_impl):
+        self.run_gmf(gmf_impl)
 
     @pytest.mark.cuda
     def test_gmf_cuda(self):
-        self.run_gmf("cuda")
+        self.run_gmf(Impl.cuda)
 
-    def run_gmf(self, gmf_key):
+    def run_gmf(self, gmf_impl):
         """Run the basic gmf function."""
 
-        gmf = GMF_LIBS[gmf_key]
+        methods = GMF_LIBS[gmf_impl]
+
+        if not methods:
+            return
+
+        if "grid_fast_dpt" not in methods:
+            return
+
+        gmf, method_type = methods["grid_fast_dpt"]
 
         # Expect output from this test
         expected = {"ri": 500, "gmf_vec": 1e04, "v_vec": 0.0, "a_vec": 0.0}

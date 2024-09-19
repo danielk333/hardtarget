@@ -95,7 +95,7 @@ GMF_LIBS[Impl.numpy]["optimize-grid-gmf"] = (optimize_grid_gmf_np, MethodType.op
 try:
     from .gmf_c import fast_gmf_c
 except ImportError as err:
-    logger.debug(f"GMF c implementations failed to import:\n {e}", exc_info=True)
+    logger.debug(f"GMF c implementations failed to import:\n {err}", exc_info=True)
 else:
     GMF_LIBS[Impl.c]["grid-fast-gmf"] = (fast_gmf_c, MethodType.grid)
     GMF_LIBS[Impl.c]["fgmf"] = GMF_LIBS[Impl.c]["grid-fast-gmf"]
