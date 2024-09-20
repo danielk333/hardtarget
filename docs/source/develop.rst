@@ -6,3 +6,7 @@ Please refer to the style and contribution guidelines documented in the
 Generally external code-contributions are made trough a "Fork-and-pull"
 workflow, while internal contributions follow the branching strategy outlined
 in the contribution guide.
+
+Please refer to `GitHub
+<https://github.com/danielk333/hardtarget/blob/main/DEVELOP.md/>`_ for more
+details.
