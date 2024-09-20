@@ -20,9 +20,33 @@ Welcome to Hardtarget's documentation!
 Introduction
 """""""""""""
 
-What Hardtarget is, and what is it used for.
+The Hardtarget library contains a set of tools used to detect and characterize
+coherent echoes in raw (complex amplitude-level) data from a radar.  At the
+heart of the library are routines for implementing a generalised match filter
+(GMF) which is used to detect targets with a quadratic phase behaviour.
 
-TODO [Daniel]
+The library is used for detections of meteors in atmospheric radar data, and
+for detecting resident space objects (RSOs) such as satellites and space debris
+with ground-based radars.
+
+The library operates on level 2 beamformed data streams that are stored on disk
+in `Digital RF <https://github.com/MITHaystack/digital_rf>`_ format.
+The program assumes that there is a complex baseband
+recording of the transmit waveform and the received complex voltage containing
+the radar echoes. The program can be adapted to various different radars and
+radar experiment parameters. This is done by editing a configuration file. An
+example configuration file is shown below. The example file includes comments
+that describe each parameter.
+
+If there is an available `CUDA compiler <https://developer.nvidia.com/cuda-zone>`_
+in the environment, then both a CUDA library and a C library will be compiled.
+If no CUDA compiler is found, then only the C code will be compiled.
+
+There is also an end-to-end test, which includes a raw voltage simulator that
+creates a dataset and analyzes it. This can be used to test the performance of
+the analysis program and to validate the results. This also includes use of an
+additional refinement step that is used to refine the detected targets:
+
 
 Quick install
 """""""""""""
@@ -51,10 +75,15 @@ Read the CLI description
 
 History
 """""""
-Hardtarget has grown out of research by ... in diverse fields,
-over some time.
+The hardtarget library has grown out of research and developments by several
+scientists in diverse fields, over some time.
 
-TODO [Daniel]
+EISCAT/IRF observations of meteors since 1994 or thereabouts.
+
+First EISCAT observations of space debris (2000-2001)
+
+ESA space debris projects SGO, IRF, UiT, NORCE (2000-2024)
+
 
 Getting Help
 """"""""""""
@@ -65,9 +94,12 @@ developers <mailto:daniel.kastinen@irf.se>`_.
 
 Acknowledgements
 """""""""""""""""
-IRF, NORCE, IKS, ESA, EISCAT
+SGO, IRF, UiT, NORCE, IKS, ESA, EISCAT
 
-TODO [Daniel]
+
+* ESOC Contract No. 13945/99/D/CD, 2002.
+* ESOC Contract No. 16646/02/D/HK(CS), 2005.
+
 
 Indices and tables
 ==================
