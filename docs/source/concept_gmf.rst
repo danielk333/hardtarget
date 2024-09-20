@@ -7,15 +7,15 @@ Generalized Matched Filter
 ==========================
 
 
-This documents context and key concepts in **GMF** processing
+This document provides context and explains key concepts in **GMF** processing.
 
 
 Coherent integration
 ----------
 
-Target echoes that are too weak to detect in the raw signal but scatter at a
-predictable phase is termed **coherent**, and can be brought out by a technique
-called **coherent integration**.
+Targets that scatter at a predictable phase are termed **coherent**.
+Echoes from coherent targets that are too weak to detect in the raw signal can
+be brought out by a technique called **coherent integration**.
 
 From a fundamental perspective, it is a filtering operation.  Echoes (complex
 amplitude data) from a collection of pulses are summed, taking into account the
@@ -74,11 +74,12 @@ clever tricks are exploited to bring down the processing time. One important
 improvement was to realise that summing over the phase contribution caused by
 a linear motion is equivalent to a DFT, which is implemented very efficiently
 by means of the FFT.  This means that one axis of the multi-dimensional filter
-bank is not necessary, greatly reducing the size of the problem..
+bank is not necessary, greatly reducing the size of the problem.
 
 The resulting GMF approach is referred to as the **Fast GMF**, or FGMF.
 Implementations of FGMF exist in numpy, numba(?) and C.
-
+The most complete description of the matching function is in the paper
+`[Markkanen, 2005] <https://doi.org/10.1016/j.asr.2005.03.038>`_ .
 
 The Discrete Polynomial-phase Transform, or DPT
 ++++++++
@@ -88,8 +89,9 @@ of radars since they were first invented during WWII, it should not come as a
 surprise that clever techniques had been invented already.  In the radar
 literature, the kind of signal we hope to detect is referred to as a
 **polynomial-phase signal**, and the problem we try to solve is a **polynomial
-phase estimation** problem. We found a paper :cite:`Peleg1995` which describes
-a very efficient algorithm for estimating polynomial phase coefficients for
+phase estimation** problem.
+A paper `[Peleg, 1995] <https://doi.org/10.1109/78.403349>`_ describes a very
+efficient algorithm for estimating polynomial phase coefficients for
 the strongest target echo in a signal, one at a time, where the cost of
 extracting a single coefficient is on the order of an DFT of size equal to the
 signal's length in samples.  The algorithm is called the *Discrete
