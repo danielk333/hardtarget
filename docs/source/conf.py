@@ -25,7 +25,11 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.autosummary",
+    "sphinxcontrib.bibtex"
 ]
+
+# Path to your bibliography files
+bibtex_bibfiles = ['references.bib']
 
 html_favicon = "_static/favicon.png"
 html_logo = "_static/logo.png"
@@ -52,3 +56,19 @@ html_theme_options = {
 autosummary_generate = True
 autosummary_generate_overwrite = True
 autosummary_imported_members = False
+
+
+# -----------------------------------------------------------------------------
+# Autodoc
+# -----------------------------------------------------------------------------
+
+# Autodoc settings
+autodoc_default_options = {
+    'members': True,
+    'undoc-members': False,
+    'private-members': False,
+    'special-members': '__init__',
+    'inherited-members': False,
+    'show-inheritance': False,
+}
+

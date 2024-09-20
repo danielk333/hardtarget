@@ -1,20 +1,29 @@
 # Minimal makefile for Sphinx documentation
-#
 
-# You can set these variables from the command line, and also
-# from the environment for the first two.
-SPHINXOPTS    ?=
-SPHINXBUILD   ?= sphinx-build
-SOURCEDIR     = source
-BUILDDIR      = build
+# html
+SPHINX_OPTS    ?=
+SPHINX_BUILD    = sphinx-build
+DOCS_SOURCE     = source
+DOCS_BUILD      = build
 
-# Put it first so that "make" without argument is like "make help".
-help:
-	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+# apidoc
+SPHINX_APIDOC   = sphinx-apidoc
+APIDOCS_SOURCE   = ../src/hardtarget
+APIDOCS_BUILD    = $(DOCS_SOURCE)/apidoc
 
-.PHONY: help Makefile
+# Default target: build HTML documentation
+html:
+	$(SPHINX_BUILD) -b html $(SPHINX_OPTS) $(DOCS_SOURCE) $(DOCS_BUILD)/html
+	@echo "Build finished. The HTML pages are in $(DOCS_BUILD)/html."
 
-# Catch-all target: route all unknown targets to Sphinx using the new
-# "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-%: Makefile
-	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+apidoc:
+	$(SPHINX_APIDOC) -o $(APIDOCS_BUILD) $(APIDOCS_SOURCE)
+	@echo "API documentation generated in $(APIDOCS_BUILD)."
+
+clean:
+	rm -rf $(DOCS_BUILD)/*
+	@echo "Cleaned docs build directory."
+
+realclean: clean
+	rm -rf $(APIDOCS_BUILD)/*
+	@echo "Cleaned apidocs build directory."

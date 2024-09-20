@@ -1,8 +1,8 @@
 ..  _radarexperimentparams:
 
-=====================
+===========================
 Radar Experiment Parameters
-=====================
+===========================
 
 This describes parameters associated with a radar experiment. Experiment
 parameters are stored as part of the :ref:`format_drf` file format.

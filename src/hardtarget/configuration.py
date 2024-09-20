@@ -19,16 +19,18 @@ channels in the drf structure. Either way, there are several segments within
 each cycle that we need to extract and index. Hence, there are three main levels
 of signal indices within one cycle, which we will call Index Levels (IL's):
 
- 0) Signal samples (can be same channel)
-    - RX signal (size=IPP length)
-    - TX signal (size=IPP length)
- 0d) Decimated signal samples
-    - RX signal (size=IPP length / decimation)
- 1) Stenciled samples:
-    - RX window (size=chosen reception length, i.e. all range gates)
-    - TX pulse (size=length of transmitted pulse)
- 2) Target range-gate:
-    - RX pulse (size=length of transmitted pulse, offset by chosen range gate)
+..  code-block:: text
+
+    0) Signal samples (can be same channel)
+        - RX signal (size=IPP length)
+        - TX signal (size=IPP length)
+    0d) Decimated signal samples
+        - RX signal (size=IPP length / decimation)
+    1) Stenciled samples:
+        - RX window (size=chosen reception length, i.e. all range gates)
+        - TX pulse (size=length of transmitted pulse)
+    2) Target range-gate:
+        - RX pulse (size=length of transmitted pulse, offset by chosen range gate)
 
 The IL-0d is a bit of a special case as temporal decimation (piece-wise sums of
 neighbors) only maintains desirable properties (both statistical and signal
@@ -36,6 +38,8 @@ vise) if it is done on an isochronal and continuous sample stream. As such,
 decimation operation only occurs on a level 0 signal.
 
 Illustration of the above:
+
+..  code-block:: text
 
     IL-0     : |0123456789...................................|
     Signal   : |xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|
@@ -61,6 +65,9 @@ decimation does not evenly divide the vector.
 In the analysis, several of these cycles are stacked on top of each other. This
 means that when selecting the IL-1 tx samples the resulting array is no longer
 isochronal and continues but instead has a jump in the middle, e.g.
+
+
+..  code-block:: text
 
     IL-1 tx  : |  012345        6789..        ......      |
     TX pulse : |--xxxxxx--------xxxxxx--------xxxxxx------|
@@ -192,12 +199,19 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     """Loads and calculates parameters needed to run analysis.
 
     First load params from
-     - experiment (hardtarget_drf)
-     - signal processing config (gmf_config)
+
+    .. code-block:: text
+    
+        - experiment (hardtarget_drf)
+        - signal processing config (gmf_config)
+
     Then calculate additional derived parameters that are implementation specific
     and cumbersome, such as signal stencils and acceleration phasors.
 
     Output format is structured as:
+
+    ..  code-block:: python
+
         {
             "EXP": experiment parameters,
             "PRO": signal processing parameters,

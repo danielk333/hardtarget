@@ -3,6 +3,7 @@
 
 #docs
 docs/build/
+docs/source/apidoc
 
 #examples data
 examples/data
@@ -99,4 +100,6 @@ logfile
 cache_error*
 *.log
 .*.sw[op]
+
+
 

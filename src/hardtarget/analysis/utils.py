@@ -173,7 +173,11 @@ def yield_chunked_gmf_data(paths, chunk_size=None):
 
 
 def all_gmf_h5_files(gmf_folder):
-    """generate all files matching 'yyyy-mm-ddThh-00-00/gmf-*.h5'"""
+    """
+    ..  code-block:: text
+
+        generate all files matching 'yyyy-mm-ddThh-00-00/gmf-*.h5'
+    """
     top = Path(gmf_folder)
     dir_pattern = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}-00-00')
     subdirs = [d for d in top.iterdir() if d.is_dir() and dir_pattern.match(d.name)]
@@ -512,6 +516,7 @@ def is_pair_unpackable(a):
     """Returns true if a can be unpacked to a pair of variables."""
     return True if isinstance(a, (tuple, list)) and len(a) == 2 else False
 
+
 def load_source(src):
     """
     Load Digital_rf reader object from (srcdir, chnl)
@@ -558,8 +563,12 @@ def compute_job_tasks(job, n_tasks):
 
     Examples
     --------
-    >>> get_tasks({"idx":1, "N":2}, 8)
-    [1,3,5,7]
+
+    .. code:: python
+
+        >>> get_tasks({"idx":1, "N":2}, 8)
+        [1,3,5,7]
+
     """
     return list(range(job["idx"], n_tasks, job["N"]))
 
@@ -568,11 +577,15 @@ def compute_total_tasks(ipp, n_ipp, num_cohints_per_file, bounds):
     """
     Compute the total number of tasks, associated with sample bounds.
 
-    ipp: inter-pulse period length in samples
-    n_ipp: number of interpulse periods to coherently integrate
-    num_cohints_per_file:
-      number of coherent integration periods to include in one output file
-      smaller means that lower latency can be achieved
+    Params
+    ------
+        ipp: (int)
+            inter-pulse period length in samples
+        n_ipp: (int)
+            number of interpulse periods to coherently integrate
+        num_cohints_per_file: (int)
+            number of coherent integration periods to include in one output file
+            smaller means that lower latency can be achieved
     """
     n_tasks = np.ceil(np.floor((bounds[1] - bounds[0]) / (ipp * n_ipp)) / num_cohints_per_file).astype(int)
     return n_tasks
@@ -617,13 +630,9 @@ def get_filepath(epoch_unix_us):
     return Path(time_string) / f"gmf-{epoch_unix_us:08d}.h5"
 
 
-
-
 ####################################################################
 # LOAD POINTING DATA
 ####################################################################
-
-
 
 
 def load_metadata(reader, interval, target_rate, target_value):
@@ -646,13 +655,13 @@ def load_metadata(reader, interval, target_rate, target_value):
     numpy.ndarray
         float array of values, NaN's for non-existing data
     """
-    
+
     # check target rate
     _N = target_rate / reader.sample_rate
     N = int(round(_N))
 
-    assert N == _N  and N > 0, f"Illegal target_rate {target_rate} for metadata with rate {reader.sample_rate}"
-    
+    assert N == _N and N > 0, f"Illegal target_rate {target_rate} for metadata with rate {reader.sample_rate}"
+
     # query metadata
     idx_start = int(index_from_ts(interval[0], reader.sample_rate))
     idx_end = int(index_from_ts(interval[1], reader.sample_rate)) + 1
@@ -672,15 +681,15 @@ def load_metadata(reader, interval, target_rate, target_value):
     # slice samples
     # this is because the query operation above fetches all metadata values covering
     # the time interval, which typically corresponds to a larger time interval.
-    
+
     # first element in samples vector corresponds to metadata idx_start
     ts_offset = ts_from_index(idx_start, reader.sample_rate)
-    
+
     # convert timestamps to sample indexes
     offset = index_from_ts(ts_offset, target_rate)
     start = index_from_ts(interval[0], target_rate)
     end = index_from_ts(interval[1], target_rate)    
-    
+
     return samples[int(start-offset):int(end-offset)]
 
 

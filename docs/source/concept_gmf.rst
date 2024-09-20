@@ -1,5 +1,4 @@
 
-
 ..  _concept_gmf:
 
 ==========================
@@ -11,7 +10,7 @@ This documents context and key concepts in **GMF** processing
 
 
 Coherent integration
-----------
+--------------------
 
 Target echoes that are too weak to detect in the raw signal but scatter at a
 predictable phase is termed **coherent**, and can be brought out by a technique
@@ -29,9 +28,9 @@ The SNR increase is sometimes referred to as the **gain** of the filter.
 
 
 Matched Filter
---------
+--------------
 
-When a coherent target's position relative to the radar is not stationary, but
+When a target's position relative to the radar is not stationary, but
 expected to follow some predictable trajectory, the phase contribution due to
 the motion can be compensated for before the complex amplitude data are
 summed. This is called a **matched filter** operation, the phase function in
@@ -40,7 +39,7 @@ phase is not correctly predicted, the gain of the filter will be reduced, and
 a target may evade detection.
 
 The Generalized Matched Filter
---------
+------------------------------
 
 In our case, the parameters that are used to predict the phase of a target are
 not known in advance --- in fact, these are exactly the parameters we want to
@@ -53,7 +52,7 @@ often referred to as a **filter bank**.  In the context of EISCAT Space Debris
 observations, this is referred to as the Generalized Matched Filter.
 
 Implementations
---------
+---------------
 
 The brute-force filter bank operation has an algorithmic complexity which is
 proportional to the product of the number of grid search points for each
@@ -65,8 +64,8 @@ detection process, and optimizations must be found to produce results without
 unacceptable delays.
 
 
-The Fast GMF, of FGMF
-++++++++
+The Fast GMF, or FGMF
++++++++++++++++++++++
 
 The processing chain developed at SGO over several years of EISCAT Space
 Debris observations is centered on a GMF implementation where a number of
@@ -81,14 +80,14 @@ Implementations of FGMF exist in numpy, numba(?) and C.
 
 
 The Discrete Polynomial-phase Transform, or DPT
-++++++++
++++++++++++++++++++++++++++++++++++++++++++++++
 
 Given that the detection of very weak hard target echoes has been the purpose
 of radars since they were first invented during WWII, it should not come as a
 surprise that clever techniques had been invented already.  In the radar
 literature, the kind of signal we hope to detect is referred to as a
 **polynomial-phase signal**, and the problem we try to solve is a **polynomial
-phase estimation** problem. We found a paper :cite:`Peleg1995` which describes
+phase estimation** problem. We found a paper :cite:`peleg1995discrete` which describes
 a very efficient algorithm for estimating polynomial phase coefficients for
 the strongest target echo in a signal, one at a time, where the cost of
 extracting a single coefficient is on the order of an DFT of size equal to the
@@ -97,5 +96,4 @@ Polynomial-phase Transform*, or DPT. Using the FFT to compute the DFTs, we name
 this the Fast DPT, or *FDPT*.
 
 
-
-TODO [Daniel, Tom]
+.. bibliography:: references.bib

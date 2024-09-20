@@ -116,4 +116,11 @@ Indices and tables
    format_gmf
 
 
+.. toctree::
+   :maxdepth: 2
+   :caption: API Documentation
+
+   apidoc/modules
+
+
 

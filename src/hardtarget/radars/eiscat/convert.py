@@ -19,8 +19,9 @@ PARBL_ELEVATION = 8
 PARBL_AZIMUTH = 9
 PARBL_END_TIME = 10
 PARBL_SEQUENCE = 11
-PARBL_START_TIME = 42 # upar[1]
-PARBL_RADAR_FREQUENCY = 54 # upar[13]
+PARBL_START_TIME = 42  # upar[1]
+PARBL_RADAR_FREQUENCY = 54  # upar[13]
+
 
 ####################################################################
 # UTIL
@@ -100,11 +101,9 @@ def index_of_filestart(mat, sample_rate, file_secs):
     return idx_origin + file_idx * samples_per_file
 
 
-
 ####################################################################
 # CONVERT
 ####################################################################
-
 
 def convert(src, dst, name=None, compression=0, progress=False, logger=None):
 
@@ -141,8 +140,6 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
     from the name of the 'src' directory. The name of the Hardtarget DRF folder
     may be specified using the 'name' option. If 'name' is None, name is derived
     from 'src' (leo_bpark_2.1u_NO@uhf -> leo_bpark_2.1u_NO@uhf_drf).
-
-
 
     Returns
     -------
@@ -221,13 +218,15 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
     #######################################################################
 
     # create sample writer
-    sample_writer = drf_wrapper.DigitalRFWriter(hdrf, chnl,
-        sample_rate, # sample rate numerator
-        1, # samplerate denominator
+    sample_writer = drf_wrapper.DigitalRFWriter(
+        hdrf,
+        chnl,
+        sample_rate,  # sample rate numerator
+        1,  # samplerate denominator
         np.int16,
         idx_start,
-        subdir_cadence_secs=3600, # one dir per hour
-        file_cadence_secs=1, # one file per second
+        subdir_cadence_secs=3600,  # one dir per hour
+        file_cadence_secs=1,  # one file per second
         is_complex=True,
         compression_level=compression,
         uuid_str=chnl,
@@ -237,8 +236,8 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
     # create pointing writer
     pointing_writer = drf_wrapper.DigitalMetadataWriter(
         hdrf, "pointing",
-        sample_rate, # sample rate - numerator (int)
-        samples_per_file, # sample rate - denominator (int)
+        sample_rate,  # sample rate - numerator (int)
+        samples_per_file,  # sample rate - denominator (int)
     )
 
     #######################################################################
@@ -270,7 +269,6 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
                 logger.error(err)
             raise e
 
-
     # initialise writing loop
 
     idx_prev = idx_start - samples_per_file
@@ -301,7 +299,11 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
                 n_pad = (idx-idx_prev) - samples_per_file
                 zeropad(n_pad, file)
             else:
-                err = f"wrong sample index from file {file}, got {idx}, expected {idx_prev + samples_per_file}"
+                err = (
+                    f"wrong sample index from file {file},\n"
+                    f"got {idx},\n"
+                    f"expected {idx_prev + samples_per_file}"
+                )
                 if logger:
                     logger.error(err)
                 raise Exception(err)
@@ -346,7 +348,6 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
     if logger:
         logger.info("Done writing DRF files")
 
-
     #######################################################################
     # WRITE METADATA
     #######################################################################
@@ -385,12 +386,3 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         meta.write(f)
 
     return str(hdrf)
-
-
-
-if __name__ == '__main__':
-    PROJECT = Path("/cluster/projects/p106119-SpaceDebrisRadarCharacterization")
-    SRC = PROJECT / "raw/leo_bpark_2.1u_NO-20220408-UHF/leo_bpark_2.1u_NO@uhf"
-    CFG = "/cluster/home/inar/Dev/Git/hardtarget/examples/cfg/test.ini"
-
-
