@@ -77,7 +77,8 @@ by means of the FFT.  This means that one axis of the multi-dimensional filter
 bank is not necessary, greatly reducing the size of the problem.
 
 The resulting GMF approach is referred to as the **Fast GMF**, or FGMF.
-Implementations of FGMF exist in numpy, numba(?) and C.
+Implementations of FGMF exist in `numpy <https://numpy.org/>`_,
+`numba(?) <https://numba.pydata.org/>`_, and C.
 The most complete description of the matching function is in the paper
 `[Markkanen, 2005] <https://doi.org/10.1016/j.asr.2005.03.038>`_ .
 
