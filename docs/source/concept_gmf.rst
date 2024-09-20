@@ -69,17 +69,14 @@ The Fast GMF, or FGMF
 
 The processing chain developed at SGO over several years of EISCAT Space
 Debris observations is centered on a GMF implementation where a number of
-clever tricks are exploited to bring down the processing time. One important
-improvement was to realise that summing over the phase contribution caused by
-a linear motion is equivalent to a DFT, which is implemented very efficiently
-by means of the FFT.  This means that one axis of the multi-dimensional filter
-bank is not necessary, greatly reducing the size of the problem..
+clever tricks are exploited to bring down the processing time by three orders
+of magnitude over the most obvious method.  The resulting method is called the
+**Fast Matching Function**, or FMF, and the most complete description of the
+FMF is in the paper :cite:`markkanen2005real`.
 
-The resulting GMF approach is referred to as the **Fast GMF**, or FGMF.
-Implementations of FGMF exist in `numpy <https://numpy.org/>`_,
-`numba(?) <https://numba.pydata.org/>`_, and C.
-The most complete description of the matching function is in the paper
-:cite:`markkanen2005real`.
+The resulting GMF with the FMF at its centre is referred to as the **Fast
+GMF**, or FGMF.  Implementations of FGMF exist in
+`numpy <https://numpy.org/>`_, `numba(?) <https://numba.pydata.org/>`_, and C.
 
 
 The Discrete Polynomial-phase Transform, or DPT
