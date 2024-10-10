@@ -143,6 +143,7 @@ Indices and tables
    :maxdepth: 2
    :hidden:
 
+   parallelism
    params_experiment
    params_processing
    format_drf
