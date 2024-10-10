@@ -14,14 +14,15 @@ Install
 Prerequisites
 -------------
 
-Hardtarget depends on *gcc* and *libfftw3-dev*.
+Hardtarget depends on `gcc`, `libhdf5-dev`, and `libfftw3-dev`.
+
 
 .. code-block:: bash
 
    sudo apt install gcc libfftw3-dev libhdf5-dev
 
 
-It is recommended to install Hardtarget in a virtual environment, e.g. *virtualenv* or *conda*.
+It is recommended to install Hardtarget in a virtual environment, e.g. `virtualenv` or `conda`.
 
 .. code-block:: bash
 

@@ -51,8 +51,9 @@ additional refinement step that is used to refine the detected targets:
 Quick install
 """""""""""""
 
-To install, ensure dependencies `gcc` and `libfftw3-dev` are installed for the 
-C implementations and/or `cuda` for the GPU implementations. Then install with
+To install, ensure dependencies `gcc`, `libfftw3-dev`, and `libhdf5-dev` are
+installed for the C implementations and/or `cuda` for the GPU implementations.
+Then install with
 
 .. code-block:: bash
    
