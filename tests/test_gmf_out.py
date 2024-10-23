@@ -1,8 +1,7 @@
-# import pytest
 import numpy as np
-from hardtarget.gmf_out_utils import GMFOutArgs, dump_gmf_out, load_gmf_out
+from hardtarget.analysis.utils import GMFOutArgs, dump_gmf_out, load_gmf_out
 import tempfile
-import pprint
+from pathlib import Path
 
 ####################################################################
 # MOCK UP DATA
@@ -76,13 +75,14 @@ rgs = np.random.randint(0, 1000, size=(RANGES_SIZE), dtype=np.int32)
 fvec = np.random.rand(RANGE_RATE_SIZE)
 re = np.random.rand(MOCK_DIM_1, RANGE_RATE_SIZE)
 im = 1j * np.random.rand(MOCK_DIM_1, RANGE_RATE_SIZE)
-acceleration_phasors =  re + im
+acceleration_phasors = re + im
 rx_stencil = np.random.choice([True, False], size=SAMPLE_SIZE)
 tx_stencil = np.random.choice([True, False], size=SAMPLE_SIZE)
 rx_window_indices = np.random.randint(0, 1000, size=(MOCK_DIM_2), 
                                       dtype=np.int32)
-epoch_unix = 1.1
+epoch_unix = np.float64(1.1)
 
+pointing_vec = np.tile([90.0, 75.0], (INTEGRATION_SIZE, 1))
 
 gmf_params['DER'] = {
     'rgs': rgs,
@@ -99,8 +99,6 @@ gmf_out_args = GMFOutArgs(
     range_rates=RANGE_RATE_SIZE,
     accelerations=ACCELERATIONS_SIZE,
     sample_numbers=SAMPLE_SIZE,
-    mock_dim_1=MOCK_DIM_1,
-    mock_dim_2=MOCK_DIM_2,
     vals=gmf_vals,
     dc=gmf_dc,
     v_ind=gmf_v_ind,
@@ -110,26 +108,25 @@ gmf_out_args = GMFOutArgs(
     v_vec=v_vec,
     a_vec=a_vec,
     g_vec=g_vec,
-    rgs=gmf_params["DER"]["rgs"],
-    fvec=gmf_params["DER"]["fvec"],
-    acceleration_phasors=gmf_params["DER"]["acceleration_phasors"],
-    rx_stencil=gmf_params["DER"]["rx_stencil"],
-    tx_stencil=gmf_params["DER"]["tx_stencil"],
-    rx_window_indices=gmf_params["DER"]["rx_window_indices"],
-    epoch=epoch_unix)
+    pointing_vec=pointing_vec,
+    epoch=epoch_unix
+)
 
-      
-def test_write():
+
+def test_dump_load():
 
     # Create a temporary file for gmf out
-    with tempfile.NamedTemporaryFile(suffix='.h5', delete=True) as temp_file:
-        dump_gmf_out(gmf_out_args, gmf_params, temp_file.name)
+    with tempfile.TemporaryDirectory() as temp_dir:
 
-        # Load gmf out
-        items = load_gmf_out(temp_file.name)
+        # mockup name for subfolder and gmf file
+        outfile = Path(temp_dir) / "2015-10-22T11-00-00" / "gmf-1445515198000000.h5"
+        outfile.parent.mkdir(parents=True, exist_ok=True)
+
+        # dump
+        dump_gmf_out(gmf_out_args, gmf_params, str(outfile))
+
+        # load
+        items = list(load_gmf_out(temp_dir))
 
         # Assert the result based on your expectations
         assert len(items) > 0
-
-        pprint.pprint(items)
-
