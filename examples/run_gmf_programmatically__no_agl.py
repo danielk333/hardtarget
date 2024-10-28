@@ -8,10 +8,17 @@ This script shows how to call the `compute_gmf` function directly.
 For developers this is also particularly useful since it can be used to
 debug the backends developed in different programming languages.
 
-For example, to debug the C-implementation using GNU debugger simply
+For example, if i had some data located at
+
+`/home/danielk/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf`
+
+I can debug the C-implementation using GNU debugger simply by running
 
 ```
-gdb --args python ./examples/run_gmf_programmatically__no_agl.py
+gdb --args python ./examples/run_gmf_programmatically__no_agl.py \
+    /home/danielk/data/spade/beamparks_raw/leo_bpark_2.1u_NO@uhf_drf \
+    /home/danielk/data/spade/beamparks_analyzed/leo_bpark_2.1u_NO@uhf_fgmf_c_debug \
+    uhf --lib c
 ```
 
 to start gdb targeting the python binary which is set to run this example.
@@ -57,11 +64,10 @@ return to original performance.
 
 """
 
-
+import argparse
 from pathlib import Path
 from pprint import pprint
 import hardtarget
-
 try:
     from mpi4py import MPI
 
@@ -71,24 +77,27 @@ except ImportError:
     rank = 0
     size = 1
 
-# gmflib = "c"
-gmflib = "cuda"
+HERE = Path(__file__).parent.absolute() / "cfg" / "test.ini"
 
-base_path = Path("/home/danielk/data/spade/")
-drf_path = base_path / "beamparks_raw" / "leo_bpark_2.1u_NO@uhf_drf"
-rx_channel = "uhf"
-config_path = Path("./examples/cfg/test.ini").resolve()
-output_path = base_path / "beamparks_analyzed" / f"leo_bpark_2.1u_NO@uhf_{gmflib}"
+parser = argparse.ArgumentParser()
+parser.add_argument("drf_path")
+parser.add_argument("output_path")
+parser.add_argument("rx_channel")
+parser.add_argument("--config", type=Path, default=HERE)
+parser.add_argument("--lib", choices=["cuda", "c"], default="c")
+
+args = parser.parse_args()
 
 # process
 results = hardtarget.compute_gmf(
-    rx=(drf_path, rx_channel),
-    tx=(drf_path, rx_channel),
-    config=config_path,
+    rx=(Path(args.drf_path), args.rx_channel),
+    tx=(Path(args.drf_path), args.rx_channel),
+    config=args.config,
     job={"idx": rank, "N": size},
-    gmflib=gmflib,
+    gmf_implementation=args.lib,
+    gmf_method="fgmf",
     clobber=True,
-    output=output_path,
+    output=Path(args.output_path),
     start_time="2021-04-12T12:15:40",
     end_time="2021-04-12T12:16:10",
     relative_time=False,
