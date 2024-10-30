@@ -1,39 +1,45 @@
 #!/usr/bin/env python
+"""
+Simulate hard target and analyse
+================================
+
+```bash
+python ./examples/simulate_hard_target__no_agl.py \
+    /home/danielk/data/spade/beamparks_raw/sim_drf \
+    /home/danielk/data/spade/beamparks_analyzed/sim_drf_analysis \
+    --lib c --action all
+```
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
-import pathlib
+from pathlib import Path
 import hardtarget
 import argparse
 import logging
 
 logger = logging.getLogger("hardtarget.example_simulation")
 hardtarget.profiling.setup_loggers(stdout=True, verbosity=1)
+HERE = Path(__file__).parent.absolute() / "cfg" / "sim_test.ini"
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--action", required=False,
     choices=("all", "simulate", "analyse", "plot"), default="all",
 )
+parser.add_argument("sim_output_path", type=Path)
+parser.add_argument("analysis_output_path", type=Path)
+parser.add_argument("--config", type=Path, default=HERE)
+parser.add_argument("--lib", default="numpy")
+parser.add_argument("--method", default="fgmf")
+
+
 args = parser.parse_args()
 
-gmfimpl_o, gmfmethod_o = (None, None)
+gmfimpl, gmfmethod = (args.lib, args.method)
 
-# gmfimpl, gmfmethod = ("numpy", "grid-fast-gmf")
-gmfimpl, gmfmethod = ("numpy", "grid-fast-dpt")
-# gmfimpl_o, gmfmethod_o = ("numpy", "optimize-grid-gmf")
-# gmfimpl_o, gmfmethod_o = ("numpy", "optimize-scipy-gmf")
-# gmflib = "c"
-# gmflib = "numpy"
-# gmflib = "numpy_daf"
-
-base_path = pathlib.Path("/home/danielk/data/spade")
-drf_path = base_path / "beamparks_raw" / "leo_bpark_2.1u_NO@uhf_drf_sim"
-rx_channel = "sim"
-config_path = pathlib.Path("./examples/cfg/sim_test.ini").resolve()
-output_path = base_path / "beamparks_analyzed" / f"leo_bpark_2.1u_NO@uhf_{gmfimpl}_{gmfmethod}_sim"
-
-if gmfimpl_o is not None:
-    gmfimpl, gmfmethod = gmfimpl_o, gmfmethod_o
+args = parser.parse_args()
 
 t_start = 0
 echo_len = 5.0
@@ -54,9 +60,11 @@ simulation_params = {
     "tx_amp": np.sqrt(peak_SNR),
 }
 
+rx_channel = "sim"
+
 range0 = 2000e3
 vel0 = 0.4e3
-acel0 = -0.20e3
+acel0 = 0.20e3
 
 sim_r = range0 + vel0*t_rel + acel0*0.5*t_rel**2
 sim_v = vel0 + acel0*t_rel
@@ -104,18 +112,19 @@ for key, val in experiment_params.items():
 if args.action in ("all", "simulate"):
     logger.info("Simulating")
     hardtarget.simulation.drf(
-        drf_path,
+        args.sim_output_path,
         range_function,
         simulation_params,
         experiment_params,
+        chnl=rx_channel,
         snr_function=snr_function,
         dtype=np.complex64,
         clobber=True,
     )
 
-reader, params = hardtarget.drf_utils.load_hardtarget_drf(drf_path)
+reader, params = hardtarget.drf_utils.load_hardtarget_drf(args.sim_output_path)
 
-all_params = hardtarget.load_gmf_params(drf_path, config_path)
+all_params = hardtarget.load_gmf_params(args.sim_output_path, args.config)
 
 for key, val in all_params["PRO"].items():
     print(f"{key}: {val}")
@@ -135,13 +144,13 @@ if args.action in ("all", "analyse"):
     logger.info("Analysing")
     # process
     results = hardtarget.compute_gmf(
-        rx=(drf_path, rx_channel),
-        tx=(drf_path, rx_channel),
-        config=config_path,
+        rx=(args.sim_output_path, rx_channel),
+        tx=(args.sim_output_path, rx_channel),
+        config=args.config,
         gmf_method=gmfmethod,
         gmf_implementation=gmfimpl,
         clobber=True,
-        output=output_path,
+        output=args.analysis_output_path,
         progress=True,
         subprogress=True,
     )
@@ -169,7 +178,7 @@ if args.action in ("all", "plot"):
         axis_units=True,
     )
 
-    data_generator = hardtarget.load_gmf_out(output_path)
+    data_generator = hardtarget.load_gmf_out(args.analysis_output_path)
     for data, meta in data_generator:
         data["t"] -= np.min(data["t"])
 
