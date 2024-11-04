@@ -33,6 +33,7 @@ jobs:
                 run: |
                     python -m venv venv
                     source venv/bin/activate
+                    pip install --upgrade pip
                     pip install .[develop]
                     # Save the virtual environment as an artifact
                     tar -czf venv.tar.gz venv
@@ -67,7 +68,7 @@ jobs:
             # activate venv
             -   name: Activate virtual environment
                 run: |
-                    tar -xzf venv/venv.tar.gz
+                    tar -xzf venv.tar.gz venv
                     source venv/bin/activate
     
             # actual linting
