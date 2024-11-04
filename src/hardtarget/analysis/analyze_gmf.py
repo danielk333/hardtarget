@@ -7,8 +7,7 @@ from pathlib import Path
 from hardtarget.gmf import get_available_libs, get_estimation_method, MethodType
 from hardtarget.configuration import load_gmf_params
 import hardtarget.analysis.utils as utils
-from hardtarget.utils import index_from_ts, ts_from_index
-
+from hardtarget.utils import ts_from_index
 
 
 ####################################################################
@@ -80,7 +79,7 @@ def compute_gmf(
     -------
 
     dict
-        Dictionary with to entries ("path", "files")        
+        Dictionary with to entries ("path", "files")
         path provides path to produced :ref:`format_gmf`
         files provides a list of gmf filenames
 
@@ -149,7 +148,7 @@ def compute_gmf(
     sample_rate = params_exp["sample_rate"]
     n_ipp = params_pro["n_ipp"]
     num_cohints_per_file = params_pro["num_cohints_per_file"]
-    ipp_samp = params_exp["ipp_samp"] 
+    ipp_samp = params_exp["ipp_samp"]
 
     ##########################################################
     # TASKS
@@ -206,16 +205,16 @@ def compute_gmf(
     # integration_rate : coherent integration periods per second
     _samples_per_integration = ipp * n_ipp
     _integration_rate = sample_rate / _samples_per_integration
-    # ts_origin: timestamp (sec since epoch) assoeciated with task_idx 0 
+    # ts_origin: timestamp (sec since epoch) assoeciated with task_idx 0
     # NOTE: assuming that bounds[0] is sample associated with task_idx 0
     _ts_origin = ts_from_index(bounds[0], sample_rate)
 
     pointing_args = (
-        rx_srcdir, # path
-        "pointing", # chnl
-        _task_rate, # task_rate
-        _ts_origin, # ts origin
-        _integration_rate, # target rate
+        rx_srcdir,  # path
+        "pointing",  # chnl
+        _task_rate,  # task_rate
+        _ts_origin,  # ts origin
+        _integration_rate,  # target rate
     )
 
     ##########################################################
@@ -294,9 +293,6 @@ def compute_gmf(
                     hf["range_rate_peak"][()],
                     hf["acceleration_peak"][()],
                 ])
-
-
-
 
         # process
         # TODO: in case the RAM load is too heavy, this should write directly to disk instead

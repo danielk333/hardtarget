@@ -29,7 +29,7 @@ PARBL_RADAR_FREQUENCY = 54  # upar[13]
 
 def to_i2x16(zz):
     """
-    convert from (N,) complex128 to (N,2) int16 
+    convert from (N,) complex128 to (N,2) int16
     """
     zz2x16 = np.empty((len(zz), 2), dtype=np.int16)
     zz2x16[:, 0] = zz.real.astype(np.int16)
@@ -90,10 +90,10 @@ def index_of_filestart(mat, sample_rate, file_secs):
     # we use the approach of counting samples from ts_orgin_sec,
     # relying on a fixed sample count per file
 
-    # NOTE: file_idx is a logical sequence number for files, starting from 
+    # NOTE: file_idx is a logical sequence number for files, starting from
     # file_idx 0 at ts_origin_sec. This does not correspond to the order of files processed.
     # For instance, the first file might have file_idx 6, indicating that the
-    # recording only started some time after ts_origin_sec 
+    # recording only started some time after ts_origin_sec
     # also the inprecision in ts_endfile_sec goes away in division
     file_idx = round((ts_endfile_sec - ts_origin_sec) / file_secs) - 1
     # sample index for start of first file
@@ -183,7 +183,7 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
 
     # all files from Eiscat raw data product, in sorted order
     files = list(all_files(src))
-   
+
     #######################################################################
     # META DATA
     #######################################################################
@@ -200,11 +200,11 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
     samples_per_file = int(file_secs * sample_rate)
     chnl = cfv.get("rx_channel", "tbd")
     radar_frequency = float(mat_first["d_parbl"][0][PARBL_RADAR_FREQUENCY])
-    
+
     #######################################################################
     # BOUNDS
     #######################################################################
-    
+
     # sample index start of first file
     idx_start = index_of_filestart(mat_first, sample_rate, file_secs)
     idx_end = index_of_filestart(mat_last, sample_rate, file_secs) + samples_per_file
@@ -310,7 +310,7 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
 
         # data
         zz = to_i2x16(mat["d_raw"][:, 0])
-        
+
         # check data
         n_samples = len(zz)
         if n_samples > samples_per_file:

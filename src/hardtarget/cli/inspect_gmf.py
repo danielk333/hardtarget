@@ -41,5 +41,3 @@ def main(args):
                 print(f"-- {_path} (scale) shape:{item['shape']} dtype:{item['dtype']}")
             else:
                 print(f"-- {_path} (dataset) shape:{item['shape']} dtype:{item['dtype']}")
-
-

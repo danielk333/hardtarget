@@ -247,7 +247,7 @@ def download(day, mode, instrument, dst, logger=None, progress=False, wget=False
         os.remove(zip_download)
         if logger:
             if code is None:
-                logger.warning('Download: terminiated')        
+                logger.warning('Download: terminiated')
             else:
                 logger.info(f"Download: fail - status code: {code}")
         return

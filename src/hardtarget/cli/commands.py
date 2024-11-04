@@ -14,7 +14,7 @@ def build_parser():
     parser = argparse.ArgumentParser(description="Radar hard target processing toolbox")
 
     # Top level functionality
-    parser.add_argument('--version', action='store_true', 
+    parser.add_argument('--version', action='store_true',
                         help='package version')
 
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="count", default=0)
@@ -60,5 +60,3 @@ def main():
         cmd_function = COMMANDS[args.command]["function"]
         logger.info(f"Executing command {args.command}")
         cmd_function(args)
-
-

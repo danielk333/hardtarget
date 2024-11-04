@@ -201,7 +201,7 @@ def load_gmf_params(drf_srcdir, gmf_configfile):
     First load params from
 
     .. code-block:: text
-    
+
         - experiment (hardtarget_drf)
         - signal processing config (gmf_config)
 

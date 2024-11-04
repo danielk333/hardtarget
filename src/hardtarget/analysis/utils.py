@@ -638,7 +638,7 @@ def get_filepath(epoch_unix_us):
 def load_metadata(reader, interval, target_rate, target_value):
     """
     read metadata data for time interval and upsample to sample_rate
-    
+
     Parameters
     ----------
     reader: digitalrf_wrapper.DigitalMetadataReader
@@ -688,7 +688,7 @@ def load_metadata(reader, interval, target_rate, target_value):
     # convert timestamps to sample indexes
     offset = index_from_ts(ts_offset, target_rate)
     start = index_from_ts(interval[0], target_rate)
-    end = index_from_ts(interval[1], target_rate)    
+    end = index_from_ts(interval[1], target_rate)
 
     return samples[int(start-offset):int(end-offset)]
 
@@ -717,11 +717,11 @@ def load_pointing_data(task_idx, path, chnl, task_rate, ts_offset_sec, target_ra
 
     Returns
     -------
-    numpy.ndarray 
-        (N,2) (float32) of upsampled (azimuth, elevation) tuples. Nan if chnl does not exist  
+    numpy.ndarray
+        (N,2) (float32) of upsampled (azimuth, elevation) tuples. Nan if chnl does not exist
     """
 
-    # time interval of this task 
+    # time interval of this task
     interval = [ts_from_index(idx, task_rate, ts_offset_sec=ts_offset_sec) for idx in [task_idx, task_idx+1]]
 
     try:
@@ -737,7 +737,7 @@ def load_pointing_data(task_idx, path, chnl, task_rate, ts_offset_sec, target_ra
         res = np.array([np.nan, np.nan], dtype=np.float32)
         if item is not None:
             res[0] = item['azimuth']
-            res[1] = item['elevation']     
+            res[1] = item['elevation']
         return res
 
     # load pointing data as vector

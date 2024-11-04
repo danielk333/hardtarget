@@ -12,11 +12,12 @@ This module provides a wrapper around reader and writer objects
 from 'digital_rf' - to provide a uniform API and correct some design issues.
 
 NOTE - not sure if digital_rf is thread-safe with respect to concurrent
-writes to same file (e.g. adjacent blocks). 
-Also, it appears that digital_rf is not random access with respect to 
-writing (even in non-continuous mode) as it maintains and internal index 
+writes to same file (e.g. adjacent blocks).
+Also, it appears that digital_rf is not random access with respect to
+writing (even in non-continuous mode) as it maintains and internal index
 for next available sample.
 """
+
 
 ####################################################################
 # BASE INDEXED TIME SEQUENCE
@@ -41,17 +42,17 @@ class BaseIndexedTimeSequence:
         # ts_align_sec is a timestamp in seconds since Epoch
         # ts_align_sec is a timestamp associated with some index.
         # (typically it could be the timestamp of the first sample)
-        # ts_align_sec defines the precise alignment between timestamps and index-domain.        
+        # ts_align_sec defines the precise alignment between timestamps and index-domain.
         # ts_align_sec may not precisely match logical sample boundaries (which are
         # defined by sample rate and ts_offset_sec)
-        # Essentially (ts_align_sec * sample_rate) may not produce a perfect integer, 
-        # and must therefore be floored to produce an integer index. 
-        # This discrepancy defines a static skew (in time domain), 
+        # Essentially (ts_align_sec * sample_rate) may not produce a perfect integer,
+        # and must therefore be floored to produce an integer index.
+        # This discrepancy defines a static skew (in time domain),
         # between logical integer indexes and timestamps.
-        # if ts_align_sec is not provided, the assumption is that the skew is 0 
+        # if ts_align_sec is not provided, the assumption is that the skew is 0
 
         self.__ts_skew = 0
-        __idx_align = index_from_ts(ts_align_sec, self.sample_rate) 
+        __idx_align = index_from_ts(ts_align_sec, self.sample_rate)
         self.__ts_skew = __idx_align - np.floor(__idx_align)
 
     def ts_from_index(self, idx):
@@ -68,27 +69,27 @@ class BaseIndexedTimeSequence:
 ####################################################################
 
 class DigitalRFWriter(BaseIndexedTimeSequence):
-    
+
     """
-    Convenience wrapper around digital_rf.DigitalRFWriter 
+    Convenience wrapper around digital_rf.DigitalRFWriter
     """
 
-    def __init__(self, dst, chnl,
-                 sample_rate_numerator,
-                 sample_rate_denominator,
-                 dtype_str,
-                 start_global_index,
-                 subdir_cadence_secs=3600,  # 1 dir per hour
-                 file_cadence_secs=3600,  # 1 hour per file
-                 compression_level=0,
-                 is_complex=False,
-                 checksum=False,
-                 num_subchannels=1,
-                 is_continuous=True,
-                 marching_periods=False,
-                 uuid_str=None,
-                 ts_align_sec=None
-                ):
+    def __init__(
+            self, dst, chnl,
+            sample_rate_numerator,
+            sample_rate_denominator,
+            dtype_str,
+            start_global_index,
+            subdir_cadence_secs=3600,  # 1 dir per hour
+            file_cadence_secs=3600,  # 1 hour per file
+            compression_level=0,
+            is_complex=False,
+            checksum=False,
+            num_subchannels=1,
+            is_continuous=True,
+            marching_periods=False,
+            uuid_str=None,
+            ts_align_sec=None):
 
         # check dst
         dst = Path(dst)
@@ -101,7 +102,7 @@ class DigitalRFWriter(BaseIndexedTimeSequence):
 
         # sample rate
         sample_rate = sample_rate_numerator / float(sample_rate_denominator)
-        
+
         super().__init__(sample_rate, ts_align_sec=ts_align_sec)
 
         # meta data writer
@@ -124,7 +125,7 @@ class DigitalRFWriter(BaseIndexedTimeSequence):
 
     def close(self):
         self._writer.close()
-    
+
     def write(self, batch):
         self._writer.rf_write(batch)
 
@@ -137,7 +138,7 @@ class DigitalRFWriter(BaseIndexedTimeSequence):
 class DigitalRFReader(BaseIndexedTimeSequence):
 
     """
-    Convenience wrapper around digital_rf.DigitalRFReader 
+    Convenience wrapper around digital_rf.DigitalRFReader
     """
 
     def __init__(self, dst, chnl, ts_align_sec=0):
@@ -172,9 +173,8 @@ class DigitalRFReader(BaseIndexedTimeSequence):
 
         # check chnl
         if chnl not in self._reader.get_channels():
-            raise Exception(f"chnl {chnl} missing in {dir}") 
+            raise Exception(f"chnl {chnl} missing in {dir}")
         self.chnl = chnl
-
 
         sample_rate = float(self._reader.get_properties(chnl)["samples_per_second"])
 
@@ -196,14 +196,13 @@ class DigitalRFReader(BaseIndexedTimeSequence):
 
         idx_first, idx_last = self._reader.get_bounds(self.chnl)
         idx_start = idx_first
-        idx_end = idx_last + 1        
+        idx_end = idx_last + 1
         return idx_start, idx_end
-
 
     def read(self, idx_start, idx_end):
         """
         indexes in data sampling domain
-        
+
         TODO: reads outside bounds will either return NaN data padding, or not
         return anything elements. This is related to the issue of bounds and
         internal storage organization.
@@ -216,25 +215,24 @@ class DigitalRFReader(BaseIndexedTimeSequence):
         return self._reader.read(idx_first, idx_last, self.chnl).items()
 
 
-
 ####################################################################
 # DIGITAL METADATA WRITER
 ####################################################################
 
 class DigitalMetadataWriter(BaseIndexedTimeSequence):
-    
+
     """
-    Convenience wrapper around digital_rf.DigitalMetadataWriter 
+    Convenience wrapper around digital_rf.DigitalMetadataWriter
     """
 
-    def __init__(self, dst, chnl,
-                 sample_rate_numerator,
-                 sample_rate_denominator,
-                 subdir_cadence_secs=3600,  # 1 dir per hour
-                 file_candence_secs=3600,  # 1 hour per file
-                 prefix="meta",
-                 ts_align_sec=0
-                ):
+    def __init__(
+            self, dst, chnl,
+            sample_rate_numerator,
+            sample_rate_denominator,
+            subdir_cadence_secs=3600,  # 1 dir per hour
+            file_candence_secs=3600,  # 1 hour per file
+            prefix="meta",
+            ts_align_sec=0):
 
         # check dst
         dst = Path(dst)
@@ -274,7 +272,7 @@ class DigitalMetadataWriter(BaseIndexedTimeSequence):
 class DigitalMetadataReader(BaseIndexedTimeSequence):
 
     """
-    Convenience wrapper around digital_rf.DigitalMetadataReader 
+    Convenience wrapper around digital_rf.DigitalMetadataReader
     """
 
     def __init__(self, dst, chnl, ts_align_sec=0):
@@ -311,9 +309,9 @@ class DigitalMetadataReader(BaseIndexedTimeSequence):
         Returns list of tuples (idx, metadatat)
 
         TODO : semantics for reading non-existing data
-        should be consistent with RFdata, 
+        should be consistent with RFdata,
         either to return nothing (empty collection)
-        or to generate padding. Think this is an 
+        or to generate padding. Think this is an
         argument for returning nothing both for reads of both RFData and Metadata
         """
         idx_first = idx_start
