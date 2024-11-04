@@ -27,7 +27,7 @@ def str_from_ts(ts, as_local=False):
     if as_local:
         _datetime = dt.datetime.fromtimestamp(ts)
     else:
-        _datetime = dt.datetime.utcfromtimestamp(ts)
+        _datetime = dt.datetime.fromtimestamp(ts, tzinfo=dt.utc)
     return _datetime.strftime("%Y-%m-%dT%H:%M:%S.%f")
 
 
