@@ -34,7 +34,7 @@ jobs:
                     python -m venv venv
                     source venv/bin/activate
                     pip install --upgrade pip
-                    pip install .[develop]
+                    pip install .[test]
                     # Save the virtual environment as an artifact
                     tar -czf venv.tar.gz venv
                     
