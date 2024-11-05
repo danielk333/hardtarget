@@ -39,7 +39,7 @@ jobs:
                     tar -czf venv.tar.gz venv
                     
             -   name: Upload virtual environment
-                uses: actions/upload-artifact@v3
+                uses: actions/upload-artifact@v4
                 with:
                     name: venv
                     path: venv.tar.gz
@@ -60,16 +60,16 @@ jobs:
                     python-version: '3.x'
 
             -   name: Download virtual environment
-                uses: actions/download-artifact@v3
+                uses: actions/download-artifact@v4
                 with:
                     name: venv
-                    path: venv.tar.gz
+                    path: ./
 
             # activate venv
             -   name: Activate virtual environment
                 run: |
                     tar -xzf venv.tar.gz
-                    source venv/bin/activate
+                    source ./venv/bin/activate
     
             # actual linting
             -   name: Flake8 linting
