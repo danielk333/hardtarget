@@ -22,6 +22,7 @@ jobs:
             with:
                 python-version: '3.x'
 
+
         # Attempt to restore the venv cache
         -   name: Cache virtual environment
             id: venv-cache
@@ -29,6 +30,7 @@ jobs:
             with:
                 path: venv   # The directory where venv will be stored
                 key: venv-${{ hashFiles('setup.cfg') }}
+            
             
         # Only create the venv if the cache is missing
         -   name: Install dependencies if cache is missing
@@ -63,17 +65,10 @@ jobs:
             with:
                 python-version: '3.x'
 
-        # Restore the venv from cache
-        -   name: Restore cached virtual environment
-            uses: actions/cache@v4
-            with:
-                path: venv
-                key: venv-${{ hashFiles('setup.cfg') }}
-
         # Run the linting command using the cached venv
         -   name: Run flake8 linting
             run: |
-                source venv/bin/activate
+                pip install flake8
                 flake8 src/hardtarget
 
     test:
@@ -88,6 +83,11 @@ jobs:
             uses: actions/setup-python@v5
             with:
                 python-version: '3.x'
+
+        -   name: Install system dependencies
+            run: |
+                sudo apt-get update
+                sudo apt-get install -y gcc libfftw3-dev libhdf5-dev
 
         # Restore the venv from cache
         -   name: Restore cached virtual environment
