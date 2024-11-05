@@ -1,4 +1,4 @@
-name: Linting and Testing
+name: Testing
 
 # Run this workflow on any push or pull request to the main branch
 on:
@@ -52,25 +52,6 @@ jobs:
                 key: venv-${{ hashFiles('setup.cfg') }}
 
 
-    lint:
-        runs-on: ubuntu-latest
-        needs: setup-venv
-
-        steps:
-        -   name: Check out code
-            uses: actions/checkout@v4
-
-        -   name: Set up Python
-            uses: actions/setup-python@v5
-            with:
-                python-version: '3.x'
-
-        # Run the linting command using the cached venv
-        -   name: Run flake8 linting
-            run: |
-                pip install flake8
-                flake8 src/hardtarget
-
     test:
         runs-on: ubuntu-latest
         needs: setup-venv
@@ -95,6 +76,12 @@ jobs:
             with:
                 path: venv
                 key: venv-${{ hashFiles('setup.cfg') }}
+
+        # linting
+        -   name: Linting
+            run: |
+                source venv/bin/activate
+                flake8 src/hardtarget
 
         # testing
         -   name: Testing

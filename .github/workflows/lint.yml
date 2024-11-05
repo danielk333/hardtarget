@@ -1,0 +1,31 @@
+name: Linting
+
+# Run this workflow on any push or pull request to the main branch
+on:
+  push:
+    branches:
+      - dev/ingar
+  pull_request:
+    branches:
+      - dev/ingar
+
+jobs:
+
+    lint:
+        runs-on: ubuntu-latest
+
+        steps:
+        -   name: Check out code
+            uses: actions/checkout@v4
+
+        -   name: Set up Python
+            uses: actions/setup-python@v5
+            with:
+                python-version: '3.x'
+
+        # Run the linting command using the cached venv
+        -   name: Run flake8 linting
+            run: |
+                pip install flake8
+                flake8 src/hardtarget
+        
