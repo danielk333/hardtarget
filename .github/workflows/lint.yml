@@ -1,13 +1,13 @@
 name: Linting
 
-# Run this workflow on any push or pull request to the main branch
+# Run this workflow on any push or pull request to the develop branch
 on:
   push:
     branches:
-      - dev/ingar
+      - develop
   pull_request:
     branches:
-      - dev/ingar
+      - develop
 
 jobs:
 
