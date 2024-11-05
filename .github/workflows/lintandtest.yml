@@ -69,8 +69,8 @@ jobs:
             -   name: Activate virtual environment
                 run: |
                     tar -xzf venv.tar.gz
-                    ls
-                    source ./venv/bin/activate
+                    chmod +x venv/bin/activate
+                    source venv/bin/activate
     
             # actual linting
             -   name: Flake8 linting
