@@ -34,8 +34,8 @@ jobs:
         -   name: Install dependencies if cache is missing
             if: steps.venv-cache.outputs.cache-hit != 'true'
             run: |
-                apt-get update
-                apt-get install -y gcc libfftw3-dev libhdf5-dev
+                sudo apt-get update
+                sudo apt-get install -y gcc libfftw3-dev libhdf5-dev
                 python -m venv venv
                 source venv/bin/activate
                 pip install --upgrade pip
