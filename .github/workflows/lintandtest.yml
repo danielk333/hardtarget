@@ -69,6 +69,7 @@ jobs:
             -   name: Activate virtual environment
                 run: |
                     tar -xzf venv.tar.gz
+                    ls
                     source ./venv/bin/activate
     
             # actual linting
