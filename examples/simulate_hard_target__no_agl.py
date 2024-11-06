@@ -30,6 +30,7 @@ parser.add_argument(
 )
 parser.add_argument("sim_output_path", type=Path)
 parser.add_argument("analysis_output_path", type=Path)
+parser.add_argument("--noise_sigma", type=float, default=0.0)
 parser.add_argument("--config", type=Path, default=HERE)
 parser.add_argument("--lib", default="numpy")
 parser.add_argument("--method", default="fgmf")
@@ -55,8 +56,7 @@ simulation_params = {
     "end_time": 15.0,
     "target_start_time": t_abs[0],
     "target_end_time": t_abs[-1],
-    "noise_sigma": 0,
-    # "noise_sigma": 1.0,
+    "noise_sigma": args.noise_sigma,
     "tx_amp": np.sqrt(peak_SNR),
 }
 
