@@ -17,8 +17,9 @@ src/gmf_cuda_lib/.clangd
 # examples
 src/gmf_cuda_lib/hello_world
 
-# clangd
+# clangd and gdb
 compile_commands.json
+src/gmf_cuda_lib/.project.gf
 
 #Sublime
 *.sublime*
