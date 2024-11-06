@@ -8,9 +8,16 @@ docs/source/apidoc
 #examples data
 examples/data
 
+# host specific configs
+src/gmf_cuda_lib/.clangd
+
 # Compiled source #
 ###################
 
+# examples
+src/gmf_cuda_lib/hello_world
+
+# clangd
 compile_commands.json
 
 #Sublime
