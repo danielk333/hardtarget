@@ -510,7 +510,6 @@ def grid_integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gmf_lib, lib
             gmf_params,
             **lib_kwargs
         )
-
     return gmf_vars
 
 
