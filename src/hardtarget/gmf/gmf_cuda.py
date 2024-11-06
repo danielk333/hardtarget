@@ -39,6 +39,9 @@ if __libpath__.is_file():
 
     gmfcudalib.print_devices.restype = None
     gmfcudalib.print_devices.argtypes = []
+
+    gmfcudalib.test_cuda.restype = ctypes.c_int
+    gmfcudalib.test_cuda.argtypes = []
 else:
     raise ImportError(f'{__libpath__} GMF Cuda Library not found')
 
@@ -47,6 +50,12 @@ def print_cuda_devices():
     """Print available cuda devices
     """
     gmfcudalib.print_devices()
+
+
+def test_cuda():
+    """Tests if cuda works
+    """
+    assert gmfcudalib.test_cuda() == 0, "CUDA DIDNT WORK"
 
 
 def fast_gmf_cuda(z_tx, z_rx, gmf_variables, gmf_params, gpu_id=0):

@@ -121,6 +121,7 @@ def cuda_main(args):
     try:
         import hardtarget.gmf.gmf_cuda as gcu
         gcu.print_cuda_devices()
+        gcu.test_cuda()
     except ImportError as e:
         print(e)
 
@@ -134,8 +135,8 @@ SOURCES = {
         "main": cuda_main,
         "parser_build": cuda_parser_build,
         "add_parser_args": {
-            "description": "Test target",
-            "usage": "%(prog)s [options] path",
+            "description": "Check cuda devices and functionality",
+            "usage": "%(prog)s",
         },
     },
     "range-gates": {

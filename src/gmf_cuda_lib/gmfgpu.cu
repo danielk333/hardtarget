@@ -1,4 +1,6 @@
+#include <__clang_cuda_builtin_vars.h>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include "gmfgpu.h"
 
@@ -20,6 +22,56 @@ extern "C" void print_devices() {
         printf("\n");
     }
 }
+
+__global__
+void test_add(int *out, int *a, int *b) 
+{ 
+    out[blockIdx.x] = a[blockIdx.x] + b[blockIdx.x];
+}
+
+extern "C" int test_cuda() {
+    int N = 16;
+    int *out;
+    int *a;
+    int *b;
+    int *ad;
+    int *bd;
+    int *outd;
+    const int isize = N * sizeof(int);
+    out = (int *)malloc(sizeof(int) * N);
+    a = (int *)malloc(sizeof(int) * N);
+    b = (int *)malloc(sizeof(int) * N);
+    for(int ind = 0; ind < N; ind++) {
+        a[ind] = ind;
+        b[ind] = 1;
+    }
+    cudaMalloc((void **)&outd, isize);
+    cudaMalloc((void **)&ad, isize);
+    cudaMalloc((void **)&bd, isize);
+    cudaMemcpy(ad, a, isize, cudaMemcpyHostToDevice);
+    cudaMemcpy(bd, b, isize, cudaMemcpyHostToDevice);
+
+    test_add<<<N, 1>>>(outd, ad, bd);
+
+    cudaMemcpy(out, outd, isize, cudaMemcpyDeviceToHost);
+    cudaFree(outd);
+    cudaFree(ad);
+    cudaFree(bd);
+    free(a);
+    free(b);
+
+    for(int ind = 0; ind < N; ind++) {
+        if ((a[ind] + b[ind]) != out[ind]) {
+            printf("CUDA FAILED\n");
+            free(out);
+            return 1;
+        }
+    }
+    free(out);
+    printf("CUDA WORKING\n");
+    return 0;
+}
+
 
 /*
   For each range gate (i), multiply transmit pulse with range delayed echo

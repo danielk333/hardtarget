@@ -10,6 +10,7 @@
 #include <cufft.h>
 
 extern "C" void print_devices();
+extern "C" int test_cuda();
 extern "C" int gmf(
     float *z_tx, int z_tx_len, float *z_rx, int z_rx_len,
     float *acc_phasors, int n_accs, int *rgs, int n_rg,
