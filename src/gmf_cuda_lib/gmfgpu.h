@@ -1,5 +1,5 @@
-#ifndef PLASMA_LINE
-#define PLASMA_LINE
+#ifndef GMF_CUDA
+#define GMF_CUDA
 
 // system includes
 #include <stdio.h>
@@ -18,4 +18,4 @@ extern "C" int gmf(
     int gpu_id
 );
 
-#endif
+#endif // GMF_CUDA

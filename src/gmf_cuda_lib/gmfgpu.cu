@@ -1,4 +1,5 @@
-// header file for the plasmaline project
+#include <cstdio>
+#include <cstring>
 #include "gmfgpu.h"
 
 extern "C" void print_devices() {
@@ -13,8 +14,10 @@ extern "C" void print_devices() {
         printf("  Device name: %s\n", prop.name);
         printf("  Memory Clock Rate (KHz): %d\n", prop.memoryClockRate);
         printf("  Memory Bus Width (bits): %d\n", prop.memoryBusWidth);
-        printf("  Peak Memory Bandwidth (GB/s): %f\n\n",
+        printf("  Peak Memory Bandwidth (GB/s): %f\n",
                2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e6);
+        printf("  Compute capability: %d.%d\n", prop.major, prop.minor);
+        printf("\n");
     }
 }
 
@@ -134,6 +137,8 @@ extern "C" int gmf(
     cufftComplex *d_z_echo;
     cufftComplex *d_acc_phasors;
 
+    int echo_len = (int)(z_tx_len / dec);
+
     float *d_gmf_vec;
     float *d_gmf_dc_vec;
 
@@ -143,7 +148,6 @@ extern "C" int gmf(
     int *d_rx_window;
     int *d_dec_rx_inds;
 
-    int echo_len = (int)(z_tx_len / dec);
 
     // allocating device memory to the above pointers
     // the signal and echo here are only one row of the CPU data (one time step)
@@ -214,5 +218,5 @@ extern "C" int gmf(
     check_cudaFree(cudaFree(d_dec_rx_inds), "d_dec_rx_inds");
 
     check_cufft(cufftDestroy(plan), "destroy plan");
-    return 0;
+    return EXIT_SUCCESS;
 }
