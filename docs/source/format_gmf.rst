@@ -171,3 +171,13 @@ Datasets
     * **path**: ["vector_params"]["rx_window_indices"]
     * **dims**: ["rx_window_index",]
     * **dtype**: int32
+
+* pointing
+    Pointing data for radar antenna. 
+    Vector of angle measurements {'azimuth': 40.0, 'elevation': 98.0}
+    * **path**: ["pointing"]
+    * **dims**: ["integration_index",]
+    * **dtype**: float32
+    * **unit**: "deg"
+
+
