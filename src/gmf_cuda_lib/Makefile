@@ -1,6 +1,15 @@
-CC = nvcc
-all: CFLAGS = --compiler-options '-fPIC' -shared
-debug: CFLAGS = --compiler-options '-fPIC' -shared -g -G
+NVCC=nvcc
+
+HOST_COMPILER=${NVCC_CCBIN}
+GPU_COMPUTE_VER=$(shell nvidia-smi --query-gpu=compute_cap --format=csv,noheader)
+GPU_COMPUTE=$(subst .,,$(GPU_COMPUTE_VER))
+ARCH_FLAGS=-gencode arch=compute_${GPU_COMPUTE},code=sm_${GPU_COMPUTE}
+
+CCOPTS=--compiler-options '-fPIC'
+all: CFLAGS=${CCOPTS} -shared
+debug: CFLAGS=${CCOPTS} -shared -g -G
+NVFLAGS=-ccbin ${HOST_COMPILER}
+
 LIBS = -lcufft
 INSTALL = ../hardtarget/gmf
 
@@ -13,11 +22,11 @@ all: $(INSTALLLIB) $(OUTLIB)
 debug: $(INSTALLLIB) $(OUTLIB)
 
 hello_world: hello.cu
-	$(CC) $(CFLAGS) hello.cu -o hello_world
+	$(NVCC) $(CCOPTS) $(NVFLAGS) $(ARCH_FLAGS) hello.cu -o hello_world
 
 $(OUTLIB): $(SOURCES)
 	@echo "gmfcudalib installation -> Linking shared library $(OUTLIB) ..."
-	$(CC) $(CFLAGS) $(LIBS) $(SOURCES) -o $(OUTLIB)
+	$(NVCC) $(CFLAGS) $(NVFLAGS) $(ARCH_FLAGS) $(LIBS) $(SOURCES) -o $(OUTLIB)
 	@echo "gmfcudalib installation -> The shared library $(OUTLIB) has been created successfully."
 
 $(INSTALLLIB): $(OUTLIB)

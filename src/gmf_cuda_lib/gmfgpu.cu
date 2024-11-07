@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include "gmfgpu.h"
 
 extern "C" void print_devices() {
@@ -33,6 +34,7 @@ extern "C" int test_cuda() {
     int *ad;
     int *bd;
     int *outd;
+    int RET_CODE = EXIT_SUCCESS;
     const int isize = N * sizeof(int);
     out = (int *)malloc(sizeof(int) * N);
     a = (int *)malloc(sizeof(int) * N);
@@ -52,20 +54,21 @@ extern "C" int test_cuda() {
     cudaMemcpy(out, outd, isize, cudaMemcpyDeviceToHost);
     cudaFree(outd);
     cudaFree(ad);
-    cudaFree(bd);
-    free(a);
-    free(b);
-
+    cudaFree(bd);;
     for(int ind = 0; ind < N; ind++) {
         if ((a[ind] + b[ind]) != out[ind]) {
-            printf("CUDA FAILED\n");
-            free(out);
-            return 1;
+            printf("CUDA FAILED [%d: %d + %d != %d\n", ind, a[ind], b[ind], out[ind]);
+            RET_CODE = EXIT_FAILURE;
+            break;
         }
     }
+    free(a);
+    free(b);
     free(out);
-    printf("CUDA WORKING\n");
-    return 0;
+    if (RET_CODE == EXIT_SUCCESS) {
+        printf("CUDA WORKING\n");
+    }
+    return RET_CODE;
 }
 
 
