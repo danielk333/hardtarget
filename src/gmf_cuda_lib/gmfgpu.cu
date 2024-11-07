@@ -1,7 +1,3 @@
-#include <__clang_cuda_builtin_vars.h>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include "gmfgpu.h"
 
 extern "C" void print_devices() {
