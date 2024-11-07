@@ -76,29 +76,26 @@ pages:
   artifacts:
     paths:
       - public
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
-#  only:
-#    - tags
+  only:
+    - tags
 
 # Build and check integrity of distribution
 # Then publish package on public PyPI
-### TODO: WE DONT UPLOAD YET
-# pypi:
-#   stage: release
-#   extends: .devsetup
-#   variables:
-#     #Use a gitlab variable to securly store the token
-#     PYPI_TOKEN: $PYPI_TOKEN
-#   script:
-#     - python -m build
-#     - python -m twine check dist/*
-#     - >
-#       TWINE_USERNAME=__token__
-#       TWINE_PASSWORD=$PYPI_TOKEN
-#       python -m twine upload dist/*
-#   artifacts:
-#     paths:
-#       - dist/*
-#   only:
-#     - tags
+pypi:
+  stage: release
+  extends: .devsetup
+  variables:
+    #Use a gitlab variable to securly store the token
+    PYPI_TOKEN: $PYPI_TOKEN
+  script:
+    - python -m build
+    - python -m twine check dist/*
+    - >
+      TWINE_USERNAME=__token__
+      TWINE_PASSWORD=$PYPI_TOKEN
+      python -m twine upload dist/*
+  artifacts:
+    paths:
+      - dist/*
+  only:
+    - tags
