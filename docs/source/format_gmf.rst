@@ -72,7 +72,7 @@ Datasets
 --------
 
 * gmf
-    Generalized Matched Filter output values
+    Generalized Matched Filter (GMF) output values
 
     * **path**: ["gmf"]
     * **dims**: ["integration_index", "ranges"]
@@ -129,47 +129,10 @@ Datasets
     * **dtype**: float32
 
 * rgs
-    TODO [Daniel]
+    Range gates in index form
 
     * **path**: ["vector_params"]["rgs"]
     * **dims**: ["ranges",]
-    * **dtype**: int32
-
-* fvec
-    TODO [Daniel]
-
-    * **path**: ["vector_params"]["fvec"]
-    * **dims**: ["ranges",]
-    * **dtype**: float64
-    * **unit**: "Hz"
-
-* acceleration_phasors
-    TODO [Daniel]
-
-    * **path**: ["vector_params"]["acceleration_phasors"]
-    * **dims**: ["accelerations", "range_rates"]
-    * **dtype**: complex64
-    * **unit**: "rad"
-
-* rx_stencil
-    TODO [Daniel]
-
-    * **path**: ["vector_params"]["rx_stencil"]
-    * **dims**: ["sample_numbers",]
-    * **dtype**: bool
-
-* tx_stencil
-    TODO [Daniel]
-
-    * **path**: ["vector_params"]["tx_stencil"]
-    * **dims**: ["sample_numbers",]
-    * **dtype**: bool
-
-* rx_window_indices
-    TODO [Daniel]
-
-    * **path**: ["vector_params"]["rx_window_indices"]
-    * **dims**: ["rx_window_index",]
     * **dtype**: int32
 
 * pointing

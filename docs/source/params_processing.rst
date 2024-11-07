@@ -26,16 +26,16 @@ This describes processing paramaters used to configure :ref:`api_gmf`.
     Number or interpulse periods to coherently integrate
 
 * ipp_offset *(int)*
-    TODO [Daniel]
+    Pulse offset to use when selecting transmitt pulse for coherent integration, used for finding range-aliased echoes. Value of 1 would mean first range alias, 2 second alias, ect.
 
 * min_range_gate *(int)*
-    TODO [Daniel]
+    Minimum range gate to process relative to the start of transmission for each pulse (each range gate is one receiver sample).
 
 * max_range_gate *(int)*
-    TODO [Daniel]
+    Maximum range gate to process relative to the start of transmission for each pulse (each range gate is one receiver sample).
 
 * range_gate_step *(int)*
-    TODO [Daniel]
+    The step in range-gates to use when processing, if baud-length is longer than the receiver sampling time this can be increased to sacrifice range-resolution for processing speed.
 
 * frequency_decimation *(str)*
     How many samples to step in range in the first stage of the course search.
@@ -53,18 +53,8 @@ This describes processing paramaters used to configure :ref:`api_gmf`.
     How many radians of resolution for the acceleration search
 
 * num_cohints_per_file *(int)*
-    
     How many coherent integration periods to include in one output file.
     Smaller means that lower latency can be achieved.
 
-* reduce_range *(bool)*
-    TODO [Daniel]
-
-* reduce_range_rate *(bool)*
-    TODO [Daniel]
-
-* reduce_acceleration *(bool)*
-    TODO [Daniel]
-
 * dpt_ipp_delay_paramater *(int)*
-    TODO [Daniel]
+    How many IPPs to use for estimating the numerical derivative of the phase of the coherent signal if using the polynomial phase transform method. Also used by the Fast GMF method to calculate the acceleration resolution to sample. A larger number means smaller accelerations can be determined at higher resolution.
