@@ -54,13 +54,13 @@ stages:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
 
-### TODO: NO TESTSING FOR NOW
-# python:
-#   extends: .pytest
 
-# python3.10:
-#   extends: .pytest
-#   image: python:3.10
+python:
+  extends: .pytest
+
+python3.10:
+  extends: .pytest
+  image: python:3.10
 
 ###############
 ## Releasing ##
