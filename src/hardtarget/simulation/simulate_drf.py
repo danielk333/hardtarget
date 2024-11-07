@@ -29,6 +29,8 @@ def simulate_drf(
     experiment_params,
     snr_function=None,
     compression_level=0,
+    dir_cadence_secs=3600,
+    file_cadence_millisecs=1000,
     chnl="sim",
     clobber=False,
     dtype=np.complex128,
@@ -85,8 +87,8 @@ def simulate_drf(
         rf_writer = drf.DigitalRFWriter(
             str(dstdir),  # directory
             dtype,  # dtype
-            3600,  # subdir cadence secs    => one dir per hour
-            1000,  # file cadence millisecs => one file per second
+            dir_cadence_secs,  # subdir cadence secs    => one dir per hour
+            file_cadence_millisecs,  # file cadence millisecs => one file per second
             samp_t0,  # start global index
             sample_rate,  # sample rate numerator
             1,  # sample rate denominator
