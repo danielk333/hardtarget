@@ -728,7 +728,7 @@ def load_pointing_data(task_idx, path, chnl, task_rate, ts_offset_sec, target_ra
         # reader of pointing data
         reader = drf_wrapper.DigitalMetadataReader(path, chnl)
     except Exception as e:
-        print(e)
+        logger.debug(e)
         # no reader - generate vector of NaN data
         N = int((interval[1] - interval[0]) * target_rate)
         return np.full((N, 2), np.nan)
