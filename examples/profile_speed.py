@@ -216,7 +216,15 @@ def fgmf_large_test(total_time, max_rgs):
     print_results(
         config,
         impl_data,
-        headers=["Range gates", "numpy [s]", "c [s]", "cuda [s]", "numpy [%]", "c [%]", "cuda [%]", ],
+        headers=[
+            "Range gates",
+            "numpy [s]",
+            "c [s]",
+            "cuda [s]",
+            "numpy [%]",
+            "c [%]",
+            "cuda [%]",
+        ],
         title="FastGMF implementation vs range gate size",
     )
 
@@ -257,12 +265,57 @@ def fgmf_cores_test(total_time, max_rgs):
     print_results(
         config,
         impl_data,
-        headers=["Range gates", "Cores", "numpy [s]", "c [s]", "cuda [s]", "numpy [%]", "c [%]", "cuda [%]"],
+        headers=[
+            "Range gates",
+            "Cores",
+            "numpy [s]",
+            "c [s]",
+            "cuda [s]",
+            "numpy [%]",
+            "c [%]",
+            "cuda [%]",
+        ],
         title="FastGMF implementation vs range gate size",
     )
 
 
+def fgmf_vs_fdpt(cores=1):
+    config = dict(
+        range_gate_lims = (6600, 6700),
+        n_ipp = 10,
+        tau_ipp = 5,
+        total_time = 10.0,
+        cores = cores,
+    )
+    impl_data = []
+    impls = ["numpy", "c"]
+    algs = ["fgmf", "fdpt"]
+    pbar = tqdm(total=len(impls)*len(algs), desc="impls and algs")
+    for impl in impls:
+        algs_dt = []
+        for alg in algs:
+            dt = run_hardtarget(
+                gmf_conf = (impl, alg),
+                **config
+            )
+            pbar.update(1)
+            algs_dt.append(dt)
+        impl_data.append(
+            [impl,] + algs_dt + [x/max(algs_dt) for x in algs_dt]
+        )
+    pbar.close()
+    print_results(
+        config,
+        impl_data,
+        headers=["Implementation"]
+        + [f"Time {alg} [s]" for alg in algs]
+        + [f"Time {alg} [%]" for alg in algs],
+        title="Implementation & method",
+    )
+
+
 scenarios = {
+    "alg_vs": fgmf_vs_fdpt,
     "fgmf-impl": lambda: fgmf_small_test(total_time=4.0, max_rg=6700),
     "fgmf-impl-long": lambda: fgmf_small_test(total_time=100.0, max_rg=8000),
     "fgmf-impl-mat": lambda: fgmf_large_test(total_time=4.0, max_rgs=[6700, 6800, 7000]),
