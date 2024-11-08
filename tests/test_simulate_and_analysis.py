@@ -12,7 +12,7 @@ class TestBlackBoxComputeGMF:
     It is possible that CUDA support is compiled, yet still non-functional.
     """
 
-    @pytest.mark.parametrize("gmf_impl", [Impl.numpy])
+    @pytest.mark.parametrize("gmf_impl", [Impl.numpy, Impl.c])
     def test_dpt(self, gmf_impl):
         self.run_test("fdpt", gmf_impl)
 
