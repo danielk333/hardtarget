@@ -63,7 +63,7 @@ simulation_params = {
 rx_channel = "sim"
 
 range0 = 2000e3
-vel0 = 0.4e3
+vel0 = -0.4e3
 acel0 = 0.20e3
 
 sim_r = range0 + vel0*t_rel + acel0*0.5*t_rel**2
