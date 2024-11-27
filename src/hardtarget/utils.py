@@ -6,29 +6,44 @@ import datetime as dt
 ####################################################################
 
 
+
 def ts_from_str(datetime_str, as_local=False):
     """
-    convert from human readable string (ISO 8601 minus time zone) to timestamps (seconds since epoch)
-    by default, the string is interpreded as UTC time, unless <as_local> is True,
-    in which case the string is interpreted as local time.
+    Convert from human-readable string (ISO 8601 without a time zone) to a timestamp (seconds since epoch).
+    
+    By default, the string is interpreted as UTC time unless <as_local> is True, in which case
+    the string is interpreted as local time.
     """
+    # Parse the string into a naive datetime object
     _datetime = dt.datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S.%f")
-    if not as_local:
-        # Convert to UTC (assuming the datetime_str was referencing local time)
+    
+    if as_local:
+        # Make it timezone-aware as local time
+        _datetime = _datetime.astimezone()
+    else:
+        # Make it timezone-aware as UTC
         _datetime = _datetime.replace(tzinfo=dt.timezone.utc)
+    
+    # Return the timestamp
     return _datetime.timestamp()
 
 
 def str_from_ts(ts, as_local=False):
     """
-    convert from timestamp (seconds since epoch) to human readable string (ISO 8601 minus time zone)
-    returns UTC time by default - or local time if as_local is True
+    Convert from a timestamp (seconds since epoch) to a human-readable string (ISO 8601 without a time zone).
+    
+    Returns UTC time by default, or local time if <as_local> is True.
     """
     if as_local:
-        _datetime = dt.datetime.fromtimestamp(ts)
+        # Convert to local time (timezone-aware)
+        _datetime = dt.datetime.fromtimestamp(ts).astimezone()
     else:
-        _datetime = dt.datetime.fromtimestamp(ts, tzinfo=dt.timezone.utc)
+        # Convert to UTC (timezone-aware)
+        _datetime = dt.datetime.fromtimestamp(ts, tz=dt.timezone.utc)
+    
+    # Format the datetime as a string
     return _datetime.strftime("%Y-%m-%dT%H:%M:%S.%f")
+
 
 
 ####################################################################
