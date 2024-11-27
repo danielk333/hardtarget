@@ -10,6 +10,7 @@ from hardtarget.utils import str_from_ts
 import hardtarget.digitalrf_wrapper as drf_wrapper
 import configparser
 from tqdm import tqdm
+import datetime as dt
 
 ####################################################################
 # GLOBALS
@@ -101,6 +102,14 @@ def index_of_filestart(mat, sample_rate, file_secs):
     return idx_origin + file_idx * samples_per_file
 
 
+def beginning_of_year(_dt):
+    return _dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+def get_seconds_since_year_start(_dt):
+    _dt_year_start = beginning_of_year(_dt)
+    return int((_dt - _dt_year_start).total_seconds())
+
+
 ####################################################################
 # CONVERT
 ####################################################################
@@ -183,6 +192,7 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
 
     # all files from Eiscat raw data product, in sorted order
     files = list(all_files(src))
+    n_files = len(files)
 
     #######################################################################
     # META DATA
@@ -269,76 +279,96 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
                 logger.error(err)
             raise e
 
-    # initialise writing loop
+    def drop(data, file):
+        if logger:
+            logger.info(f"dropping {file}")
 
-    idx_prev = idx_start - samples_per_file
-    n_files = len(files)
+
+
+    
     if logger:
         logger.info(f"writing DRF from {n_files} input files")
 
     if progress:
         pbar = tqdm(desc="Converting files to digital_rf", total=n_files)
 
-    for progress_idx, file in enumerate(files):
+    def log_progress(progress_idx):
         if logger:
             if progress_idx + 1 == n_files or progress_idx % 10 == 0:
                 logger.debug(f"write progress {progress_idx+1}/{n_files}")
 
-        mat = loadmat(file)
-        # sample index
-        idx = index_of_filestart(mat, sample_rate, file_secs)
 
-        # check idx of file
-        # idx of file should be the logical continuation, samples_per_file larger
-        # than the previous index
-        # if it is not - a file could be missing - try to zero pad until where you
-        # expected to be - given this idx
-        if idx-idx_prev != samples_per_file:
-            if idx - samples_per_file > idx_prev:
-                # missing file
-                n_pad = (idx-idx_prev) - samples_per_file
-                zeropad(n_pad, file)
-            else:
-                err = (
-                    f"wrong sample index from file {file},\n"
-                    f"got {idx},\n"
-                    f"expected {idx_prev + samples_per_file}"
-                )
-                if logger:
-                    logger.error(err)
-                raise Exception(err)
 
-        # data
+    # Initialise write looop
+
+    file_idx_start = index_of_filestart(mat_first, sample_rate, file_secs)
+    # index of next write
+    idx_write = file_idx_start
+
+    for progress_idx, file in enumerate(files):
+        file = Path(file)
+
+        log_progress(progress_idx)
+
+        #################
+        # initialise
+        #################
+        
+        mat = loadmat(str(file))
+        process_ok = True
+        chunk_idx_start = index_of_filestart(mat, sample_rate, file_secs)
         zz = to_i2x16(mat["d_raw"][:, 0])
-
-        # check data
         n_samples = len(zz)
-        if n_samples > samples_per_file:
-            # truncate
-            zz = zz[:samples_per_file]
-            if logger:
-                logger.warning(f"truncating from {n_samples} samples to {samples_per_file}")
 
-        # write data
-        write(zz, file)
+        #################
+        # check
+        #################
 
-        # if data was too short, zero pad
-        if n_samples < samples_per_file:
-            # zero padding
-            n_pad = samples_per_file - n_samples
-            zeropad(n_pad, file)
+        # check length of data
+        # conservative - must be exact
+        if n_samples != samples_per_file:
+            process_ok = False
 
-        # write pointing data
-        ts = sample_writer.ts_from_index(idx)
-        pointing_idx = int(pointing_writer.index_from_ts(ts))
-        d = {
-            'azimuth': float(mat["d_parbl"][0][PARBL_AZIMUTH]) % 360,
-            'elevation': float(mat["d_parbl"][0][PARBL_ELEVATION])
-        }
-        pointing_writer.write(pointing_idx, d)
+        # check that we are not writing old data
+        if chunk_idx_start < idx_write:
+            process_ok = False
 
-        # increment idx_prev
-        idx_prev = idx
+        # check that idx_start is aligned with logical file boundaries
+        remainder = (chunk_idx_start - idx_start) % samples_per_file
+        if remainder != 0.0:
+            # illegal index
+            process_ok = False        
+
+        # check if filenames are consistent with read index
+        # filenames are given by end_index (first index of next chunk)
+        idx_last = chunk_idx_start + samples_per_file
+        ts_last = idx_last / 1e6
+        dt_last = dt.datetime.fromtimestamp(ts_last, tz=dt.timezone.utc)
+        offset = get_seconds_since_year_start(dt_last)
+        if offset != int(file.name.split(".")[0]):
+            # filename inconsistency
+            process_ok = False
+
+        #################
+        # process
+        #################
+
+        if process_ok:
+            # if necessary, zero pad stream up to idx_write
+            n_pad = chunk_idx_start - idx_write
+            if n_pad > 0:
+                zeropad(n_pad, file)
+            # write chunk to stream
+            write(zz, file)
+        else:
+            # drop 
+            drop(zz, file)
+            # do not increment idx_write
+            continue
+
+        # increment idx_write
+        idx_write = chunk_idx_start + samples_per_file
+
         if progress:
             pbar.update(1)
 
