@@ -104,7 +104,8 @@ def index_of_filestart(mat, sample_rate, file_secs):
 
 def beginning_of_year(_dt):
     return _dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    
+
+
 def get_seconds_since_year_start(_dt):
     _dt_year_start = beginning_of_year(_dt)
     return int((_dt - _dt_year_start).total_seconds())
@@ -283,9 +284,6 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         if logger:
             logger.info(f"dropping {file}")
 
-
-
-    
     if logger:
         logger.info(f"writing DRF from {n_files} input files")
 
@@ -296,8 +294,6 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         if logger:
             if progress_idx + 1 == n_files or progress_idx % 10 == 0:
                 logger.debug(f"write progress {progress_idx+1}/{n_files}")
-
-
 
     # Initialise write looop
 
@@ -313,7 +309,7 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         #################
         # initialise
         #################
-        
+
         mat = loadmat(str(file))
         process_ok = True
         chunk_idx_start = index_of_filestart(mat, sample_rate, file_secs)
@@ -337,7 +333,7 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         remainder = (chunk_idx_start - idx_start) % samples_per_file
         if remainder != 0.0:
             # illegal index
-            process_ok = False        
+            process_ok = False
 
         # check if filenames are consistent with read index
         # filenames are given by end_index (first index of next chunk)
@@ -360,8 +356,17 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
                 zeropad(n_pad, file)
             # write chunk to stream
             write(zz, file)
+
+            # write pointing data
+            ts = sample_writer.ts_from_index(chunk_idx_start)
+            pointing_idx = int(pointing_writer.index_from_ts(ts))
+            d = {
+                'azimuth': float(mat["d_parbl"][0][PARBL_AZIMUTH]) % 360,
+                'elevation': float(mat["d_parbl"][0][PARBL_ELEVATION])
+            }
+            pointing_writer.write(pointing_idx, d)
         else:
-            # drop 
+            # drop
             drop(zz, file)
             # do not increment idx_write
             continue
