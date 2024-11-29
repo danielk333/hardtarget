@@ -1,35 +1,30 @@
 import pytest
 from pathlib import Path
-from hardtarget.utils import index_from_ts, ts_from_index
-import numpy as np
-import numpy.testing as npt
 import hardtarget.digitalrf_wrapper as drf_wrapper
-import hardtarget.analysis.utils as utils
-from hardtarget.utils import ts_from_str, str_from_ts
 import datetime as dt
 from hardtarget.radars.eiscat.convert import loadmat, index_of_filestart, load_expconfig, expinfo_split
 from hardtarget.radars.eiscat.convert import to_i2x16
-from hardtarget.radars.eiscat.convert import PARBL_RADAR_FREQUENCY
 
 """
 test products converted to Hardtarget DRF in various ways
 """
 
 PROJECT = Path("/cluster/projects/p106119-SpaceDebrisRadarCharacterization")
-RAW = PROJECT / "raw" 
+RAW = PROJECT / "raw"
 DRF = PROJECT / "drf"
+
 
 def prerequisites():
     return DRF.is_dir() and RAW.is_dir()
 
 
-@pytest.mark.skipif(not prerequisites() , reason="Local file is missing")
+@pytest.mark.skipif(not prerequisites(), reason="Local file is missing")
 def test_pointing():
 
     """
-    test that there is a correspondence between number of zip files in a 
-    RAW Eiscat format, and the number of entries in the pointing dataset of 
-    the derived Hardtarget DRF 
+    test that there is a correspondence between number of zip files in a
+    RAW Eiscat format, and the number of entries in the pointing dataset of
+    the derived Hardtarget DRF
 
     Test all product in DRF directory
     """
@@ -39,7 +34,7 @@ def test_pointing():
 
         # check that drf product has pointing
         if not (drf_product / "pointing").is_dir():
-            continue     
+            continue
 
         bad = []
 
@@ -58,33 +53,28 @@ def test_pointing():
             if len(pointing_data) != len(bz2_files):
                 bad.append((drf_product.name, len(bz2_files), len(pointing_data)))
 
-
         for name, n_files, n_pointing in bad:
             print(f"{name} zip files {n_files} pointing {n_pointing}")
 
         assert len(bad) == 0
-            
-
 
 
 SOURCE = RAW / "leo_bpark_2.1u_NO-20190606-UHF/leo_bpark_2.1u_NO@uhf"
+
 
 def required_product():
     return SOURCE.is_dir()
 
 
-
-@pytest.mark.skipif(not required_product() , reason="Local file is missing")
+@pytest.mark.skipif(not required_product(), reason="Local file is missing")
 def test_timestamps():
-
 
     def beginning_of_year(_dt):
         return _dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        
+
     def get_seconds_since_year_start(_dt):
         _dt_year_start = beginning_of_year(_dt)
         return int((_dt - _dt_year_start).total_seconds())
-
 
     # time region
     exp = 1559837299200000 / 1e6
@@ -113,14 +103,12 @@ def test_timestamps():
     sample_rate = float(cfv.get("sample_rate"))
     file_secs = float(cfv.get("file_secs"))
     samples_per_file = int(file_secs * sample_rate)
-    chnl = cfv.get("rx_channel", "tbd")
-    radar_frequency = float(mat_last["d_parbl"][0][PARBL_RADAR_FREQUENCY])
+    # chnl = cfv.get("rx_channel", "tbd")
+    # radar_frequency = float(mat_last["d_parbl"][0][PARBL_RADAR_FREQUENCY])
 
     idx_start = index_of_filestart(mat_first, sample_rate, file_secs)
     # idx_end = index_of_filestart(mat_last, sample_rate, file_secs) + samples_per_file
-    n_files = len(bz2_files)
-
-
+    # n_files = len(bz2_files)
 
     def zeropad(n_pad, file):
         print(f"zeropad {n_pad} bytes")
@@ -130,7 +118,6 @@ def test_timestamps():
 
     def drop(zz, file):
         print(f"drop {len(zz)} bytes")
-
 
     print("start")
 
@@ -142,7 +129,7 @@ def test_timestamps():
         #################
         # initialise
         #################
-        
+
         mat = loadmat(str(file))
         process_ok = True
         chunk_idx_start = index_of_filestart(mat, sample_rate, file_secs)
@@ -166,7 +153,7 @@ def test_timestamps():
         remainder = (chunk_idx_start - idx_start) % samples_per_file
         if remainder != 0.0:
             # illegal index
-            process_ok = False        
+            process_ok = False
 
         # check if filenames are consistent with read index
         # filenames are given by end_index (first index of next chunk)
@@ -192,15 +179,10 @@ def test_timestamps():
             # write chunk to stream
             write(zz, file)
         else:
-            # drop 
+            # drop
             drop(zz, file)
             # do not increment idx_write
             continue
 
         # increment idx_write
         idx_write = chunk_idx_start + samples_per_file
-
-        
-
-
-
