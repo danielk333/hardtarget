@@ -127,11 +127,9 @@ class TestBlackBoxComputeGMF:
         for key, val in experiment_params.items():
             print(f"{key}: {val}")
 
-        with (
-            tempfile.TemporaryDirectory() as tmp_sim_path,
-            tempfile.TemporaryDirectory() as tmp_analysis_path,
-            tempfile.NamedTemporaryFile(mode="w+") as tmp_config,
-        ):
+        with tempfile.TemporaryDirectory() as tmp_sim_path, \
+             tempfile.TemporaryDirectory() as tmp_analysis_path, \
+             tempfile.NamedTemporaryFile(mode="w+") as tmp_config:
             # hacky way to create a temp config
             tmp_config.write(config_str)
             tmp_config.seek(0)
