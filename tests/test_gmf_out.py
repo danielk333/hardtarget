@@ -1,7 +1,47 @@
+import pytest
 import numpy as np
 from hardtarget.analysis.utils import GMFOutArgs, dump_gmf_out, load_gmf_out
 import tempfile
 from pathlib import Path
+import hardtarget.analysis.utils as utils
+import h5py
+import pprint
+
+####################################################################
+# TEST POINTING
+####################################################################
+
+"""
+Test if all gmf files have pointing data
+"""
+
+PROJECT = Path("/cluster/projects/p106119-SpaceDebrisRadarCharacterization")
+PRODUCT = Path("leo_bpark_2.1u_NO-20190606-UHF")
+GMF_PRODUCT = PROJECT / "gmf" / PRODUCT
+
+def prerequisites():
+    return GMF_PRODUCT.is_dir()
+
+@pytest.mark.skipif(not prerequisites(), reason="Local file is missing")
+def test_pointing():
+    
+    files = utils.all_gmf_h5_files(str(GMF_PRODUCT))
+    print(len(files))
+
+    bad = []
+    # only first file
+    for file in files[:1]:
+        with h5py.File(file, "r") as f:            
+            if "pointing" not in f.keys():
+                bad.append(str(file))
+
+    if len(bad) > 0:
+        pprint.pprint(bad)
+
+    assert len(bad) == 0
+
+
+
 
 ####################################################################
 # MOCK UP DATA

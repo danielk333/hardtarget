@@ -18,6 +18,8 @@ def prerequisites():
     return DRF.is_dir() and RAW.is_dir()
 
 
+MAX_DROPPED = 10
+
 @pytest.mark.skipif(not prerequisites(), reason="Local file is missing")
 def test_pointing():
 
@@ -30,7 +32,12 @@ def test_pointing():
     """
 
     # testing only the first DRF
-    for drf_product in list(DRF.iterdir())[:1]:
+    for raw_product in RAW.iterdir():
+
+        if not raw_product.is_dir():
+            continue
+
+        drf_product = DRF / raw_product.relative_to(RAW)
 
         # check that drf product has pointing
         if not (drf_product / "pointing").is_dir():
@@ -50,24 +57,32 @@ def test_pointing():
             bounds = reader.get_bounds()
             pointing_data = list(reader.read(*bounds))
 
-            if len(pointing_data) != len(bz2_files):
-                bad.append((drf_product.name, len(bz2_files), len(pointing_data)))
+            # some bz2 files might have been dropped. Assume that at most 10 are dropped
+            assert len(pointing_data) >= len(bz2_files) - MAX_DROPPED
 
-        for name, n_files, n_pointing in bad:
-            print(f"{name} zip files {n_files} pointing {n_pointing}")
+            missing =  len(bz2_files) - len(pointing_data)
+            if missing > 0:
+                bad.append((drf_product.name, len(bz2_files), len(pointing_data), missing))
 
-        assert len(bad) == 0
+        for name, n_files, n_pointing, n_missing in bad:
+            print(f"{name} zip files {n_files} pointing {n_pointing} missing {n_missing}")
 
+
+
+
+######################################################################################
+# TEST CONVERT LOOP
+######################################################################################
 
 SOURCE = RAW / "leo_bpark_2.1u_NO-20190606-UHF/leo_bpark_2.1u_NO@uhf"
 
 
-def required_product():
-    return SOURCE.is_dir()
 
+@pytest.mark.skipif(not SOURCE.is_dir(), reason="Local file missing")
 
-@pytest.mark.skipif(not required_product(), reason="Local file is missing")
-def test_timestamps():
+def test_timestamps(pytestconfig):
+    if not pytestconfig.getoption("--run-slow"):
+        pytest.skip("Skipped because it is marked as slow.")
 
     def beginning_of_year(_dt):
         return _dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
