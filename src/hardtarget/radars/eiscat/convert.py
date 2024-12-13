@@ -280,9 +280,9 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
                 logger.error(err)
             raise e
 
-    def drop(data, file):
+    def drop(msg, file):
         if logger:
-            logger.info(f"dropping {file}")
+            logger.info(f"dropping : {msg} : {file}")
 
     if logger:
         logger.info(f"writing DRF from {n_files} input files")
@@ -320,20 +320,25 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         # check
         #################
 
+        msg = ""
+
         # check length of data
         # conservative - must be exact
         if n_samples != samples_per_file:
             process_ok = False
+            msg = f"incorrect sample count {n_samples} {samples_per_file}"
 
         # check that we are not writing old data
         if chunk_idx_start < idx_write:
             process_ok = False
+            msg = "attempt to overwrite data"
 
         # check that idx_start is aligned with logical file boundaries
         remainder = (chunk_idx_start - idx_start) % samples_per_file
         if remainder != 0.0:
             # illegal index
             process_ok = False
+            msg = "illegal index"
 
         # check if filenames are consistent with read index
         # filenames are given by end_index (first index of next chunk)
@@ -341,9 +346,11 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
         ts_last = idx_last / 1e6
         dt_last = dt.datetime.fromtimestamp(ts_last, tz=dt.timezone.utc)
         offset = get_seconds_since_year_start(dt_last)
-        if offset != int(file.name.split(".")[0]):
+        _offset = int(file.name.split(".")[0])
+        if offset != _offset:
             # filename inconsistency
             process_ok = False
+            msg = f"filename inconsistency {offset} {_offset}"
 
         #################
         # process
@@ -367,7 +374,7 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
             pointing_writer.write(pointing_idx, d)
         else:
             # drop
-            drop(zz, file)
+            drop(msg, file)
             # do not increment idx_write
             continue
 
