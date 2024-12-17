@@ -8,6 +8,7 @@ from hardtarget.gmf import get_available_libs, get_estimation_method, MethodType
 from hardtarget.configuration import load_gmf_params
 import hardtarget.analysis.utils as utils
 from hardtarget.utils import ts_from_index
+import shutil
 
 
 ####################################################################
@@ -392,6 +393,10 @@ def compute_gmf(
                 utils.dump_gmf_out(gmf_out_args, gmf_params, outfile, mode="w", meta=True)
             elif libtype == MethodType.optimize:
                 utils.dump_gmf_out(gmf_out_args, gmf_params, outfile, clobber=clobber, mode="a", meta=False)
+
+            # Copy gmf config file to output
+            shutil.copy(str(config), str(Path(output) / config.name))
+
             results["files"].append(filepath.name)
         else:
             # write dict
