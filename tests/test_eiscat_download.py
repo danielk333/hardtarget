@@ -21,7 +21,7 @@ NEW_PRODUCT = {
     NEW_PRODUCT
 ])
 
-
+@pytest.mark.skip(reason="This test is skipped because download is no longer available")
 def test_download_nodes(product):
     day = product['day']
     mode = product['mode']
