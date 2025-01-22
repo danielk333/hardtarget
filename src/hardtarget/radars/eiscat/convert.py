@@ -118,7 +118,7 @@ def parse_foldername(product_folder):
         e.g. result ('leo_pwait', '2.3r', 'sod')
 
     NOTE - this is similar to expinfo split - which produces similar output
-    from parsing eiscat metadata. This function additionally 
+    from parsing eiscat metadata. This function additionally
     gets the chnl name. This function would be obsolete, if correct chnl
     name was parsed from metadata instead. At this time, we are useing the
     folder as a quick solution.
