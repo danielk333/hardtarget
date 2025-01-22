@@ -111,6 +111,26 @@ def get_seconds_since_year_start(_dt):
     return int((_dt - _dt_year_start).total_seconds())
 
 
+def parse_foldername(product_folder):
+    """
+    Parses foldername of eiscat raw data product to produce (expname, expvers, chnl)
+        e.g. foldername "leo_pwait_2.3r_3P@sod"
+        e.g. result ('leo_pwait', '2.3r', 'sod')
+
+    NOTE - this is similar to expinfo split - which produces similar output
+    from parsing eiscat metadata. This function additionally 
+    gets the chnl name. This function would be obsolete, if correct chnl
+    name was parsed from metadata instead. At this time, we are useing the
+    folder as a quick solution.
+    """
+    product_folder = Path(product_folder)
+    tokens = product_folder.name.split("_")
+    expname = "_".join(tokens[:2])
+    expvers = tokens[2]
+    chnl = tokens[3].split("@")[1]
+    return expname, expvers, chnl
+
+
 ####################################################################
 # CONVERT
 ####################################################################
@@ -209,8 +229,12 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
     sample_rate = float(cfv.get("sample_rate"))
     file_secs = float(cfv.get("file_secs"))
     samples_per_file = int(file_secs * sample_rate)
-    chnl = cfv.get("rx_channel", "tbd")
     radar_frequency = float(mat_first["d_parbl"][0][PARBL_RADAR_FREQUENCY])
+    # NOTE override channel
+    # chnl = cfv.get("rx_channel", "tbd")
+    chnl = parse_foldername(src)[2]
+
+    print("CHNL", chnl)
 
     #######################################################################
     # BOUNDS
@@ -411,6 +435,9 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
     ]
     for prop in props:
         exp[prop] = cfv.get(prop)
+    # NOTE override channels
+    exp["rx_channel"] = chnl
+    exp["tx_channel"] = chnl
 
     # add
     exp["radar_frequency"] = str(radar_frequency)
