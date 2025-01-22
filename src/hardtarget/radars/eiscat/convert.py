@@ -234,8 +234,6 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None):
     # chnl = cfv.get("rx_channel", "tbd")
     chnl = parse_foldername(src)[2]
 
-    print("CHNL", chnl)
-
     #######################################################################
     # BOUNDS
     #######################################################################

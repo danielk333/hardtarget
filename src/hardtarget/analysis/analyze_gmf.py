@@ -395,6 +395,7 @@ def compute_gmf(
                 utils.dump_gmf_out(gmf_out_args, gmf_params, outfile, clobber=clobber, mode="a", meta=False)
 
             # Copy gmf config file to output
+            config = Path(config)
             shutil.copy(str(config), str(Path(output) / config.name))
 
             results["files"].append(filepath.name)
