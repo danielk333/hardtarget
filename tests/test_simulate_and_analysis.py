@@ -5,7 +5,7 @@ from scipy import constants
 
 from hardtarget.gmf import Impl
 import hardtarget
-
+from pathlib import Path
 
 class TestBlackBoxComputeGMF:
     """
@@ -159,7 +159,7 @@ class TestBlackBoxComputeGMF:
             _ = hardtarget.compute_gmf(
                 rx=(tmp_sim_path, rx_channel),
                 tx=(tmp_sim_path, rx_channel),
-                config=tmp_config_path,
+                config=Path(tmp_config_path),
                 gmf_method=gmf_method,
                 gmf_implementation=gmf_impl,
                 clobber=False,
