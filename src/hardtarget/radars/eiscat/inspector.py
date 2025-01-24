@@ -8,12 +8,13 @@ from hardtarget.radars.eiscat.convert import to_i2x16
 from hardtarget.radars.eiscat.convert import get_seconds_since_year_start
 from hardtarget.radars.eiscat.convert import PARBL_START_TIME, PARBL_END_TIME
 
+
 def get_date_str(ts_sec):
     _datetime = dt.datetime.fromtimestamp(ts_sec, tz=dt.timezone.utc)
     return _datetime.strftime('%Y-%m-%dT%H:%M:%S')
 
 
-def eiscat_inspect_file (idx, filepath):
+def eiscat_inspect_file(idx, filepath):
     mat = loadmat(str(filepath))
     host, expname, expvers, owner = expinfo_split(str(mat["d_ExpInfo"][0]))
     cfg = load_expconfig(expname)
@@ -97,22 +98,21 @@ def eiscat_inspect_file (idx, filepath):
     }, zz
 
 
-
-def eiscat_inspect (productpath, start=None, end=None, count=None):
+def eiscat_inspect(productpath, start=None, end=None, count=None):
     """
     info from eiscat raw data
-    """ 
+    """
     files = eiscat_files(productpath, start=start, end=end, count=count)
     for idx, file in files:
         yield eiscat_inspect_file(idx, file)
 
 
-def index_of (alist, match_func):
+def index_of(alist, match_func):
     matches = [match_func(e) for e in alist]
     return matches.index(True)
 
 
-def eiscat_files (productpath, start=None, end=None, count=None):
+def eiscat_files(productpath, start=None, end=None, count=None):
     """
     return sorted list of eiscat files from product
     file list is limited by start && (end || count)
@@ -124,7 +124,7 @@ def eiscat_files (productpath, start=None, end=None, count=None):
     subdirs = [d for d in productpath.iterdir() if d.is_dir()]
     files = []
     for subdir in subdirs:
-        files +=  [f for f in subdir.iterdir() if ok(f)]
+        files += [f for f in subdir.iterdir() if ok(f)]
 
     # sort by path (ascending in time)
     files.sort()
@@ -162,16 +162,15 @@ def eiscat_files (productpath, start=None, end=None, count=None):
     return files[start:end]
 
 
-
 if __name__ == "__main__":
 
+    import pprint
 
-    # test 
+    # test
     PROJECT = Path("/cluster/work/users/inar/mode-test")
     RAW = PROJECT / "raw"
     DRF = PROJECT / "drf"
     SOURCE = RAW / "leo_bpark_2.2_EI-20151027-42m/leo_bpark_2.2_EI@42m"
-    
-    import pprint
+
     for info, zz in eiscat_inspect(SOURCE, start=193, count=2):
         pprint.pprint(info, sort_dicts=False)
