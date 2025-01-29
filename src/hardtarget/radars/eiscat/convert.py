@@ -86,8 +86,7 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None,
     #######################################################################
     # SRC FILES
     #######################################################################
-
-    files = eiscat_util.eiscat_files(src, start=start, end=end, count=count)
+    files = eiscat_util.eiscat_files(src)
     n_files = len(files)
 
     #######################################################################

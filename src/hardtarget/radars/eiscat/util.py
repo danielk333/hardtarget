@@ -147,6 +147,9 @@ def eiscat_files(productpath, start=None, end=None, count=None):
     # sort by path (ascending in time)
     files.sort()
 
+    start_idx = 0
+    end_idx = len(files)
+
     # start
     if isinstance(start, str):
         # start is str date (year offset in seconds) from filename
@@ -162,10 +165,6 @@ def eiscat_files(productpath, start=None, end=None, count=None):
         start_idx = start
     else:
         raise Exception("illegal start", start)
-
-    if end is None and count is None:
-        # only start given
-        return files[start_idx, start_idx+1]
 
     # end
     if end is not None:
