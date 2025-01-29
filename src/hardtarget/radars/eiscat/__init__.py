@@ -55,6 +55,6 @@ def load_expconfig(xpname):
     except Exception as e:
         raise ValueError(f"Couldn't open config file for {xpname}:" + str(e))
 
-from .util import *
+from .eiscat_utils import *
 from .download import download, get_download_nodes
 from .convert import convert

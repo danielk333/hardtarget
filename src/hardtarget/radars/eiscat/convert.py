@@ -3,7 +3,7 @@ import numpy as np
 import hardtarget.digitalrf_wrapper as drf_wrapper
 import configparser
 from tqdm import tqdm
-from hardtarget.radars.eiscat.util import eiscat_load_file, eiscat_files, eiscat_process
+from hardtarget.radars.eiscat import eiscat_load_file, eiscat_files, eiscat_process
 
 
 ####################################################################
