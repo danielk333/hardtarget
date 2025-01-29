@@ -59,4 +59,4 @@ def load_expconfig(xpname):
 
 from .download import download, get_download_nodes
 from .convert import convert
-
+import hardtarget.radars.eiscat.util as util

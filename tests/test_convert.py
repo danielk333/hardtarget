@@ -3,7 +3,7 @@ from pathlib import Path
 import hardtarget.digitalrf_wrapper as drf_wrapper
 import datetime as dt
 from hardtarget.radars.eiscat.util import eiscat_files, eiscat_process
-from hardtarget.radars.eiscat.convert import convert
+from hardtarget.radars.eiscat import convert
 import pprint
 
 
@@ -14,15 +14,13 @@ test products converted to Hardtarget DRF in various ways
 PROJECT = Path("/cluster/projects/p106119-SpaceDebrisRadarCharacterization")
 RAW = PROJECT / "raw"
 DRF = PROJECT / "drf"
+SOURCE = RAW / "leo_bpark_2.1u_NO-20190606-UHF/leo_bpark_2.1u_NO@uhf"
 
-
-def prerequisites():
-    return DRF.is_dir() and RAW.is_dir()
 
 
 MAX_DROPPED = 10
 
-@pytest.mark.skipif(not prerequisites(), reason="Local file is missing")
+@pytest.mark.skipif(not SOURCE.is_dir(), reason="Local file missing")
 def test_pointing():
 
     """
@@ -34,16 +32,16 @@ def test_pointing():
     """
 
     # testing only the first DRF
-    for raw_product in RAW.iterdir():
+    # for raw_product in RAW.iterdir():
 
+    def run(raw_product): 
         if not raw_product.is_dir():
-            continue
-
+            return
         drf_product = DRF / raw_product.relative_to(RAW)
 
         # check that drf product has pointing
         if not (drf_product / "pointing").is_dir():
-            continue
+            return
 
         bad = []
 
@@ -52,6 +50,7 @@ def test_pointing():
         for subfolder in raw_product.iterdir():
             if subfolder.name.endswith("information"):
                 continue
+            print(subfolder.name)
             # matlab files
             bz2_files = list(sorted([file for file in subfolder.rglob("*.bz2") if file.is_file()]))
             # pointing data
@@ -69,15 +68,12 @@ def test_pointing():
         for name, n_files, n_pointing, n_missing in bad:
             print(f"{name} zip files {n_files} pointing {n_pointing} missing {n_missing}")
 
-
+    run(SOURCE)    
 
 
 ######################################################################################
 # TEST CONVERT PROCESSING
 ######################################################################################
-
-SOURCE = RAW / "leo_bpark_2.1u_NO-20190606-UHF/leo_bpark_2.1u_NO@uhf"
-
 
 @pytest.mark.skipif(not SOURCE.is_dir(), reason="Local file missing")
 def test_meta(pytestconfig):
