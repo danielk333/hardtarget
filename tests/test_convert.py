@@ -2,8 +2,10 @@ import pytest
 from pathlib import Path
 import hardtarget.digitalrf_wrapper as drf_wrapper
 import datetime as dt
-from hardtarget.radars.eiscat.convert import loadmat, index_of_filestart, load_expconfig, expinfo_split
-from hardtarget.radars.eiscat.convert import to_i2x16
+from hardtarget.radars.eiscat.util import eiscat_files, eiscat_process
+from hardtarget.radars.eiscat.convert import convert
+import pprint
+
 
 """
 test products converted to Hardtarget DRF in various ways
@@ -71,133 +73,54 @@ def test_pointing():
 
 
 ######################################################################################
-# TEST CONVERT LOOP
+# TEST CONVERT PROCESSING
 ######################################################################################
 
 SOURCE = RAW / "leo_bpark_2.1u_NO-20190606-UHF/leo_bpark_2.1u_NO@uhf"
 
 
-
 @pytest.mark.skipif(not SOURCE.is_dir(), reason="Local file missing")
-
-def test_timestamps(pytestconfig):
+def test_meta(pytestconfig):
+    """
+    This test prints the meta info extracted from 2 random eiscat files
+    """
     if not pytestconfig.getoption("--run-slow"):
         pytest.skip("Skipped because it is marked as slow.")
 
-    def beginning_of_year(_dt):
-        return _dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    files = eiscat_files(SOURCE, start=193, count=2)
+    for meta in eiscat_process(files):
+        pprint.pprint(meta, sort_dicts=False)
 
-    def get_seconds_since_year_start(_dt):
-        _dt_year_start = beginning_of_year(_dt)
-        return int((_dt - _dt_year_start).total_seconds())
+
+@pytest.mark.skipif(not SOURCE.is_dir(), reason="Local file missing")
+def test_convert(pytestconfig):
+    if not pytestconfig.getoption("--run-slow"):
+        pytest.skip("Skipped because it is marked as slow.")
+    SOURCE = RAW / "leo_bpark_2.2_EI-20151027-42m/leo_bpark_2.2_EI@42m"
+    DST = "/tmp"
+    convert(SOURCE, DST, progress=True, start=193, count=2)
+    # TODO - check that something is written to DST
+
+
+@pytest.mark.skipif(not SOURCE.is_dir(), reason="Local file missing")
+def test_timestamps(pytestconfig):
+    """
+    This tests a particular product with an issue around the given
+    timestamp - visually verifying that the eiscat convert process handles
+    it appropriately
+    """
+    if not pytestconfig.getoption("--run-slow"):
+        pytest.skip("Skipped because it is marked as slow.")
 
     # time region
-    exp = 1559837299200000 / 1e6
+    ts_exp = 1559837299200000 / 1e6
+    ts_start = ts_exp - 40
+    ts_end = ts_exp + 40
 
-    dt_exp = dt.datetime.fromtimestamp(exp, tz=dt.timezone.utc)
+    dt_start = dt.datetime.fromtimestamp(ts_start, tz=dt.timezone.utc)
+    dt_end = dt.datetime.fromtimestamp(ts_end, tz=dt.timezone.utc)
+    bz2_files = eiscat_files(SOURCE, start=dt_start, end=dt_end)
 
-    # calculate time offset in seconds since start of year - used in filenames
-    target_offset = get_seconds_since_year_start(dt_exp)
-
-    # find all bz2 files which are close in time
-    bz2_files = sorted([file for file in SOURCE.rglob("*.bz2") if file.is_file()])
-
-    def select(file):
-        # get file offset
-        offset = int(file.name.split(".")[0])
-        return abs(target_offset - offset) < 40
-
-    bz2_files = [f for f in bz2_files if select(f)]
-
-    mat_first = loadmat(str(bz2_files[0]))
-    mat_last = loadmat(str(bz2_files[-1]))
-
-    host, expname, expvers, owner = expinfo_split(str(mat_last["d_ExpInfo"][0]))
-    cfg = load_expconfig(expname)
-    cfv = cfg[expvers]
-    sample_rate = float(cfv.get("sample_rate"))
-    file_secs = float(cfv.get("file_secs"))
-    samples_per_file = int(file_secs * sample_rate)
-    # chnl = cfv.get("rx_channel", "tbd")
-    # radar_frequency = float(mat_last["d_parbl"][0][PARBL_RADAR_FREQUENCY])
-
-    idx_start = index_of_filestart(mat_first, sample_rate, file_secs)
-    # idx_end = index_of_filestart(mat_last, sample_rate, file_secs) + samples_per_file
-    # n_files = len(bz2_files)
-
-    def zeropad(n_pad, file):
-        print(f"zeropad {n_pad} bytes")
-
-    def write(zz, file):
-        print(f"write {len(zz)} bytes")
-
-    def drop(zz, file):
-        print(f"drop {len(zz)} bytes")
-
-    print("start")
-
-    # index of next write
-    idx_write = idx_start
-
-    for file in bz2_files:
-
-        #################
-        # initialise
-        #################
-
-        mat = loadmat(str(file))
-        process_ok = True
-        chunk_idx_start = index_of_filestart(mat, sample_rate, file_secs)
-        zz = to_i2x16(mat["d_raw"][:, 0])
-        n_samples = len(zz)
-
-        #################
-        # check
-        #################
-
-        # check length of data
-        # conservative - must be exact
-        if n_samples != samples_per_file:
-            process_ok = False
-
-        # check that we are not writing old data
-        if chunk_idx_start < idx_write:
-            process_ok = False
-
-        # check that idx_start is aligned with logical file boundaries
-        remainder = (chunk_idx_start - idx_start) % samples_per_file
-        if remainder != 0.0:
-            # illegal index
-            process_ok = False
-
-        # check if filenames are consistent with read index
-        # filenames are given by end_index (first index of next chunk)
-        idx_last = chunk_idx_start + samples_per_file
-        ts_last = idx_last / 1e6
-        dt_last = dt.datetime.fromtimestamp(ts_last, tz=dt.timezone.utc)
-        offset = get_seconds_since_year_start(dt_last)
-        if offset != int(file.name.split(".")[0]):
-            # filename inconsistency
-            process_ok = False
-
-        print(f"exp {idx_write/1e6} got {chunk_idx_start/1e6} exp {offset} got {file.name}")
-
-        #################
-        # process
-        #################
-
-        if process_ok:
-            # if necessary, zero pad stream up to idx_write
-            n_pad = chunk_idx_start - idx_write
-            if n_pad > 0:
-                zeropad(n_pad, file)
-            # write chunk to stream
-            write(zz, file)
-        else:
-            # drop
-            drop(zz, file)
-            # do not increment idx_write
-            continue
-
-        # increment idx_write
-        idx_write = chunk_idx_start + samples_per_file
+    for meta in eiscat_process(bz2_files):
+        if meta["errors"]:
+            print(meta["errors"])
