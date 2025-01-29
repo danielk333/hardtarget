@@ -2,8 +2,9 @@ import pytest
 from pathlib import Path
 import hardtarget.digitalrf_wrapper as drf_wrapper
 import datetime as dt
-from hardtarget.radars.eiscat.util import eiscat_files, eiscat_process
 from hardtarget.radars.eiscat import convert
+from hardtarget.radars.eiscat import eiscat_files, eiscat_process
+
 import pprint
 
 

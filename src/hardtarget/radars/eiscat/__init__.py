@@ -55,7 +55,6 @@ def load_expconfig(xpname):
     except Exception as e:
         raise ValueError(f"Couldn't open config file for {xpname}:" + str(e))
 
-
-#import hardtarget.radars.eiscat.util as util
-# from hardtarget.radars.eiscat.download import download, get_download_nodes
-#from hardtarget.radars.eiscat.convert import convert
+from .util import *
+from .download import download, get_download_nodes
+from .convert import convert

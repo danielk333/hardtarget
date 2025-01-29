@@ -1,6 +1,6 @@
 import pytest
 
-from hardtarget.radars.eiscat.download import get_download_nodes
+from hardtarget.radars.eiscat import get_download_nodes
 
 
 OLD_PRODUCT = {
