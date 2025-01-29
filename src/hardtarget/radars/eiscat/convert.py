@@ -3,7 +3,7 @@ import numpy as np
 import hardtarget.digitalrf_wrapper as drf_wrapper
 import configparser
 from tqdm import tqdm
-import hardtarget.radars.eiscat.util as eiscat_util
+from hardtarget.radars.eiscat.util import eiscat_load_file, eiscat_files, eiscat_process
 
 
 ####################################################################
@@ -86,7 +86,7 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None,
     #######################################################################
     # SRC FILES
     #######################################################################
-    files = eiscat_util.eiscat_files(src)
+    files = eiscat_files(src)
     n_files = len(files)
 
     #######################################################################
@@ -94,7 +94,7 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None,
     #######################################################################
 
     # load experiment info from first matlab file
-    meta_first = eiscat_util.eiscat_load_file(files[0])[0]
+    meta_first = eiscat_load_file(files[0])[0]
 
     #######################################################################
     # WRITER SETUP
@@ -169,13 +169,13 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None,
         pbar = tqdm(desc="Converting files to digital_rf", total=n_files)
 
     # processing loop
-    for meta in eiscat_util.eiscat_process(files,
-                                           write_data=write_data,
-                                           pad_data=pad_data,
-                                           drop_data=drop_data,
-                                           write_pointing=write_pointing,
-                                           log_progress=log_progress
-                                           ):
+    for meta in eiscat_process(files,
+                               write_data=write_data,
+                               pad_data=pad_data,
+                               drop_data=drop_data,
+                               write_pointing=write_pointing,
+                               log_progress=log_progress
+                               ):
         if meta["errors"]:
             if logger:
                 logger.debug(meta["errors"])
@@ -217,7 +217,7 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None,
     # Bounds
     BOUNDS_SECTION = "Bounds"
     meta.add_section(BOUNDS_SECTION)
-    meta_last = eiscat_util.eiscat_load_file(files[-1])[0]
+    meta_last = eiscat_load_file(files[-1])[0]
     meta["Bounds"]["ts_start"] = str(meta_first["ts"]["file_start"])
     meta["Bounds"]["start"] = meta_first["date"]["file_start"]
     meta["Bounds"]["ts_end"] = str(meta_last["ts"]["file_end"])
