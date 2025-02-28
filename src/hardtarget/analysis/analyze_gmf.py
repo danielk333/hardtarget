@@ -358,7 +358,7 @@ def compute_gmf(
             snr = (np.sqrt(all_gmf_vars.vals) - np.sqrt(noise_floor[None, :])) ** 2 / noise_floor[None, :]
             # finding peaks
             r_inds = np.argmax(snr, axis=1)
-            
+
             r_vec = params_der["ranges"][r_inds]
             v_vec = params_der["range_rates"][all_gmf_vars.v_ind[coh_ints, r_inds]]
             a_vec = params_der["accelerations"][all_gmf_vars.a_ind[coh_ints, r_inds]]
