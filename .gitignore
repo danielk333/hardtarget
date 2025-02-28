@@ -111,4 +111,6 @@ cache_error*
 .*.sw[op]
 
 
+/.DS_Store
+
 
