@@ -9,6 +9,7 @@ from hardtarget.configuration import load_gmf_params
 import hardtarget.analysis.utils as utils
 from hardtarget.utils import ts_from_index
 import shutil
+from scipy.signal import savgol_filter
 
 
 ####################################################################
@@ -351,7 +352,13 @@ def compute_gmf(
             sample_numbers = np.arange(gmf_params["PRO"]["read_length"])
             coh_ints = np.arange(num_cohints)
 
-            r_inds = np.argmax(all_gmf_vars.vals, axis=1)
+            # Substracting background level
+            noise_floor = np.nanmedian(all_gmf_vars.dc, axis=0)
+            noise_floor = savgol_filter(noise_floor, 2000, 1, mode='nearest')
+            snr = (np.sqrt(all_gmf_vars.vals) - np.sqrt(noise_floor[None, :])) ** 2 / noise_floor[None, :]
+            # finding peaks
+            r_inds = np.argmax(snr, axis=1)
+            
             r_vec = params_der["ranges"][r_inds]
             v_vec = params_der["range_rates"][all_gmf_vars.v_ind[coh_ints, r_inds]]
             a_vec = params_der["accelerations"][all_gmf_vars.a_ind[coh_ints, r_inds]]
