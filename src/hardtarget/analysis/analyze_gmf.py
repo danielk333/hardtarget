@@ -194,7 +194,7 @@ def compute_gmf(
         progress_bar = tqdm(
             position=progress_position,
             desc=f"{progress_desc} {subprog_str}" if subprogress else progress_desc,
-            total=total,
+            total=total
         )
 
     ##########################################################
@@ -420,7 +420,7 @@ def compute_gmf(
             curr_num = f"{idx + 1}".ljust(extend_str_len, " ")
             subprog_str = f"[file {curr_num}/{total_num}]"
             progress_bar.set_description(
-                f"{progress_desc} {subprog_str}" if subprogress else progress_desc,
+                f"{progress_desc} {subprog_str}" if subprogress else progress_desc
             )
             tasks_skipped = 0
     if progress:

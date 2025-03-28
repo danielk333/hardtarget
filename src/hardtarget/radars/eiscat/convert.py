@@ -212,8 +212,8 @@ def convert(src, dst, name=None, compression=0, progress=False, logger=None,
         exp[prop] = str(meta_first["exp"].get(prop))
     exp["rx_channel"] = meta_first["exp"]["chnl"]
     exp["tx_channel"] = meta_first["exp"]["chnl"]
-    exp["sample_rate"] = int(meta_first["exp"]["sample_rate"])
-    exp["ipp"] = int(meta_first["exp"]["ipp"])
+    exp["sample_rate"] = str(int(meta_first["exp"]["sample_rate"]))
+    exp["ipp"] = str(int(meta_first["exp"]["ipp"]))
 
     # Bounds
     BOUNDS_SECTION = "Bounds"
