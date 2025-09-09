@@ -11,7 +11,6 @@ SOURCES = {
         "parser_build": convert_eiscat.parser_build,
         "add_parser_args": {
             "description": "Script converting eiscat data to drf format",
-            "usage": "%(prog)s [options] input -o output_folder",
         },
     },
 }

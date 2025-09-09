@@ -136,7 +136,6 @@ SOURCES = {
         "parser_build": cuda_parser_build,
         "add_parser_args": {
             "description": "Check cuda devices and functionality",
-            "usage": "%(prog)s",
         },
     },
     "range-gates": {
@@ -144,7 +143,6 @@ SOURCES = {
         "parser_build": range_gates_parser_build,
         "add_parser_args": {
             "description": "Check the available range gates (two-way range) of the target DRF",
-            "usage": "%(prog)s [options] path",
         },
     }
 }

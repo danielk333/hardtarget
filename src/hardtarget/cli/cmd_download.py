@@ -12,7 +12,6 @@ SOURCES = {
         "parser_build": download_eiscat.parser_build,
         "add_parser_args": {
             "description": "Script downloading eiscat",
-            "usage": "%(prog)s [options] input -o output_folder",
         },
     },
 }
