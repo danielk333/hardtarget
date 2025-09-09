@@ -16,6 +16,15 @@ except ImportError:
     exit(1)
 
 
+DEFAULT_IMPLS = ["numpy"]
+if len(hardtarget.GMF_LIBS[hardtarget.Impl.c]) > 0:
+    DEFAULT_IMPLS.append("c")
+if len(hardtarget.GMF_LIBS[hardtarget.Impl.cuda]) > 0:
+    DEFAULT_IMPLS.append("cuda")
+
+print(f"{DEFAULT_IMPLS=}")
+
+
 def compute_gmf_wrapper(x):
     job, kw = x
     hardtarget.compute_gmf(job=job, **kw)
@@ -152,7 +161,7 @@ def run_hardtarget(
 
 
 def print_results(config, data, headers, title):
-    print("\n" + "-"*10 + f"RESULTS {title}" + "-"*10)
+    print("\n" + "-" * 10 + f"RESULTS {title}" + "-" * 10)
     print("## CONFIG:")
     pprint(config, indent=4)
 
@@ -163,26 +172,20 @@ def print_results(config, data, headers, title):
     print("\n")
     print(tabulate(data, headers=headers, tablefmt="latex"))
 
-def fgmf_small_test(total_time, max_rg, cores=1):
+
+def fgmf_small_test(total_time, max_rg, cores=1, impls=DEFAULT_IMPLS):
     config = dict(
-        range_gate_lims = (6640, max_rg),
-        n_ipp = 10,
-        tau_ipp = 5,
-        total_time = total_time,
-        cores = cores,
+        range_gate_lims=(6640, max_rg),
+        n_ipp=10,
+        tau_ipp=5,
+        total_time=total_time,
+        cores=cores,
     )
     impl_data = []
-    impls = ["numpy", "c", "cuda"]
     for impl in tqdm(impls, desc="impl"):
-        dt = run_hardtarget(
-            gmf_conf = (impl, "fgmf"),
-            **config
-        )
+        dt = run_hardtarget(gmf_conf=(impl, "fgmf"), **config)
         impl_data.append(dt)
-    impl_data = [
-        [impl, dt, dt/max(impl_data)]
-        for dt, impl in zip(impl_data, impls)
-    ]
+    impl_data = [[impl, dt, dt / max(impl_data)] for dt, impl in zip(impl_data, impls)]
     print_results(
         config,
         impl_data,
@@ -191,27 +194,23 @@ def fgmf_small_test(total_time, max_rg, cores=1):
     )
 
 
-def fgmf_large_test(total_time, max_rgs):
+def fgmf_large_test(total_time, max_rgs, impls=DEFAULT_IMPLS):
     config = dict(
-        n_ipp = 10,
-        tau_ipp = 5,
-        total_time = total_time,
-        cores = 1,
+        n_ipp=10,
+        tau_ipp=5,
+        total_time=total_time,
+        cores=1,
     )
     min_rg = 6600
     impl_data = []
-    pbar = tqdm(total=len(max_rgs)*3, desc="impl-rgs sampling")
+    pbar = tqdm(total=len(max_rgs) * 3, desc="impl-rgs sampling")
     for max_rg in max_rgs:
         rg_data = []
-        for impl in ["numpy", "c", "cuda"]:
-            dt = run_hardtarget(
-                gmf_conf = (impl, "fgmf"),
-                range_gate_lims = (min_rg, max_rg),
-                **config
-            )
+        for impl in impls:
+            dt = run_hardtarget(gmf_conf=(impl, "fgmf"), range_gate_lims=(min_rg, max_rg), **config)
             pbar.update(1)
             rg_data.append(dt)
-        rg_data = [max_rg - min_rg] + rg_data + [x/max(rg_data)*100 for x in rg_data]
+        rg_data = [max_rg - min_rg] + rg_data + [x / max(rg_data) * 100 for x in rg_data]
         impl_data.append(rg_data)
     pbar.close()
     print_results(
@@ -230,38 +229,35 @@ def fgmf_large_test(total_time, max_rgs):
     )
 
 
-def fgmf_cores_test(total_times, max_rgs):
+def fgmf_cores_test(total_times, max_rgs, impls=DEFAULT_IMPLS):
     for total_time in total_times:
         config = dict(
-            n_ipp = 10,
-            tau_ipp = 5,
-            total_time = total_time,
+            n_ipp=10,
+            tau_ipp=5,
+            total_time=total_time,
         )
         test_cores = [1, 6]
         min_rg = 6600
         impl_data = []
-        pbar = tqdm(total=len(max_rgs)*3*len(test_cores), desc="impl-rgs sampling")
+        pbar = tqdm(total=len(max_rgs) * 3 * len(test_cores), desc="impl-rgs sampling")
         for max_rg in max_rgs:
             for cores in test_cores:
                 rg_data = []
-                for impl in ["numpy", "c"]:
+                for impl in impls:
+                    if cores > 1 and impl == "cuda":
+                        rg_data.append(0)
+                        continue
                     dt = run_hardtarget(
-                        gmf_conf = (impl, "fgmf"),
-                        range_gate_lims = (min_rg, max_rg),
-                        cores = cores,
-                        **config
+                        gmf_conf=(impl, "fgmf"),
+                        range_gate_lims=(min_rg, max_rg),
+                        cores=cores,
+                        **config,
                     )
                     pbar.update(1)
                     rg_data.append(dt)
-                dt = run_hardtarget(
-                    gmf_conf = ("cuda", "fgmf"),
-                    range_gate_lims = (min_rg, max_rg),
-                    cores = 1,
-                    **config
+                rg_data = (
+                    [max_rg - min_rg, cores] + rg_data + [x / max(rg_data) * 100 for x in rg_data]
                 )
-                pbar.update(1)
-                rg_data.append(dt)
-                rg_data = [max_rg - min_rg, cores] + rg_data + [x/max(rg_data)*100 for x in rg_data]
                 impl_data.append(rg_data)
         pbar.close()
         print_results(
@@ -283,27 +279,28 @@ def fgmf_cores_test(total_times, max_rgs):
 
 def fgmf_vs_fdpt(cores=1, total_time=10.0, max_rg=6700):
     config = dict(
-        range_gate_lims = (6600, max_rg),
-        n_ipp = 10,
-        tau_ipp = 5,
-        total_time = total_time,
-        cores = cores,
+        range_gate_lims=(6600, max_rg),
+        n_ipp=10,
+        tau_ipp=5,
+        total_time=total_time,
+        cores=cores,
     )
     impl_data = []
     impls = ["numpy", "c"]
     algs = ["fgmf", "fdpt"]
-    pbar = tqdm(total=len(impls)*len(algs), desc="impls and algs")
+    pbar = tqdm(total=len(impls) * len(algs), desc="impls and algs")
     for impl in impls:
         algs_dt = []
         for alg in algs:
-            dt = run_hardtarget(
-                gmf_conf = (impl, alg),
-                **config
-            )
+            dt = run_hardtarget(gmf_conf=(impl, alg), **config)
             pbar.update(1)
             algs_dt.append(dt)
         impl_data.append(
-            [impl,] + algs_dt + [x/max(algs_dt) for x in algs_dt]
+            [
+                impl,
+            ]
+            + algs_dt
+            + [x / max(algs_dt) for x in algs_dt]
         )
     pbar.close()
     print_results(
