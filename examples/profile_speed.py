@@ -44,7 +44,7 @@ def run_hardtarget(
         "rx_end": 20000,
         "cal_on": 19900.0,
         "cal_off": 19997.0,
-        "frequency": 929.6,
+        "radar_frequency": 929.6,
         "baud_length": 30.0,
         "code": hardtarget.load_radar_code("leo_bpark"),
     }

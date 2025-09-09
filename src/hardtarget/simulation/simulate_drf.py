@@ -58,7 +58,7 @@ def simulate_drf(
     samp_epoch = unix_epoch * sample_rate
 
     ipp_samp = np.round(experiment_params["ipp"] * 1e-6 * sample_rate).astype(np.int64)
-    wavelength = scipy.constants.c / (experiment_params["frequency"] * 1e6)
+    wavelength = scipy.constants.c / (experiment_params["radar_frequency"] * 1e6)
     T_rx_start_samp = np.round(experiment_params["rx_start"] * 1e-6 * sample_rate).astype(np.int64)
     T_rx_end_samp = np.round(experiment_params["rx_end"] * 1e-6 * sample_rate).astype(np.int64)
     T_rx_samps = T_rx_end_samp - T_rx_start_samp
@@ -115,7 +115,7 @@ def simulate_drf(
         tx_wave = waveform_generator(
             t_tx,
             experiment_params["baud_length"] * 1e-6,
-            experiment_params["frequency"] * 1e6,
+            experiment_params["radar_frequency"] * 1e6,
             experiment_params["code"][pid % codes],
             dtype=dtype,
         )
@@ -167,6 +167,7 @@ def simulate_drf(
         "tx_end",
         "cal_on",
         "cal_off",
+        "radar_frequency",
     ]
 
     for prop in props:
@@ -174,8 +175,6 @@ def simulate_drf(
             exp[prop] = str(experiment_params[prop])
     exp["rx_channel"] = chnl
     exp["tx_channel"] = chnl
-    # add
-    exp["radar_frequency"] = str(experiment_params["frequency"])
 
     if output_path is None:
         return simulated_signal

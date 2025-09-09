@@ -7,6 +7,7 @@ from hardtarget.gmf import Impl
 import hardtarget
 from pathlib import Path
 
+
 class TestBlackBoxComputeGMF:
     """
     It is possible that CUDA support is compiled, yet still non-functional.
@@ -102,12 +103,12 @@ class TestBlackBoxComputeGMF:
             "rx_end": 20000,
             "cal_on": 19900.0,
             "cal_off": 19997.0,
-            "frequency": 929.6,
+            "radar_frequency": 929.6,
             "baud_length": 30.0,
             "code": hardtarget.load_radar_code("leo_bpark"),
         }
 
-        wavelength = constants.c / (experiment_params["frequency"] * 1e6)
+        wavelength = constants.c / (experiment_params["radar_frequency"] * 1e6)
         print(wavelength)
 
         sample_rate = experiment_params["sample_rate"]
