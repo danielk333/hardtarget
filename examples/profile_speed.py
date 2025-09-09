@@ -160,7 +160,8 @@ def print_results(config, data, headers, title):
     print(tabulate(data, headers=headers))
     print("\n")
     print(json.dumps(data, indent=4))
-
+    print("\n")
+    print(tabulate(data, headers=headers, tablefmt="latex"))
 
 def fgmf_small_test(total_time, max_rg, cores=1):
     config = dict(
@@ -229,62 +230,63 @@ def fgmf_large_test(total_time, max_rgs):
     )
 
 
-def fgmf_cores_test(total_time, max_rgs):
-    config = dict(
-        n_ipp = 10,
-        tau_ipp = 5,
-        total_time = total_time,
-    )
-    test_cores = [1, 6]
-    min_rg = 6600
-    impl_data = []
-    pbar = tqdm(total=len(max_rgs)*3*len(test_cores), desc="impl-rgs sampling")
-    for max_rg in max_rgs:
-        for cores in test_cores:
-            rg_data = []
-            for impl in ["numpy", "c"]:
+def fgmf_cores_test(total_times, max_rgs):
+    for total_time in total_times:
+        config = dict(
+            n_ipp = 10,
+            tau_ipp = 5,
+            total_time = total_time,
+        )
+        test_cores = [1, 6]
+        min_rg = 6600
+        impl_data = []
+        pbar = tqdm(total=len(max_rgs)*3*len(test_cores), desc="impl-rgs sampling")
+        for max_rg in max_rgs:
+            for cores in test_cores:
+                rg_data = []
+                for impl in ["numpy", "c"]:
+                    dt = run_hardtarget(
+                        gmf_conf = (impl, "fgmf"),
+                        range_gate_lims = (min_rg, max_rg),
+                        cores = cores,
+                        **config
+                    )
+                    pbar.update(1)
+                    rg_data.append(dt)
                 dt = run_hardtarget(
-                    gmf_conf = (impl, "fgmf"),
+                    gmf_conf = ("cuda", "fgmf"),
                     range_gate_lims = (min_rg, max_rg),
-                    cores = cores,
+                    cores = 1,
                     **config
                 )
                 pbar.update(1)
                 rg_data.append(dt)
-            dt = run_hardtarget(
-                gmf_conf = ("cuda", "fgmf"),
-                range_gate_lims = (min_rg, max_rg),
-                cores = 1,
-                **config
-            )
-            pbar.update(1)
-            rg_data.append(dt)
-            rg_data = [max_rg - min_rg, cores] + rg_data + [x/max(rg_data)*100 for x in rg_data]
-            impl_data.append(rg_data)
-    pbar.close()
-    print_results(
-        config,
-        impl_data,
-        headers=[
-            "Range gates",
-            "Cores",
-            "numpy [s]",
-            "c [s]",
-            "cuda [s]",
-            "numpy [%]",
-            "c [%]",
-            "cuda [%]",
-        ],
-        title="FastGMF implementation vs range gate size",
-    )
+                rg_data = [max_rg - min_rg, cores] + rg_data + [x/max(rg_data)*100 for x in rg_data]
+                impl_data.append(rg_data)
+        pbar.close()
+        print_results(
+            config,
+            impl_data,
+            headers=[
+                "Range gates",
+                "Cores",
+                "numpy [s]",
+                "c [s]",
+                "cuda [s]",
+                "numpy [%]",
+                "c [%]",
+                "cuda [%]",
+            ],
+            title="FastGMF implementation vs range gate size",
+        )
 
 
-def fgmf_vs_fdpt(cores=1):
+def fgmf_vs_fdpt(cores=1, total_time=10.0, max_rg=6700):
     config = dict(
-        range_gate_lims = (6600, 6700),
+        range_gate_lims = (6600, max_rg),
         n_ipp = 10,
         tau_ipp = 5,
-        total_time = 10.0,
+        total_time = total_time,
         cores = cores,
     )
     impl_data = []
@@ -315,12 +317,15 @@ def fgmf_vs_fdpt(cores=1):
 
 
 scenarios = {
-    "alg_vs": fgmf_vs_fdpt,
+    "alg_vs": lambda: fgmf_vs_fdpt(cores=1, total_time=10.0, max_rg=6700),
+    "alg_vs_long": lambda: fgmf_vs_fdpt(cores=1, total_time=100.0, max_rg=6700),
+    "alg_vs_much": lambda: fgmf_vs_fdpt(cores=1, total_time=10.0, max_rg=7700),
     "fgmf-impl": lambda: fgmf_small_test(total_time=4.0, max_rg=6700),
-    "fgmf-impl-long": lambda: fgmf_small_test(total_time=100.0, max_rg=8000),
+    "fgmf-impl-long": lambda: fgmf_small_test(total_time=20.0, max_rg=8000),
     "fgmf-impl-mat": lambda: fgmf_large_test(total_time=4.0, max_rgs=[6700, 6800, 7000]),
     "fgmf-impl-mat-long": lambda: fgmf_large_test(total_time=20.0, max_rgs=[6700, 7000]),
-    "fgmf-impl-cores": lambda: fgmf_cores_test(total_time=20.0, max_rgs=[6700, 7000]),
+    "fgmf-impl-cores": lambda: fgmf_cores_test(total_times=[20.0], max_rgs=[6700, 8000]),
+    "fgmf-impl-cores-time": lambda: fgmf_cores_test(total_times=[20.0, 200.0], max_rgs=[6700]),
 }
 
 parser = argparse.ArgumentParser()
