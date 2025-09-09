@@ -79,7 +79,7 @@ def main(args):
         relative_time=args.relative_time,
         progress=args.progress,
         progress_position=job["idx"],
-        logger=logger
+        logger=logger,
     )
 
     logger.info(f"produced {len(results['files'])} files")

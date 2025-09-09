@@ -14,10 +14,11 @@ def build_parser():
     parser = argparse.ArgumentParser(description="Radar hard target processing toolbox")
 
     # Top level functionality
-    parser.add_argument('--version', action='store_true',
-                        help='package version')
+    parser.add_argument("--version", action="store_true", help="package version")
 
-    parser.add_argument("-v", "--verbose", help="increase output verbosity", action="count", default=0)
+    parser.add_argument(
+        "-v", "--verbose", help="increase output verbosity", action="count", default=0
+    )
 
     # Sub level parsers
     subparsers = parser.add_subparsers(help="available command line interfaces", dest="command")
@@ -35,7 +36,6 @@ def add_command(name, function, parser_build, add_parser_args={}):
     Add a new command.
     Used by CLI scripts in order register new commands
     """
-    global COMMANDS
     COMMANDS[name] = dict()
     COMMANDS[name]["function"] = function
     COMMANDS[name]["parser"] = (parser_build, add_parser_args)

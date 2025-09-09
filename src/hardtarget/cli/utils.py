@@ -42,12 +42,12 @@ def unit_to_range_gate(val, unit, sample_rate):
     if unit == "sample":
         return val
     val = unit_to_SI(val, unit)
-    val = sample_rate*val/constants.c - 1
+    val = sample_rate * val / constants.c - 1
     return np.round(val).astype(np.int64)
 
 
 def range_gate_to_unit(val, unit, sample_rate):
     if unit == "sample":
         return val
-    val = constants.c*val/sample_rate + 1
+    val = constants.c * val / sample_rate + 1
     return SI_to_unit(val, unit)

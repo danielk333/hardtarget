@@ -26,7 +26,6 @@ SOURCES = {
 
 
 def parser_build(parser):
-    global SOURCES
     subparsers = parser.add_subparsers(help="hardtarget file types", dest="filetype")
     subparsers.required = True
     for source in SOURCES:
@@ -37,7 +36,6 @@ def parser_build(parser):
 
 
 def main(args):
-    global SOURCES
     function = SOURCES[args.filetype]["main"]
     logger.info(f"Executing command {args.command} {args.filetype}")
     function(args)

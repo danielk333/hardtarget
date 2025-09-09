@@ -23,7 +23,8 @@ def parser_build(parser):
         help="Desired ending range in given unit",
     )
     parser.add_argument(
-        "-u", "--unit",
+        "-u",
+        "--unit",
         choices=["sample", "m", "km", "R_E", "LD", "AU"],
         help="Unit for start and end ranges, default [km]",
         default="km",
