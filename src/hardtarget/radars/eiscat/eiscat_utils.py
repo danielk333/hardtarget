@@ -75,6 +75,8 @@ def parse_foldername(product_folder):
     gets the chnl name. This function would be obsolete, if correct chnl
     name was parsed from metadata instead. At this time, we are useing the
     folder as a quick solution.
+
+    TODO: make away with this solution - its very restrictive
     """
     product_folder = Path(product_folder)
     tokens = product_folder.name.split("_")
@@ -141,6 +143,9 @@ def eiscat_files(productpath, start=None, end=None, count=None):
 
     subdirs = [d for d in productpath.iterdir() if d.is_dir()]
     files = []
+    # files += [f for f in productpath.iterdir() if ok(f)]
+    # this conversion system is way to ridgid, what if i just want to 
+    # convert a few files??
     for subdir in subdirs:
         files += [f for f in subdir.iterdir() if ok(f)]
 
