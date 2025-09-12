@@ -92,6 +92,7 @@ def collect_gmf_data(paths, mats=None, vecs=None):
             "gmf_optimized",
             "gmf_peak",
             "tx_power",
+            "snr",
             "t"
         ]
     derived = ["t", "nf_vec"]
@@ -374,6 +375,7 @@ GMFOutArgs = namedtuple(
         "accelerations",
         "sample_numbers",
         "vals",
+        "snr",
         "dc",
         "v_ind",
         "a_ind",
@@ -437,6 +439,11 @@ def define_grid_variables(gmf_out_args):
             "data": gmf_out_args.vals,
             "dims": [("integration_index", "t"), ("ranges", "r")],
             "long_name": "Generalized Matched Filter output values",
+        },
+        "snr": {
+            "data": gmf_out_args.snr,
+            "dims": [("integration_index", "t")],
+            "long_name": "SNR for best range gate index",
         },
         "gmf_zero_frequency": {
             "data": gmf_out_args.dc,

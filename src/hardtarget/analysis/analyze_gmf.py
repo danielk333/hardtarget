@@ -373,6 +373,7 @@ def compute_gmf(
                 accelerations=gmf_params["DER"]["accelerations"],
                 sample_numbers=sample_numbers,
                 vals=all_gmf_vars.vals,
+                snr=np.max(snr, axis=1),
                 dc=all_gmf_vars.dc,
                 v_ind=all_gmf_vars.v_ind,
                 a_ind=all_gmf_vars.a_ind,
