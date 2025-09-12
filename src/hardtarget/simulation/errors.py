@@ -6,15 +6,15 @@ TODO: This feels like it should be in hardtarget? that already has all the model
 needed... also it would be nice the have errors as a standard output of processing
 """
 import pathlib
+import shutil
 import numpy as np
-import h5py
-import scipy.interpolate
-import scipy.constants as consts
-import scipy.signal
-from tqdm import tqdm
+import scipy.constants
 
-from hardtarget.simulation import drf as simulate_drf
-import hardtarget
+from .simulate_drf import simulate_drf
+from hardtarget.radars.eiscat import load_radar_code
+from hardtarget import noise
+from hardtarget.drf_utils import load_hardtarget_drf
+from hardtarget.analysis import compute_gmf, load_gmf_out
 
 
 def linearized_mle_covariance(
@@ -23,8 +23,8 @@ def linearized_mle_covariance(
     vel0,
     acel0,
     n_ipp=10,
-    dr=100.0,
-    dv=10.0,
+    dr=10.0,
+    dv=1.0,
     da=1.0,
 ):
     """ """
@@ -40,7 +40,7 @@ def linearized_mle_covariance(
         "cal_off": 19997.0,
         "radar_frequency": 929.6,
         "baud_length": 30.0,
-        "code": hardtarget.load_radar_code("leo_bpark"),
+        "code": load_radar_code("leo_bpark"),
     }
     snr = 10.0 ** (snr_db * 0.1)
     ipp = experiment_params["ipp"] * 1e-6
@@ -91,8 +91,7 @@ def linearized_mle_covariance(
         experiment_params["tx_pulse_length"] * 1e-6 * experiment_params["sample_rate"]
     ).astype(np.int64)
     coh_samples = tx_pulse_samps * n_ipp
-    # todo: check if snr calc makes sense
-    z_sigma_inv = 2 * snr * coh_samples
+    z_sigma_inv = snr / (2 * coh_samples)
     S = np.linalg.inv(np.real(np.transpose(np.conj(A)) @ A * z_sigma_inv))
     return S
 
@@ -121,7 +120,7 @@ def monte_carlo_sample_errors(
         "cal_off": 19997.0,
         "radar_frequency": 929.6,
         "baud_length": 30.0,
-        "code": hardtarget.load_radar_code("leo_bpark"),
+        "code": load_radar_code("leo_bpark"),
     }
     rg0 = np.round((range0 / scipy.constants.c) * experiment_params["sample_rate"]).astype(np.int64)
     rg1 = rg0 + len(experiment_params["code"][0])
@@ -160,7 +159,7 @@ def monte_carlo_sample_errors(
     ).astype(np.int64)
     coh_samples = tx_pulse_samps * n_ipp
     snr = 10.0 ** (snr_db * 0.1)
-    noise_sigma = np.sqrt(1 / (2 * snr * coh_samples))
+    # noise_sigma = np.sqrt(1 / (2 * snr * coh_samples))
 
     coh_int_time = n_ipp * experiment_params["ipp"] * 1e-6
     sim_len = coh_int_time * samples
@@ -171,8 +170,8 @@ def monte_carlo_sample_errors(
         "end_time": sim_len,
         "target_start_time": 0,
         "target_end_time": sim_len,
-        "noise_sigma": noise_sigma,
-        "tx_amp": 1,
+        "noise_sigma": 1,
+        "tx_amp": 1000,
     }
     rx_channel = "sim"
 
@@ -181,11 +180,12 @@ def monte_carlo_sample_errors(
         return range0 + vel0 * _t + acel0 * 0.5 * _t**2
 
     try:
-        hardtarget.simulation.drf(
+        simulate_drf(
             drf_path,
             range_function,
             simulation_params,
             experiment_params,
+            snr_function=lambda t: np.full_like(t, snr / coh_samples),
             chnl=rx_channel,
             dtype=np.complex64,
             clobber=clobber,
@@ -193,9 +193,12 @@ def monte_carlo_sample_errors(
     except FileExistsError:
         pass
 
-    reader, params = hardtarget.drf_utils.load_hardtarget_drf(drf_path)
+    reader, params = load_hardtarget_drf(drf_path)
 
-    hardtarget.compute_gmf(
+    if clobber and gmf_path.is_dir():
+        shutil.rmtree(gmf_path)
+
+    compute_gmf(
         rx=(drf_path, rx_channel),
         tx=(drf_path, rx_channel),
         config=config_path,
@@ -211,8 +214,9 @@ def monte_carlo_sample_errors(
         "delta_r": np.full((samples,), np.nan, dtype=np.float64),
         "delta_v": np.full((samples,), np.nan, dtype=np.float64),
         "delta_a": np.full((samples,), np.nan, dtype=np.float64),
+        "delta_snr": np.full((samples,), np.nan, dtype=np.float64),
     }
-    data_generator = hardtarget.load_gmf_out(gmf_path)
+    data_generator = load_gmf_out(gmf_path)
     index = 0
     for data, meta in data_generator:
         data_len = len(data["range_peak"])
@@ -220,7 +224,10 @@ def monte_carlo_sample_errors(
         dr = data["range_peak"] - range0
         dv = data["range_rate_peak"] - vel0
         da = data["acceleration_peak"] - acel0
+        dsnr = data["snr"] - snr
         errors["delta_r"][index : (index + data_len)] = dr
         errors["delta_v"][index : (index + data_len)] = dv
         errors["delta_a"][index : (index + data_len)] = da
+        errors["delta_snr"][index : (index + data_len)] = dsnr
+    errors["cov"] = np.cov(np.stack([data["range_peak"], data["range_rate_peak"], data["acceleration_peak"]]))
     return errors

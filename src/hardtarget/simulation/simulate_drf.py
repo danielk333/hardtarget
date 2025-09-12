@@ -69,6 +69,8 @@ def simulate_drf(
     T_tx_start_samp = np.round(experiment_params["tx_start"] * 1e-6 * sample_rate).astype(np.int64)
     T_tx_end_samp = np.round(experiment_params["tx_end"] * 1e-6 * sample_rate).astype(np.int64)
     T_tx_samps = T_tx_end_samp - T_tx_start_samp
+    T_tx_select = np.full((ipp_samp,), False, dtype=bool)
+    T_tx_select[T_tx_start_samp:T_tx_end_samp] = True
 
     samp_t0 = samp_epoch + sim_params["start_time"] * sample_rate
     samp_t0 = np.round((samp_t0 // ipp_samp) * ipp_samp).astype(np.int64)
@@ -124,7 +126,7 @@ def simulate_drf(
 
         if include_tx_signal:
             # TODO: this assumes rx streches over tx, generalize
-            signal[T_tx_start_samp:T_tx_end_samp] += tx_amp0*tx_wave
+            signal[T_tx_select] += tx_amp0*tx_wave
 
         s0 = samp0 + T_tx_start_samp
         s1 = s0 + T_tx_samps / sample_rate
