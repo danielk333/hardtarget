@@ -303,7 +303,7 @@ def compute_gmf(
         # of collecting all the data
         ts0 = time.time()
         num_cohints = num_cohints_per_file
-        if file_idx_sample + num_cohints_per_file * ipp_samp * n_ipp > bounds[1]:
+        if file_idx_sample + num_cohints_per_file * ipp_samp * n_ipp - 1 > bounds[1]:
             num_cohints = int((bounds[1] - file_idx_sample) // (ipp_samp * n_ipp))
         start_cohind = 0
         # TODO: until this is fixed, adaptive start interval disabled
