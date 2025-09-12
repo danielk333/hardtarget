@@ -33,6 +33,7 @@ def simulate_drf(
     file_cadence_millisecs=1000,
     chnl="sim",
     clobber=False,
+    include_tx_signal=True,
     dtype=np.complex128,
 ):
     """
@@ -121,8 +122,9 @@ def simulate_drf(
         )
         tx_amp0 = sim_params["tx_amp"] if "tx_amp" in sim_params else 1.0
 
-        # TODO: this assumes rx streches over tx, generalize
-        signal[T_tx_start_samp:T_tx_end_samp] += tx_amp0*tx_wave
+        if include_tx_signal:
+            # TODO: this assumes rx streches over tx, generalize
+            signal[T_tx_start_samp:T_tx_end_samp] += tx_amp0*tx_wave
 
         s0 = samp0 + T_tx_start_samp
         s1 = s0 + T_tx_samps / sample_rate
@@ -135,7 +137,10 @@ def simulate_drf(
 
             if rg_samp0 >= T_rx_start_samp and rg_samp0 <= T_rx_end_samp:
                 if sim_params["noise_sigma"] > 0:
-                    amp0 = np.sqrt(sn0*2*sim_params["noise_sigma"]**2)
+                    if snr_function is None:
+                        amp0 = 1
+                    else:
+                        amp0 = np.sqrt(sn0*2*sim_params["noise_sigma"]**2)
                 else:
                     amp0 = np.sqrt(sn0)
                 ranges = range_function(t0 + t_tx)
