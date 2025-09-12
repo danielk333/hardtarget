@@ -36,6 +36,8 @@ def compute_gmf(
     """
     Performs GMF analysis on Hardtarget DRF.
 
+    #TODO: this should be able to take data directly from RAM
+
     Example
     -------
 
@@ -167,7 +169,7 @@ def compute_gmf(
 
     num_cohints = num_cohints_per_file
     file_idx_sample = np.max(job_tasks) * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
-    if file_idx_sample + num_cohints_per_file * ipp_samp * n_ipp > bounds[1]:
+    if file_idx_sample + num_cohints_per_file * ipp_samp * n_ipp - 1 > bounds[1]:
         num_cohints = int((bounds[1] - file_idx_sample) // (ipp_samp * n_ipp))
     job_cohints += num_cohints
     num_cohints = num_cohints_per_file
