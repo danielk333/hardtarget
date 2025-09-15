@@ -107,18 +107,22 @@ def monte_carlo_sample_errors(
     gmf_method="fgmf",
     gmf_implementation="c",
     n_ipp=10,
+    sample_rate=1_000_000,
+    ipp=2e-2,
+    tx_pulse_length=2e-3,
+    radar_frequency=930e6,
 ):
     experiment_params = {
-        "sample_rate": 1000000,
-        "ipp": 20000,
-        "tx_pulse_length": 1920.0,
-        "tx_start": 82.0,
-        "tx_end": 2002.0,
+        "sample_rate": sample_rate,
+        "ipp": ipp * 1e6,
+        "tx_pulse_length": tx_pulse_length * 1e6,
+        "tx_start": 0,
+        "tx_end": tx_pulse_length * 1e6,
         "rx_start": 0,
-        "rx_end": 20000,
-        "cal_on": 19900.0,
-        "cal_off": 19997.0,
-        "radar_frequency": 929.6,
+        "rx_end": ipp * 1e6,
+        "cal_on": 0,
+        "cal_off": 0,
+        "radar_frequency": radar_frequency * 1e-6,
         "baud_length": 30.0,
         "code": load_radar_code("leo_bpark"),
     }
@@ -159,10 +163,13 @@ def monte_carlo_sample_errors(
     ).astype(np.int64)
     coh_samples = tx_pulse_samps * n_ipp
     snr = 10.0 ** (snr_db * 0.1)
-    # noise_sigma = np.sqrt(1 / (2 * snr * coh_samples))
+    if not isinstance(snr, np.ndarray):
+        snr = np.array([snr])
+    snr_len = len(snr)
 
     coh_int_time = n_ipp * experiment_params["ipp"] * 1e-6
-    sim_len = coh_int_time * samples
+    step_size = coh_int_time * samples
+    sim_len = step_size * snr_len
 
     simulation_params = {
         "epoch": "2021-04-12T12:15:40",
@@ -171,7 +178,7 @@ def monte_carlo_sample_errors(
         "target_start_time": 0,
         "target_end_time": sim_len,
         "noise_sigma": 1,
-        "tx_amp": 1000,
+        "tx_amp": 10000,
     }
     rx_channel = "sim"
 
@@ -185,7 +192,7 @@ def monte_carlo_sample_errors(
             range_function,
             simulation_params,
             experiment_params,
-            snr_function=lambda t: np.full_like(t, snr / coh_samples),
+            snr_function=lambda t: snr[np.floor(t / step_size).astype(np.int64)] / coh_samples,
             chnl=rx_channel,
             dtype=np.complex64,
             clobber=clobber,
@@ -208,13 +215,14 @@ def monte_carlo_sample_errors(
         output=gmf_path,
         progress=True,
         subprogress=True,
+        noise_power=2 * simulation_params["noise_sigma"] ** 2,
     )
 
-    errors = {
-        "delta_r": np.full((samples,), np.nan, dtype=np.float64),
-        "delta_v": np.full((samples,), np.nan, dtype=np.float64),
-        "delta_a": np.full((samples,), np.nan, dtype=np.float64),
-        "delta_snr": np.full((samples,), np.nan, dtype=np.float64),
+    results = {
+        "delta_r": np.full((samples * snr_len,), np.nan, dtype=np.float64),
+        "delta_v": np.full((samples * snr_len,), np.nan, dtype=np.float64),
+        "delta_a": np.full((samples * snr_len,), np.nan, dtype=np.float64),
+        "delta_snr": np.full((samples * snr_len,), np.nan, dtype=np.float64),
     }
     data_generator = load_gmf_out(gmf_path)
     index = 0
@@ -224,10 +232,19 @@ def monte_carlo_sample_errors(
         dr = data["range_peak"] - range0
         dv = data["range_rate_peak"] - vel0
         da = data["acceleration_peak"] - acel0
-        dsnr = data["snr"] - snr
-        errors["delta_r"][index : (index + data_len)] = dr
-        errors["delta_v"][index : (index + data_len)] = dv
-        errors["delta_a"][index : (index + data_len)] = da
-        errors["delta_snr"][index : (index + data_len)] = dsnr
-    errors["cov"] = np.cov(np.stack([data["range_peak"], data["range_rate_peak"], data["acceleration_peak"]]))
-    return errors
+        results["range"] = data["range_peak"]
+        results["range_rate"] = data["range_rate_peak"]
+        results["acceleration"] = data["acceleration_peak"]
+        results["snr"] = np.max(data["snr"], axis=1)
+        dsnr = np.max(data["snr"], axis=1)
+        for ind in range(snr_len):
+            dsnr[(ind * samples) : ((ind + 1) * samples)] =- snr[ind]
+        results["delta_r"][index : (index + data_len)] = dr
+        results["delta_v"][index : (index + data_len)] = dv
+        results["delta_a"][index : (index + data_len)] = da
+        results["delta_snr"][index : (index + data_len)] = dsnr
+        index += data_len
+    results["cov"] = np.cov(
+        np.stack([data["range_peak"], data["range_rate_peak"], data["acceleration_peak"]])
+    )
+    return results

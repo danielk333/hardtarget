@@ -20,7 +20,7 @@ def to_relative_range_gate(ranges, meta):
 
 
 def plot_peaks(axes, data, meta, monostatic=True, snr_dB_limit=15.0):
-    r_inds = np.argmax(data["gmf"], axis=1)
+    r_inds = np.argmax(data["snr"], axis=1)
     coh_inds = np.arange(data["gmf"].shape[0])
 
     optimized = "gmf_optimized_peak" in data
@@ -28,7 +28,9 @@ def plot_peaks(axes, data, meta, monostatic=True, snr_dB_limit=15.0):
     min_acc = meta["processing"]["min_acceleration"]
     max_acc = meta["processing"]["max_acceleration"]
 
-    snr = noise.snr(data["gmf"], data["nf_range"])
+    # snr = noise.snr(data["gmf"], data["nf_range"])
+    # todo: for now just grab snr from here?
+    snr = data["snr"]
     if optimized:
         range_gates = to_relative_range_gate(data["gmf_optimized_peak"][:, 0], meta)
         snr_opt = noise.snr(data["gmf_optimized"], data["nf_range"], range_gates=range_gates)
@@ -86,13 +88,14 @@ def plot_peaks(axes, data, meta, monostatic=True, snr_dB_limit=15.0):
 
 
 def plot_detections(axes, data, meta, monostatic=True, snr_dB_limit=15.0):
-    r_inds = np.argmax(data["gmf"], axis=1)
+    r_inds = np.argmax(data["snr"], axis=1)
     coh_inds = np.arange(data["gmf"].shape[0])
 
     min_acc = meta["processing"]["min_acceleration"]
     max_acc = meta["processing"]["max_acceleration"]
 
-    snr = noise.snr(data["gmf"], data["nf_range"])
+    # snr = noise.snr(data["gmf"], data["nf_range"])
+    snr = data["snr"]
     snr = snr[coh_inds, r_inds]
     snrdb = 10 * np.log10(snr)
 

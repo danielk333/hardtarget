@@ -19,8 +19,9 @@ FLOAT_PROPS = [
     "cal_on",
     "cal_off",
     "radar_frequency",
+    "ipp",
 ]
-INT_PROPS = ["sample_rate", "ipp"]
+INT_PROPS = ["sample_rate"]
 BOOL_PROPS = []
 SECTIONS = ["Experiment"]
 

@@ -79,6 +79,7 @@ def collect_gmf_data(paths, mats=None, vecs=None):
             "gmf",
             "gmf_optimized_peak",
             "gmf_zero_frequency",
+            "snr",
             "range_rate_index",
             "acceleration_index",
             "nf_vec",
@@ -92,7 +93,6 @@ def collect_gmf_data(paths, mats=None, vecs=None):
             "gmf_optimized",
             "gmf_peak",
             "tx_power",
-            "snr",
             "t"
         ]
     derived = ["t", "nf_vec"]

@@ -16,6 +16,7 @@ from scipy.signal import savgol_filter
 # ANALYZE GMF
 ####################################################################
 
+
 def compute_gmf(
     rx,
     tx,
@@ -23,6 +24,7 @@ def compute_gmf(
     start_time=None,
     end_time=None,
     relative_time=False,
+    noise_power=None,
     job=None,
     progress=False,
     progress_position=0,
@@ -31,7 +33,7 @@ def compute_gmf(
     output=None,
     gmf_method=None,
     gmf_implementation=None,
-    logger=None
+    logger=None,
 ):
     """
     Performs GMF analysis on Hardtarget DRF.
@@ -159,7 +161,8 @@ def compute_gmf(
     ##########################################################
 
     total_tasks = utils.compute_total_tasks(
-        ipp, n_ipp,
+        ipp,
+        n_ipp,
         num_cohints_per_file,
         bounds,
     )
@@ -175,7 +178,9 @@ def compute_gmf(
     num_cohints = num_cohints_per_file
     file_idx_sample = np.min(job_tasks) * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
     if file_idx_sample < bounds[0]:
-        num_cohints = num_cohints_per_file - int((bounds[0] - file_idx_sample) // (ipp_samp * n_ipp))
+        num_cohints = num_cohints_per_file - int(
+            (bounds[0] - file_idx_sample) // (ipp_samp * n_ipp)
+        )
     job_cohints += num_cohints
 
     tasks_skipped = 0
@@ -196,7 +201,7 @@ def compute_gmf(
         progress_bar = tqdm(
             position=progress_position,
             desc=f"{progress_desc} {subprog_str}" if subprogress else progress_desc,
-            total=total
+            total=total,
         )
 
     ##########################################################
@@ -242,8 +247,8 @@ def compute_gmf(
         file_idx_sample = task_idx * ipp_samp * n_ipp * num_cohints_per_file + bounds[0]
 
         # filenames are in unix time microseconds
-        epoch_unix_us = file_idx_sample / (sample_rate/1000000)
-        epoch_unix = epoch_unix_us.astype("float64")/1000000
+        epoch_unix_us = file_idx_sample / (sample_rate / 1000000)
+        epoch_unix = epoch_unix_us.astype("float64") / 1000000
         epoch_unix_us = epoch_unix_us.astype("int64")
         filepath = utils.get_filepath(epoch_unix_us)
 
@@ -292,11 +297,13 @@ def compute_gmf(
             # 3) run hardtarget with an optimize method to refine events and get optimal SNR
             # 4) run resordan to create event files
             with h5py.File(outfile, "r") as hf:
-                gmf_starts = np.stack([
-                    hf["range_peak"][()],
-                    hf["range_rate_peak"][()],
-                    hf["acceleration_peak"][()],
-                ])
+                gmf_starts = np.stack(
+                    [
+                        hf["range_peak"][()],
+                        hf["range_rate_peak"][()],
+                        hf["acceleration_peak"][()],
+                    ]
+                )
 
         # process
         # TODO: in case the RAM load is too heavy, this should write directly to disk instead
@@ -354,10 +361,14 @@ def compute_gmf(
             sample_numbers = np.arange(gmf_params["PRO"]["read_length"])
             coh_ints = np.arange(num_cohints)
 
-            # Substracting background level
-            noise_floor = np.nanmedian(all_gmf_vars.dc, axis=0)
-            noise_floor = savgol_filter(noise_floor, 2000, 1, mode='nearest')
-            snr = (np.sqrt(all_gmf_vars.vals) - np.sqrt(noise_floor[None, :])) ** 2 / noise_floor[None, :]
+            if noise_power is None:
+                # Substracting background level
+                noise_floor = np.nanmedian(all_gmf_vars.dc, axis=0)
+                noise_floor = savgol_filter(noise_floor, 2000, 1, mode="nearest")
+                snr = (np.sqrt(all_gmf_vars.vals) - np.sqrt(noise_floor[None, :])) ** 2 / noise_floor[None, :]
+            else:
+                snr = (np.sqrt(all_gmf_vars.vals) - np.sqrt(noise_power)) ** 2 / noise_power
+
             # finding peaks
             r_inds = np.argmax(snr, axis=1)
 
@@ -373,7 +384,7 @@ def compute_gmf(
                 accelerations=gmf_params["DER"]["accelerations"],
                 sample_numbers=sample_numbers,
                 vals=all_gmf_vars.vals,
-                snr=np.max(snr, axis=1),
+                snr=snr,
                 dc=all_gmf_vars.dc,
                 v_ind=all_gmf_vars.v_ind,
                 a_ind=all_gmf_vars.a_ind,
@@ -402,7 +413,9 @@ def compute_gmf(
             if libtype == MethodType.grid:
                 utils.dump_gmf_out(gmf_out_args, gmf_params, outfile, mode="w", meta=True)
             elif libtype == MethodType.optimize:
-                utils.dump_gmf_out(gmf_out_args, gmf_params, outfile, clobber=clobber, mode="a", meta=False)
+                utils.dump_gmf_out(
+                    gmf_out_args, gmf_params, outfile, clobber=clobber, mode="a", meta=False
+                )
 
             # Copy gmf config file to output
             config = Path(config)
@@ -509,27 +522,23 @@ def grid_integrate_and_match_ipps(rx, tx, start_sample, gmf_params, gmf_lib, lib
     tx_amp = np.sqrt(tx_pwr)
     z_tx = np.conj(z_tx) / tx_amp
 
-    size = (gmf_params["PRO"]["n_ranges"], )
+    size = (gmf_params["PRO"]["n_ranges"],)
     gmf_vars = utils.GMFVariables(
-        vals = np.zeros(size, dtype=np.float32),
-        dc = np.zeros(size, dtype=np.float32),
-        v_ind = np.full(size, -1, dtype=np.int32),
-        a_ind = np.full(size, -1, dtype=np.int32),
-        tx_pwr = tx_pwr,
+        vals=np.zeros(size, dtype=np.float32),
+        dc=np.zeros(size, dtype=np.float32),
+        v_ind=np.full(size, -1, dtype=np.int32),
+        a_ind=np.full(size, -1, dtype=np.int32),
+        tx_pwr=tx_pwr,
     )
 
     if tx_amp > 1.0:
-        gmf_lib(
-            z_tx,
-            z_rx,
-            gmf_vars,
-            gmf_params,
-            **lib_kwargs
-        )
+        gmf_lib(z_tx, z_rx, gmf_vars, gmf_params, **lib_kwargs)
     return gmf_vars
 
 
-def optimize_integrate_and_match_ipps(rx, tx, start_sample, gmf_start, gmf_params, gmf_lib, lib_kwargs):
+def optimize_integrate_and_match_ipps(
+    rx, tx, start_sample, gmf_start, gmf_params, gmf_lib, lib_kwargs
+):
     """
     TODO: do this docstring
 
@@ -544,17 +553,13 @@ def optimize_integrate_and_match_ipps(rx, tx, start_sample, gmf_start, gmf_param
     z_tx = np.conj(z_tx) / tx_amp
 
     gmf_vars = utils.GMFOptimizeVariables(
-        peak = np.zeros((3, ), dtype=np.float64),
-        peak_val = np.zeros((1, ), dtype=np.float64),
+        peak=np.zeros((3,), dtype=np.float64),
+        peak_val=np.zeros((1,), dtype=np.float64),
     )
 
     if tx_amp > 1.0:
         gmf_vars.peak[:], gmf_vars.peak_val[0] = gmf_lib(
-            z_tx,
-            z_ipp,
-            gmf_params,
-            gmf_start,
-            **lib_kwargs
+            z_tx, z_ipp, gmf_params, gmf_start, **lib_kwargs
         )
 
     return gmf_vars
