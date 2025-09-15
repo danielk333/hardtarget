@@ -42,7 +42,7 @@ axes[1].set_ylabel("Velocity [m/s]")
 axes[2].plot(results["acceleration"], ".")
 axes[2].set_xlabel("Sample")
 axes[2].set_ylabel("Acceleration [m/s^2]")
-axes[3].plot(np.log10(results["snr"])*10, ".")
+axes[3].plot(np.log10(results["snr"]) * 10, ".")
 axes[3].set_xlabel("Sample")
 axes[3].set_ylabel("SNR [dB]")
 
@@ -70,3 +70,25 @@ axes[3].set_ylabel("SNR [1]")
 
 
 plt.show()
+
+# # For some reason this does not work - changing sampling frequency somewhere breaks the analysis!
+# # TODO: fix so that analysis can use arbitrary sampling rates
+# # Also the other experiment parameters dont work!!!
+# sample_rates = [500_000, 1_000_000, 2_000_000]
+# num = len(sample_rates)
+#
+# results = []
+# for ind in range(num):
+#     result = monte_carlo_sample_errors(
+#         snr_db=40,
+#         range0=2000e3,
+#         vel0=0.3e3,
+#         acel0=-0.1e3,
+#         samples=50,
+#         clobber=args.clobber,
+#         output_path=pathlib.Path(args.sim_output_path) / f"sim{ind}",
+#         sample_rate=sample_rates[ind],
+#     )
+#     results.append(result)
+#
+#
