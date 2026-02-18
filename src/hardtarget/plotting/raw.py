@@ -60,14 +60,41 @@ def rti(
     Returns:
         Axis and pmesh
     """
+    time_bounds_us = Bounds(
+        int(data_loader.meta.bounds.ts_start_usec), int(data_loader.meta.bounds.ts_end_usec)
+    )
+    request_bounds = time_interval_to_sample_bound(
+        time_bounds=time_bounds_us,
+        start_time=start_time,
+        end_time=end_time,
+        sample_rate=data_loader.meta.experiment.sample_rate,
+        relative_time=relative_time,
+    )
 
-    rxchn = str(data_loader.meta.experiment.rx_channels[0])
+    ipp_samps = data_loader.meta.experiment.ipp_samps
+    start, end = data_loader.bounds(data_loader.channels[0])
+    sample_bounds = Bounds(start, end)
+    ipp_n0 = (request_bounds.start - sample_bounds.start) // ipp_samps
+    ipp_n1 = (request_bounds.end - sample_bounds.start) // ipp_samps
+
+    samp_start = ipp_n0 * ipp_samps + sample_bounds.start
+    samp_end = ipp_n1 * ipp_samps + sample_bounds.start
+    if samp_end > end:
+        samp_end = end
+
+    samp_bounds = Bounds(samp_start, samp_end)
+
+    n_samp = samp_bounds.end - samp_bounds.start
+    data_vec = np.zeros((n_samp,), dtype=np.complex128)
+    for chnl in data_loader.channels:
+        data_vec += data_loader.read(chnl, samp_bounds.start, n_samp)
+
+    data_vec.flatten()
 
     T_ipp = data_loader.meta.experiment.t_ipp_usec * 1e-6
     sample_rate = data_loader.meta.experiment.sample_rate
 
     T_samp = data_loader.meta.experiment.t_samp_usec
-    ipp_samps = data_loader.meta.experiment.ipp_samps
 
     # Use np.round and case to int to avoid floating point errors in floor
     T_rx_start_samp = np.round(
@@ -98,41 +125,6 @@ def rti(
     T_cal_start_samp = np.round(t_cal_on_usec / data_loader.meta.experiment.t_samp_usec).astype(np.int64)
     T_cal_end_samp = np.round(t_cal_off_usec / data_loader.meta.experiment.t_samp_usec).astype(np.int64)
 
-    start, end = data_loader.bounds(rxchn)
-    sample_bounds = Bounds(start, end)
-
-    time_bounds_us = Bounds(
-        int(data_loader.meta.bounds.ts_start_usec), int(data_loader.meta.bounds.ts_end_usec)
-    )
-
-    request_bounds = time_interval_to_sample_bound(
-        time_bounds=time_bounds_us,
-        start_time=start_time,
-        end_time=end_time,
-        sample_rate=sample_rate,
-        relative_time=relative_time,
-    )
-
-    ipp_n0 = (request_bounds.start - sample_bounds.start) // ipp_samps
-    ipp_n1 = (request_bounds.end - sample_bounds.start) // ipp_samps
-
-    bounds = Bounds(
-        start=(ipp_n0 + 1) * ipp_samps + sample_bounds.start,
-        end=ipp_n1 * ipp_samps + sample_bounds.start,
-    )
-
-    # The following assumes continuous samples in the DRF
-    # check blocks rx channel
-    # blocks = drf_reader.get_continuous_blocks(bounds[0], bounds[1], rxchn)
-    # if len(blocks) > 1:
-    #    logger.warning(f"multiple continuous blocks: {len(blocks)}")
-
-    data_vec = data_loader.read(
-        rxchn,
-        bounds.start,
-        bounds.end - bounds.start,
-    )
-
     range_T = T_tx_start_samp / sample_rate
     samp_vec = np.arange(ipp_samps)
     rt_vec = np.arange(T_rx_end_samp - T_rx_start_samp) * T_samp - range_T
@@ -144,7 +136,7 @@ def rti(
         end_range_gate *= 2
 
     mat_shape = (data_vec.size // ipp_samps, ipp_samps)
-    data_vec = data_vec.reshape(mat_shape).T
+    data_ipp_vec = data_vec.reshape(mat_shape).T
 
     if start_range_gate is None:
         il0_rg0 = T_rx_start_samp
@@ -178,34 +170,27 @@ def rti(
         f"requested end range gate {il0_rg1} after measurement end {T_rx_end_samp}"
     )
 
-    data_vec = data_vec[il0_rg0:il0_rg1, :]
+    data_ipp_vec = data_ipp_vec[il0_rg0:il0_rg1, :]
     samp_vec = samp_vec[il0_rg0:il0_rg1]
 
     # Remove tx-signal (if it exists) and null calibration signal
     if not keep_tx:
-        if T_rx_start_samp < T_tx_end_samp:
-            tx_samps = np.logical_and(samp_vec <= T_tx_end_samp, samp_vec >= T_tx_start_samp)
-            data_vec[tx_samps, :] = 0
-        data_vec[T_cal_start_samp:T_cal_end_samp, :] = 0
+        tx_samps = np.logical_and(samp_vec <= T_tx_end_samp, samp_vec >= T_tx_start_samp)
+        data_ipp_vec[tx_samps, :] = 0
+        data_ipp_vec[T_cal_start_samp:T_cal_end_samp, :] = 0
 
-    powsum = np.log10(np.abs(data_vec) ** 2) if log else np.abs(data_vec) ** 2
-
-    """
-    Sets pyplot to classic rendering, then renders the powersum unto it. We then add
-    a colorbar and the y and x-label before saving it. At the moment it only saves
-    to plot.png.
-    """
+    powsum = np.log10(np.abs(data_ipp_vec) ** 2) if log else np.abs(data_ipp_vec) ** 2
 
     if not axis_units:
         X, Y = np.meshgrid(
-            np.arange(data_vec.shape[1]),
+            np.arange(data_ipp_vec.shape[1]),
             samp_vec,
         )
         ax.set_xlabel("IPP")
         ax.set_ylabel("Level-0 sample")
     else:
         X, Y = np.meshgrid(
-            np.arange(data_vec.shape[1]) * T_ipp,
+            np.arange(data_ipp_vec.shape[1]) * T_ipp,
             1e-3 * rt_vec * constants.c,
         )
         ax.set_xlabel("Time [s]")

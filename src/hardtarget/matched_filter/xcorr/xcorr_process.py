@@ -67,12 +67,13 @@ class XCorrProcess(Process[XCorrCfgParams, XCorrProParams, XCorrVariables, XCorr
 
     def analyse_ipps(self, start_sample: int) -> XCorrVariables:
         """
-        SHould be per IPP if understood correctly
+        Analyse the interpulse periods from start sample with the choosen optimize method
 
-        soo n_ipp = 1 always, (what happens if we search over several??)
-        this is so read_length= ipp_samps
+        Args:
+            start_sample: sample index to start analysis at.
 
-        signal model shold be the tx which we either load or simulate in measurement
+        Returns:
+            Outcome of xcorr analysis
         """
 
         tx, rx, ipp = self.get_data(start_sample, self.pro_params.read_length)

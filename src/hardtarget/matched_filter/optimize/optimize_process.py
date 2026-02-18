@@ -18,7 +18,7 @@ from hardtarget.types.types import (
     CfgParams,
     DataItem,
     ExpParams,
-    ExtractedSignals,
+    ExtractSignals,
     MethodLib,
     OptimizeLib,
     OptStart,
@@ -43,7 +43,7 @@ class OptimizeProcess(
         cfg_params: CfgParams,
         pro_params: ProParams,
         epoch_bounds: Bounds,
-        func_get_data: Callable[[int, int], ExtractedSignals],
+        func_get_data: ExtractSignals,
         func_get_pointing: Callable[[int], Pointing],
         output_dir: str | Path | None = None,
         progress: bool = False,
@@ -140,7 +140,7 @@ class OptimizeProcess(
         Analyse the interpulse periods from start sample with the choosen optimize method
 
         Args:
-            start_sample: sample to start the analysis
+            start_sample: sample index to start analysis at.
 
         Returns:
             Outcome of optimize analysis
@@ -215,12 +215,12 @@ class OptimizeProcess(
             A dictionary containing the output with attributes such as dimensions, long names and units.
         """
         return {
-            f"{output.peaks=}".split("=")[0].split(".")[1]: DataItem(  # gmf_optimized_peak
+            f"{output.peaks=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.peaks,
                 # dims=[("num_cohints_per_file", "t")], #TODO
                 long_name="Fine tuned range, range-rate and acceleration",
             ),
-            f"{output.peak_vals=}".split("=")[0].split(".")[1]: DataItem(  # gmf_optimized
+            f"{output.peak_vals=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.peak_vals,
                 # dims=[("num_cohints_per_file", "t")], #TODO
                 long_name="Generalized Matched Filter fine tuned peak output values",

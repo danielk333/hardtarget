@@ -1,9 +1,11 @@
 import datetime as dt
 import logging
+import sys
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
+from pyant.models.array import Array, ArrayParams
 
 from hardtarget.data_handling import Measurement
 from hardtarget.process import get_analysis_process
@@ -12,8 +14,12 @@ from hardtarget.types.constants import (
     Impl,
     MethodLib,
 )
-from hardtarget.types.types import AnalysedResult, GenericCfg, Job
+from hardtarget.types.types import AnalysedResult, ArrayKwargs, GenericCfg, Job
 
+if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
+    from typing_extensions import Unpack
+else:
+    from typing import Unpack
 
 def analyse(
     path: str | Path,
@@ -29,7 +35,7 @@ def analyse(
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
-    logger: Optional[logging.Logger] = None,
+    **kwargs: Unpack[ArrayKwargs],
 ) -> AnalysedResult:
     """
     Perform matched filter analysis.
@@ -50,15 +56,12 @@ def analyse(
         progress (optional): If a progress bar should be visualized.
         clobber (optional): If previous analysis should be overwritten.
         output (optional): Output directory for the analysed files, if None no files will be saved.
-        logger (optional): Specific logger to log on for debugging.
+        **kwargs (optional): Extra data such as Beam and Beam parameters (needed for interferometry)
 
     """
 
     if job is None:
         job = Job(idx=0, N=1)
-
-    if logger is None:
-        logger = logging.getLogger(__name__)
 
     # create measurement object to access measurement data
     measurement = Measurement(
@@ -84,12 +87,12 @@ def analyse(
         func_get_pointing=measurement.pointing,
         output_dir=output,
         progress=progress,
+        **kwargs,
     )
 
     # run analysis
     results = process.run(
         job=job,
-        channel_bounds=measurement.rx_sample_bounds,
         epoch=measurement.epoch,
         start_time=start_time,
         end_time=end_time,
@@ -113,7 +116,6 @@ def target_estimation(
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
-    logger: Optional[logging.Logger] = None,
 ) -> AnalysedResult:
     """Wrapper around analyse for Target Estimations"""
 
@@ -131,7 +133,6 @@ def target_estimation(
         progress=progress,
         clobber=clobber,
         output=output,
-        logger=logger,
     )
 
 
@@ -148,7 +149,6 @@ def optimize(
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
-    logger: Optional[logging.Logger] = None,
 ) -> AnalysedResult:
     """Wrapper around analyse for Target Estimation optimization"""
 
@@ -166,7 +166,6 @@ def optimize(
         progress=progress,
         clobber=clobber,
         output=output,
-        logger=logger,
     )
 
 
@@ -183,7 +182,6 @@ def event_detection(
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
-    logger: Optional[logging.Logger] = None,
 ) -> AnalysedResult:
     """Wrapper around analyse for Event Detection"""
 
@@ -201,5 +199,41 @@ def event_detection(
         progress=progress,
         clobber=clobber,
         output=output,
-        logger=logger,
+    )
+
+
+def direction_of_arrival(
+    path: str | Path,
+    config: str | Path | GenericCfg,
+    array_beam: Array,
+    beam_params: ArrayParams,
+    method_lib: Optional[MethodLib] = None,
+    implementation: Optional[Impl] = None,
+    rx_channel: Optional[str | int] = None,
+    start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+    end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+    relative_time: bool = False,
+    job: Optional[Job] = None,
+    progress: bool = False,
+    clobber: bool = True,
+    output: Optional[str | Path] = None,
+) -> AnalysedResult:
+    """Wrapper around analyse for Direction of Arrival"""
+
+    return analyse(
+        path=path,
+        config=config,
+        method=AnalysisMethod.direction_of_arrival,
+        method_lib=method_lib,
+        implementation=implementation,
+        rx_channel=rx_channel,
+        start_time=start_time,
+        end_time=end_time,
+        relative_time=relative_time,
+        job=job,
+        progress=progress,
+        clobber=clobber,
+        output=output,
+        beam=array_beam,
+        parameters=beam_params,
     )

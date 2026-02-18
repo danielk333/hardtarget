@@ -97,7 +97,8 @@ class GMFProcess(Process[GMFCfgParams, GMFProParams, MFVariables, MFOutArgs, Ana
         Analyse the interpulse periods from start sample with the choosen GMF method.
 
         Args:
-            start_sample: sample to start the analysis
+            start_sample: sample index to start analysis at.
+
 
         Returns:
             Outcome of GMF analysis

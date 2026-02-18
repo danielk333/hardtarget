@@ -45,7 +45,7 @@ assert reader is not None
 # So what is seen here is the power for each rx sample for each ipp on the logarithmic scale, for a specific
 # set of ipps
 
-start_time = int(reader.meta.experiment.t_ipp_usec * 950)
+start_time = int(reader.meta.experiment.t_ipp_usec * 40)
 end_time = start_time + int(reader.meta.experiment.t_ipp_usec * 150)
 fig, ax = plt.subplots()
 ax, handles = plotting.rti(
@@ -55,6 +55,7 @@ ax, handles = plotting.rti(
     end_time=end_time,
     axis_units=True,
     log=True,
+    keep_tx=True,
     relative_time=True,
 )
 

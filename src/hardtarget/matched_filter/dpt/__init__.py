@@ -42,7 +42,10 @@ def get_dbt_lib(
         implementation = Impl.numpy
 
     if not isinstance(method_lib, TargetEstimationMethod):
-        raise Exception(f"Method: {method_lib} is not available for target estimation")
+        try:
+            method_lib = TargetEstimationMethod(method_lib)
+        except ValueError:
+            raise Exception(f"Method: {method_lib} is not available for target estimation")
 
     lib = DPT_LIBS[method_lib].get(implementation, None)
     if lib is None:

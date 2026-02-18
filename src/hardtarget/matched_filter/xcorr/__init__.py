@@ -33,7 +33,10 @@ def get_event_detection_lib(
         implementation = Impl.c
 
     if not isinstance(method_lib, EventDetectionMethod):
-        raise Exception(f"Method: {method_lib} is not available for event detection")
+        try:
+            method_lib = EventDetectionMethod(method_lib)
+        except ValueError:
+            raise Exception(f"Method: {method_lib} is not available for event detection")
 
     lib = EVENT_DETECTION_LIBS[method_lib].get(implementation, None)
     if lib is None:

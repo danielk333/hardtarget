@@ -6,6 +6,7 @@ abstract methods filled in. It supports a variety of datatypes.
 
 import datetime as dt
 import logging
+import sys
 import time
 from abc import ABC, abstractmethod
 from dataclasses import asdict
@@ -15,17 +16,23 @@ from typing import Callable, Generic, Optional
 import numpy as np
 from tqdm import tqdm
 
+if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
+    from typing_extensions import Unpack
+else:
+    from typing import Unpack
+
 import hardtarget.process.utils as utils
 from hardtarget.data_handling import dump_params_to_file
 from hardtarget.process.utils import calculate_tasks, sample_interval_to_closest_ipp
 from hardtarget.types.constants import Impl, MethodLib
 from hardtarget.types.types import (
     AnalysedResult,
+    ArrayKwargs,
     Bounds,
     CfgParams,
     DataItem,
     ExpParams,
-    ExtractedSignals,
+    ExtractSignals,
     GenericCfg,
     GenericLib,
     GenericOut,
@@ -90,15 +97,16 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
 
     Args:
-        cfg_path: path to user config file
+        cfg_raw: path to user config file or CfgParams object matching the specfic process
         exp_params: experiment parameters derived from the radar data
         cfg_params: base configurable processing params
         pro_params: base calculated processing params
         epoch_bounds: time bounds of the data
         func_get_data: function that extracts N rx and tx samples from a given start sample
-        pointing_data: radar beam pointing data
+        func_get_pointing_data: function that extract pointing data at a given sample
         lib: The analysis library
         output_dir: Path to output directory
+        **kwargs: Extra data such as Beam and Beam parameters (needed for interferometry)
 
     """
 
@@ -109,10 +117,11 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         cfg_params: CfgParams,
         pro_params: ProParams,
         epoch_bounds: Bounds,
-        func_get_data: Callable[[int, int], ExtractedSignals],
+        func_get_data: ExtractSignals,
         func_get_pointing: Callable[[int], Pointing],
         output_dir: Optional[str | Path] = None,
         progress: bool = False,
+        **kwargs: Unpack[ArrayKwargs],
     ) -> None:
         self._logger = logging.getLogger(__name__)
         self.exp_params = exp_params
@@ -173,7 +182,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         Abstract method, shall analyse the interpulse periods from start sample.
 
         Args:
-            start_sample: sample to start the analysis
+            start_sample: sample index to start analysis at.
 
         Returns:
             Outcome of analysis
@@ -325,7 +334,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
     def run(
         self,
         job: Job,
-        channel_bounds: Bounds,
         epoch: Bounds,
         start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
         end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,

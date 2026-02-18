@@ -110,7 +110,7 @@ class DPTProcess(Process[DPTCfgParams, DPTProParams, MFVariables, MFOutArgs, Ana
         Analyse the interpulse periods from start sample with the choosen DPT method.
 
         Args:
-            start_sample: sample to start the analysis
+            start_sample: sample index to start analysis at.
 
         Returns:
             Outcome of DPT analysis

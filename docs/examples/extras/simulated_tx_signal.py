@@ -3,9 +3,10 @@
 # In the cases when there is no tx signal available the tx signal can be modeled. From the metadata of the
 # measurement the tx signal code is available, using this we can model the signal.
 
-from hardtarget.data_simulation.tx_model import tx_signal_model
-from matplotlib import pyplot as plt
 import numpy as np
+from matplotlib import pyplot as plt
+
+from hardtarget.data_simulation.tx_model import tx_signal_model
 
 # First we define a simple code
 # ```
@@ -27,6 +28,7 @@ code = np.kron(
 ipp_samples = 56
 tx = tx_signal_model(
     code=code,
+    tx_start_samp=0,
     ipp_samps=ipp_samples,
     read_length=ipp_samples,
 )
@@ -40,6 +42,7 @@ plt.plot(np.real(tx))
 sub_resolution = 4
 tx = tx_signal_model(
     code=code,
+    tx_start_samp=0,
     ipp_samps=ipp_samples,
     read_length=ipp_samples,
     sub_resolution=sub_resolution,

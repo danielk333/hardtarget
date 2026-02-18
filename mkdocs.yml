@@ -70,6 +70,7 @@ plugins:
         - examples/target_estimation/precision_orbit_analysis.py
         - examples/target_estimation/profile_speed.py
         - examples/back_to_basics/part3_sweep_acceleration.py
+        - examples/direction_of_arrival/interferometry.py
 
       include_source: false
       ignore: ["_wip*"]
@@ -103,6 +104,7 @@ nav:
           - Target Estimation: analyse/target_estimation.md
           - Optimization: analyse/optimization.md
           - Event Detection: analyse/event_detection.md
+          - Direction Of Arrival: analyse/direction_of_arrival.md
       - Configuration parameters: analyse/config_parameters.md
       - Analysis output: analyse/format_analyse.md
       - Parallelism: analyse/parallelism.md

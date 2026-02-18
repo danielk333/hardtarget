@@ -43,7 +43,14 @@ class EventDetectionMethod(StrEnum):
     xcorr = "xcorr"
 
 
-MethodLib: TypeAlias = TargetEstimationMethod | OptimizationMethod | EventDetectionMethod
+class DOAMethod(StrEnum):
+    """Direction of arrival methods"""
+
+    music_grid_search = "music_grid_search"
+    beamforming_grid_search = "beamforming_grid_search"
+
+
+MethodLib: TypeAlias = TargetEstimationMethod | OptimizationMethod | EventDetectionMethod | DOAMethod
 
 
 class Impl(StrEnum):
@@ -60,6 +67,7 @@ class Processes(StrEnum):
     DPT = "dpt"
     Optimization = "optimization"
     XCORR = "xcorr"
+    DOA = "doa"
 
 
 class ConfigSubSection(StrEnum):
@@ -69,4 +77,5 @@ class ConfigSubSection(StrEnum):
     GMF = "gmf"
     DPT = "dpt"
     OPTIMIZATION = "optimization"
+    INTERFEROMETRY = "interferometry"
     XCORR = "xcorr"

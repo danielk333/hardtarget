@@ -7,10 +7,11 @@ import argparse
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Generic, NamedTuple, TypeAlias, TypeVar
+from typing import Any, Callable, Generic, NamedTuple, Protocol, TypeAlias, TypeVar
 
 import numpy as np
 import numpy.typing as npt
+from pyant.models.array import Array, ArrayParams
 from radardef.types import ExpParams, Pointing
 
 from hardtarget.types.constants import (
@@ -83,7 +84,7 @@ class ProParams:
     Args:
         method: Method used for the analysis.
         method_lib: Specific library used for the analyse method.
-        read_length: How many samples should be read each "loop".
+        read_length: How many samples to read per
         decimated_read_length: Decimated read length, the read length with the frequency decimation
                                accounted for.
         range_gates: Range gates, the "gates" between max and min range gate with a range gate step.
@@ -181,6 +182,11 @@ class OptStart(NamedTuple):
     a_vec: float = 0.0
 
 
+class ArrayKwargs(TypedDict, total=False):
+    beam: Array
+    parameters: ArrayParams
+
+
 GenericCfg = TypeVar("GenericCfg", bound=CfgParams)
 GenericPro = TypeVar("GenericPro", bound=ProParams)
 GenericVars = TypeVar("GenericVars", bound=NamedTuple)
@@ -239,5 +245,16 @@ EventSearchLib: TypeAlias = Callable[
     GenericVars,
 ]
 
+InterferometryLib: TypeAlias = Callable[
+    [npt.NDArray[np.complex64], ExpParams, GenericCfg, GenericPro, Array, ArrayParams],
+    GenericVars,
+]
 
-LibType: TypeAlias = AnalysisLib | OptimizeLib | EventSearchLib
+LibType: TypeAlias = AnalysisLib | OptimizeLib | EventSearchLib | InterferometryLib
+
+
+# Type hinting for a common declaration of what func_get_data should be passed to the processes
+class ExtractSignals(Protocol):
+    def __call__(
+        self, start_sample: int, read_length: int, sum_rx_channels: bool = True
+    ) -> ExtractedSignals: ...

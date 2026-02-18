@@ -31,17 +31,16 @@ analyse the analysis. Furthermore the analysis output is stored, the output is n
 format as during the analysis, each object in the output has had further attributes added to
 it, following the [DataItem](../reference/hardtarget/types/types.md#hardtarget.types.types.DataItem) structure.
 Depending on the method/process running (e.g [Target Estimation](../analyse/target_estimation.md)/[Optimization](../analyse/optimization.md)/
-[Event Detection](../analyse/event_detection.md)) the data will be different as the output will vary.
+[Event Detection](../analyse/event_detection.md)/[Direction Of Arrival](../analyse/direction_of_arrival.md))
+the data will be different as the output will vary.
 
 ::: hardtarget.types.types.DataItem
-
 
 ## Store in RAM
 
 If running a small analysis and there is no need to store the output the data can be stored in RAM.
 By not declaring any output path to the analysis the output can be retrived from [AnalysedResult](../reference/hardtarget/types/types.md#hardtarget.types.types.AnalysedResult)`["data"]`, this will be a dict containing the sample start as key and contains the output,
 experiment parameters, configuration parameters and process parameters
-
 
 ```Python
 out, exp, cfg, pro = analysed_result["data"][00001]

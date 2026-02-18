@@ -34,7 +34,10 @@ def get_optimize_lib(
         implementation = Impl.numpy
 
     if not isinstance(method_lib, OptimizationMethod):
-        raise Exception(f"Method: {method_lib} is not available for optimization")
+        try:
+            method_lib = OptimizationMethod(method_lib)
+        except ValueError:
+            raise Exception(f"Method: {method_lib} is not available for optimization")
 
     lib = OPTIMIZE_LIBS[method_lib].get(implementation, None)
     if lib is None:

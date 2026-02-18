@@ -5,17 +5,20 @@ The CLI Analyse functionality, abstracts the analyse functionality to a user fri
 import argparse
 import logging
 
+from radardef import RadarDef
+
 import hardtarget.utils.global_mpi
 from hardtarget.analyse import analyse
 from hardtarget.types.constants import (
     AnalysisMethod,
+    DOAMethod,
     EventDetectionMethod,
     Impl,
     OptimizationMethod,
     StrEnum,
     TargetEstimationMethod,
 )
-from hardtarget.types.types import Job
+from hardtarget.types.types import Array, ArrayKwargs, ArrayParams, Job
 from hardtarget.utils.profiling import get_logging_level
 
 from .commands import add_command
@@ -54,6 +57,13 @@ class AnalyseParser:
             help="implementation",
             default=None,
         )
+        if self.method_name is AnalysisMethod.direction_of_arrival:
+            parser.add_argument(
+                "station_id",
+                help="Source of measurement",
+                choices=[f"{station_id}" for station_id in RadarDef().radar_stations],
+            )
+
         return parser
 
     def main(self, args: argparse.Namespace) -> None:
@@ -72,6 +82,21 @@ class AnalyseParser:
         # job
         job = Job(idx=comm.rank, N=comm.size)
 
+        if AnalysisMethod.direction_of_arrival:
+            # TODO: How to handle inputs to the radar_station (just default now)
+            radar_station = RadarDef().get_radar(args.station_id)
+            if radar_station is None:
+                raise KeyError(f"No station available with id: {args.station_id}")
+            if not isinstance(radar_station.beam, Array) or not isinstance(
+                radar_station.beam_parameters, ArrayParams
+            ):
+                raise ValueError(
+                    f"Radar station {radar_station.station_id} is not of Array type, not possible to calculate direction of arrival"
+                )
+            kwargs = ArrayKwargs(beam=radar_station.beam, parameters=radar_station.beam_parameters)
+        else:
+            kwargs = {}
+
         # process
         results = analyse(
             path=args.rx,
@@ -87,6 +112,7 @@ class AnalyseParser:
             end_time=args.end_time,
             relative_time=args.relative_time,
             progress=args.progress,
+            **kwargs,
         )
 
         self.logger.info(f"produced {len(results['files'])} files")
@@ -96,6 +122,7 @@ method_and_sub_method = [
     (AnalysisMethod.target_estimation, TargetEstimationMethod),
     (AnalysisMethod.optimize, OptimizationMethod),
     (AnalysisMethod.event_detection, EventDetectionMethod),
+    (AnalysisMethod.direction_of_arrival, DOAMethod),
 ]
 
 for method, sub_method in method_and_sub_method:

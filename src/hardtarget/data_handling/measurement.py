@@ -32,7 +32,7 @@ class Measurement:
     Wrapper to simplify the usage of the measurement data and user defined configuration.
 
     Args:
-        path: Path to measurement file or directory
+        path: path to the measurement data
         config: Path to config file
         method: Analysis method to be used
         method_lib (optional): Specific method library
@@ -40,13 +40,7 @@ class Measurement:
         rx_channel (optional): If a specific channel should be analysed, if None all channels will be summed
         excluded_channels (optional): Channels to ignore when if summing over several channels,
                                         thus only applicable when rx_channel is None
-        est_method (optional): Estimation method to be used during analyse
     """
-
-    @property
-    def path(self) -> Path:
-        """Path to measurement file"""
-        return self.__path
 
     @property
     def exp_params(self) -> ExpParams:
@@ -149,29 +143,39 @@ class Measurement:
         """Pointing data to define radar pointing direction in spherical coordinates"""
         return self.__data_loader.pointing(start_sample)
 
-    def extract_signals(self, start_sample: int, read_length: int) -> ExtractedSignals:
+    def extract_signals(
+        self, start_sample: int, read_length: int, sum_rx_channels: bool = True
+    ) -> ExtractedSignals:
         """
         Extract rx and tx data at the given sample.
 
         Args:
             start_sample: Start sample
             read_length: Amount of sample to read from the start sample
-
+            sum_rx_channels (optional): If multiple rx channels available they will all be summed.
         Returns:
-            Rx and Tx samples, If multiple rx channels are available and no specific channel has been
-            requested during initialization all channels except the tx channel and channels in the excluded
-            channels list will be summed. If no tx channel is available a tx model
-            will be used to simulate the tx signal
+            Rx and Tx samples, either as a array (read_length,) or if multiple channels requested
+            (n_channels, read_length).
+            If no tx channel is available a tx model will be used to simulate the tx signal
         """
 
         # if no rx channel specified all channels will be summed for full analysis
-        if self._rx_channel is None:
-            ipp = np.zeros((read_length,), dtype=np.complex128)
-            for chnl in self.data_loader.channels:
-                if chnl != self._tx_channel and chnl not in self._excluded_channels:
-                    ipp += self.data_loader.read(chnl, start_sample, read_length)
+        if sum_rx_channels:
+            if self._rx_channel is None:
+                ipp = np.zeros((read_length,), dtype=np.complex128)
+                for chnl in self.data_loader.channels:
+                    if chnl != self._tx_channel and chnl not in self._excluded_channels:
+                        ipp += self.data_loader.read(chnl, start_sample, read_length)
+            else:
+                ipp = self.data_loader.read(self._rx_channel, start_sample, read_length)
+            # Extract rx samples
+            rx = ipp[self.pro_params.rx_stencil].copy()
         else:
-            ipp = self.data_loader.read(self._rx_channel, start_sample, read_length)
+            ipp = np.zeros((len(self.exp_params.rx_channels), read_length), dtype=np.complex128)
+            for i, chnl in enumerate[int | str](self.data_loader.channels):
+                ipp[i, :] = self.data_loader.read(chnl, start_sample, read_length)
+            # Extract rx samples
+            rx = ipp[:, self.pro_params.rx_stencil].copy()
 
         # Extracting tx data
         if self._tx_channel != self._rx_channel and self._tx_channel is not None:
@@ -190,16 +194,15 @@ class Measurement:
             )
             tx = tx_signal_model(
                 code=self.exp_params.code,
-                ipp_samps=self.exp_params.ipp_samps,
+                tx_start_samp=int(self.exp_params.t_tx_start_usec / self.exp_params.t_samp_usec),
+                start_samp=(start_sample % self.exp_params.ipp_samps) - self.cfg_params.samp_offset,
                 read_length=read_length,
-                start_sample=start_sample,
+                ipp_samps=self.exp_params.ipp_samps,
                 sub_resolution=self.cfg_params.range_gate_sub_resolution,
                 kind="linear",
             )
-
-        # clean ground clutter, get separate transmit waveform and echo vectors
-        rx = ipp[self.pro_params.rx_stencil].copy()
         tx = tx[self.pro_params.tx_stencil, :]
+
         return ExtractedSignals(
             tx=tx.astype(np.complex64), rx=rx.astype(np.complex64), ipp=ipp.astype(np.complex64)
         )
