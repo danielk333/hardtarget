@@ -59,21 +59,15 @@ class CfgParams:
         tx_amp_limit: The tx amplitude limit, if lower than this the analysis will ignore the cohints.
     """
 
-    node_gpus: int = 1
-    n_ipp: int = 10
+    n_ipp: int = 1
     ipp_offset: int = 0
     samp_offset: int = 0
     min_range_gate: int = 0
     max_range_gate: int = -1
     range_gate_step: int = 1
-    range_gate_sub_resolution: int = 1
-    frequency_decimation: int = 1
-    clutter_length: int = 0
-    min_acceleration: float = -200.0
-    max_acceleration: float = 200.0
     num_cohints_per_file: int = 100
-    optimization: bool = False
     tx_amp_limit: float = 1.0
+    node_gpus: int = 1
 
 
 @dataclass(frozen=True)
@@ -104,19 +98,10 @@ class ProParams:
     method_lib: MethodLib | None = TargetEstimationMethod.unknown
     implementation: Impl | None = Impl.unknown
     read_length: int = 0
-    decimated_read_length: int = 0
-    range_gates: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
-    rel_rgs: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
-    il0_rgs: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
-    ranges: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty(2, dtype=np.float64))
     rx_stencil: npt.NDArray = field(default_factory=lambda: np.ndarray([0, 0], dtype=bool))
     tx_stencil: npt.NDArray = field(default_factory=lambda: np.ndarray([0, 0], dtype=bool))
-    il1_rx_window_indices: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
-    il0_rx_window_indices: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
-    il0_dec_rx_window_indices: npt.NDArray[np.int32] = field(
-        default_factory=lambda: np.empty(2, dtype=np.int32)
-    )
-    range_rates: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty(2, dtype=np.float64))
+    rel_rgs: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
+    range_gates: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
 
 
 class ExtractedSignals(NamedTuple):
@@ -215,7 +200,7 @@ AnalysisLib: TypeAlias = Callable[
     [
         npt.NDArray[np.complex64],
         npt.NDArray[np.complex64],
-        npt.NDArray,
+        npt.NDArray[np.floating],
         GenericCfg,
         GenericPro,
     ],
@@ -256,5 +241,9 @@ LibType: TypeAlias = AnalysisLib | OptimizeLib | EventSearchLib | Interferometry
 # Type hinting for a common declaration of what func_get_data should be passed to the processes
 class ExtractSignals(Protocol):
     def __call__(
-        self, start_sample: int, read_length: int, sum_rx_channels: bool = True
+        self,
+        start_sample: int,
+        read_length: int,
+        sum_rx_channels: bool = True,
+        sub_resolution: int = 1,
     ) -> ExtractedSignals: ...

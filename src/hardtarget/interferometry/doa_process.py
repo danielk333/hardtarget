@@ -155,6 +155,7 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAVars, Interfero
         file_idx_sample: int,
         exp_params: ExpParams,
         cfg_params: DOACfgParams,
+        pro_params: DOAProParams,
     ) -> DOAVars:
         """
         Restructures the data to a out args object

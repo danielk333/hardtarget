@@ -7,12 +7,18 @@ from typing import Callable
 import h5py
 import numpy as np
 
-from hardtarget.data_handling.configuration import extract_config_section
+from hardtarget.data_handling.configuration import extract_config_section, get_ilx_windows
+from hardtarget.matched_filter.gmf.types import GMFCfgParams
 from hardtarget.matched_filter.optimize import get_optimize_lib
-from hardtarget.matched_filter.optimize.types import OptimizeCfgParams, OptimizeProParams
-from hardtarget.matched_filter.types import MFOptimizeOutArgs, MFOptimizeVariables
+from hardtarget.matched_filter.optimize.types import (
+    MFOptimizeOutArgs,
+    MFOptimizeVariables,
+    OptimizeCfgParams,
+    OptimizeProParams,
+)
+from hardtarget.matched_filter.types import MFOutArgs
 from hardtarget.process import Process
-from hardtarget.types.constants import ConfigSubSection, Impl, OptimizationMethod
+from hardtarget.types.constants import AnalysisMethod, ConfigSubSection, Impl, OptimizationMethod
 from hardtarget.types.types import (
     Bounds,
     CfgParams,
@@ -69,6 +75,20 @@ class OptimizeProcess(
         self.store_mode = "a"
         self.store_params = False
 
+        # Verify optimization is running on the correct data
+        with h5py.File(paths[0], "r") as hf:
+            method = AnalysisMethod(hf[f"{ProParams.method=}".split("=")[0].split(".")[1]].asstr()[()])
+            if method != AnalysisMethod.target_estimation:
+                raise ValueError(
+                    f"It is only possible to run optimization on a previous target estimation analysis, not on {method}"
+                )
+            try:
+                self.sub_resolution: int = hf[GMFCfgParams.__name__][
+                    f"{GMFCfgParams.range_gate_sub_resolution=}".split("=")[0].split(".")[1]
+                ][()]
+            except KeyError:
+                raise ValueError("Optimization is only compatible with a previous gmf analysis")
+
     def load_analysed_cohint(self, start_sample: int) -> OptStart:
         """
         Extract range, velocity and acceleration estimation from a specific cohint based on the start_sample
@@ -87,11 +107,11 @@ class OptimizeProcess(
         cohind = (start_sample - (file_id * samples_per_file)) // samples_per_cohint
 
         with h5py.File(self.sorted_mf_files[file_id], "r") as hf:
-            group = hf["OutArgs"]  # TODO: Update to proper type
             # TODO: Should r/v/a_vec from all files be read at start and loaded to RAM to access it faster?
-            # TODO hardcode the r_vec string
             opt_start = OptStart(
-                r_vec=group["r_vec"][cohind], v_vec=group["v_vec"][cohind], a_vec=group["a_vec"][cohind]
+                r_vec=hf["OutArgs"][f"{MFOutArgs.r_vec=}".split("=")[0].split(".")[1]][cohind],
+                v_vec=hf["OutArgs"][f"{MFOutArgs.v_vec=}".split("=")[0].split(".")[1]][cohind],
+                a_vec=hf["OutArgs"][f"{MFOutArgs.a_vec=}".split("=")[0].split(".")[1]][cohind],
             )
 
         return opt_start
@@ -128,12 +148,13 @@ class OptimizeProcess(
             exp_params: Experiment parameters from measurement file
             cfg_params: Process specific configuration paramters
             pro_params: General process parameters
-
         Returns:
             Process specific Optimize Process parameters
         """
 
-        return OptimizeProParams(**asdict(pro_params))
+        _, il0_rx_window_indices, _ = get_ilx_windows(exp_params, cfg_params, pro_params)
+
+        return OptimizeProParams(**asdict(pro_params), il0_rx_window_indices=il0_rx_window_indices)
 
     def analyse_ipps(self, start_sample: int) -> MFOptimizeVariables:
         """
@@ -146,7 +167,9 @@ class OptimizeProcess(
             Outcome of optimize analysis
         """
 
-        tx, rx, ipp = self.get_data(start_sample, self.pro_params.read_length)
+        tx, rx, ipp = self.get_data(
+            start_sample, self.pro_params.read_length, sub_resolution=self.sub_resolution
+        )
 
         # conjugate, so that when matched filtering, it will cancel out phase of transmit waveform.
         # scale transmit waveform to unity power
@@ -168,7 +191,6 @@ class OptimizeProcess(
                 self.pro_params,
                 self.load_analysed_cohint(start_sample),
             )
-
         return gmf_vars
 
     def stack_vars(self, vars_list: list[MFOptimizeVariables]) -> MFOptimizeVariables:
@@ -185,6 +207,7 @@ class OptimizeProcess(
         file_idx_sample: int,
         exp_params: ExpParams,
         cfg_params: OptimizeCfgParams,
+        pro_params: OptimizeProParams,
     ) -> MFOptimizeOutArgs:
         """
         Restructures the data to a out args object
@@ -198,7 +221,6 @@ class OptimizeProcess(
         Returns:
             Output data
         """
-
         return MFOptimizeOutArgs(
             peaks=all_vars.peak,
             peak_vals=all_vars.peak_val,

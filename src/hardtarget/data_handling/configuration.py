@@ -75,6 +75,8 @@ that sample of range-gate 0 has traveled the time of 1 sample. The largest range
 gate is at the end of reception, which basically means only one sample of the TX
 could be measured.
 
+#TODO: Move explanation to docs aswell and MF process
+
 """
 
 # TODO: decimation runs on JUST the top 1 level of direct signal
@@ -87,8 +89,7 @@ from pathlib import Path
 from typing import Any, Optional, Type
 
 import numpy as np
-import scipy.constants
-import scipy.fft as fft
+import numpy.typing as npt
 
 from hardtarget.types.constants import AnalysisMethod, ConfigSubSection, MethodLib
 from hardtarget.types.types import CfgParams, ExpParams, GenericCfg, Impl, ProParams
@@ -210,38 +211,62 @@ def compute_process_params(
     def usec_to_samp(usec: int | float) -> int:
         return int(usec / exp_params.t_samp_usec)
 
-    rx_start_samp = usec_to_samp(exp_params.t_rx_start_usec)
-    rx_end_samp = usec_to_samp(exp_params.t_rx_end_usec)
-    tx_start_samp = usec_to_samp(exp_params.t_tx_start_usec)
-    tx_end_samp = usec_to_samp(exp_params.t_tx_end_usec)
-
     # ---- Read length ----
     read_length = (cfg_params.n_ipp + cfg_params.ipp_offset) * exp_params.ipp_samps
-    decimated_read_length = np.ceil(read_length / cfg_params.frequency_decimation).astype(np.int64)
-
     # ---- Range gates ----
     range_gates = np.arange(
         cfg_params.min_range_gate, cfg_params.max_range_gate, cfg_params.range_gate_step, dtype=np.int32
     )
-    full_res_rgs = np.arange(
-        cfg_params.min_range_gate,
-        cfg_params.max_range_gate,
-        cfg_params.range_gate_step / cfg_params.range_gate_sub_resolution,
-        dtype=np.float64,
-    )
     rel_rgs = (range_gates - cfg_params.min_range_gate).astype(np.int32)
-    ranges = ((full_res_rgs + 1) * scipy.constants.c / exp_params.sample_rate).astype(np.float64)  # m
-    assert np.all(range_gates > 0), "Computed range gates not compatible with stencils"
 
-    if exp_params.tx_pulse_length is not None:
-        _tx_pulse_samps = usec_to_samp(exp_params.tx_pulse_length)
-        assert _tx_pulse_samps == tx_end_samp - tx_start_samp, (
-            f"tx pulse lengths does not correspond to tx start and stop values:\n"
-            f"   - tx_pulse_samps: {_tx_pulse_samps}\n"
-            f"   - end_samp-start_samp: {tx_end_samp - tx_start_samp}"
+    # --- signal indexing ----
+    rx_stencil = np.full((read_length,), False, dtype=bool)
+    tx_stencil = np.full((read_length,), False, dtype=bool)
+
+    # --- Signal stencils ----
+    for k in range(cfg_params.n_ipp):
+        rx_end_samp = int(exp_params.t_rx_end_usec / exp_params.t_samp_usec)
+        tx_start_samp = int(exp_params.t_tx_start_usec / exp_params.t_samp_usec)
+        tx_end_samp = int(exp_params.t_tx_end_usec / exp_params.t_samp_usec)
+        tx_pulse_samps = tx_end_samp - tx_start_samp
+
+        _il0_min_range_gate = cfg_params.min_range_gate
+        # TODO: should it be else rx_start_samp??
+        _il0_min_range_gate += (tx_start_samp + 1) if cfg_params.min_range_gate >= 0 else (tx_start_samp + 1)
+        _il0_max_range_gate = cfg_params.max_range_gate
+        _il0_max_range_gate += (
+            (tx_start_samp + 1) if cfg_params.max_range_gate >= 0 else (rx_end_samp - tx_pulse_samps)
         )
-    else:
-        _tx_pulse_samps = tx_end_samp - tx_start_samp
+
+        # start of pulse within range-gates, thus include also the entire pulse at the end
+        _rx0 = (k + cfg_params.ipp_offset) * exp_params.ipp_samps + _il0_min_range_gate
+        _rx1 = (k + cfg_params.ipp_offset) * exp_params.ipp_samps + _il0_max_range_gate + tx_pulse_samps
+        rx_stencil[_rx0:_rx1] = True
+
+        _tx0 = k * exp_params.ipp_samps + tx_start_samp
+        _tx1 = k * exp_params.ipp_samps + tx_end_samp
+        tx_stencil[_tx0:_tx1] = True
+
+    return ProParams(
+        method=analysis_method,
+        method_lib=method_lib,
+        implementation=implementation,
+        read_length=read_length,
+        range_gates=range_gates,
+        rel_rgs=rel_rgs,
+        rx_stencil=rx_stencil,
+        tx_stencil=tx_stencil,
+    )
+
+
+def get_ilx_windows(
+    exp_params: ExpParams, cfg_params: CfgParams, pro_params: ProParams
+) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
+    rx_end_samp = int(exp_params.t_rx_end_usec / exp_params.t_samp_usec)
+    tx_start_samp = int(exp_params.t_tx_start_usec / exp_params.t_samp_usec)
+    tx_end_samp = int(exp_params.t_tx_end_usec / exp_params.t_samp_usec)
+
+    _tx_pulse_samps = tx_end_samp - tx_start_samp
 
     # range gates are relative to tx start + 1
     # TODO: this is one of the parts of not handling partial codes
@@ -252,100 +277,16 @@ def compute_process_params(
     _il0_min_range_gate = cfg_params.min_range_gate
     _il0_min_range_gate += _il0_rgs_min if cfg_params.min_range_gate >= 0 else _il0_rgs_min
 
-    assert _il0_max_range_gate <= rx_end_samp - _tx_pulse_samps, (
-        f"end range gate {_il0_max_range_gate} cannot be after RX end (-minus tx length) {rx_end_samp - _tx_pulse_samps}"
-    )
-    assert _il0_max_range_gate > rx_start_samp, (
-        f"end range gate: {_il0_max_range_gate} cannot be before RX start: {rx_start_samp}"
-    )
-    assert _il0_min_range_gate <= rx_end_samp - _tx_pulse_samps, "start range gate cannot be after  RX end"
-    assert _il0_min_range_gate >= rx_start_samp, (
-        f"start range gate: {_il0_min_range_gate}  cannot be before RX start: {rx_start_samp}"
-    )
-
     il0_rgs = np.arange(_il0_min_range_gate, _il0_max_range_gate, cfg_params.range_gate_step, dtype=np.int32)
 
-    # --- signal indexing ----
-    rx_stencil = np.full((read_length,), False, dtype=bool)
-    tx_stencil = np.full((read_length,), False, dtype=bool)
-
-    # for each coherently integrated IPP, create stencils
-    for k in range(cfg_params.n_ipp):
-        # start of pulse within range-gates, thus include also the entire pulse at the end
-        _rx0 = (k + cfg_params.ipp_offset) * exp_params.ipp_samps + _il0_min_range_gate
-        _rx1 = (k + cfg_params.ipp_offset) * exp_params.ipp_samps + _il0_max_range_gate + _tx_pulse_samps
-        rx_stencil[_rx0:_rx1] = True
-
-        _tx0 = k * exp_params.ipp_samps + tx_start_samp
-        _tx1 = k * exp_params.ipp_samps + tx_end_samp
-        tx_stencil[_tx0:_tx1] = True
-
-    _il0_rx_stencil_indices = np.argwhere(rx_stencil).flatten()
-    _il0_tx_stencil_indices = np.argwhere(tx_stencil).flatten()
-
-    _coh_int_samps = len(_il0_tx_stencil_indices)
-
-    # Decimated signals
-    # TODO: this can probably be allowed if we truncate/pad the end or start of the decimated vector
-    assert _tx_pulse_samps % cfg_params.frequency_decimation == 0, (
-        "Pulse samples should be divisible by decimation to avoid edge effects\n"
-        f"tx_pulse_samps / frequency_decimation = {_tx_pulse_samps}/{cfg_params.frequency_decimation} ="
-        f"{_tx_pulse_samps / cfg_params.frequency_decimation}"
-    )
-    # TODO: this can be avoided by padding the stencil and having a second 0-stencil
-    # TODO: better assert messages if keep
-    assert len(ranges) % cfg_params.frequency_decimation == 0, (
-        "range-gate interval not compatible with decimation: "
-        f"{len(ranges)} % {cfg_params.frequency_decimation} = "
-        f"{len(ranges) % cfg_params.frequency_decimation}"
-    )
-    assert exp_params.ipp_samps % cfg_params.frequency_decimation == 0, (
-        "ipp-samples length not compatible with decimation: "
-        f"{exp_params.ipp_samps} % {cfg_params.frequency_decimation} = "
-        f"{exp_params.ipp_samps % cfg_params.frequency_decimation}"
-    )
-    assert _coh_int_samps % cfg_params.frequency_decimation == 0, (
-        "range-gate interval not compatible with decimation: "
-        f"{_coh_int_samps} % {cfg_params.frequency_decimation} = "
-        f"{_coh_int_samps % cfg_params.frequency_decimation}"
-    )
+    _il0_rx_stencil_indices = np.argwhere(pro_params.rx_stencil).flatten()
 
     # cyclic range gate selector - in the index space of stenciled RX signals
     # TODO: this can be generalized for a-periodic codes ect
     _base_rx_window = np.arange(_tx_pulse_samps, dtype=np.int32)
-    _d_window = _tx_pulse_samps + len(range_gates)
+    _d_window = _tx_pulse_samps + len(pro_params.range_gates)
     _il1_rx_window_blocks = [_base_rx_window + ind * _d_window for ind in range(cfg_params.n_ipp)]
     il1_rx_window_indices = np.concatenate(_il1_rx_window_blocks, dtype=np.int32)
     il0_rx_window_indices = _il0_rx_stencil_indices[il1_rx_window_indices].astype(np.int32)
 
-    il0_dec_rx_window_indices = (
-        il0_rx_window_indices[:: cfg_params.frequency_decimation] // cfg_params.frequency_decimation
-    ).astype(np.int32)
-
-    # ---- Velocity related parameters ----
-
-    # frequency vector
-    _fft_frequencies = fft.fftfreq(
-        decimated_read_length,
-        d=cfg_params.frequency_decimation / exp_params.sample_rate,
-    )  # Hz
-
-    range_rates = (exp_params.wavelength * _fft_frequencies).astype(np.float64)
-
-    return ProParams(
-        method=analysis_method,
-        method_lib=method_lib,
-        implementation=implementation,
-        read_length=read_length,
-        decimated_read_length=decimated_read_length,
-        range_gates=range_gates,
-        rel_rgs=rel_rgs,
-        il0_rgs=il0_rgs,
-        ranges=ranges,
-        rx_stencil=rx_stencil,
-        tx_stencil=tx_stencil,
-        il1_rx_window_indices=il1_rx_window_indices,
-        il0_rx_window_indices=il0_rx_window_indices,
-        il0_dec_rx_window_indices=il0_dec_rx_window_indices,
-        range_rates=range_rates,
-    )
+    return il0_rgs, il0_rx_window_indices, il1_rx_window_indices

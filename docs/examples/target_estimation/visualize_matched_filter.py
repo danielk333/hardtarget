@@ -82,11 +82,7 @@ analyse_process = hardtarget.process.GMFProcess(
     None,
     None,
 )
-pro_params = analyse_process.get_process_params(
-    measurement.exp_params,
-    analyse_process.get_conf_params(config, measurement.cfg_params),
-    measurement.pro_params,
-)
+pro_params = analyse_process.pro_params
 cfg_params = analyse_process.cfg_params
 
 # ## Matched filter calculation

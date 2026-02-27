@@ -99,15 +99,16 @@ config_str = f"""
             ipp_offset=0
             min_range_gate=81
             max_range_gate=138
+            range_gate_step=1
+            num_cohints_per_file=500
+            tx_amp_limit = 0.2
+            node_gpus=1
+        [target_estimation]
             min_acceleration=0
             max_acceleration=0
-            range_gate_step=1
             range_gate_sub_resolution = 10
             frequency_decimation=1
             clutter_length=1500
-            num_cohints_per_file=500
-            node_gpus=1
-            tx_amp_limit = 0.2
         [optimization]
             path = {str(output_path)}
         """

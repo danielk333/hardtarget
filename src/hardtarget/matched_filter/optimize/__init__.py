@@ -41,7 +41,7 @@ def get_optimize_lib(
 
     lib = OPTIMIZE_LIBS[method_lib].get(implementation, None)
     if lib is None:
-        raise Exception(f"Ther is no available {implementation} implementation for method lib {method_lib}")
+        raise Exception(f"There is no available {implementation} implementation for method lib {method_lib}")
 
     return lib, method_lib, implementation
 

@@ -37,9 +37,20 @@ measurement = hardtarget.data_handling.Measurement(
     Path(config),
     AnalysisMethod.target_estimation,
 )
-exp = measurement.exp_params
-cfg = measurement.cfg_params
-pro = measurement.pro_params
+
+process = hardtarget.GMFProcess(
+    config,
+    measurement.exp_params,
+    measurement.cfg_params,
+    measurement.pro_params,
+    None,
+    None,
+    None,
+)
+
+exp = process.exp_params
+cfg = process.cfg_params
+pro = process.pro_params
 
 # Extract the range gates
 

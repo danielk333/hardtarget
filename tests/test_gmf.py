@@ -74,14 +74,13 @@ def create_config_params():
         ipp_offset=0
         min_range_gate=6800
         max_range_gate=7280
-        # min_range_gate=3420
-        # max_range_gate=10000
-        min_acceleration=-300.0
-        max_acceleration=300.0
         range_gate_step=1
-        frequency_decimation=16
         num_cohints_per_file=10
         node_gpus=1
+    [target_estimation]
+        min_acceleration=-300.0
+        max_acceleration=300.0
+        frequency_decimation=16
     [gmf]
 
     """
@@ -127,9 +126,8 @@ class TestGMF:
         )
 
         # Initialise vectors
-
         # - new
-        size = len(pro_params.ranges)
+        size = len(pro_params.rel_rgs)
         vars = MFVariables(
             vals=np.zeros(size, dtype=np.float32),
             dc=np.zeros(size, dtype=np.float32),

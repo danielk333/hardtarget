@@ -1,9 +1,64 @@
 """General Matched Filter Types, usable for all matched filter processes"""
 
+from dataclasses import dataclass, field
 from typing import NamedTuple
 
 import numpy as np
 import numpy.typing as npt
+
+from hardtarget.types.types import (
+    CfgParams,
+    ProParams,
+)
+
+
+@dataclass(frozen=True)
+class TargetEstimationCfgParams(CfgParams):
+    """
+    MF specific configuration parameters, can be configured under the mf section in the .ini file
+
+    Args:
+        TODO
+    """
+
+    range_gate_sub_resolution: int = 1
+    frequency_decimation: int = 1
+    clutter_length: int = 0
+    min_acceleration: float = -200.0
+    max_acceleration: float = 200.0
+    optimization: bool = False
+
+
+@dataclass(frozen=True)
+class TargetEstimationProParams(ProParams):
+    """
+    MF specific process parameters
+
+    Args:
+        TODO
+    """
+
+    decimated_read_length: int = 0
+    il0_rgs: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
+    ranges: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty(2, dtype=np.float64))
+    il1_rx_window_indices: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
+    il0_rx_window_indices: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
+    il0_dec_rx_window_indices: npt.NDArray[np.int32] = field(
+        default_factory=lambda: np.empty(2, dtype=np.int32)
+    )
+    range_rates: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty(2, dtype=np.float64))
+
+
+@dataclass(frozen=True)
+class ExtendedTargetEstimationProParams(TargetEstimationProParams):
+    inds_accelerations: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
+    accelerations: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty(2, dtype=np.float64))
+    acceleration_phasors: npt.NDArray[np.complexfloating] = field(
+        default_factory=lambda: np.empty(2, dtype=np.complex64)
+    )
+    fgmf_acceleration_phasors: npt.NDArray[np.complexfloating] = field(
+        default_factory=lambda: np.empty(2, dtype=np.complex64)
+    )
 
 
 class MFVariables(NamedTuple):
@@ -37,15 +92,3 @@ class MFOutArgs(NamedTuple):
     pointing_vec: npt.NDArray[np.float32]
     t: npt.NDArray[np.float32]
     epoch: float
-
-
-class MFOptimizeVariables(NamedTuple):
-    """Container for compacting the variables set by the GMF Optimize function."""
-
-    peak: npt.NDArray[np.float64]  # peak location
-    peak_val: npt.NDArray[np.float64]  # peak magnitude
-
-
-class MFOptimizeOutArgs(NamedTuple):
-    peaks: npt.NDArray[np.float64]
-    peak_vals: npt.NDArray[np.float64]

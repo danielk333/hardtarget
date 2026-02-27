@@ -98,6 +98,7 @@ class XCorrProcess(Process[XCorrCfgParams, XCorrProParams, XCorrVariables, XCorr
         file_idx_sample: int,
         exp_params: ExpParams,
         cfg_params: XCorrCfgParams,
+        pro_params: XCorrProParams,
     ) -> XCorrVariables:
         """
         In this case does nothing as the data is already in the correct format

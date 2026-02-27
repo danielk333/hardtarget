@@ -74,6 +74,7 @@ class ConfigSubSection(StrEnum):
     """Subsections in configuration .ini file"""
 
     PROCCESSING = "processing"
+    TARGET_ESTIMATION = "target_estimation"
     GMF = "gmf"
     DPT = "dpt"
     OPTIMIZATION = "optimization"

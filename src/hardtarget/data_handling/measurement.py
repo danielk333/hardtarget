@@ -144,7 +144,11 @@ class Measurement:
         return self.__data_loader.pointing(start_sample)
 
     def extract_signals(
-        self, start_sample: int, read_length: int, sum_rx_channels: bool = True
+        self,
+        start_sample: int,
+        read_length: int,
+        sum_rx_channels: bool = True,
+        sub_resolution: int = 1,
     ) -> ExtractedSignals:
         """
         Extract rx and tx data at the given sample.
@@ -180,14 +184,10 @@ class Measurement:
         # Extracting tx data
         if self._tx_channel != self._rx_channel and self._tx_channel is not None:
             tx = self.data_loader.read(self._tx_channel, start_sample, read_length)
-            tx = np.broadcast_to(
-                tx.reshape((tx.size, 1)), (tx.size, self.cfg_params.range_gate_sub_resolution)
-            )
+            tx = np.broadcast_to(tx.reshape((tx.size, 1)), (tx.size, sub_resolution))
         elif self._tx_channel == self._rx_channel and self._tx_channel is not None:
             tx = ipp.copy()
-            tx = np.broadcast_to(
-                tx.reshape((tx.size, 1)), (tx.size, self.cfg_params.range_gate_sub_resolution)
-            )
+            tx = np.broadcast_to(tx.reshape((tx.size, 1)), (tx.size, sub_resolution))
         else:
             assert self.exp_params.code is not None, (
                 "No code available from the metadata, not possible to simulate tx"
@@ -198,7 +198,7 @@ class Measurement:
                 start_samp=(start_sample % self.exp_params.ipp_samps) - self.cfg_params.samp_offset,
                 read_length=read_length,
                 ipp_samps=self.exp_params.ipp_samps,
-                sub_resolution=self.cfg_params.range_gate_sub_resolution,
+                sub_resolution=sub_resolution,
                 kind="linear",
             )
         tx = tx[self.pro_params.tx_stencil, :]

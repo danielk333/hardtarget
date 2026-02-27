@@ -12,7 +12,7 @@ from hardtarget.matched_filter.utils import default_mf_vars_items
 def fast_dpt_np(
     tx: npt.NDArray[np.complexfloating],
     rx: npt.NDArray[np.complexfloating],
-    tx_pwr: npt.NDArray,
+    tx_pwr: npt.NDArray[np.floating],
     cfg_params: DPTCfgParams,
     pro_params: DPTProParams,
 ) -> MFVariables:

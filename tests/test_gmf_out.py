@@ -85,7 +85,9 @@ def test_store_and_load():
         method_lib=TargetEstimationMethod.fgmf,
         implementation=Impl.c,
     )
+    # for target estimation the process parameters are done in two steps
     pro_org = GMFProcess.get_process_params(None, exp_org, cfg_org, _pro)
+    pro_org = GMFProcess.get_lib_specific_process_params(None, exp_org, cfg_org, pro_org)
 
     gmf_out_args = MFOutArgs(
         num_cohints_per_file=cfg_org.num_cohints_per_file,

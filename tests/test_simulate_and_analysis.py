@@ -53,14 +53,15 @@ class TestBlackBoxComputeGMF:
         [processing]
             n_ipp={n_ipp}
             ipp_offset=0
+            num_cohints_per_file=10
             min_range_gate=6640
             max_range_gate=6750
+            range_gate_step=1
+            node_gpus=1
+        [target_estimation]
             min_acceleration=-300.0
             max_acceleration=300.0
-            range_gate_step=1
             frequency_decimation={frequency_decimation}
-            num_cohints_per_file=10
-            node_gpus=1
         [dpt]
             ipp_delay_parameter={tau_ipp}
         [gmf]

@@ -1,5 +1,6 @@
 from .process import Process  # isort: off
 
+from hardtarget.matched_filter.target_estimation_process import TargetEstimationProcess
 from hardtarget.matched_filter.dpt import DPTProcess
 from hardtarget.matched_filter.gmf import GMFProcess
 from hardtarget.matched_filter.optimize import OptimizeProcess
@@ -10,7 +11,7 @@ from typing import Optional
 from typing import Callable
 
 # ---- Processes ----
-PROCESSES: dict[Processes, Callable[..., Process]] = {
+PROCESSES: dict[Processes, type[Process]] = {
     Processes.GMF: GMFProcess,
     Processes.DPT: DPTProcess,
     Processes.Optimization: OptimizeProcess,
@@ -19,9 +20,7 @@ PROCESSES: dict[Processes, Callable[..., Process]] = {
 }
 
 
-def get_analysis_process(
-    method: AnalysisMethod, method_lib: Optional[MethodLib] = None
-) -> Callable[..., Process]:
+def get_analysis_process(method: AnalysisMethod, method_lib: Optional[MethodLib] = None) -> type[Process]:
 
     if method == AnalysisMethod.target_estimation:
         if method_lib:

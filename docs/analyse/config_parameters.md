@@ -23,14 +23,8 @@ The default values and desciption of the configuration parameters can be found a
         min_range_gate = 6800
         max_range_gate = 7280
         range_gate_step = 1
-        range_gate_sub_resolution = 5
-        frequency_decimation = 16
-        clutter_length = 0
-        min_acceleration = -200.0
-        max_acceleration = 200.0
-        num_cohints_per_file = 10
-        optimization = False
         tx_amp_limit = 1.0
+        num_cohints_per_file = 10
     [section...]
         ...
         ...
@@ -41,6 +35,13 @@ method that will be used. Some available can be seen below, even if all are defi
 section relevant to the method running will be extracted.
 
 ```ini
+    [target_estimation]
+        range_gate_sub_resolution = 5
+        frequency_decimation = 16
+        clutter_length = 0
+        min_acceleration = -200.0
+        max_acceleration = 200.0
+        optimization = False
     [dpt]
         ipp_delay_parameter = 10
     [gmf]
@@ -48,7 +49,7 @@ section relevant to the method running will be extracted.
 
 ```
 
-A real example of a configuration file for a gmf analysis could then look as:
+A real example of a configuration file for a target estimation gmf analysis could then look as:
 
 ```ini
   [processing]
@@ -57,12 +58,13 @@ A real example of a configuration file for a gmf analysis could then look as:
         samp_offset=3
         min_range_gate=6660
         max_range_gate=6680
-        min_acceleration=-300.0
-        max_acceleration=300.0
         range_gate_step=1
-        frequency_decimation=1
         num_cohints_per_file=10
         node_gpus=1
+    [target_estimation]
+        min_acceleration=-300.0
+        max_acceleration=300.0
+        frequency_decimation=1
     [gmf]
         acceleration_steps = 10
 

@@ -8,11 +8,14 @@ from typing import Generator
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 
-from hardtarget.matched_filter.gmf.types import GMFCfgParams
-from hardtarget.matched_filter.types import MFOutArgs
+from hardtarget.matched_filter.types import (
+    ExtendedTargetEstimationProParams,
+    MFOutArgs,
+    TargetEstimationCfgParams,
+)
 from hardtarget.plotting import mf_analysis
 from hardtarget.plotting.load_data import load_analysed_data, load_optimized_data
-from hardtarget.types.types import ExpParams, ProParams
+from hardtarget.types.types import ExpParams
 
 
 def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -36,14 +39,14 @@ def main(args: argparse.Namespace) -> None:
     if args.chunk_size == 0:
         args.chunk_size = None
 
-    data_generator: Generator[tuple[MFOutArgs, ExpParams, GMFCfgParams, ProParams], None, None] = (
-        load_analysed_data(
-            args.path,
-            start_time=args.start_time,
-            end_time=args.end_time,
-            relative_time=args.relative_time,
-            chunk_size=args.chunk_size,
-        )
+    data_generator: Generator[
+        tuple[MFOutArgs, ExpParams, TargetEstimationCfgParams, ExtendedTargetEstimationProParams], None, None
+    ] = load_analysed_data(
+        args.path,
+        start_time=args.start_time,
+        end_time=args.end_time,
+        relative_time=args.relative_time,
+        chunk_size=args.chunk_size,
     )
 
     optimized_data = load_optimized_data(args.path)

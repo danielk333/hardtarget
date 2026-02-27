@@ -10,8 +10,9 @@ import h5py
 import numpy as np
 import numpy.typing as npt
 
-from hardtarget.matched_filter.types import MFOptimizeOutArgs, MFOutArgs
-from hardtarget.process import get_analysis_process
+from hardtarget.matched_filter.optimize.types import MFOptimizeOutArgs
+from hardtarget.matched_filter.types import MFOutArgs
+from hardtarget.process import Process, get_analysis_process
 from hardtarget.types.constants import AnalysisMethod
 from hardtarget.types.types import ExpParams, GenericCfg, GenericOut, GenericPro, ProParams
 from hardtarget.utils.h5_tools import get_analysed_h5_files
@@ -172,14 +173,7 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpParams, Gen
         Process specific types with the experiment data, configuration data, process data and the analysed
         output.
     """
-
-    with h5py.File(paths[0], "r") as file:
-        # Get analysis method from the process parameters
-        method = AnalysisMethod(file[f"{ProParams.method=}".split("=")[0].split(".")[1]].asstr()[()])
-        method_lib = file[f"{ProParams.method_lib=}".split("=")[0].split(".")[1]].asstr()[()]
-        # Retrive process matching the method and get the specific generic types for that process
-        generic_types = orig_bases(get_analysis_process(method, method_lib))[0].__args__  # type: ignore[arg-type]
-        cfg_type, pro_type, _, out_type, _ = generic_types
+    cfg_type, pro_type, out_type = get_process_types(paths[0])
 
     out_args: dict[str, Any] = {}
     exp_params: ExpParams | None = None
@@ -237,6 +231,35 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpParams, Gen
         cfg_params if cfg_params is not None else cfg_type(),
         pro_params if pro_params is not None else pro_type(),
     )
+
+
+def get_process_types(path: Path) -> tuple[Any, Any, Any]:
+    """
+    From a given file determine what process what used and return the
+    compatible data types
+
+    Args:
+        path: Path to analysed file
+    Returns:
+        tuple containing Configuration, Process and Output data type
+
+    """
+
+    with h5py.File(path, "r") as file:
+        method = AnalysisMethod(file[f"{ProParams.method=}".split("=")[0].split(".")[1]].asstr()[()])
+        method_lib = file[f"{ProParams.method_lib=}".split("=")[0].split(".")[1]].asstr()[()]
+        # Retrive process matching the method and get the specific generic types for that process
+        process = get_analysis_process(method, method_lib)
+        if process.__bases__[0] != Process:
+            # For target estimation processes there is a double inheritance case
+            _, _, _, out_type, _ = orig_bases(process.__bases__[0])[0].__args__
+            cfg_type, pro_type = orig_bases(process)[0].__args__
+        else:
+            # Get process base types
+            generic_types = orig_bases(get_analysis_process(method, method_lib))[0].__args__
+            cfg_type, pro_type, _, out_type, _ = generic_types
+
+        return cfg_type, pro_type, out_type
 
 
 """

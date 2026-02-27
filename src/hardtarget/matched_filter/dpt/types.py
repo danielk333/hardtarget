@@ -1,15 +1,12 @@
 """Discrete Polynomial-phase Transform, or DPT type specifics"""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-import numpy as np
-import numpy.typing as npt
-
-from hardtarget.types.types import CfgParams, ProParams
+from hardtarget.matched_filter.types import ExtendedTargetEstimationProParams, TargetEstimationCfgParams
 
 
 @dataclass(frozen=True)
-class DPTCfgParams(CfgParams):
+class DPTCfgParams(TargetEstimationCfgParams):
     """DPT specific configuration parameters, can be configured under the dpt section in the .ini file
 
     Args:
@@ -25,24 +22,12 @@ class DPTCfgParams(CfgParams):
 
 
 @dataclass(frozen=True)
-class DPTProParams(ProParams):
+class DPTProParams(ExtendedTargetEstimationProParams):
     """
     DPT specific process parameters
 
     Args: TODO
         decimated_ipp_delay_parameter:
-        inds_accelerations:
-        accelerations:
-        acceleration_phasors:
-        fgmf_acceleration_phasors:
     """
 
     decimated_ipp_delay_parameter: int = 1
-    inds_accelerations: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
-    accelerations: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty(2, dtype=np.float64))
-    acceleration_phasors: npt.NDArray[np.complexfloating] = field(
-        default_factory=lambda: np.empty(2, dtype=np.complex64)
-    )
-    fgmf_acceleration_phasors: npt.NDArray[np.complexfloating] = field(
-        default_factory=lambda: np.empty(2, dtype=np.complex64)
-    )

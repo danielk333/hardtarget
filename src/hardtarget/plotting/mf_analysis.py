@@ -9,7 +9,12 @@ from matplotlib.collections import QuadMesh
 from matplotlib.lines import Line2D
 from scipy import constants
 
-from hardtarget.matched_filter.types import MFOptimizeOutArgs, MFOutArgs
+from hardtarget.matched_filter.optimize.types import MFOptimizeOutArgs
+from hardtarget.matched_filter.types import (
+    ExtendedTargetEstimationProParams,
+    MFOutArgs,
+    TargetEstimationCfgParams,
+)
 from hardtarget.types.types import CfgParams, ExpParams, ProParams
 from hardtarget.utils import noise
 from hardtarget.utils.time_conversion import ipp_time_to_sample
@@ -29,7 +34,7 @@ def to_relative_range_gate(
     ranges: npt.NDArray[np.float64 | np.int64],
     cfg: CfgParams,
     exp: ExpParams,
-    pro: ProParams,
+    pro: ExtendedTargetEstimationProParams,
 ) -> npt.NDArray[np.int64]:
     sample_rate = exp.sample_rate
     il0_r_samp = (ranges / constants.c) * sample_rate + ipp_time_to_sample(
@@ -43,8 +48,8 @@ def plot_peaks(
     axes: npt.NDArray,  # of type Axes
     out_data: MFOutArgs,
     exp: ExpParams,
-    cfg: CfgParams,
-    pro: ProParams,
+    cfg: TargetEstimationCfgParams,
+    pro: ExtendedTargetEstimationProParams,
     optimization: Optional[MFOptimizeOutArgs] = None,
     monostatic: bool = True,
     snr_dB_limit: float = 15.0,
@@ -137,8 +142,8 @@ def plot_detections(
     axes: npt.NDArray,  # of type axes
     out_data: MFOutArgs,
     exp: ExpParams,
-    cfg: CfgParams,
-    pro: ProParams,
+    cfg: TargetEstimationCfgParams,
+    pro: ExtendedTargetEstimationProParams,
     monostatic: bool = True,
     snr_dB_limit: float = 15.0,
 ) -> tuple[npt.NDArray, list[list[Line2D]]]:  # of type Axes
@@ -218,8 +223,8 @@ def plot_map(
     axes: list[Axes],
     out_data: MFOutArgs,
     exp: ExpParams,
-    cfg: CfgParams,
-    pro: ProParams,
+    cfg: TargetEstimationCfgParams,
+    pro: ExtendedTargetEstimationProParams,
 ) -> tuple[list[Axes], list[QuadMesh | list[Line2D]]]:
     """
     Plot map

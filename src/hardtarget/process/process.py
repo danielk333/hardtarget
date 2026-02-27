@@ -202,6 +202,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         file_idx_sample: int,
         exp_params: ExpParams,
         cfg_params: GenericCfg,
+        pro_params: GenericPro,
     ) -> GenericOut:
         """
         Abstract method, shall calculate important parameters from the analysis and generate the output.
@@ -284,7 +285,9 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self._logger.debug(msg.format(**info))
 
         # --- Generate output ---
-        return self.generate_output(all_vars, file_idx_sample, self.exp_params, self.cfg_params)
+        return self.generate_output(
+            all_vars, file_idx_sample, self.exp_params, self.cfg_params, self.pro_params
+        )
 
     def save_task_data(
         self,
