@@ -4,6 +4,7 @@
 #docs
 docs/build/
 docs/source/apidoc
+docs/reference/
 
 #examples data
 examples/data

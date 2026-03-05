@@ -1,0 +1,39 @@
+import pathlib
+
+import mkdocs_gen_files
+import os
+
+try:
+    root = pathlib.Path(__file__).parent.parent.parent
+except NameError:
+    root = pathlib.Path(os.path.abspath(""))
+src = root / "src"
+package = src / "hardtarget"
+output_dir = root / "docs" / "reference"
+output_dir.mkdir(exist_ok=True)
+
+nav = mkdocs_gen_files.Nav()
+
+for file in sorted(package.rglob("*.py")):
+    module_path = file.relative_to(src).with_suffix("")
+    doc_path = file.relative_to(src).with_suffix(".md")
+    full_doc_path = pathlib.Path("reference", doc_path)
+
+    parts = tuple(module_path.parts)
+    if parts[-1] == "__init__":
+        parts = parts[:-1]
+        doc_path = doc_path.with_name("index.md")
+        full_doc_path = full_doc_path.with_name("index.md")
+    elif parts[-1] == "__main__":
+        continue
+
+    nav[parts] = doc_path.as_posix()
+
+    with mkdocs_gen_files.open(full_doc_path, "w") as fd:
+        ident = ".".join(parts)
+        fd.write(f"::: {ident}")
+
+    mkdocs_gen_files.set_edit_path(full_doc_path, file.relative_to(root))
+
+with mkdocs_gen_files.open("reference/nav.md", "w") as nav_file:
+    nav_file.writelines(nav.build_literate_nav())

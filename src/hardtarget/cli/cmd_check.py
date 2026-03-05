@@ -1,27 +1,32 @@
+"""
+The CLI Check functionality, analyses the raw data and extracts relevant parameters for the analysis
+configuration.
+"""
+
+import argparse
 import logging
+import tempfile
+from pathlib import Path
+
 import numpy as np
 import scipy.constants as constants
-from .commands import add_command
-from .utils import SI_to_unit, unit_to_SI
-from hardtarget.drf_utils import load_hardtarget_drf
+from radardef import RadarDef
+from radardef.types import SourceFormat
 
+from hardtarget.types.types import ParserArgs, SubParser
+from hardtarget.utils.range_conversion import SI_to_unit, unit_to_SI
+
+from .commands import add_command
 
 logger = logging.getLogger(__name__)
 
 
-#################################################
-# CHECK RANGE-GATES
-#################################################
+def range_gates_parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Adds mandatory and optional positional arguments to the parser."""
 
-
-def range_gates_parser_build(parser):
-    parser.add_argument("path", help="path to source directory with DRF data")
-    parser.add_argument(
-        "--start-range", "-s", default=None, help="Desired starting range in given unit"
-    )
-    parser.add_argument(
-        "--end-range", "-e", default=None, help="Desired ending range in given unit"
-    )
+    parser.add_argument("path", help="path to source directory with raw data")
+    parser.add_argument("--start-range", "-s", default=None, help="Desired starting range in given unit")
+    parser.add_argument("--end-range", "-e", default=None, help="Desired ending range in given unit")
     parser.add_argument(
         "--clutter-range",
         "-c",
@@ -42,14 +47,36 @@ def range_gates_parser_build(parser):
     return parser
 
 
-def range_gates_main(args):
-    _, meta = load_hardtarget_drf(args.path)
+def range_gates_main(args: argparse.Namespace) -> None:
+    """Check CLI"""
 
-    sample_rate = meta["sample_rate"]
-    rx_start = meta["rx_start"]
-    rx_end = meta["rx_end"]
-    tx_start = meta["tx_start"]
-    tx_end = meta["tx_end"]
+    with tempfile.TemporaryDirectory() as converted_data_path:
+        radar_def = RadarDef()
+        source_format = radar_def.get_source_format(args.path)
+        if source_format is not SourceFormat.UNKNOWN:
+            # Source format is not unknown, thus it is unconverted file
+            target_formats = radar_def.available_target_formats(source_format)
+            converted_files = radar_def.convert(args.path, target_formats[0], converted_data_path)
+            if converted_files is None:
+                raise Exception(f"Not possible to convert the file:  {args.path}")
+            filepath = converted_files[0]
+        else:
+            # File is already converted
+            filepath = Path(args.path)
+
+        data_loader = radar_def.load_data(filepath)
+
+        if data_loader is None:
+            logger.warning(f"Not possible to read data from path: {args.path}")
+            return
+
+        meta = data_loader.meta
+
+    sample_rate = 1 / (meta.experiment.t_samp_usec * 1e-6)
+    rx_start = meta.experiment.t_rx_start_usec if meta.experiment.t_rx_start_usec is not None else 0
+    rx_end = meta.experiment.t_rx_end_usec if meta.experiment.t_rx_end_usec is not None else 0
+    tx_start = meta.experiment.t_tx_start_usec if meta.experiment.t_tx_start_usec is not None else 0
+    tx_end = meta.experiment.t_tx_end_usec if meta.experiment.t_tx_end_usec is not None else 0
 
     T_rx_start_samp = np.round(rx_start * 1e-6 * sample_rate).astype(np.int64)
     T_rx_end_samp = np.round(rx_end * 1e-6 * sample_rate).astype(np.int64)
@@ -68,13 +95,9 @@ def range_gates_main(args):
     tx_end_rg = T_tx_end_samp - (T_tx_start_samp + 1)
     tx_end_rg_km = (tx_end_rg + 1) / sample_rate * constants.c * 1e-3
 
-    print(f"DRF '{args.path}':")
-    print(
-        f" - Minimum range gate IL0 sample (range-gate {rgs_min}): {il0_rgs_min} ({rgs_min_km} km)"
-    )
-    print(
-        f" - Maximum range gate IL0 sample (range-gate {rgs_max}): {il0_rgs_max} ({rgs_max_km} km)"
-    )
+    print(f"File: '{args.path}':")
+    print(f" - Minimum range gate IL0 sample (range-gate {rgs_min}): {il0_rgs_min} ({rgs_min_km} km)")
+    print(f" - Maximum range gate IL0 sample (range-gate {rgs_max}): {il0_rgs_max} ({rgs_max_km} km)")
     print(f" - Range-gate at TX pulse end {tx_end_rg} ({tx_end_rg_km} km)")
 
     if args.clutter_range is not None:
@@ -98,9 +121,7 @@ def range_gates_main(args):
         rg0_unit = SI_to_unit(rg0_sec * constants.c, args.unit.lower())
 
         rg0 = il0_rg0 - (T_tx_start_samp + 1)
-        print(
-            f" - Requested start range ({rg0_unit} {args.unit}): IL0 sample {il0_rg0} (range-gate {rg0})"
-        )
+        print(f" - Requested start range ({rg0_unit} {args.unit}): IL0 sample {il0_rg0} (range-gate {rg0})")
         assert il0_rg0 <= T_rx_end_samp, "start range gate cannot be after than RX end"
         assert il0_rg0 > T_rx_start_samp, "start range gate cannot be before than RX start"
 
@@ -112,25 +133,20 @@ def range_gates_main(args):
         rg1_unit = SI_to_unit(rg1_sec * constants.c, args.unit.lower())
 
         rg1 = il0_rg1 - (T_tx_start_samp + 1)
-        print(
-            f" - Requested end range ({rg1_unit} {args.unit}): IL0 sample {il0_rg1} (range-gate {rg1})"
-        )
+        print(f" - Requested end range ({rg1_unit} {args.unit}): IL0 sample {il0_rg1} (range-gate {rg1})")
         assert il0_rg1 <= T_rx_end_samp, "end range gate cannot be after than RX end"
         assert il0_rg1 > T_rx_start_samp, "end range gate cannot be before than RX start"
 
 
-#################################################
-# CUDA CHECK COMMAND
-#################################################
-
-
-def cuda_parser_build(parser):
+def cuda_parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Specific cuda parser build"""
     return parser
 
 
-def cuda_main(args):
+def cuda_main(args: argparse.Namespace) -> None:
+    """Validation of the cuda environment if present"""
     try:
-        import hardtarget.gmf.gmf_cuda as gcu
+        import hardtarget.matched_filter.gmf.gmf_cuda as gcu
 
         gcu.print_cuda_devices()
         gcu.test_cuda()
@@ -138,40 +154,35 @@ def cuda_main(args):
         print(e)
 
 
-#################################################
-# COMMANDS
-#################################################
-
-SOURCES = {
-    "cuda": {
-        "main": cuda_main,
-        "parser_build": cuda_parser_build,
-        "add_parser_args": {
-            "description": "Check cuda devices and functionality",
-        },
-    },
-    "range-gates": {
-        "main": range_gates_main,
-        "parser_build": range_gates_parser_build,
-        "add_parser_args": {
-            "description": "Check the available range gates (two-way range) of the target DRF",
-        },
-    },
+SOURCES: dict[str, SubParser] = {
+    "cuda": SubParser(
+        main=cuda_main,
+        parser_build=cuda_parser_build,
+        parser_args=ParserArgs(description="Check cuda devices and functionality", usage=""),
+    ),
+    "range-gates": SubParser(
+        main=range_gates_main,
+        parser_build=range_gates_parser_build,
+        parser_args=ParserArgs(
+            description="Check the available range gates (two-way range) of the target DRF", usage=""
+        ),
+    ),
 }
 
 
-def parser_build(parser):
+def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Adds mandatory and optional positional arguments to the parser."""
     subparsers = parser.add_subparsers(help="hardtarget check types", dest="checktype")
     subparsers.required = True
     for source in SOURCES:
-        cmd_parser = subparsers.add_parser(source, **SOURCES[source]["add_parser_args"])
-        parser_builder = SOURCES[source]["parser_build"]
+        cmd_parser = subparsers.add_parser(source, **SOURCES[source].parser_args)
+        parser_builder = SOURCES[source].parser_build
         parser_builder(cmd_parser)
     return parser
 
 
-def main(args):
-    function = SOURCES[args.checktype]["main"]
+def main(args: argparse.Namespace) -> None:
+    function = SOURCES[args.checktype].main
     logger.info(f"Executing command {args.command} {args.checktype}")
     function(args)
 

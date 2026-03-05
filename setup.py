@@ -1,12 +1,9 @@
+import codecs
 import os
 from os.path import join as pjoin
-import codecs
-import pathlib
 
-from setuptools import setup, Extension
+from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
-
-HERE = pathlib.Path(__file__).resolve().parents[0]
 
 
 def find_in_path(name, path):
@@ -66,7 +63,7 @@ clibraries = ["fftw3f"]
 # Build C module
 gmfcmodule = Extension(
     # Where to store the .so file
-    name="hardtarget.gmf.gmfclib",
+    name="hardtarget.matched_filter.utils.gmfclib",
     # Libraries used
     libraries=clibraries,
     extra_compile_args={
@@ -84,7 +81,7 @@ try:
 
     gmfgpumodule = Extension(
         # Where to store the .so file
-        name="hardtarget.gmf.gmfcudalib",
+        name="hardtarget.matched_filter.utils.gmfcudalib",
         library_dirs=[CUDA["lib64"]],
         # Libraries used
         libraries=cudalibraries,
@@ -173,5 +170,8 @@ def get_version(path):
 setup(
     cmdclass={"build_ext": custom_build_ext},
     ext_modules=extmodules,
-    version=get_version(HERE / "src" / "hardtarget" / "version.py"),
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
+    package_data={"": ["*.ini", "*.txt"]},
+    include_package_data=True,
 )

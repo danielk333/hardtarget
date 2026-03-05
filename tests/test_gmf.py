@@ -1,10 +1,18 @@
-import pytest
-import numpy as np
-import hardtarget.analysis.utils as utils
-from hardtarget.gmf import get_estimation_method
-from hardtarget.configuration import load_gmf_params
 import tempfile
 from pathlib import Path
+
+import numpy as np
+import pytest
+
+import hardtarget.process.utils as utils
+from hardtarget.data_handling.configuration import (
+    compute_process_params,
+    load_config_params,
+)
+from hardtarget.matched_filter import get_estimation_method
+from hardtarget.matched_filter.types import MFVariables
+from hardtarget.types.constants import AnalysisMethod, EstimationMethod, Impl
+from radardef.types import ExpParams
 
 """
 Should ideally be able to test the different implementations of the GMF function
@@ -20,7 +28,7 @@ whereas optimized
 ISSUE 2
 implementations of GMF functions depend on gmf_params,
 gmf_params = {"DER": {}, "PRO": {}}
-This way of organizing parameters is not motivated in the context of 
+This way of organizing parameters is not motivated in the context of
 gmf_function implementation.
 
 ISSUE 3
@@ -37,38 +45,31 @@ which is not needed by gmf functions.
 """
 
 
-def create_gmf_params():
-    """
-    Create mockup gmf params for testing gmf
-    """
+def create_experiment_params():
 
-    MOCK_DRF_METADATA = """
-    [Experiment]
-        name = leo_bpark
-        version = 2.1u
-        sample_rate = 1000000
-        ipp = 20000
-        file_secs = 12.8
-        tx_pulse_length = 1920.0
-        rx_channel = uhf
-        rx_start = 0
-        rx_end = 20000
-        tx_channel = uhf
-        tx_start = 82.0
-        tx_end = 2002.0
-        cal_on = 19900.0
-        cal_off = 19997.0
-        radar_frequency = 929.6
+    return ExpParams(
+        name="leo_bpark",
+        radar_frequency=929.6,
+        t_ipp_usec=20000,
+        ipp_samps=20000,
+        sample_rate=1000000.0,
+        t_samp_usec=1,
+        rx_channels=["uhf"],
+        t_rx_start_usec=0,
+        t_rx_end_usec=20000,
+        t_tx_start_usec=82.0,
+        t_tx_end_usec=2002.0,
+        tx_channel="uhf",
+        tx_pulse_length=1920.0,
+        t_cal_on_usec=19900.0,
+        t_cal_off_usec=19997.0,
+    )
 
-    [Bounds]
-        ts_start = 1445511612.8
-        ts_end = 1445551228.8
-        start = 2015-10-22T11:00:12.800000
-        end = 2015-10-22T22:00:28.800000
-    """
 
-    MOCK_GMF_CONFIG = """
-    [signal-processing]
+def create_config_params():
+
+    MOCK_CONFIG = """
+    [processing]
         n_ipp=10
         ipp_offset=0
         min_range_gate=6800
@@ -81,65 +82,62 @@ def create_gmf_params():
         frequency_decimation=16
         num_cohints_per_file=10
         node_gpus=1
-        dpt_ipp_delay_parameter=5
+    [gmf]
+
     """
 
     # Make temp directory with mockup config files
     with tempfile.TemporaryDirectory() as temp_dir:
 
         # Mockup DRF metadata file
-        metafile = Path(temp_dir) / "metadata.ini"
-        with open(metafile, "w") as f:
-            f.write(MOCK_DRF_METADATA)
+        # metafile = Path(temp_dir) / "metadata.ini"
+        # with open(metafile, "w") as f:
+        #    f.write(MOCK_DRF_METADATA)
 
         # Mockup GMF processing config
         config = Path(temp_dir) / "config.ini"
         with open(config, "w") as f:
-            f.write(MOCK_GMF_CONFIG)
+            f.write(MOCK_CONFIG)
 
-        # GMF params
-        return load_gmf_params(temp_dir, str(config))
-
-
-
+        # process params
+        return load_config_params(config)
 
 
 class TestGMF:
-
 
     def test_gmf(self):
         """Run the basic gmf function."""
 
         # GMF method and implementation
-        gmf_method = "fgmf"
-        gmf_implementation = "numpy"
-        gmf_lib, gmf_libtype = get_estimation_method(
-            gmf_implementation,
-            gmf_method
-        )
+        gmf_method = EstimationMethod.fgmf
+        gmf_implementation = Impl.numpy
+        gmf_lib, gmf_libtype = get_estimation_method(gmf_implementation, gmf_method)
 
         # GMF params
-        gmf_params = create_gmf_params()
+        init_pro_params = create_config_params()
+        experiment = create_experiment_params()
+
+        pro_params = compute_process_params(experiment, init_pro_params, analysis_method=AnalysisMethod.gmf)
 
         # Initialise vectors
-        
+
         # - new
-        size = gmf_params["PRO"]["n_ranges"]
-        gmf_vars = utils.GMFVariables(
-            vals = np.zeros(size, dtype=np.float32),
-            dc = np.zeros(size, dtype=np.float32),
-            v_ind = np.full(size, -1, dtype=np.int32),
-            a_ind = np.full(size, -1, dtype=np.int32),
-            tx_pwr = None  # not needed
+        size = len(pro_params.ranges)
+        vars = MFVariables(
+            vals=np.zeros(size, dtype=np.float32),
+            dc=np.zeros(size, dtype=np.float32),
+            v_ind=np.full(size, -1, dtype=np.int32),
+            a_ind=np.full(size, -1, dtype=np.int32),
+            tx_pwr=None,  # not needed
         )
 
         # - old
-        """        
+        """
         dec = 10
         acc_phasors = np.zeros([20, 1000], dtype=np.complex64)
         acc_phasors[0, :] = 1.0
         rgs = np.arange(1000, dtype=np.float32)
-        
+
         n_r = len(rgs)
         gmf_vec = np.zeros(n_r, dtype=np.float32)
         gmf_dc_vec = np.zeros(n_r, dtype=np.float32)
@@ -148,21 +146,21 @@ class TestGMF:
         """
 
         # Mockup signal
-       
-        # - old       
+
+        # - old
         """
         z_tx = np.zeros(10000, dtype=np.complex64)
         z_rx = np.zeros(12000, dtype=np.complex64)
         for i in range(10):
             z_tx[(i * 1000): (i * 1000 + 20)] = 1.0
             z_rx[(i * 1000 + 500): (i * 1000 + (500 + 20))] = 0.5  # simulated "echo"
-                    
+
         """
 
         # Process
 
         # - old
-        """        
+        """
         # for i in range(20):
         gmf_func(z_tx, z_rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_vec)
         """

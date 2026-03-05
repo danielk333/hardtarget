@@ -1,78 +1,125 @@
 # Official language image. Look for the different tagged releases at:
 # https://hub.docker.com/r/library/python/tags/
-image: python:3.8.10
+image: python:3.11
 
 stages:
   - test
+  - type_checking
+  - documentation
   - release
 
-
-# Prepare the development enviornment
+# Prepare the development environment
 .devsetup:
   before_script:
     - python -V
-    # Prepare and activate virtualenv
     - pip install -U pip
     - pip install virtualenv
     - virtualenv venv
     - source venv/bin/activate
-    # Install dependancies
-    - apt update
-    - apt install -y pandoc gcc libfftw3-dev libhdf5-dev
-    # Install the package
-    - pip install .[develop]
-
-# Prepare the nominal usage enviornment
-.setup:
-  before_script:
-    - python -V
-    # Prepare and activate virtualenv
-    - pip install -U pip
-    - pip install virtualenv
-    - virtualenv venv
-    - source venv/bin/activate
-    # Install dependancies
     - apt update
     - apt install -y gcc libfftw3-dev libhdf5-dev
-    # install the package
-    - pip install .
+    - apt install -y openmpi-bin libopenmpi-dev
+    - pip install .[develop,profiling,mpi]
 
-
-#######################
-## Platforms testing ##
-
-#Template for testing on python images,
-# extend this for each python-platform
-# the package is intended to work on
-.pytest:
-  stage: test
-  extends: .setup
-  allow_failure: true
-  script:
-    - pip install pytest
-    - pytest
+# Rules to trigger standard jobs
+.merge_request_rules:
   rules:
+    - if: $CI_MERGE_REQUEST_TITLE =~ /^(\[Draft\]|\(Draft\)|Draft:)/
+      when: never
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
     - if: $CI_COMMIT_BRANCH == "main"
 
+##### Testing #####
+pytest:
+  stage: test
+  image: ghcr.io/astral-sh/uv:bookworm-slim
+  allow_failure: false
+  parallel:
+    matrix:
+      - VERSION: ["3.10", "3.11", "3.12", "3.13"]
+  script:
+    - uv python install $VERSION
+    - apt-get update
+    - apt-get -y install git
+    - apt-get install -y gcc libfftw3-dev libhdf5-dev
+    - uv venv --python $VERSION
+    - source .venv/bin/activate
+    - uv pip install .[develop,test]
+    - uv run pytest
+  coverage: /TOTAL.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
+  rules:
+    - !reference [.merge_request_rules, rules]
 
-python:
-  extends: .pytest
+##### Type checking, type hinting , cyclomatic complexity #####
+mypy:
+  stage: type_checking
+  extends:
+    - .devsetup
+  allow_failure: false
+  script:
+    - pip install .[type_checker]
+    - mypy src/hardtarget --follow-untyped-imports --disallow-untyped-defs --warn-unused-ignores
+  rules:
+    - !reference [.merge_request_rules, rules]
 
-python3.10:
-  extends: .pytest
-  image: python:3.10
+cyclomatic-complexity:
+  stage: type_checking
+  extends:
+    - .devsetup
+  allow_failure: false
+  script:
+    - pip install .[type_checker]
+    - xenon src/hardtarget -m C -a A # Average of a file (-m): max C, Total average (-a): max A
+  rules:
+    - !reference [.merge_request_rules, rules]
 
-###############
-## Releasing ##
+##### Documentation #####
+build-docs:
+  stage: documentation
+  extends:
+    - .devsetup
+  allow_failure: false
+  script:
+    - pip install .[documentation]
+    - mkdocs build
+  rules:
+    - !reference [.merge_request_rules, rules]
 
+doc-coverage:
+  stage: documentation
+  extends:
+    - .devsetup
+  variables:
+    DOC_COVERAGE: 0
+    DOC_MIN_COVERAGE: 50
+  script:
+    - pip install .[documentation]
+    - set +e
+    - docstr-coverage src/hardtarget/
+    - DOC_COVERAGE=$((docstr-coverage src/hardtarget/ |& grep 'Total coverage') | grep -Eo '[+-]?[0-9]+([.][0-9]+)?')
+    - DOC_COVERAGE=${DOC_COVERAGE%.*}
+    - set -e
+    - >
+      if [ $DOC_MIN_COVERAGE -gt $DOC_COVERAGE ]; then
+        echo "\"Good code is its own best documentation\", too bad we are lacking that. Bump up the documentation coverage!"
+        echo "Total coverage: $DOC_COVERAGE%, Minimum coverage: $DOC_MIN_COVERAGE%"
+        exit 1
+      else
+        echo "Wonderful documentation, future you will thank you!"
+        exit 0
+      fi
+  rules:
+    - !reference [.merge_request_rules, rules]
+
+##### Releasing #####
 # Compile documentation for publication
 pages:
   stage: release
   extends: .devsetup
   script:
-    - cd docs
-    - make html
-    - mv build/html ../public
+    - pip install .[documentation]
+    - mkdocs build --site-dir public
   artifacts:
     paths:
       - public
@@ -85,17 +132,15 @@ pypi:
   stage: release
   extends: .devsetup
   variables:
-    #Use a gitlab variable to securly store the token
+    #Use a gitlab variable to securely store the token
     PYPI_TOKEN: $PYPI_TOKEN
   script:
     - python -m build
     - python -m twine check dist/*
-    - mkdir wheelhouse
-    - mv -v dist/*tar.gz wheelhouse/
     - >
       TWINE_USERNAME=__token__
       TWINE_PASSWORD=$PYPI_TOKEN
-      python -m twine upload wheelhouse/*
+      python -m twine upload dist/*
   artifacts:
     paths:
       - dist/*

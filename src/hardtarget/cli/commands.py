@@ -1,13 +1,20 @@
+"""
+Main entry for the CLI functionality
+"""
+
 import argparse
 import logging
-from hardtarget import profiling, __version__
+from typing import Callable
+
+from hardtarget import __version__
+from hardtarget.utils import profiling
 
 logger = logging.getLogger(__name__)
 
-COMMANDS = dict()
+COMMANDS: dict[str, dict] = dict()
 
 
-def build_parser():
+def build_parser() -> argparse.ArgumentParser:
     """
     Build parser object from commands.
     """
@@ -16,9 +23,7 @@ def build_parser():
     # Top level functionality
     parser.add_argument("--version", action="store_true", help="package version")
 
-    parser.add_argument(
-        "-v", "--verbose", help="increase output verbosity", action="count", default=0
-    )
+    parser.add_argument("-v", "--verbose", help="increase output verbosity", action="count", default=0)
 
     # Sub level parsers
     subparsers = parser.add_subparsers(help="available command line interfaces", dest="command")
@@ -31,17 +36,29 @@ def build_parser():
     return parser
 
 
-def add_command(name, function, parser_build, add_parser_args={}):
+def add_command(
+    name: str,
+    function: Callable,
+    parser_build: Callable[[argparse.ArgumentParser], argparse.ArgumentParser],
+    add_parser_args: dict[str, str] = {},
+) -> None:
     """
     Add a new command.
     Used by CLI scripts in order register new commands
+
+    Args:
+        name: Name of command
+        function: Function to execute
+        parser_build: Available parser that should be added as a subparser
+        add_parser_args: parser arguments
+
     """
     COMMANDS[name] = dict()
     COMMANDS[name]["function"] = function
     COMMANDS[name]["parser"] = (parser_build, add_parser_args)
 
 
-def main():
+def main() -> None:
     """
     Main parser.
     """

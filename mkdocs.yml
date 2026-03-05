@@ -1,0 +1,128 @@
+site_name: hardtarget
+
+theme:
+  name: "material"
+  logo: assets/logo.png
+  favicon: assets/favicon.png
+  features:
+    - navigation.instant
+    - navigation.path
+    - navigation.top
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: "#002d72"
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: "#002d72"
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  icon:
+    repo: fontawesome/brands/github
+
+repo_url: https://github.com/danielk333/hardtarget
+
+extra_css:
+  - assets/style.css
+
+plugins:
+  - search
+  - section-index
+  - gen-files:
+      scripts:
+        - docs/scripts/generate_api_docs.py
+  - literate-nav:
+      nav_file: nav.md
+  - bibtex:
+      bib_file: "docs/references.bib"
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            docstring_section_style: table
+            show_docstring_functions: true
+            show_docstring_modules: true
+            show_docstring_description: true
+            inherited_members: true
+            parameter_headings: true
+            type_parameter_headings: true
+            show_symbol_type_toc: true
+            separate_signature: true
+            show_signature_annotations: true
+            show_signature_type_parameters: true
+            summary: true
+  - mkdocs-jupyter:
+      execute: true
+      execute_ignore:
+        - examples/analysis/estimate_errors.py
+        - examples/analysis/experiment_space.py
+        - examples/analysis/linearized_errors.py
+        - examples/analysis/plot_logo.py
+        - examples/analysis/precision_orbit_analysis.py
+        - examples/analysis/profile_speed.py
+        - examples/back_to_basics/part3_sweep_acceleration.py
+
+      include_source: false
+      ignore: ["_wip*"]
+      allow_errors: false
+      remove_tag_config:
+        remove_input_tags:
+          - hide_code
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/config.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Usage:
+      - Install: usage/install.md
+      - Quickstart: usage/quickstart.md
+      - CLI: usage/cli.md
+      - Develop: usage/develop.md
+  - Analyse:
+      - analyse/api_mf.md
+      - Processes:
+          - DPT: analyse/dpt_process.md
+          - GMF: analyse/gmf_process.md
+          - Optimization: analyse/optimization_process.md
+      - Configuration parameters: analyse/config_parameters.md
+      - Analysis output: analyse/format_mf.md
+      - Parallelism: analyse/parallelism.md
+  - Concepts: concepts/concept_mf.md
+  - Reference: reference/
+  - Examples:
+      - Back to basics:
+          - Part 1 - Boxcar: examples/back_to_basics/part1_boxcar_fft.py
+          - Part 2 - Doppler drift: examples/back_to_basics/part2_doppler_drift.py
+          #- Part 3 - Sweep acceleration: examples/back_to_basics/part3_sweep_acceleration.py
+          - Part 4 - Determine acceleration: examples/back_to_basics/part4_determine_acceleration.py
+          - Part 5 - Ambiguity function: examples/back_to_basics/part5_ambiguity_function.py
+          - Part 6 - Ipp number: examples/back_to_basics/part6_ipp_number.py
+          - Part 7 - DPT Criterion: examples/back_to_basics/part7_dpt_criterion.py
+          - Part 8 - Plot GMF: examples/back_to_basics/part8_plot_gmf.py
+      - Analysis:
+          - Analyse and inspect: examples/analysis/analyse_and_inspect.py
+          - Optimization: examples/analysis/optimization.py
+          - Simulated tx signal: examples/analysis/simulated_tx_signal.py
+          - Implementation performance comparison: examples/analysis/implementation_performance.py
+          - Visualization of analysis parameters: examples/analysis/visualize_analysis_parameters.py
+          - Visualization of matched filter: examples/analysis/visualize_matched_filter.py
+          - Visualization of raw data: examples/analysis/plot_raw_data.py

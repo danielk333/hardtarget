@@ -1,11 +1,15 @@
-import pytest
-import numpy as np
 import tempfile
+from pathlib import Path
+
+import numpy as np
+import pytest
 from scipy import constants
 
-from hardtarget.gmf import Impl
 import hardtarget
-from pathlib import Path
+import radardef.radar_stations.eiscat.utils as radardef_utils
+from hardtarget.data_simulation import simulate_drf, DRFSimParams
+from hardtarget.types.constants import Impl
+from radardef.types import BoundParams, ExpParams
 
 
 class TestBlackBoxComputeGMF:
@@ -13,19 +17,19 @@ class TestBlackBoxComputeGMF:
     It is possible that CUDA support is compiled, yet still non-functional.
     """
 
-    @pytest.mark.parametrize("gmf_impl", [Impl.numpy, Impl.c])
-    def test_dpt(self, gmf_impl):
-        self.run_test("fdpt", gmf_impl)
+    @pytest.mark.parametrize("mf_impl", [Impl.numpy, Impl.c])
+    def test_dpt(self, mf_impl):
+        self.run_test("fdpt", mf_impl)
 
-    @pytest.mark.parametrize("gmf_impl", [Impl.numpy, Impl.c])
-    def test_gmf(self, gmf_impl):
-        self.run_test("fgmf", gmf_impl)
+    @pytest.mark.parametrize("mf_impl", [Impl.numpy, Impl.c])
+    def test_gmf(self, mf_impl):
+        self.run_test("fgmf", mf_impl)
 
     @pytest.mark.cuda
     def test_gmf_cuda(self):
         self.run_test("fgmf", Impl.cuda)
 
-    def run_test(self, gmf_method, gmf_impl):
+    def run_test(self, mf_method, mf_impl):
         """Simulate echoes without noise and analyse the echoes to verify parameters are recovered.
 
         There is a minimum acceleration thats theoretically detectable depending
@@ -38,7 +42,7 @@ class TestBlackBoxComputeGMF:
         bins, even if there is no noise
         """
 
-        gmf_impl = gmf_impl.name
+        mf_impl = mf_impl.name
 
         debug_test = False
         frequency_decimation = 10
@@ -46,37 +50,38 @@ class TestBlackBoxComputeGMF:
         tau_ipp = 5
 
         config_str = f"""
-
-        [signal-processing]
+        [processing]
             n_ipp={n_ipp}
             ipp_offset=0
             min_range_gate=6640
-            max_range_gate=6700
+            max_range_gate=6750
             min_acceleration=-300.0
             max_acceleration=300.0
             range_gate_step=1
             frequency_decimation={frequency_decimation}
             num_cohints_per_file=10
             node_gpus=1
-            dpt_ipp_delay_parameter={tau_ipp}
-
+        [dpt]
+            ipp_delay_parameter={tau_ipp}
+        [gmf]
+            acceleration_steps = 25
         """
 
-        t_end = 4.0
-        coh_int_len = 0.2
-        t_abs = np.arange(0, t_end + coh_int_len, coh_int_len)
+        t_start = 0
+        t_end = 20000 * 750  # ipp_us = 20000
+        coh_int_len = 20000 * n_ipp
+        t_abs_us = np.arange(0, t_end + coh_int_len, coh_int_len)
+        t_abs = t_abs_us * 1e-6
 
-        simulation_params = {
-            "epoch": "2021-04-12T12:15:40",
-            "start_time": 0,
-            "end_time": t_end,
-            "target_start_time": 0,
-            "target_end_time": t_end,
-            "noise_sigma": 0,
-            "tx_amp": 1,
-        }
-
-        rx_channel = "sim"
+        simulation_params = DRFSimParams(
+            epoch="2021-04-12T12:15:40",
+            start_time_us=t_start,
+            end_time_us=t_end,
+            target_start_time_us=t_start,
+            target_end_time_us=t_end,
+            noise_sigma=0,
+            tx_amp=1,
+        )
 
         range0 = 2000e3
         vel0 = 0.4e3
@@ -93,44 +98,49 @@ class TestBlackBoxComputeGMF:
             else:
                 return np.nan
 
-        experiment_params = {
-            "sample_rate": 1000000,
-            "ipp": 20000,
-            "tx_pulse_length": 1920.0,
-            "tx_start": 82.0,
-            "tx_end": 2002.0,
-            "rx_start": 0,
-            "rx_end": 20000,
-            "cal_on": 19900.0,
-            "cal_off": 19997.0,
-            "radar_frequency": 929.6,
-            "baud_length": 30.0,
-            "code": hardtarget.load_radar_code("leo_bpark"),
-        }
-
-        wavelength = constants.c / (experiment_params["radar_frequency"] * 1e6)
-        print(wavelength)
-
-        sample_rate = experiment_params["sample_rate"]
-        dec_samp = (
-            (experiment_params["ipp"] * 1e-6 * sample_rate)
-            / frequency_decimation
+        exp_params = ExpParams(
+            name="simulation",
+            radar_frequency=929.6,
+            t_ipp_usec=20000,
+            ipp_samps=20000,
+            sample_rate=1000000.0,
+            t_samp_usec=1,
+            rx_channels=["sim"],
+            t_tx_start_usec=82.0,
+            t_tx_end_usec=2001.0,
+            t_rx_start_usec=0,
+            t_rx_end_usec=20000,
+            tx_channel="sim",
+            tx_pulse_length=1919,
+            t_cal_on_usec=19900.0,
+            t_cal_off_usec=19997.0,
+            wavelength=constants.c / (929.6 * 1e6),
+            code=radardef_utils.load_radar_code("leo_bpark"),
         )
 
+        bounds_params = BoundParams(
+            ts_start_usec=1445511612800000,
+            ts_end_usec=1445551228800000,
+        )
+
+        sample_rate = 1 / (exp_params.t_samp_usec * 1e-6)
+        dec_samp = (exp_params.t_ipp_usec * 1e-6 * sample_rate) / frequency_decimation
+
         range_gate = constants.c / sample_rate
-        doppler_gate = 2 * wavelength * frequency_decimation / ((experiment_params["ipp"] * 1e-6) * n_ipp)
+        doppler_gate = (
+            2 * exp_params.wavelength * frequency_decimation / ((exp_params.t_ipp_usec * 1e-6) * n_ipp)
+        )
 
         step = 2 * dec_samp * tau_ipp * frequency_decimation / sample_rate
         max_accels_len = (n_ipp - tau_ipp) * dec_samp
-        accel_gate = wavelength * 2 * sample_rate / (max_accels_len * frequency_decimation * step)
-        print(f"{range_gate=}, {doppler_gate=}, {accel_gate=}")
+        accel_gate = exp_params.wavelength * 2 * sample_rate / (max_accels_len * frequency_decimation * step)
+        print(f"{range_gate=} meters/sample, {doppler_gate=}, {accel_gate=}")
 
-        for key, val in experiment_params.items():
-            print(f"{key}: {val}")
-
-        with tempfile.TemporaryDirectory() as tmp_sim_path, \
-             tempfile.TemporaryDirectory() as tmp_analysis_path, \
-             tempfile.NamedTemporaryFile(mode="w+") as tmp_config:
+        with (
+            tempfile.TemporaryDirectory(suffix="_drf") as tmp_sim_path,
+            tempfile.TemporaryDirectory() as tmp_analysis_path,
+            tempfile.NamedTemporaryFile(mode="w+") as tmp_config,
+        ):
             # hacky way to create a temp config
             tmp_config.write(config_str)
             tmp_config.seek(0)
@@ -138,92 +148,110 @@ class TestBlackBoxComputeGMF:
 
             print(f"{tmp_config_path=}")
 
-            hardtarget.simulation.drf(
-                tmp_sim_path,
+            simulate_drf(
+                Path(tmp_sim_path),
                 range_function,
                 simulation_params,
-                experiment_params,
-                chnl=rx_channel,
+                exp_params,
+                bounds_params,
                 snr_function=None,
                 dtype=np.complex64,
                 clobber=True,
             )
 
-            reader, params = hardtarget.drf_utils.load_hardtarget_drf(tmp_sim_path)
-
-            all_params = hardtarget.load_gmf_params(tmp_sim_path, tmp_config_path)
-
-            for key, val in all_params["PRO"].items():
-                print(f"{key}: {val}")
-
             # process
-            _ = hardtarget.compute_gmf(
-                rx=(tmp_sim_path, rx_channel),
-                tx=(tmp_sim_path, rx_channel),
-                config=Path(tmp_config_path),
-                gmf_method=gmf_method,
-                gmf_implementation=gmf_impl,
+            _ = hardtarget.analyse(
+                path=Path(tmp_sim_path).resolve(),
+                rx_channel="sim",
+                config=tmp_config_path,
+                start_time=simulation_params.start_time_us,
+                end_time=simulation_params.end_time_us,
+                relative_time=True,
+                method=mf_method,
+                implementation=mf_impl,
                 clobber=False,
                 output=tmp_analysis_path,
                 progress=False,
-                subprogress=False,
             )
 
-            data_generator = hardtarget.load_gmf_out(tmp_analysis_path)
-            for data, meta in data_generator:
-                dr = data["range_peak"] - sim_r[1:-1]
-                dv = data["range_rate_peak"] - sim_v[1:-1]
-                da = data["acceleration_peak"] - sim_a[1:-1]
+            data_generator = hardtarget.load_analysed_data(tmp_analysis_path)
+            for out_args, exp_params, cfg_params, pro_params in data_generator:
 
-                print(f"dr = {np.abs(np.mean(dr))} (std = {np.std(dr)}) < {range_gate=}")
-                assert np.abs(np.mean(dr)) < range_gate
-                assert np.std(dr) < range_gate
+                dr = out_args.r_vec - sim_r[:-1]
+                dv = out_args.v_vec - sim_v[:-1]
+                da = out_args.a_vec - sim_a[:-1]
 
-                print(f"dr = {np.abs(np.mean(dv))} (std = {np.std(dv)}) < {doppler_gate=}")
-                assert np.abs(np.mean(dv)) < doppler_gate
-                assert np.std(dv) < doppler_gate
+                def assert_simulated_vs_estimated(delta, limit, param_str):
+                    mean_error = np.abs(np.mean(delta))
+                    print(f"{param_str} = {mean_error} (std = {np.std(delta)}) < {limit}")
+                    assert (
+                        mean_error < limit
+                    ), f"mean {param_str} is over the limit, x̄({param_str}): {mean_error}, limit: {limit}"
+                    std = np.std(delta)
+                    assert (
+                        std < limit
+                    ), f"{param_str} standard deviation is to large, std({param_str}): {std} > {limit} "
 
-                print(f"dr = {np.abs(np.mean(da))} (std = {np.std(da)}) < {accel_gate=}")
-                assert np.abs(np.mean(da)) < accel_gate
-                assert np.std(da) < accel_gate
+                # Assert expected range is equal to estimated range
+                assert_simulated_vs_estimated(dr, range_gate, "delta_r")
+
+                # Assert expected velocity is equal to estimated velocity
+                assert_simulated_vs_estimated(dv, doppler_gate, "delta_v")
+
+                # Assert expected acceleration is equal to estimated acceleration
+                assert_simulated_vs_estimated(da, accel_gate, "delta_a")
 
             # # This is test debugging code
             if debug_test:
                 import matplotlib.pyplot as plt
-                data_generator = hardtarget.load_gmf_out(tmp_analysis_path)
-                for data, meta in data_generator:
-                    data["t"] -= np.min(data["t"])
+
+                data_generator = hardtarget.load_analysed_data(tmp_analysis_path)
+                for _out_args, _exp_params, _cfg_params, _pro_params in data_generator:
+                    t = _out_args.t - np.min(_out_args.t)
 
                     fig, axes = plt.subplots(2, 2)
-                    hardtarget.plotting.gmf.plot_peaks(axes, data, meta)
+                    hardtarget.plotting.mf_analysis.plot_peaks(
+                        axes, _out_args, _exp_params, _cfg_params, _pro_params
+                    )
                     fig, axes = plt.subplots(2, 3)
-                    hardtarget.plotting.gmf.plot_detections(axes, data, meta)
+                    hardtarget.plotting.mf_analysis.plot_detections(
+                        axes, _out_args, _exp_params, _cfg_params, _pro_params
+                    )
                     fig, axes = plt.subplots(3, 1)
-                    hardtarget.plotting.gmf.plot_map(axes, data, meta)
+                    hardtarget.plotting.mf_analysis.plot_map(
+                        axes, _out_args, _exp_params, _cfg_params, _pro_params
+                    )
 
                     fig, axes = plt.subplots(2, 2)
-                    snr = hardtarget.noise.snr(data["gmf"], data["nf_range"])
-                    r_inds = np.argmax(data["gmf"], axis=1)
-                    coh_inds = np.arange(data["gmf"].shape[0])
+                    nf_vec = np.nanmedian(_out_args.dc, axis=0)
+                    nf_vec = nf_vec.reshape((1, nf_vec.size))
+                    nf_range = np.nanmedian(nf_vec, axis=0)
+                    snr = hardtarget.noise.snr(_out_args.vals, nf_range)
+                    r_inds = np.argmax(_out_args.vals, axis=1)
+                    coh_inds = np.arange(_out_args.vals.shape[0])
                     snr = snr[coh_inds, r_inds]
 
-                    axes[0, 0].plot(data["t"], data["range_peak"]*1e-3*0.5, c="blue")
-                    axes[0, 0].plot(t_abs, sim_r*1e-3*0.5, c="red")
+                    axes[0, 0].plot(t, _out_args.r_vec * 1e-3 * 0.5, c="blue", label="r_vec")
+                    axes[0, 0].plot(t_abs, sim_r * 1e-3 * 0.5, c="red", label="sim_r")
                     axes[0, 0].set_xlabel("Time [s]")
                     axes[0, 0].set_ylabel("range [km]")
+                    axes[0, 0].legend(loc="upper left")
 
-                    axes[0, 1].plot(data["t"], data["range_rate_peak"]*1e-3*0.5, c="blue")
-                    axes[0, 1].plot(t_abs, sim_v*1e-3*0.5, c="red")
+                    axes[0, 1].plot(t, _out_args.v_vec * 1e-3 * 0.5, c="blue", label="v_vec")
+                    axes[0, 1].plot(t_abs, sim_v * 1e-3 * 0.5, c="red", label="sim_v")
                     axes[0, 1].set_xlabel("Time [s]")
                     axes[0, 1].set_ylabel("range rate [km/s]")
+                    axes[0, 1].legend(loc="upper left")
 
-                    axes[1, 0].plot(data["t"], data["acceleration_peak"]*0.5, c="blue")
-                    axes[1, 0].plot(t_abs, sim_a*0.5, c="red")
+                    axes[1, 0].plot(t, _out_args.a_vec * 0.5, c="blue", label="a_vec")
+                    axes[1, 0].plot(t_abs, sim_a * 0.5, c="red", label="sim_a")
                     axes[1, 0].set_xlabel("Time [s]")
                     axes[1, 0].set_ylabel("acceleration [m/s^2]")
                     axes[1, 0].set_ylim([-300, 300])
+                    axes[1, 0].legend(loc="lower left")
 
-                    axes[1, 1].plot(data["t"], np.sqrt(snr))
+                    axes[1, 1].plot(t, np.sqrt(snr))
                     axes[1, 1].set_xlabel("Time [s]")
                     axes[1, 1].set_ylabel("sqrt(ENR) [1]")
+
                 plt.show()

@@ -2,7 +2,7 @@ CC = gcc
 all: CFLAGS = -fPIC -shared
 debug: CFLAGS = -fPIC -shared -g
 LIBS = -lfftw3f
-INSTALL = ../hardtarget/gmf
+INSTALL = ../hardtarget/matched_filter/utils
 
 SOURCES=gmf.c
 EXT=$(shell python -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))")

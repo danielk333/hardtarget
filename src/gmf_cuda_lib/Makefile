@@ -11,7 +11,7 @@ debug: CFLAGS=${CCOPTS} -shared -g -G
 NVFLAGS=-ccbin ${HOST_COMPILER}
 
 LIBS = -lcufft
-INSTALL = ../hardtarget/gmf
+INSTALL = ../hardtarget/matched_filter/utils
 
 SOURCES=gmfgpu.cu
 EXT=$(shell python -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))")

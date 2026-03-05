@@ -1,6 +1,118 @@
 [build-system]
 requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
 
-[tool.black]
-line-length = 100
-target_version = ['py35', 'py36', 'py37', 'py38', 'py39', 'py310']
+[project]
+name = "hardtarget"
+version = "0.6.0"
+description = "Hard target processing of radar data"
+readme = { file = "README.md", content-type = "text/markdown" }
+authors = [
+    { name = "Daniel Kastinen", email = "daniel.kastinen@irf.se" },
+    { name = "Hampus Andersson", email = "hampus.andersson@irf.se" },
+]
+maintainers = [
+    { name = "Daniel Kastinen", email = "daniel.kastinen@irf.se" },
+    { name = "Hampus Andersson", email = "hampus.andersson@irf.se" },
+]
+license = { file = "LICENSE" }
+classifiers = [
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "h5py >= 2.10.0",
+    "digital_rf >= 2.6.6",
+    "numpy >= 2.0",
+    "scipy >= 1.4.1",
+    "tqdm >=  4.66.1",
+    "lxml",
+    "radardef>=0.3.1",
+    "strenum ; python_version<'3.11'",
+    "typing_extensions ; python_version<'3.11'"
+]
+
+[project.urls]
+Documentation = "https://danielk.developer.irf.se/hardtarget/"
+Repository = "https://github.com/danielk333/hardtarget"
+
+[project.scripts]
+hardtarget = "hardtarget.cli:main"
+
+[project.optional-dependencies]
+develop = [
+    "pytest >= 6.2.5",
+    "wheel >= 0.37.0",
+    "build >= 0.7.0",
+    "twine >= 3.4.2",
+    "matplotlib >= 3.5.1",
+    "numpydoc >= 1.2",
+    "pre-commit > 3.0.0",
+    "auditwheel >= 5.4.0",
+    "patchelf >= 0.14",
+    "ruff",
+]
+documentation = [
+    "docstr-coverage",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "mkdocs-jupyter",
+    "mkdocs-gen-files",
+    "mkdocs-literate-nav",
+    "mkdocs-section-index",
+    "mkdocs-bibtex",
+    "matplotlib",
+]
+mpi = ["mpi4py >= 3.1.1"]
+type_checker = ["mypy >= 1.18.2", "xenon"]
+plotting = ["matplotlib >= 3.3.4"]
+profiling = ["yappi >= 1.4.0"]
+test = [
+    "pytest",
+    "pytest-cov >= 4.1.0",
+    "matplotlib >= 3.3.4",
+    "yappi >= 1.4.0",
+    "spacecoords >= 0.1.6",
+    "pyant",
+    "requests",
+]
+all = ["mpi4py >= 3.1.1", "matplotlib >= 3.3.4", "yappi >= 1.4.0"]
+
+[tool.setuptools]
+include-package-data = true
+license-files = ["LICENSE"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint]
+ignore = ["E203","D203","E251","E501","E226"]
+
+[tool.pytest.ini_options]
+addopts = "-v --cov=hardtarget -m 'not cuda' -p no:warnings"
+testpaths = ["tests"]
+
+[tool.coverage.report]
+exclude_also = [
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if __name__ == .__main__.:",
+
+    # Don't complain about abstract methods, they aren't run:
+    "@(abc\\.)?abstractmethod",
+]
