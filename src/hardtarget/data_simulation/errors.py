@@ -15,7 +15,7 @@ from radardef.types import BoundParams, ExpParams
 from scipy import constants
 
 from hardtarget import analyse, load_analysed_data
-from hardtarget.types.constants import EstimationMethod, Impl
+from hardtarget.types.constants import AnalysisMethod, Impl, TargetEstimationMethod
 
 from .simulate_drf import DRFSimParams, simulate_drf
 
@@ -142,7 +142,7 @@ def monte_carlo_sample_errors(
     samples: int,
     output_path: str | Path,
     clobber: bool = True,
-    mf_method: EstimationMethod = EstimationMethod.fgmf,
+    mf_method: TargetEstimationMethod = TargetEstimationMethod.fgmf,
     mf_implementation: Impl = Impl.c,
     n_ipp: int = 5,
     sample_rate: float = 1_000_000,
@@ -261,7 +261,8 @@ def monte_carlo_sample_errors(
     analyse(
         path=drf_path,
         config=config_path,
-        method=mf_method,
+        method=AnalysisMethod.target_estimation,
+        method_lib=mf_method,
         implementation=mf_implementation,
         clobber=clobber,
         output=gmf_path,

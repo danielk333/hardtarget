@@ -63,12 +63,12 @@ plugins:
   - mkdocs-jupyter:
       execute: true
       execute_ignore:
-        - examples/analysis/estimate_errors.py
-        - examples/analysis/experiment_space.py
-        - examples/analysis/linearized_errors.py
-        - examples/analysis/plot_logo.py
-        - examples/analysis/precision_orbit_analysis.py
-        - examples/analysis/profile_speed.py
+        - examples/extras/experiment_space.py
+        - examples/extras/linearized_errors.py
+        - examples/extras/plot_logo.py
+        - examples/target_estimation/estimate_errors.py
+        - examples/target_estimation/precision_orbit_analysis.py
+        - examples/target_estimation/profile_speed.py
         - examples/back_to_basics/part3_sweep_acceleration.py
 
       include_source: false
@@ -98,13 +98,13 @@ nav:
       - CLI: usage/cli.md
       - Develop: usage/develop.md
   - Analyse:
-      - analyse/api_mf.md
-      - Processes:
-          - DPT: analyse/dpt_process.md
-          - GMF: analyse/gmf_process.md
-          - Optimization: analyse/optimization_process.md
+      - analyse/api_analyse.md
+      - Methods:
+          - Target Estimation: analyse/target_estimation.md
+          - Optimization: analyse/optimization.md
+          - Event Detection: analyse/event_detection.md
       - Configuration parameters: analyse/config_parameters.md
-      - Analysis output: analyse/format_mf.md
+      - Analysis output: analyse/format_analyse.md
       - Parallelism: analyse/parallelism.md
   - Concepts: concepts/concept_mf.md
   - Reference: reference/
@@ -118,11 +118,15 @@ nav:
           - Part 6 - Ipp number: examples/back_to_basics/part6_ipp_number.py
           - Part 7 - DPT Criterion: examples/back_to_basics/part7_dpt_criterion.py
           - Part 8 - Plot GMF: examples/back_to_basics/part8_plot_gmf.py
-      - Analysis:
-          - Analyse and inspect: examples/analysis/analyse_and_inspect.py
-          - Optimization: examples/analysis/optimization.py
-          - Simulated tx signal: examples/analysis/simulated_tx_signal.py
-          - Implementation performance comparison: examples/analysis/implementation_performance.py
-          - Visualization of analysis parameters: examples/analysis/visualize_analysis_parameters.py
-          - Visualization of matched filter: examples/analysis/visualize_matched_filter.py
-          - Visualization of raw data: examples/analysis/plot_raw_data.py
+      - Target Estimation:
+          - Analyse and inspect: examples/target_estimation/analyse_and_inspect.py
+          - Implementation performance comparison: examples/target_estimation/implementation_performance.py
+          - Visualization of analysis parameters: examples/target_estimation/visualize_analysis_parameters.py
+          - Visualization of matched filter: examples/target_estimation/visualize_matched_filter.py
+          - Visualization of raw data: examples/target_estimation/plot_raw_data.py
+      - Optimization:
+          - Optimizing Target Estimation: examples/optimization/optimization.py
+      - Event Detection:
+          - Event Detection: examples/event_detection/event_search.py
+      - Extras:
+          - Simulated tx signal: examples/extras/simulated_tx_signal.py

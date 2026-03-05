@@ -13,9 +13,10 @@ from radardef import RadarDef
 from radardef.types import TargetFormat
 
 import hardtarget
+from hardtarget.types.constants import TargetEstimationMethod
 from hardtarget.types.types import Job
 
-sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "analysis"))
+sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
 import utils
 
 try:
@@ -36,11 +37,12 @@ hardtarget.profile()
 # Do computation
 for impl in [hardtarget.types.Impl.c, hardtarget.types.Impl.numpy]:
     # process
-    results = hardtarget.analyse(
+    results = hardtarget.target_estimation(
         path=converted_files[0],
         config=config,
-        job=Job(idx=0, N=1),
+        method_lib=TargetEstimationMethod.fgmf,
         implementation=impl,
+        job=Job(idx=0, N=1),
         start_time=0,
         end_time=200000,
         relative_time=True,

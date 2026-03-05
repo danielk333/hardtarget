@@ -21,7 +21,7 @@ from hardtarget import analyse, load_analysed_data
 from hardtarget.matched_filter.dpt.types import DPTCfgParams
 from hardtarget.matched_filter.gmf.types import GMFCfgParams
 from hardtarget.matched_filter.types import MFOutArgs
-from hardtarget.types.constants import EstimationMethod
+from hardtarget.types.constants import AnalysisMethod, TargetEstimationMethod
 from hardtarget.types.types import CfgParams, ExpParams, ProParams
 
 from .utils import cdse
@@ -75,10 +75,12 @@ dpt_cfg = DPTCfgParams(
 @pytest.mark.skipif(COPERNICUS_USR == "TODO", reason="Copernicus username missing")
 @pytest.mark.skipif(COPERNICUS_PWD == "TODO", reason="Copernicus password missing")
 @pytest.mark.skipif(not EISCAT_UHF_MEASUREMENT.exists(), reason="Local file is missing")
-@pytest.mark.parametrize("params", [(EstimationMethod.fgmf, gmf_cfg), (EstimationMethod.fdpt, dpt_cfg)])
-def test_verify_analysis_orbit_data(params: tuple[EstimationMethod, CfgParams]):
+@pytest.mark.parametrize(
+    "params", [(TargetEstimationMethod.fgmf, gmf_cfg), (TargetEstimationMethod.fdpt, dpt_cfg)]
+)
+def test_verify_analysis_orbit_data(params: tuple[TargetEstimationMethod, CfgParams]):
 
-    method, cfg = params
+    method_lib, cfg = params
 
     # Temp dir to store precision orbit data
     tmp_dir = tempfile.TemporaryDirectory()
@@ -121,7 +123,8 @@ def test_verify_analysis_orbit_data(params: tuple[EstimationMethod, CfgParams]):
         end_time=end_time,
         relative_time=False,
         progress=False,
-        method=method,
+        method=AnalysisMethod.target_estimation,
+        method_lib=method_lib,
     )
 
     assert result["dir"] is not None

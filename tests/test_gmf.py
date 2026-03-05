@@ -3,16 +3,16 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from radardef.types import ExpParams
 
 import hardtarget.process.utils as utils
 from hardtarget.data_handling.configuration import (
     compute_process_params,
     load_config_params,
 )
-from hardtarget.matched_filter import get_estimation_method
+from hardtarget.matched_filter.gmf import get_gmf_lib
 from hardtarget.matched_filter.types import MFVariables
-from hardtarget.types.constants import AnalysisMethod, EstimationMethod, Impl
-from radardef.types import ExpParams
+from hardtarget.types.constants import AnalysisMethod, Impl, TargetEstimationMethod
 
 """
 Should ideally be able to test the different implementations of the GMF function
@@ -21,9 +21,9 @@ ISSUE 1
 Functions have different signatures now
 
 regular ones must be called with
-(z_tx, z_rx, gmf_variables, gmf_params)
+(tx, rx, gmf_variables, gmf_params)
 whereas optimized
-(z_tx, z_ipp, gmf_params, gmf_start)
+(tx, ipp, gmf_params, gmf_start)
 
 ISSUE 2
 implementations of GMF functions depend on gmf_params,
@@ -88,7 +88,6 @@ def create_config_params():
 
     # Make temp directory with mockup config files
     with tempfile.TemporaryDirectory() as temp_dir:
-
         # Mockup DRF metadata file
         # metafile = Path(temp_dir) / "metadata.ini"
         # with open(metafile, "w") as f:
@@ -104,20 +103,28 @@ def create_config_params():
 
 
 class TestGMF:
-
     def test_gmf(self):
         """Run the basic gmf function."""
 
         # GMF method and implementation
-        gmf_method = EstimationMethod.fgmf
+        gmf_method = TargetEstimationMethod.fgmf
         gmf_implementation = Impl.numpy
-        gmf_lib, gmf_libtype = get_estimation_method(gmf_implementation, gmf_method)
+        gmf_lib = get_gmf_lib(
+            gmf_method,
+            gmf_implementation,
+        )
 
         # GMF params
         init_pro_params = create_config_params()
         experiment = create_experiment_params()
 
-        pro_params = compute_process_params(experiment, init_pro_params, analysis_method=AnalysisMethod.gmf)
+        pro_params = compute_process_params(
+            experiment,
+            init_pro_params,
+            analysis_method=AnalysisMethod.target_estimation,
+            method_lib=TargetEstimationMethod.fgmf,
+            implementation=Impl.c,
+        )
 
         # Initialise vectors
 
@@ -149,11 +156,11 @@ class TestGMF:
 
         # - old
         """
-        z_tx = np.zeros(10000, dtype=np.complex64)
-        z_rx = np.zeros(12000, dtype=np.complex64)
+        tx = np.zeros(10000, dtype=np.complex64)
+        rx = np.zeros(12000, dtype=np.complex64)
         for i in range(10):
-            z_tx[(i * 1000): (i * 1000 + 20)] = 1.0
-            z_rx[(i * 1000 + 500): (i * 1000 + (500 + 20))] = 0.5  # simulated "echo"
+            tx[(i * 1000): (i * 1000 + 20)] = 1.0
+            rx[(i * 1000 + 500): (i * 1000 + (500 + 20))] = 0.5  # simulated "echo"
 
         """
 
@@ -162,14 +169,14 @@ class TestGMF:
         # - old
         """
         # for i in range(20):
-        gmf_func(z_tx, z_rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_vec)
+        gmf_func(tx, rx, acc_phasors, rgs, dec, gmf_vec, gmf_dc_vec, v_vec, a_vec)
         """
 
         # - new
         """
         gmf_lib(
-            z_tx,
-            z_rx,
+            tx,
+            rx,
             gmf_vars,
             gmf_params
         )

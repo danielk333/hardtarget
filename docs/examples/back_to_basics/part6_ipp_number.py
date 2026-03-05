@@ -41,8 +41,8 @@ def search_accel(decimation, n_ipp, accels, acel0, vel0, noise_sigma=None):
     peak_dop = np.empty_like(accels)
     peak = np.empty_like(accels)
 
-    z_rx = np.zeros((ipp_samps * n_ipp,), dtype=np.complex64)
-    dec_z_rx = np.zeros((ipp_samps * n_ipp // decimation,), dtype=np.complex64)
+    rx = np.zeros((ipp_samps * n_ipp,), dtype=np.complex64)
+    dec_rx = np.zeros((ipp_samps * n_ipp // decimation,), dtype=np.complex64)
 
     window_inds = np.concatenate([np.arange(T_tx_samps) + ind * ipp_samps for ind in range(n_ipp)])
     dec_window_inds = np.concatenate(
@@ -78,11 +78,11 @@ def search_accel(decimation, n_ipp, accels, acel0, vel0, noise_sigma=None):
             rx_wave += noise_sigma * (np.random.randn(*rx_wave.shape) + 1j * np.random.randn(*rx_wave.shape))
 
         signal[rg_samp0 : (rg_samp0 + T_tx_samps)] += rx_wave
-        z_rx[(ind * ipp_samps) : ((ind + 1) * ipp_samps)] = signal
+        rx[(ind * ipp_samps) : ((ind + 1) * ipp_samps)] = signal
 
     for ai, acc in enumerate(accels):
-        ztx = z_rx[window_inds]
-        zrx = z_rx[window_inds + range_gate0]
+        ztx = rx[window_inds]
+        zrx = rx[window_inds + range_gate0]
 
         tx_pwr = np.sum(np.abs(ztx) ** 2.0)
         tx_amp = np.sqrt(tx_pwr)
@@ -98,10 +98,10 @@ def search_accel(decimation, n_ipp, accels, acel0, vel0, noise_sigma=None):
         dec_aj = np.exp(-1j * np.pi / wavelength * acc * dec_t2)
         dec_echo *= dec_aj
 
-        dec_z_rx[dec_window_inds] = dec_echo
+        dec_rx[dec_window_inds] = dec_echo
 
-        fvec = fft.fftfreq(len(dec_z_rx), d=1.0 / dec_sample_rate)
-        spec = np.abs(fft.fft(dec_z_rx))
+        fvec = fft.fftfreq(len(dec_rx), d=1.0 / dec_sample_rate)
+        spec = np.abs(fft.fft(dec_rx))
         si = np.argmax(spec)
         peak_dop[ai] = fvec[si]
         peak[ai] = spec[si]
@@ -132,7 +132,6 @@ vel = 0.4e3
 dop0 = vel / wavelength
 
 for ns in [None, 3.0]:
-
     fig, axes = plt.subplots(2, 1)
     #
     for n_ipp in [1, 2, 5, 10]:

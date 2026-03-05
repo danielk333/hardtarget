@@ -2,60 +2,49 @@
 # ---
 # How to trigger analysis and then inspect the output
 
+import datetime as dt
 import os
-import sys
 import tempfile
 from pathlib import Path
 
 from matplotlib import gridspec
 from matplotlib import pyplot as plt
-from radardef import RadarDef
 
-from hardtarget import analyse, load_analysed_data
+from hardtarget import load_analysed_data, target_estimation
 from hardtarget.plotting import mf_analysis
 
-# Workaround to make jupyter notebook find utils
-sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "analysis"))
-import utils
-
 try:
-    config = Path(__file__).parent.parent.absolute() / "cfg" / "test.ini"
+    config = Path(__file__).parent.parent.absolute() / "cfg" / "cfg_precision_orbit.ini"
 except NameError:
-    config = Path(os.path.abspath("")) / "docs" / "examples" / "cfg" / "test.ini"
+    config = Path(os.path.abspath("")) / "docs" / "examples" / "cfg" / "cfg_precision_orbit.ini"
 
 # ##Prerequisites
 # ---
 
 # Data to analyse
-
 tmp_dir = tempfile.TemporaryDirectory()
-raw_path = Path(tmp_dir.name) / "raw"
-raw_path.mkdir(parents=True, exist_ok=True)
-converted_path = Path(tmp_dir.name) / "converted"
-raw_data = utils.download_test_data(Path(tmp_dir.name) / "raw")
-
-# Convert the data to a usable format.
-
-radars = RadarDef()
-source_format = radars.get_source_format(raw_data)
-target_formats = radars.available_target_formats(source_format)
-converted_files = RadarDef().convert(raw_data, target_formats[0], str(converted_path))
-data = converted_files[0]
 
 # ## Analyse data
 # ---
-# Minimal configuration for analysis, progress, start_time, end_time and relative time are optionals.
-# In this case we choose to visualize the 500 first ipps of the measurement, acceleration has been ignored
-# for this example.
 
+data = "../../../Documents/Data/Eiscat/leo/EISCAT_leo_mpark_2.1u_EI@uhf_20240704_100019_278878.hdf5"
 output_path = Path(tmp_dir.name) / "analysed"
-analyse(
+
+
+start_time = dt.datetime.strptime("2024-07-04T10:21:15.000", "%Y-%m-%dT%H:%M:%S.%f").replace(
+    tzinfo=dt.timezone.utc
+)
+end_time = dt.datetime.strptime("2024-07-04T10:21:21.000", "%Y-%m-%dT%H:%M:%S.%f").replace(
+    tzinfo=dt.timezone.utc
+)
+
+target_estimation(
     path=data,
     config=config,
     output=output_path,
-    start_time=0,
-    end_time=500 * 3120,  # 3120 = t_ipp_usec
-    relative_time=True,
+    start_time=start_time,
+    end_time=end_time,
+    progress=True,
 )
 
 # ## Plot results

@@ -27,4 +27,4 @@ class OptimizeProParams(ProParams):
         acceleration_step: Acceleration step
     """
 
-    acceleration_step = 2
+    acceleration_step: int = 2

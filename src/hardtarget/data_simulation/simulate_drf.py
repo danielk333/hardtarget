@@ -170,11 +170,7 @@ def simulate_drf(
 
             if rg_samp0 >= rx_start_samp and rg_samp0 <= rx_end_samp:
                 if sim_params.noise_sigma > 0:
-                    if snr_function is None:
-                        amp0 = 1
-                    else:
-                        amp0 = np.sqrt(sn0 * 2 * sim_params.noise_sigma**2)
-
+                    amp0 = np.sqrt(sn0 * 2 * sim_params.noise_sigma**2)
                 else:
                     amp0 = np.sqrt(sn0)
                 ranges = range_function(t0 + t_tx)

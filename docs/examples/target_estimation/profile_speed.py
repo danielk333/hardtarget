@@ -13,10 +13,10 @@ import numpy as np
 from tqdm import tqdm
 
 import hardtarget
-from hardtarget.types.constants import EstimationMethod, Impl
+from hardtarget.types.constants import Impl, TargetEstimationMethod
 
 # Workaround to make jupyter notebook find utils
-sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "analysis"))
+sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
 import utils
 
 try:
@@ -29,18 +29,17 @@ try:
 except ImportError:
     raise Exception("`pip install tabulate` for nice printing of results")
 
-DEFAULT_IMPLS = [Impl.numpy]
-if len(hardtarget.matched_filter.ANALYSIS_LIBS[Impl.c]) > 0:
-    DEFAULT_IMPLS.append(Impl.c)
-if len(hardtarget.matched_filter.ANALYSIS_LIBS[Impl.cuda]) > 0:
-    DEFAULT_IMPLS.append(Impl.cuda)
+DEFAULT_IMPLS = [Impl.numpy, Impl.c]
+
+# if len(hardtarget.matched_filter.ANALYSIS_LIBS[Impl.cuda]) > 0:
+#    DEFAULT_IMPLS.append(Impl.cuda)
 
 print(f"{DEFAULT_IMPLS=}")
 
 
 def compute_mf_wrapper(x):
     job, kw = x
-    hardtarget.analyse(job=job, **kw)
+    hardtarget.target_estimation(job=job, **kw)
 
 
 def run_hardtarget(
@@ -128,7 +127,7 @@ def fgmf_small_test(total_time, max_rg, cores=1, impls=DEFAULT_IMPLS):
     )
     impl_data = []
     for impl in tqdm(impls, desc="impl"):
-        dt = run_hardtarget(gmf_conf=(impl, EstimationMethod.fgmf), **config)
+        dt = run_hardtarget(gmf_conf=(impl, TargetEstimationMethod.fgmf), **config)
         impl_data.append(dt)
     impl_data = [[impl, dt, dt / max(impl_data)] for dt, impl in zip(impl_data, impls)]
     print_results(
@@ -153,7 +152,7 @@ def fgmf_large_test(total_time, max_rgs, impls=DEFAULT_IMPLS):
         rg_data = []
         for impl in impls:
             dt = run_hardtarget(
-                gmf_conf=(impl, EstimationMethod.fgmf), range_gate_lims=(min_rg, max_rg), **config
+                gmf_conf=(impl, TargetEstimationMethod.fgmf), range_gate_lims=(min_rg, max_rg), **config
             )
             pbar.update(1)
             rg_data.append(dt)
@@ -195,7 +194,7 @@ def fgmf_cores_test(total_times, max_rgs, impls=DEFAULT_IMPLS):
                         rg_data.append(0)
                         continue
                     dt = run_hardtarget(
-                        gmf_conf=(impl, EstimationMethod.fgmf),
+                        gmf_conf=(impl, TargetEstimationMethod.fgmf),
                         range_gate_lims=(min_rg, max_rg),
                         cores=cores,
                         **config,
@@ -232,7 +231,7 @@ def fgmf_vs_fdpt(cores=1, total_time=10.0, max_rg=6700):
     )
     impl_data = []
     impls = [Impl.numpy, Impl.c]
-    algs = [EstimationMethod.fgmf, EstimationMethod.fdpt]
+    algs = [TargetEstimationMethod.fgmf, TargetEstimationMethod.fdpt]
     pbar = tqdm(total=len(impls) * len(algs), desc="impls and algs")
     for impl in impls:
         algs_dt = []

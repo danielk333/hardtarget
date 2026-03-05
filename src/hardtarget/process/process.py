@@ -8,8 +8,9 @@ import datetime as dt
 import logging
 import time
 from abc import ABC, abstractmethod
+from dataclasses import asdict
 from pathlib import Path
-from typing import Callable, Generic, Optional, TypeVar
+from typing import Callable, Generic, Optional
 
 import numpy as np
 from tqdm import tqdm
@@ -17,6 +18,7 @@ from tqdm import tqdm
 import hardtarget.process.utils as utils
 from hardtarget.data_handling import dump_params_to_file
 from hardtarget.process.utils import calculate_tasks, sample_interval_to_closest_ipp
+from hardtarget.types.constants import Impl, MethodLib
 from hardtarget.types.types import (
     AnalysedResult,
     Bounds,
@@ -25,6 +27,7 @@ from hardtarget.types.types import (
     ExpParams,
     ExtractedSignals,
     GenericCfg,
+    GenericLib,
     GenericOut,
     GenericPro,
     GenericVars,
@@ -34,26 +37,24 @@ from hardtarget.types.types import (
 )
 from hardtarget.utils.time_conversion import time_interval_to_sample_bound, ts_from_str
 
-LibType = TypeVar("LibType")
 
-
-class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, LibType]):
+class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, GenericLib]):
     """
     Process chain for analysing radar data, configurable based on user configuration parameters.
 
     The process chain supports multiple types to be able to support a multiple kinds of analysis:
 
-        - Cfg: Configurable parameters, process specific section (bound to CfgPro)
-        - Pro: Process specific parameters deriver from Cfg (bound to ProParams)
-        - LibType: Library type used for the analysis
-        - Vars: Datatype produced by the analysis
-        - Out: Processed Vars data
+        - GenericCfg: Configurable parameters, process specific section (bound to CfgPro)
+        - GenericPro: Process specific parameters deriver from Cfg (bound to ProParams)
+        - GenericVars: Datatype produced by the analysis
+        - GenericOut: Processed Vars data
+        - GenericLib: Library type used for the analysis
 
     The user configurable parameters are derived during class initialisation:
 
-        1. Get process specific configuration parameters <ref get_conf_params>[type: *Cfg*]
+        1. Get process specific configuration parameters <ref get_conf_params>[type: *GenericCfg*]
             (number of coherent integrations per file, number of ipps, ...)
-        2. Get process specific configuration parameters <ref get_process_params>[type: *Pro*]
+        2. Get process specific configuration parameters <ref get_process_params>[type: *GenericPro*]
             (range gates, ...)
 
     From this the processing can be triggered with *run(..)*, this triggers the chain:
@@ -72,15 +73,15 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, LibT
                     |                               :
                     └>For each coherent integration └.....
                     |   |                                 :
-                    |   └>Analyse interval <analyse_ipps(..)> [Type: LibType]
+                    |   └>Analyse interval <analyse_ipps(..)> [Type: GenericLib]
                     |       |                             :
-                    |       └>Store analysed data [Type: Vars]
+                    |       └>Store analysed data [Type: GenericVars]
                     |                                     :
-                    └>Gather all data <stack_vars(Vars)> [Type: Vars]
+                    └>Gather all data <stack_vars(GenericVars)> [Type: GenericVars]
                             |                             :
-                            └>Calculate further parameters from the analysis data <generate_output(Vars)> [Type: Out]
+                            └>Calculate further parameters from the analysis data <generate_output(GenericVars)> [Type: GenericOut]
                                 |                         :
-                                └>Add attributes <define_h5_vars(Out)>
+                                └>Add attributes <define_h5_vars(GenericOut)>
                                     |                     :
                                     └---------------------└---> Save Data <save_task_data()>
 
@@ -110,7 +111,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, LibT
         epoch_bounds: Bounds,
         func_get_data: Callable[[int, int], ExtractedSignals],
         func_get_pointing: Callable[[int], Pointing],
-        lib: LibType,
         output_dir: Optional[str | Path] = None,
         progress: bool = False,
     ) -> None:
@@ -120,21 +120,45 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, LibT
             self.cfg_params = cfg_raw
         else:
             self.cfg_params = self.get_conf_params(Path(cfg_raw), cfg_params)
+        self.lib, lib_name, impl = self.get_analysis_lib(pro_params.method_lib, pro_params.implementation)
+        pro_params = self.define_method_lib(pro_params, lib_name, impl)
         self.pro_params = self.get_process_params(self.exp_params, self.cfg_params, pro_params)
         self.epoch = epoch_bounds
         self.get_data = func_get_data
         self.progress = progress
         self.get_pointing = func_get_pointing
         self.output_dir = Path(output_dir) if output_dir is not None else None
-        self.lib = lib
         self.progress_bar = None
         self.store_mode = "w"
         self.store_params = True
 
     @abstractmethod
+    def get_analysis_lib(
+        self, lib: MethodLib | None, impl: Impl | None
+    ) -> tuple[GenericLib, MethodLib, Impl]:
+        pass
+
+    @abstractmethod
     def get_conf_params(self, cfg_path: Path, cfg_params: CfgParams) -> GenericCfg:
         """Abstract method, process specific configuration parameters"""
         pass
+
+    def define_method_lib(self, pro_params: ProParams, lib_name: MethodLib, impl: Impl) -> ProParams:
+        """
+        If method lib and implementation is not defined or not matching with what is declared in the process
+        parameters, correct process parameters and return.
+        """
+
+        method_lib_correction = pro_params.method_lib is None or pro_params.method_lib is not lib_name
+        implementation_correction = pro_params.implementation is None or pro_params.implementation is not impl
+
+        if method_lib_correction or implementation_correction:
+            pro_dict = asdict(pro_params)
+            pro_dict[f"{ProParams.method_lib=}".split("=")[0].split(".")[1]] = lib_name
+            pro_dict[f"{ProParams.implementation=}".split("=")[0].split(".")[1]] = impl
+            return ProParams(**pro_dict)
+        else:
+            return pro_params
 
     @abstractmethod
     def get_process_params(
@@ -319,7 +343,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, LibT
         Args:
             job: Job id
             channel_bounds: Measurement channel sample bounds
-            epoch_start: Start of measurement, in microseconds since epoch
+            epoch: Measurement bounds (start and end), in microseconds since epoch.
             start_time (optional): Start time, if set data before this will be neglected
             end_time (optional): End time, if set data after this will be neglected
             relative_time (optional): If relative time should be used

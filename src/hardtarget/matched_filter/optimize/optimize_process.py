@@ -8,16 +8,18 @@ import h5py
 import numpy as np
 
 from hardtarget.data_handling.configuration import extract_config_section
+from hardtarget.matched_filter.optimize import get_optimize_lib
 from hardtarget.matched_filter.optimize.types import OptimizeCfgParams, OptimizeProParams
 from hardtarget.matched_filter.types import MFOptimizeOutArgs, MFOptimizeVariables
 from hardtarget.process import Process
-from hardtarget.types.constants import ConfigSubSection
+from hardtarget.types.constants import ConfigSubSection, Impl, OptimizationMethod
 from hardtarget.types.types import (
     Bounds,
     CfgParams,
     DataItem,
     ExpParams,
     ExtractedSignals,
+    MethodLib,
     OptimizeLib,
     OptStart,
     Pointing,
@@ -29,6 +31,11 @@ from hardtarget.utils.h5_tools import get_analysed_h5_files
 class OptimizeProcess(
     Process[OptimizeCfgParams, OptimizeProParams, MFOptimizeVariables, MFOptimizeOutArgs, OptimizeLib]
 ):
+    def get_analysis_lib(
+        self, lib: MethodLib | None, impl: Impl | None
+    ) -> tuple[OptimizeLib, OptimizationMethod, Impl]:
+        return get_optimize_lib(lib, impl)
+
     def __init__(
         self,
         cfg_path: Path,
@@ -38,7 +45,6 @@ class OptimizeProcess(
         epoch_bounds: Bounds,
         func_get_data: Callable[[int, int], ExtractedSignals],
         func_get_pointing: Callable[[int], Pointing],
-        lib: OptimizeLib,
         output_dir: str | Path | None = None,
         progress: bool = False,
     ) -> None:
@@ -50,7 +56,6 @@ class OptimizeProcess(
             epoch_bounds,
             func_get_data,
             func_get_pointing,
-            lib,
             output_dir,
             progress,
         )
@@ -84,6 +89,7 @@ class OptimizeProcess(
         with h5py.File(self.sorted_mf_files[file_id], "r") as hf:
             group = hf["OutArgs"]  # TODO: Update to proper type
             # TODO: Should r/v/a_vec from all files be read at start and loaded to RAM to access it faster?
+            # TODO hardcode the r_vec string
             opt_start = OptStart(
                 r_vec=group["r_vec"][cohind], v_vec=group["v_vec"][cohind], a_vec=group["a_vec"][cohind]
             )
@@ -140,13 +146,13 @@ class OptimizeProcess(
             Outcome of optimize analysis
         """
 
-        z_tx, z_rx, z_ipp = self.get_data(start_sample, self.pro_params.read_length)
+        tx, rx, ipp = self.get_data(start_sample, self.pro_params.read_length)
 
         # conjugate, so that when matched filtering, it will cancel out phase of transmit waveform.
         # scale transmit waveform to unity power
-        tx_pwr = np.sum(np.abs(z_tx) ** 2.0)
+        tx_pwr = np.sum(np.abs(tx) ** 2.0)
         tx_amp = np.sqrt(tx_pwr)
-        z_tx = np.conj(z_tx) / tx_amp
+        tx = np.conj(tx) / tx_amp
 
         gmf_vars = MFOptimizeVariables(
             peak=np.zeros((3,), dtype=np.float64),  # TODO: Correct size
@@ -155,8 +161,8 @@ class OptimizeProcess(
 
         if tx_amp > self.cfg_params.tx_amp_limit:
             gmf_vars.peak[:], gmf_vars.peak_val[0] = self.lib(
-                z_tx,
-                z_ipp,
+                tx,
+                ipp,
                 self.exp_params,
                 self.cfg_params,
                 self.pro_params,

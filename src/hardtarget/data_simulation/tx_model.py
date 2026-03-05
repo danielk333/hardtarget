@@ -43,7 +43,7 @@ def tx_signal_model(
         fill_value=0,
     )
 
-    z_tx = np.zeros(
+    tx = np.zeros(
         (read_length, sub_resolution),
         dtype=np.complex128,
     )
@@ -52,7 +52,7 @@ def tx_signal_model(
     stop = read_length + (start_sample % ipp_samps)
     # TODO: try to only loop over subresolution instead
     for i in range(start, stop):
-        z_tx[i, :] = fun((i % (ipp_samps)) + 1 - np.linspace(0, 1, sub_resolution, endpoint=False))
+        tx[i, :] = fun((i % (ipp_samps)) + 1 - np.linspace(0, 1, sub_resolution, endpoint=False))
     for i in range(sub_resolution):
-        z_tx[:, i] /= np.sum(np.conj(z_tx[:, i]) * z_tx[:, i])
-    return z_tx
+        tx[:, i] /= np.sum(np.conj(tx[:, i]) * tx[:, i])
+    return tx

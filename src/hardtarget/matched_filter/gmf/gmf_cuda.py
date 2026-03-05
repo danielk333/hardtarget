@@ -26,8 +26,8 @@ def test_cuda() -> None:
 
 
 def fast_gmf_cuda(
-    z_tx: npt.NDArray[np.complexfloating],
-    z_rx: npt.NDArray[np.complexfloating],
+    tx: npt.NDArray[np.complexfloating],
+    rx: npt.NDArray[np.complexfloating],
     tx_pwr: npt.NDArray,
     cfg_params: GMFCfgParams,
     pro_params: GMFProParams,
@@ -37,8 +37,8 @@ def fast_gmf_cuda(
     Wrapper for the Fast GMF Cuda implementation
 
     Args:
-        z_tx: Transmitted signal
-        z_rx: Recived signal
+        tx: Transmitted signal
+        rx: Recived signal
         tx_pwr: Power of the transmission
         cfg_params: DPT configuration parameters
         pro_params: DPT processing parameters
@@ -52,10 +52,10 @@ def fast_gmf_cuda(
     dc, vals, v_ind, a_ind = default_mf_vars_items(size)
 
     error_code = gmfcudalib.gmf(
-        z_tx,  # 1
-        z_tx.size,  # 2
-        z_rx,  # 3
-        z_rx.size,  # 4
+        tx,  # 1
+        tx.size,  # 2
+        rx,  # 3
+        rx.size,  # 4
         pro_params.fgmf_acceleration_phasors,  # 5
         pro_params.fgmf_acceleration_phasors.shape[0],  # 6
         pro_params.rel_rgs,  # 7

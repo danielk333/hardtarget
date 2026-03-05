@@ -38,6 +38,7 @@ def dump_params_to_file(
     ```
     H5 Format:
         ├ method
+        ├ method_lib
         ├ OutArgs
         |      ├ data item 1
         |      └ data item 2
@@ -74,6 +75,16 @@ def dump_params_to_file(
             )
         elif clobber:
             file[method] = pro_params.method.value
+
+        # Save method library used
+        if pro_params.method_lib is not None:
+            method_lib = f"{ProParams.method_lib=}".split("=")[0].split(".")[1]
+            if method_lib not in file:
+                file.create_dataset(
+                    f"{ProParams.method_lib=}".split("=")[0].split(".")[1], data=pro_params.method_lib.value
+                )
+            elif clobber:
+                file[method_lib] = pro_params.method_lib.value
 
         grp_name = "OutArgs"  # TODO: Fix this to a set value
         if grp_name not in file:

@@ -90,8 +90,8 @@ import numpy as np
 import scipy.constants
 import scipy.fft as fft
 
-from hardtarget.types.constants import AnalysisMethod, ConfigSubSection
-from hardtarget.types.types import CfgParams, EstimationMethod, ExpParams, GenericCfg, Impl, ProParams
+from hardtarget.types.constants import AnalysisMethod, ConfigSubSection, MethodLib
+from hardtarget.types.types import CfgParams, ExpParams, GenericCfg, Impl, ProParams
 
 
 def extract_config_section(
@@ -149,16 +149,12 @@ def extract_config_section(
     return default_dict
 
 
-def load_config_params(
-    configfile: Path | str, impl: Optional[Impl] = None, est_method: Optional[EstimationMethod] = None
-) -> CfgParams:
+def load_config_params(configfile: Path | str) -> CfgParams:
     """
     Load config parameters from the processing section.
 
     Args:
         configfile: Path to configfile
-        impl (optional): Possibility to override impl from config
-        est_method (optional): Possibility to override method from config
 
     Returns:
         Dataclass containing the configuration information.
@@ -167,27 +163,16 @@ def load_config_params(
 
     cfg_pth = Path(configfile)
     d = extract_config_section(cfg_pth, ConfigSubSection.PROCCESSING, CfgParams)
-
-    # override config file
-    if impl is not None:
-        d["implementation"] = impl
-    if est_method is not None:
-        d["method"] = est_method
-
     return CfgParams(**d)
 
 
-def extract_config_params_from_derived_object(
-    cfg_derived: GenericCfg, impl: Optional[Impl] = None, est_method: Optional[EstimationMethod] = None
-) -> CfgParams:
+def extract_config_params_from_derived_object(cfg_derived: GenericCfg) -> CfgParams:
     """
     From a derived class extract the fields from the base class, this to extract the non process related
     parameters.
 
     Args:
         cfg_derived: Any class that inherits from CfgParams
-        impl (optional): Possibility to override impl from config
-        est_method (optional): Possibility to override method from config
 
     Returns:
         Configuration parameters only relevant to the base class
@@ -199,17 +184,15 @@ def extract_config_params_from_derived_object(
     for key in fields(CfgParams):
         base[key.name] = derived[key.name]
 
-    # override config file
-    if impl is not None:
-        base["implementation"] = impl
-    if est_method is not None:
-        base["method"] = est_method
-
     return CfgParams(**base)
 
 
 def compute_process_params(
-    exp_params: ExpParams, cfg_params: CfgParams, analysis_method: AnalysisMethod
+    exp_params: ExpParams,
+    cfg_params: CfgParams,
+    analysis_method: AnalysisMethod,
+    method_lib: Optional[MethodLib] = None,
+    implementation: Optional[Impl] = None,
 ) -> ProParams:
     """
     Computes the processing parameters from the experiment and configuration parameters.
@@ -218,6 +201,7 @@ def compute_process_params(
         exp_params: Experiment parameters from dataloader
         cfg_params: Configuration parameters from user
         analysis_method: Method to use during analysis
+        method_lib: Specific library used
 
     Returns:
         Process parameters derived from the given input
@@ -350,6 +334,8 @@ def compute_process_params(
 
     return ProParams(
         method=analysis_method,
+        method_lib=method_lib,
+        implementation=implementation,
         read_length=read_length,
         decimated_read_length=decimated_read_length,
         range_gates=range_gates,

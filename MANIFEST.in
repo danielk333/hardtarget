@@ -1,7 +1,9 @@
 # Include c lib source
-include src/gmf_c_lib/*.c
-include src/gmf_c_lib/*.h
-include src/gmf_c_lib/Makefile
+include src/mf_c_lib/*.c
+include src/mf_c_lib/*.h
+include src/mf_c_lib/utils/*.c
+include src/mf_c_lib/utils/*.h
+include src/mf_c_lib/Makefile
 
 # Include cuda lib source
 include src/gmf_cuda_lib/*.cu

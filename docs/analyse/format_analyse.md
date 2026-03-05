@@ -1,6 +1,6 @@
 # Hardtarget matched filter analysis output
 -------------
-This describes **Hardtarget_MF**,the data format produced by [analyse api](../analyse/api_mf.md) for matched
+This describes **Hardtarget_MF**,the data format produced by [analyse api](../analyse/api_analyse.md) for matched
 filter processes. Each analysis will return a [AnalysedResult](../reference/hardtarget/types/types.md#hardtarget.types.types.AnalysedResult)
 object, but the content of this object will vary based on a output path has been declared or not.
 
@@ -8,7 +8,7 @@ object, but the content of this object will vary based on a output path has been
 
 ## Save to path
 
-If a output path is declared the results from the [analysis](../analyse/api_mf.md) will be stored at given path
+If a output path is declared the results from the [analysis](../analyse/api_analyse.md) will be stored at given path
 in folders, named after the hour of the measurement analysed. Within each folder, there is a set of
 *HDF5* files, each including relevant datasets, and named by epoch timestamp in seconds. The parent directory
 of the stored that is available in the output [AnalysedResult](../reference/hardtarget/types/types.md#hardtarget.types.types.AnalysedResult)`["dir"]`
@@ -30,8 +30,8 @@ specific[Configuration parameters](../reference/hardtarget/types/types.md#hardta
 analyse the analysis. Furthermore the analysis output is stored, the output is not in the same
 format as during the analysis, each object in the output has had further attributes added to
 it, following the [DataItem](../reference/hardtarget/types/types.md#hardtarget.types.types.DataItem) structure.
-Depending on the process (e.g [GMF](../analyse/gmf_process.md)/[DPT](../analyse/dpt_process.md)/
-[Optimize](../analyse/optimization_process.md)) the data will be different as the output will vary.
+Depending on the method/process running (e.g [Target Estimation](../analyse/target_estimation.md)/[Optimization](../analyse/optimization.md)/
+[Event Detection](../analyse/event_detection.md)) the data will be different as the output will vary.
 
 ::: hardtarget.types.types.DataItem
 

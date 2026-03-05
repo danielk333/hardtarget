@@ -10,8 +10,8 @@ from hardtarget.matched_filter.utils import default_mf_vars_items
 
 
 def fast_gmf_np(
-    z_tx: npt.NDArray[np.complexfloating],
-    z_rx: npt.NDArray[np.complexfloating],
+    tx: npt.NDArray[np.complexfloating],
+    rx: npt.NDArray[np.complexfloating],
     tx_pwr: npt.NDArray,
     cfg_params: GMFCfgParams,
     pro_params: GMFProParams,
@@ -20,8 +20,8 @@ def fast_gmf_np(
     Compute the output of the Generalized Matched Filter GMF
 
     Args:
-        z_tx: Transmitted signal
-        z_rx: Recived signal
+        tx: Transmitted signal
+        rx: Recived signal
         tx_pwr: Power of the transmission
         cfg_params: DPT configuration parameters
         pro_params: DPT processing parameters
@@ -38,9 +38,9 @@ def fast_gmf_np(
     for ri, rg in enumerate(pro_params.rel_rgs):
         for sub_res in range(cfg_params.range_gate_sub_resolution):
             drg = int(rg // cfg_params.frequency_decimation)
-            zr = z_rx[pro_params.il1_rx_window_indices + rg]
+            zr = rx[pro_params.il1_rx_window_indices + rg]
             # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter), decimate
-            echo = np.sum((zr * z_tx[:, sub_res]).reshape(-1, cfg_params.frequency_decimation), axis=-1)
+            echo = np.sum((zr * tx[:, sub_res]).reshape(-1, cfg_params.frequency_decimation), axis=-1)
             dec_signal = np.zeros((pro_params.decimated_read_length,), dtype=np.complex64)
             # zero-frequency (DC) is used to get range-dependent noise floor
             index = sub_res + ri * cfg_params.range_gate_sub_resolution
@@ -64,8 +64,8 @@ def fast_gmf_np(
 
 
 def fast_gmf_no_reduce_np(
-    z_tx: npt.NDArray[np.complexfloating],
-    z_rx: npt.NDArray[np.complexfloating],
+    tx: npt.NDArray[np.complexfloating],
+    rx: npt.NDArray[np.complexfloating],
     tx_pwr: npt.NDArray,
     cfg_params: GMFCfgParams,
     pro_params: GMFProParams,
@@ -75,8 +75,8 @@ def fast_gmf_no_reduce_np(
     WARNING: Not working
 
     Args:
-        z_tx: Transmitted signal
-        z_rx: Recived signal
+        tx: Transmitted signal
+        rx: Recived signal
         tx_pwr: Power of the transmission
         cfg_params: DPT configuration parameters
         pro_params: DPT processing parameters
@@ -106,9 +106,9 @@ def fast_gmf_no_reduce_np(
     # number of range gates is input from user
     n_acc = params.der.acceleration_phasors.shape[0]
     for ri, rg in enumerate(params.der.rgs):
-        zr = z_rx[params.der.rx_window_indices + rg]
+        zr = rx[params.der.rx_window_indices + rg]
         # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter), decimate
-        echo = np.sum((zr * z_tx).reshape(-1, params.pro.frequency_decimation), axis=-1)
+        echo = np.sum((zr * tx).reshape(-1, params.pro.frequency_decimation), axis=-1)
         decimated_signal = np.zeros(
             (params.der.dec_signal_length,), dtype=np.complex64
         )

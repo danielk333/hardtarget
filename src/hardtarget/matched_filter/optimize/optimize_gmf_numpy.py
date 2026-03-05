@@ -12,8 +12,8 @@ from hardtarget.utils.time_conversion import ipp_time_to_sample
 
 
 def optimize_gmf_np(
-    z_tx: npt.NDArray[np.complexfloating],
-    z_ipp: npt.NDArray,
+    tx: npt.NDArray[np.complexfloating],
+    ipp: npt.NDArray,
     exp_params: ExpParams,
     cfg_params: OptimizeCfgParams,
     pro_params: OptimizeProParams,
@@ -24,8 +24,8 @@ def optimize_gmf_np(
     optimization in continuous variable space.
 
     Args:
-        z_tx: Transmitted signal
-        z_ipp: The entire sample vector
+        tx: Transmitted signal
+        ipp: The entire sample vector
         exp_params: Experiment parameters
         cfg_params: Configuration parameters
         pro_params: Process parameters
@@ -44,8 +44,8 @@ def optimize_gmf_np(
         wavelength: float,
         sample_rate: float,
         tx0_samp: int,
-        z_tx: npt.NDArray[np.complexfloating],
-        z_ipp: npt.NDArray,
+        tx: npt.NDArray[np.complexfloating],
+        ipp: npt.NDArray,
     ) -> npt.NDArray:
         rg0 = np.floor((r0 / constants.c) * sample_rate).astype(np.int64) + tx0_samp
         inds = sample_inds + rg0
@@ -53,9 +53,9 @@ def optimize_gmf_np(
         sample_t = inds / sample_rate
         r = r0 + x[0] * sample_t + 0.5 * x[1] * sample_t**2.0
         phase = 2.0 * np.pi * np.mod(r / wavelength, 1)
-        model_signal = z_tx * np.exp(-1j * phase)
+        model_signal = tx * np.exp(-1j * phase)
 
-        decoded_echo = z_ipp[inds] * model_signal
+        decoded_echo = ipp[inds] * model_signal
 
         return -(np.abs(np.sum(decoded_echo)) ** 2)
 
@@ -70,8 +70,8 @@ def optimize_gmf_np(
             exp_params.wavelength,
             exp_params.sample_rate,
             ipp_time_to_sample(exp_params.t_tx_start_usec, exp_params.sample_rate),
-            z_tx,
-            z_ipp,
+            tx,
+            ipp,
         ),
         # method="Nelder-Mead",
         method="BFGS",
@@ -82,8 +82,8 @@ def optimize_gmf_np(
 
 
 def optimize_grid_gmf_np(
-    z_tx: npt.NDArray[np.complexfloating],
-    z_ipp: npt.NDArray,
+    tx: npt.NDArray[np.complexfloating],
+    ipp: npt.NDArray,
     exp_params: ExpParams,
     cfg_params: OptimizeCfgParams,
     pro_params: OptimizeProParams,
@@ -94,8 +94,8 @@ def optimize_grid_gmf_np(
     optimization in continuous variable space.
 
     Args:
-        z_tx: Transmitted signal
-        z_ipp: The entire sample vector
+        tx: Transmitted signal
+        ipp: The entire sample vector
         exp_params: Experiment parameters
         cfg_params: Configuration parameters
         pro_params: Process parameters
@@ -129,7 +129,7 @@ def optimize_grid_gmf_np(
     rel_rg0 = rg0 - min_rg - 1
     inds = sample_inds + rel_rg0
     sample_t = inds / sample_rate
-    z_rx = z_ipp[inds]
+    rx = ipp[inds]
     gmf_mat = np.zeros_like(v_mat)
 
     for ind in range(res_v):
@@ -139,9 +139,9 @@ def optimize_grid_gmf_np(
             + 0.5 * a_mat[:, ind, None] * sample_t[None, :] ** 2.0
         )
         phase = 2.0 * np.pi * np.mod(r / wavelength, 1)
-        model_signal = z_tx[None, :, 1] * np.exp(-1j * phase)  # TODO: How to handle the sub_res
+        model_signal = tx[None, :, 1] * np.exp(-1j * phase)  # TODO: How to handle the sub_res
 
-        decoded_echo = z_rx[None, :] * model_signal
+        decoded_echo = rx[None, :] * model_signal
 
         gmf_mat[:, ind] = np.abs(np.sum(decoded_echo, axis=1)) ** 2
 

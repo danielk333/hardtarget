@@ -72,7 +72,7 @@ in the source directories. Then to combine the json files we can use `jq`. The
 complete script would be (assuming we start in repository root)
 
 ```bash
-cd src/gmf_c_lib
+cd src/mf_c_lib
 bear -- make
 cd ../src/gmf_cuda_lib
 bear -- make

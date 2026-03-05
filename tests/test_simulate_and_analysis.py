@@ -3,13 +3,13 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import radardef.radar_stations.eiscat.utils as radardef_utils
+from radardef.types import BoundParams, ExpParams
 from scipy import constants
 
 import hardtarget
-import radardef.radar_stations.eiscat.utils as radardef_utils
-from hardtarget.data_simulation import simulate_drf, DRFSimParams
-from hardtarget.types.constants import Impl
-from radardef.types import BoundParams, ExpParams
+from hardtarget.data_simulation import DRFSimParams, simulate_drf
+from hardtarget.types.constants import AnalysisMethod, Impl, TargetEstimationMethod
 
 
 class TestBlackBoxComputeGMF:
@@ -19,15 +19,15 @@ class TestBlackBoxComputeGMF:
 
     @pytest.mark.parametrize("mf_impl", [Impl.numpy, Impl.c])
     def test_dpt(self, mf_impl):
-        self.run_test("fdpt", mf_impl)
+        self.run_test(TargetEstimationMethod.fdpt, mf_impl)
 
     @pytest.mark.parametrize("mf_impl", [Impl.numpy, Impl.c])
     def test_gmf(self, mf_impl):
-        self.run_test("fgmf", mf_impl)
+        self.run_test(TargetEstimationMethod.fgmf, mf_impl)
 
     @pytest.mark.cuda
     def test_gmf_cuda(self):
-        self.run_test("fgmf", Impl.cuda)
+        self.run_test(TargetEstimationMethod.fgmf, Impl.cuda)
 
     def run_test(self, mf_method, mf_impl):
         """Simulate echoes without noise and analyse the echoes to verify parameters are recovered.
@@ -160,14 +160,14 @@ class TestBlackBoxComputeGMF:
             )
 
             # process
-            _ = hardtarget.analyse(
+            _ = hardtarget.target_estimation(
                 path=Path(tmp_sim_path).resolve(),
                 rx_channel="sim",
                 config=tmp_config_path,
                 start_time=simulation_params.start_time_us,
                 end_time=simulation_params.end_time_us,
                 relative_time=True,
-                method=mf_method,
+                method_lib=mf_method,
                 implementation=mf_impl,
                 clobber=False,
                 output=tmp_analysis_path,
@@ -176,7 +176,6 @@ class TestBlackBoxComputeGMF:
 
             data_generator = hardtarget.load_analysed_data(tmp_analysis_path)
             for out_args, exp_params, cfg_params, pro_params in data_generator:
-
                 dr = out_args.r_vec - sim_r[:-1]
                 dv = out_args.v_vec - sim_v[:-1]
                 da = out_args.a_vec - sim_a[:-1]
@@ -184,13 +183,13 @@ class TestBlackBoxComputeGMF:
                 def assert_simulated_vs_estimated(delta, limit, param_str):
                     mean_error = np.abs(np.mean(delta))
                     print(f"{param_str} = {mean_error} (std = {np.std(delta)}) < {limit}")
-                    assert (
-                        mean_error < limit
-                    ), f"mean {param_str} is over the limit, x̄({param_str}): {mean_error}, limit: {limit}"
+                    assert mean_error < limit, (
+                        f"mean {param_str} is over the limit, x̄({param_str}): {mean_error}, limit: {limit}"
+                    )
                     std = np.std(delta)
-                    assert (
-                        std < limit
-                    ), f"{param_str} standard deviation is to large, std({param_str}): {std} > {limit} "
+                    assert std < limit, (
+                        f"{param_str} standard deviation is to large, std({param_str}): {std} > {limit} "
+                    )
 
                 # Assert expected range is equal to estimated range
                 assert_simulated_vs_estimated(dr, range_gate, "delta_r")

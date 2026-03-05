@@ -78,6 +78,8 @@ from pathlib import Path
 result = analyse(
         path=Path("../some/measurement/"),
         config=Path("path/to/config.ini"),
+        method = "target_estimation",
+        method_lib = "fgmf",
         start_time=0,
         end_time=100000,
         relative_time=True,
@@ -111,51 +113,18 @@ cfg = GMFCfgParams(
     acceleration_steps=1,
 )
 ```
-The acceleration_steps parameter is unique for the [GMFCfgParams](../reference/hardtarget/matched_filter/gmf/types.md#hardtarget.matched_filter.gmf.types.GMFCfgParams) and not a part of the base class [CfgParams](../reference/hardtarget/types/types.md#hardtarget.types.types.CfgParams). Examining the  [GMF](gmf_process.md) process it can be seen that it is aswell connected to the process, thus they are compatible.
+The acceleration_steps parameter is unique for the [GMFCfgParams](../reference/hardtarget/matched_filter/gmf/types.md#hardtarget.matched_filter.gmf.types.GMFCfgParams) and not a part of the base class [CfgParams](../reference/hardtarget/types/types.md#hardtarget.types.types.CfgParams). Examining the  [GMF](../reference/hardtarget/matched_filter/gmf/gmf_process.md) process it can be seen that it is aswell connected to the process, thus they are compatible.
 The configuration object above could then be used in a analysis as:
 
 ```python
 from hardtarget import analyse
-from hardtarget.types.constants import EstimationMethod
+from hardtarget.types.constants import TargetEstimationMethod, AnalysisMethod
 
 result = analyse(
         path=Path("../some/measurement/"),
         config=cfg,
-        start_time=0,
-        end_time=100000,
-        relative_time=True,
-        method=EstimationMethod.fgmf, # Note: method is gmf as the cfg param
-    )
-```
-
-Another alternative is to declare the method in the [GMFCfgParams](../reference/hardtarget/matched_filter/gmf/types.md#hardtarget.matched_filter.gmf.types.GMFCfgParams) object (note that the analyse method parameter will
-always have prioritization, thus left out in this case) as below.
-
-```python
-from hardtarget import analyse
-from hardtarget.types.constants import EstimationMethod
-from hardtarget.matched_filter.gmf.types import GMFCfgParams
-
-cfg = GMFCfgParams(
-    method=EstimationMethod.fgmf,
-    n_ipp=1,
-    ipp_offset=0,
-    samp_offset=3,
-    min_range_gate=4000,
-    max_range_gate=8000,
-    min_acceleration=0,
-    max_acceleration=0,
-    range_gate_step=1,
-    frequency_decimation=1,
-    num_cohints_per_file=10,
-    node_gpus=1,
-    acceleration_steps=1,
-)
-
-
-result = analyse(
-        path=Path("../some/measurement/"),
-        config=cfg,
+        method=AnalysisMethod.target_estimation,
+        method_lib=TargetEstimationMethod.fgmf, # Note: method is gmf as the cfg param
         start_time=0,
         end_time=100000,
         relative_time=True,

@@ -4,22 +4,24 @@
 # visualize the filtering process.
 
 
-from pathlib import Path
-import tempfile
-import matplotlib.pyplot as plt
-import numpy as np
-import scipy.fft as fft
-from scipy import constants
 import os
-import hardtarget
-from radardef.radar_stations.eiscat import load_radar_code
-from radardef.types import BoundParams, ExpParams
 
 # Workaround to make jupyter notebook find utils
 import sys
-import os
+import tempfile
+from pathlib import Path
 
-sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "analysis"))
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.fft as fft
+from radardef.radar_stations.eiscat import load_radar_code
+from radardef.types import BoundParams, ExpParams
+from scipy import constants
+
+import hardtarget
+from hardtarget.types.constants import AnalysisMethod
+
+sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
 import utils
 
 try:
@@ -69,8 +71,8 @@ range0, vel0, acel0, t_rel, t_abs, SNR, echo_len, _ = utils.sim_data(
 # ---
 # Read the measurement and then start a process to get the correct process parameters
 
-measurement = hardtarget.Measurement(Path(tmp_sim_path.name), config)
-analyse_process = hardtarget.matched_filter.GMFProcess(
+measurement = hardtarget.Measurement(Path(tmp_sim_path.name), config, AnalysisMethod.target_estimation)
+analyse_process = hardtarget.process.GMFProcess(
     config,
     measurement.exp_params,
     measurement.cfg_params,
@@ -123,20 +125,20 @@ t = samps / exp.sample_rate
 not_used_sig = np.full(t.shape, True, dtype=bool)
 not_used_sig[pro_params.rx_stencil] = False
 not_used_sig[pro_params.tx_stencil] = False
-sel_rxs = z.z_rx[pro_params.il1_rx_window_indices + rg]
-comp_samps = np.arange(z.z_tx.size)
+sel_rxs = z.rx[pro_params.il1_rx_window_indices + rg]
+comp_samps = np.arange(z.tx.size)
 nfft = np.arange(phasors.size)
 
 # Extract the samples from the rx windows
 
-rx_window = np.full(z.z_rx.shape, False, dtype=bool)
+rx_window = np.full(z.rx.shape, False, dtype=bool)
 rx_window[pro_params.il1_rx_window_indices + rg] = True
 not_rx_window = np.logical_not(rx_window)
 
 # Calculate the cross correlation and echo
 
 assert cfg_params.range_gate_sub_resolution <= 1, "Example only runs without subresolution for now"
-xcorr = sel_rxs * z.z_tx[:, 0]
+xcorr = sel_rxs * z.tx[:, 0]
 xcorr = xcorr.copy().reshape(-1, cfg_params.frequency_decimation)
 echo = np.sum(xcorr, axis=-1)
 c_echo = echo * phasors
@@ -163,18 +165,18 @@ print("FFT len: ", len(fft_freq))
 # Plot the matched filter
 
 fig, axes = plt.subplots(3, 1)
-axes[0].semilogy(t[not_used_sig], np.abs(z.z_ipp[not_used_sig]), ".k")
-axes[0].semilogy(t[pro_params.rx_stencil][rx_window], np.abs(z.z_rx[rx_window]), ".g")
+axes[0].semilogy(t[not_used_sig], np.abs(z.ipp[not_used_sig]), ".k")
+axes[0].semilogy(t[pro_params.rx_stencil][rx_window], np.abs(z.rx[rx_window]), ".g")
 axes[0].semilogy(
     t[pro_params.rx_stencil][not_rx_window],
-    np.abs(z.z_rx[not_rx_window]),
+    np.abs(z.rx[not_rx_window]),
     ".b",
 )
-axes[0].semilogy(t[pro_params.tx_stencil], np.abs(z.z_tx), ".r")
+axes[0].semilogy(t[pro_params.tx_stencil], np.abs(z.tx), ".r")
 axes[0].set_title("Raw signal power")
 #
 axes[1].plot(comp_samps, np.real(sel_rxs) / np.sum(np.abs(sel_rxs)), "-g", label="RX")
-axes[1].plot(comp_samps, np.real(z.z_tx) / np.sum(np.abs(z.z_tx)), "-r", alpha=0.5, label="TX")
+axes[1].plot(comp_samps, np.real(z.tx) / np.sum(np.abs(z.tx)), "-r", alpha=0.5, label="TX")
 for ind in range(n_ipp):
     axes[1].axvline((exp.tx_pulse_length / exp.t_samp_usec) * (ind + 1), ls="--", c="c")
 axes[1].set_title("Stenciled signals")

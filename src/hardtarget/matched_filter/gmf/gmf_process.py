@@ -4,18 +4,24 @@ from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
+from radardef.types import ExpParams
 from scipy.signal import savgol_filter  # type: ignore[attr-defined]
 
 from hardtarget.data_handling.configuration import extract_config_section
+from hardtarget.matched_filter.gmf import get_gmf_lib
 from hardtarget.matched_filter.gmf.types import GMFCfgParams, GMFProParams
 from hardtarget.matched_filter.types import MFOutArgs, MFVariables
 from hardtarget.process import Process
-from hardtarget.types.constants import ConfigSubSection, Impl
-from hardtarget.types.types import AnalysisLib, CfgParams, DataItem, ProParams
-from radardef.types import ExpParams
+from hardtarget.types.constants import ConfigSubSection, Impl, TargetEstimationMethod
+from hardtarget.types.types import AnalysisLib, CfgParams, DataItem, MethodLib, ProParams
 
 
 class GMFProcess(Process[GMFCfgParams, GMFProParams, MFVariables, MFOutArgs, AnalysisLib]):
+    def get_analysis_lib(
+        self, lib: MethodLib | None, impl: Impl | None
+    ) -> tuple[AnalysisLib, TargetEstimationMethod, Impl]:
+        return get_gmf_lib(lib, impl)
+
     def get_conf_params(self, cfg_path: Path, cfg_params: CfgParams) -> GMFCfgParams:
         """
         Extract GMF configuration parameters
@@ -97,7 +103,7 @@ class GMFProcess(Process[GMFCfgParams, GMFProParams, MFVariables, MFOutArgs, Ana
             Outcome of GMF analysis
         """
 
-        z_tx, z_rx, z_ipp = self.get_data(start_sample, self.pro_params.read_length)
+        tx, rx, ipp = self.get_data(start_sample, self.pro_params.read_length)
 
         # TODO: generalize a preprocess filtering of 0 tx power
         # since it can cause unnessary slowdowns depending on experiment setup
@@ -106,16 +112,16 @@ class GMFProcess(Process[GMFCfgParams, GMFProParams, MFVariables, MFOutArgs, Ana
 
         # conjugate, so that when matched filtering, it will cancel out phase of transmit waveform.
         # scale transmit waveform to unity power
-        tx_pwr = np.sum(np.abs(z_tx) ** 2.0)
+        tx_pwr = np.sum(np.abs(tx) ** 2.0)
         tx_amp = np.sqrt(tx_pwr)
-        z_tx = np.conj(z_tx) / tx_amp
+        tx = np.conj(tx) / tx_amp
 
         if tx_amp > self.cfg_params.tx_amp_limit:
             kwargs = {}
-            if self.cfg_params.implementation == Impl.cuda:
+            if self.pro_params.implementation == Impl.cuda:
                 kwargs["gpu_id"] = 1 % self.cfg_params.node_gpus  # TODO:1 should be job.idx
 
-            return self.lib(z_tx, z_rx, np.array(tx_pwr), self.cfg_params, self.pro_params, **kwargs)
+            return self.lib(tx, rx, np.array(tx_pwr), self.cfg_params, self.pro_params, **kwargs)
         else:
             return MFVariables(
                 vals=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),

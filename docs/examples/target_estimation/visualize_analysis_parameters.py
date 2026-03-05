@@ -1,19 +1,20 @@
 # # Visualisation of analysis paramters
+import os
+
+# Workaround to make jupyter notebook find utils
+import sys
+import tempfile
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import hardtarget
-import hardtarget
-import tempfile
 from radardef import RadarDef
 from radardef.types import TargetFormat
 
-# Workaround to make jupyter notebook find utils
-import sys
-import os
+import hardtarget
+from hardtarget.types.types import AnalysisMethod
 
-sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "analysis"))
+sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
 import utils
 
 try:
@@ -34,6 +35,7 @@ target = converted_files[0]
 measurement = hardtarget.data_handling.Measurement(
     Path(target),
     Path(config),
+    AnalysisMethod.target_estimation,
 )
 exp = measurement.exp_params
 cfg = measurement.cfg_params

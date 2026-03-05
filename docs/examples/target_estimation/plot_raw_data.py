@@ -2,18 +2,18 @@
 # ---
 # Simple example on how the raw rti function can be utilized.
 
-import matplotlib.pyplot as plt
-
-from hardtarget import plotting
-from hardtarget.utils.time_conversion import ts_from_str
-from radardef import RadarDef
+import os
+import sys
 import tempfile
 from pathlib import Path
-import sys
-import os
+
+import matplotlib.pyplot as plt
+from radardef import RadarDef
+
+from hardtarget import plotting
 
 # Workaround to make jupyter notebook find utils
-sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "analysis"))
+sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
 import utils
 
 # ## Prerequisites

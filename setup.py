@@ -1,6 +1,7 @@
 import codecs
 import os
 from os.path import join as pjoin
+from pathlib import Path
 
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
@@ -49,7 +50,7 @@ def locate_cuda():
     }
     for k, v in iter(cudaconfig.items()):
         if not os.path.exists(v):
-            raise EnvironmentError("The CUDA %s path could not be " "located in %s" % (k, v))
+            raise EnvironmentError("The CUDA %s path could not be located in %s" % (k, v))
 
     return cudaconfig
 
@@ -57,19 +58,20 @@ def locate_cuda():
 cudasources = ["src/gmf_cuda_lib/gmfgpu.cu"]
 cudalibraries = ["cufft"]
 
-csources = ["src/gmf_c_lib/gmf.c"]
+clib_path = Path("src/mf_c_lib/")
+csources = [str(p) for p in list(clib_path.rglob("*.c"))]
 clibraries = ["fftw3f"]
 
 # Build C module
 gmfcmodule = Extension(
     # Where to store the .so file
-    name="hardtarget.matched_filter.utils.gmfclib",
+    name="hardtarget.matched_filter.utils.mfclib",
     # Libraries used
     libraries=clibraries,
     extra_compile_args={
         "gcc": [],
     },
-    # Path to cuda source files, relative to repo root
+    # Path to c source files, relative to repo root
     sources=csources,
 )
 

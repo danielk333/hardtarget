@@ -7,12 +7,12 @@ from hardtarget.matched_filter.gmf.types import GMFCfgParams, GMFProParams
 from hardtarget.matched_filter.types import MFVariables
 from hardtarget.matched_filter.utils import default_mf_vars_items, load_c_lib
 
-gmfclib = load_c_lib()
+mfclib = load_c_lib()
 
 
 def fast_gmf_c(
-    z_tx: npt.NDArray[np.complexfloating],
-    z_rx: npt.NDArray[np.complexfloating],
+    tx: npt.NDArray[np.complex64],
+    rx: npt.NDArray[np.complex64],
     tx_pwr: npt.NDArray,
     cfg_params: GMFCfgParams,
     pro_params: GMFProParams,
@@ -21,8 +21,8 @@ def fast_gmf_c(
     Wrapper for the Fast GMF C implementation
 
     Args:
-        z_tx: Transmitted signal
-        z_rx: Recived signal
+        tx: Transmitted signal
+        rx: Recived signal
         tx_pwr: Power of the transmission
         cfg_params: GMF configuration parameters
         pro_params: GMF processing parameters
@@ -34,13 +34,13 @@ def fast_gmf_c(
     size = (len(pro_params.ranges),)
     dc, vals, v_ind, a_ind = default_mf_vars_items(size)
 
-    z_tx = z_tx.flatten()
+    tx = tx.flatten()
     # Below comments are for ctypes argument error debugging
-    error_code = gmfclib.gmf(
-        z_tx.astype(np.complex64),  # 1
-        int(z_tx.size / cfg_params.range_gate_sub_resolution),  # 2
-        z_rx.astype(np.complex64),  # 3
-        z_rx.size,  # 4
+    error_code = mfclib.fgmf(
+        tx,  # 1
+        int(tx.size / cfg_params.range_gate_sub_resolution),  # 2
+        rx,  # 3
+        rx.size,  # 4
         cfg_params.range_gate_sub_resolution,  # 5
         pro_params.fgmf_acceleration_phasors,  # 6
         pro_params.fgmf_acceleration_phasors.shape[0],  # 7

@@ -10,8 +10,8 @@ import h5py
 import numpy as np
 import numpy.typing as npt
 
-from hardtarget.matched_filter import get_analysis_process
 from hardtarget.matched_filter.types import MFOptimizeOutArgs, MFOutArgs
+from hardtarget.process import get_analysis_process
 from hardtarget.types.constants import AnalysisMethod
 from hardtarget.types.types import ExpParams, GenericCfg, GenericOut, GenericPro, ProParams
 from hardtarget.utils.h5_tools import get_analysed_h5_files
@@ -176,8 +176,9 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpParams, Gen
     with h5py.File(paths[0], "r") as file:
         # Get analysis method from the process parameters
         method = AnalysisMethod(file[f"{ProParams.method=}".split("=")[0].split(".")[1]].asstr()[()])
+        method_lib = file[f"{ProParams.method_lib=}".split("=")[0].split(".")[1]].asstr()[()]
         # Retrive process matching the method and get the specific generic types for that process
-        generic_types = orig_bases(get_analysis_process(method))[0].__args__  # type: ignore[arg-type]
+        generic_types = orig_bases(get_analysis_process(method, method_lib))[0].__args__  # type: ignore[arg-type]
         cfg_type, pro_type, _, out_type, _ = generic_types
 
     out_args: dict[str, Any] = {}

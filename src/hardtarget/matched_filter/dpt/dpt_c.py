@@ -7,12 +7,12 @@ from hardtarget.matched_filter.dpt.types import DPTCfgParams, DPTProParams
 from hardtarget.matched_filter.types import MFVariables
 from hardtarget.matched_filter.utils import default_mf_vars_items, load_c_lib
 
-gmfclib = load_c_lib()
+mfclib = load_c_lib()
 
 
 def fast_dpt_c(
-    z_tx: npt.NDArray[np.complexfloating],
-    z_rx: npt.NDArray[np.complexfloating],
+    tx: npt.NDArray[np.complex64],
+    rx: npt.NDArray[np.complex64],
     tx_pwr: npt.NDArray,
     cfg_params: DPTCfgParams,
     pro_params: DPTProParams,
@@ -21,8 +21,8 @@ def fast_dpt_c(
     Wrapper for the Fast DPT C implementation
 
     Args:
-        z_tx: Transmitted signal
-        z_rx: Recived signal
+        tx: Transmitted signal
+        rx: Recived signal
         tx_pwr: Power of the transmission
         cfg_params: DPT configuration parameters
         pro_params: DPT processing parameters
@@ -34,13 +34,13 @@ def fast_dpt_c(
     size = (len(pro_params.ranges),)
     dc, vals, v_ind, a_ind = default_mf_vars_items(size)
 
-    z_tx = z_tx.flatten()
+    tx = tx.flatten()
     # Below comments are for ctypes argument error debugging
-    error_code = gmfclib.dpt(
-        z_tx.astype(np.complex64),  # 1
-        int(z_tx.size / cfg_params.range_gate_sub_resolution),  # 2
-        z_rx.astype(np.complex64),  # 2
-        z_rx.size,  # 4
+    error_code = mfclib.fdpt(
+        tx,  # 1
+        int(tx.size / cfg_params.range_gate_sub_resolution),  # 2
+        rx,  # 2
+        rx.size,  # 4
         cfg_params.range_gate_sub_resolution,  # 5
         pro_params.acceleration_phasors,  # 6
         pro_params.acceleration_phasors.shape[0],  # 7

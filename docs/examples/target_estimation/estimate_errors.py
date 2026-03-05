@@ -1,13 +1,15 @@
 # Estimate errors with simulation
 # ---
 
-import numpy as np
-import matplotlib.pyplot as plt
-from hardtarget.data_simulation.errors import monte_carlo_sample_errors
 import tempfile
 from pathlib import Path
 
-tmp_path = tempfile.TemporaryDirectory(suffix="_drf")
+import matplotlib.pyplot as plt
+import numpy as np
+
+from hardtarget.data_simulation.errors import monte_carlo_sample_errors
+
+tmp_path = tempfile.TemporaryDirectory()
 results = monte_carlo_sample_errors(
     snr_db=np.linspace(10, 40, num=10),
     # snr_db=10,

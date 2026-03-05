@@ -1,5 +1,7 @@
 """Project constants"""
 
+from typing import TypeAlias
+
 # Python StrEnum has default lowercase for auto() but is only available from py 3.11
 try:
     from enum import StrEnum
@@ -12,10 +14,36 @@ except ImportError:
 class AnalysisMethod(StrEnum):
     """Analysis method type"""
 
-    gmf = "gmf"
-    dpt = "dpt"
+    target_estimation = "target_estimation"
     optimize = "optimize"
+    event_detection = "event_detection"
+    direction_of_arrival = "direction_of_arrival"
     unknown = "unknown"
+
+
+class TargetEstimationMethod(StrEnum):
+    """Target estimation methods"""
+
+    fgmf = "fgmf"
+    fdpt = "fdpt"
+    grid_fast_no_reduce = "grid_fast_no_reduce"
+    unknown = "unknown"
+
+
+class OptimizationMethod(StrEnum):
+    """GMF Optimization Methods"""
+
+    optimize_scipy_gmf = "optimize-scipy-gmf"
+    optimize_grid_gmf = "optimize-grid-gmf"
+
+
+class EventDetectionMethod(StrEnum):
+    """Event detection methods"""
+
+    xcorr = "xcorr"
+
+
+MethodLib: TypeAlias = TargetEstimationMethod | OptimizationMethod | EventDetectionMethod
 
 
 class Impl(StrEnum):
@@ -27,42 +55,11 @@ class Impl(StrEnum):
     unknown = "unknown"
 
 
-class GMFMethod(StrEnum):
-    """GMF Analysis Methods"""
-
-    grid_fast_gmf = "grid-fast-gmf"
-    fgmf = "fgmf"
-    grid_fast_no_reduce = "grid_fast_no_reduce"
-    unknown = "unknown"
-
-
-class DPTMethod(StrEnum):
-    """DPT Analysis Methods"""
-
-    grid_fast_dpt = "grid-fast-dpt"
-    fdpt = "fdpt"
-    unknown = "unknown"
-
-
-class OptimizationMethod(StrEnum):
-    """GMF Optimization Methods"""
-
-    optimize_scipy_gmf = "optimize-scipy-gmf"
-    optimize_grid_gmf = "optimize-grid-gmf"
-    unknown = "unknown"
-
-
-class EstimationMethod(StrEnum):
-    """All estimation methods"""
-
-    grid_fast_gmf = "grid-fast-gmf"
-    grid_fast_dpt = "grid-fast-dpt"
-    fgmf = "fgmf"
-    fdpt = "fdpt"
-    grid_fast_no_reduce = "grid_fast_no_reduce"
-    optimize_scipy_gmf = "optimize-scipy-gmf"
-    optimize_grid_gmf = "optimize-grid-gmf"
-    unknown = "unknown"
+class Processes(StrEnum):
+    GMF = "gmf"
+    DPT = "dpt"
+    Optimization = "optimization"
+    XCORR = "xcorr"
 
 
 class ConfigSubSection(StrEnum):
@@ -72,4 +69,4 @@ class ConfigSubSection(StrEnum):
     GMF = "gmf"
     DPT = "dpt"
     OPTIMIZATION = "optimization"
-    INFOMETRY = "infometry"
+    XCORR = "xcorr"

@@ -5,11 +5,11 @@ import numpy as np
 
 from hardtarget.data_handling.configuration import compute_process_params
 from hardtarget.data_handling.store_params import dump_params_to_file
-from hardtarget.matched_filter import GMFProcess
 from hardtarget.matched_filter.gmf.types import GMFCfgParams
 from hardtarget.matched_filter.types import MFOutArgs
 from hardtarget.plotting.load_data import load_analysed_data
-from hardtarget.types.constants import AnalysisMethod, EstimationMethod, Impl
+from hardtarget.process import GMFProcess
+from hardtarget.types.constants import AnalysisMethod, Impl, TargetEstimationMethod
 from hardtarget.types.types import ExpParams
 
 
@@ -37,8 +37,6 @@ def test_store_and_load():
     )
 
     cfg_org = GMFCfgParams(
-        implementation=Impl.c,
-        method=EstimationMethod.grid_fast_gmf,
         node_gpus=1,
         n_ipp=5,
         ipp_offset=0,
@@ -80,7 +78,13 @@ def test_store_and_load():
     epoch_unix = np.float64(1.1)
 
     pointing_vec = np.tile([90.0, 75.0], (INTEGRATION_SIZE, 1))
-    _pro = compute_process_params(exp_org, cfg_org, AnalysisMethod.gmf)
+    _pro = compute_process_params(
+        exp_org,
+        cfg_org,
+        analysis_method=AnalysisMethod.target_estimation,
+        method_lib=TargetEstimationMethod.fgmf,
+        implementation=Impl.c,
+    )
     pro_org = GMFProcess.get_process_params(None, exp_org, cfg_org, _pro)
 
     gmf_out_args = MFOutArgs(

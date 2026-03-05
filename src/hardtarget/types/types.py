@@ -13,7 +13,12 @@ import numpy as np
 import numpy.typing as npt
 from radardef.types import ExpParams, Pointing
 
-from hardtarget.types.constants import AnalysisMethod, EstimationMethod, Impl
+from hardtarget.types.constants import (
+    AnalysisMethod,
+    Impl,
+    MethodLib,
+    TargetEstimationMethod,
+)
 
 if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
     # in python 3.10 there is a bug present for TypedDict
@@ -28,8 +33,6 @@ class CfgParams:
     Configuration parameters
 
     Args:
-        implementation: Implementation of the library that should be used, very optional.
-        method: What method to use for the analysis.
         node_gpus: Amount of gpus
         n_ipp: Number or interpulse periods to coherently integrate
         ipp_offset: Pulse offset to use when selecting transmitt pulse for coherent integration,
@@ -55,8 +58,6 @@ class CfgParams:
         tx_amp_limit: The tx amplitude limit, if lower than this the analysis will ignore the cohints.
     """
 
-    implementation: Impl = Impl.numpy
-    method: EstimationMethod = EstimationMethod.fgmf
     node_gpus: int = 1
     n_ipp: int = 10
     ipp_offset: int = 0
@@ -80,10 +81,11 @@ class ProParams:
     Process parameters, derived from Cfg and Exp params
 
     Args:
-        method: Estimation method used for the analysis.
+        method: Method used for the analysis.
+        method_lib: Specific library used for the analyse method.
         read_length: How many samples should be read each "loop".
-        decimated_read_length: Decimated read length, the read length with the frequency decimation accounted
-                               for.
+        decimated_read_length: Decimated read length, the read length with the frequency decimation
+                               accounted for.
         range_gates: Range gates, the "gates" between max and min range gate with a range gate step.
         rel_rgs: Relative range gates, range gates relative to the min range gate.
         il0_rgs: Index level 0 range gates.
@@ -98,6 +100,8 @@ class ProParams:
     """
 
     method: AnalysisMethod = AnalysisMethod.unknown
+    method_lib: MethodLib | None = TargetEstimationMethod.unknown
+    implementation: Impl | None = Impl.unknown
     read_length: int = 0
     decimated_read_length: int = 0
     range_gates: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
@@ -118,14 +122,14 @@ class ExtractedSignals(NamedTuple):
     """
     Collection of signals read from a measurement file.
     Args:
-        z_tx: tx signal samples
-        z_rx: rx signal samples
-        z_ipp: The full ipp samples
+        tx: tx signal samples
+        rx: rx signal samples
+        ipp: The full ipp samples
     """
 
-    z_tx: npt.NDArray[np.complexfloating]
-    z_rx: npt.NDArray[np.complexfloating]
-    z_ipp: npt.NDArray[np.complexfloating]
+    tx: npt.NDArray[np.complexfloating]
+    rx: npt.NDArray[np.complexfloating]
+    ipp: npt.NDArray[np.complexfloating]
 
 
 class Bounds(NamedTuple):
@@ -181,6 +185,7 @@ GenericCfg = TypeVar("GenericCfg", bound=CfgParams)
 GenericPro = TypeVar("GenericPro", bound=ProParams)
 GenericVars = TypeVar("GenericVars", bound=NamedTuple)
 GenericOut = TypeVar("GenericOut", bound=NamedTuple)
+GenericLib = TypeVar("GenericLib", bound=Callable)
 
 
 class AnalysedResult(TypedDict, Generic[GenericOut, GenericCfg, GenericPro]):
@@ -202,8 +207,8 @@ class AnalysedResult(TypedDict, Generic[GenericOut, GenericCfg, GenericPro]):
 
 AnalysisLib: TypeAlias = Callable[
     [
-        npt.NDArray[np.complexfloating],
-        npt.NDArray[np.complexfloating],
+        npt.NDArray[np.complex64],
+        npt.NDArray[np.complex64],
         npt.NDArray,
         GenericCfg,
         GenericPro,
@@ -213,7 +218,7 @@ AnalysisLib: TypeAlias = Callable[
 
 OptimizeLib: TypeAlias = Callable[
     [
-        npt.NDArray[np.complexfloating],
+        npt.NDArray[np.complex64],
         npt.NDArray,
         ExpParams,
         GenericCfg,
@@ -222,3 +227,17 @@ OptimizeLib: TypeAlias = Callable[
     ],
     tuple[npt.NDArray, npt.NDArray],
 ]
+
+EventSearchLib: TypeAlias = Callable[
+    [
+        npt.NDArray[np.complex64],
+        npt.NDArray[np.complex64],
+        ExpParams,
+        GenericCfg,
+        GenericPro,
+    ],
+    GenericVars,
+]
+
+
+LibType: TypeAlias = AnalysisLib | OptimizeLib | EventSearchLib

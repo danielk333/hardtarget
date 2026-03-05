@@ -9,14 +9,20 @@ from radardef.types import ExpParams
 from scipy.signal import savgol_filter  # type: ignore[attr-defined]
 
 from hardtarget.data_handling.configuration import extract_config_section
+from hardtarget.matched_filter.dpt import get_dbt_lib
 from hardtarget.matched_filter.dpt.types import DPTCfgParams, DPTProParams
 from hardtarget.matched_filter.types import MFOutArgs, MFVariables
 from hardtarget.process import Process
-from hardtarget.types.constants import ConfigSubSection
-from hardtarget.types.types import AnalysisLib, CfgParams, DataItem, ProParams
+from hardtarget.types.constants import ConfigSubSection, Impl, TargetEstimationMethod
+from hardtarget.types.types import AnalysisLib, CfgParams, DataItem, MethodLib, ProParams
 
 
 class DPTProcess(Process[DPTCfgParams, DPTProParams, MFVariables, MFOutArgs, AnalysisLib]):
+    def get_analysis_lib(
+        self, lib: MethodLib | None, impl: Impl | None
+    ) -> tuple[AnalysisLib, TargetEstimationMethod, Impl]:
+        return get_dbt_lib(lib, impl)
+
     def get_conf_params(self, cfg_path: Path, cfg_params: CfgParams) -> DPTCfgParams:
         """
         Extract DPT configuration parameters
@@ -110,9 +116,9 @@ class DPTProcess(Process[DPTCfgParams, DPTProParams, MFVariables, MFOutArgs, Ana
             Outcome of DPT analysis
         """
 
-        z_tx, z_rx, z_ipp = self.get_data(start_sample, self.pro_params.read_length)
+        tx, rx, ipp = self.get_data(start_sample, self.pro_params.read_length)
 
-        if len(z_rx) == 0:
+        if len(rx) == 0:
             raise ValueError("No data on rx signal")
         # TODO: generalize a preprocess filtering of 0 tx power
         # since it can cause unnessary slowdowns depending on experiment setup
@@ -121,14 +127,14 @@ class DPTProcess(Process[DPTCfgParams, DPTProParams, MFVariables, MFOutArgs, Ana
 
         # conjugate, so that when matched filtering, it will cancel out phase of transmit waveform.
         # scale transmit waveform to unity power
-        tx_pwr = np.sum(np.abs(z_tx) ** 2.0)
+        tx_pwr = np.sum(np.abs(tx) ** 2.0)
         tx_amp = np.sqrt(tx_pwr)
-        z_tx = np.conj(z_tx) / tx_amp
+        tx = np.conj(tx) / tx_amp
 
         if tx_amp > self.cfg_params.tx_amp_limit:
             return self.lib(
-                z_tx,
-                z_rx,
+                tx,
+                rx,
                 np.array(tx_pwr),
                 self.cfg_params,
                 self.pro_params,
