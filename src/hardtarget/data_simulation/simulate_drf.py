@@ -68,17 +68,6 @@ def simulate_drf(
     """
 
     # ------- Channel data --------
-    if output_path is not None:
-        output_path = pathlib.Path(output_path)
-        output_path.mkdir(exist_ok=True)
-
-        dstdir = output_path / str(experiment_params.rx_channels[0])
-        if dstdir.is_dir() and clobber:
-            logger.info(f"'{dstdir}' exists and clobber is on: removing dir")
-            shutil.rmtree(dstdir)
-        elif dstdir.is_dir():
-            raise FileExistsError(f"Directory '{dstdir}' exists")
-        dstdir.mkdir(exist_ok=False)
 
     sample_rate = experiment_params.sample_rate
 
@@ -117,7 +106,20 @@ def simulate_drf(
     sim_pulses = int((samp_t1 - samp_t0) / ipp_samp)
     simulated_signal = np.empty((samp_t1 - samp_t0,), dtype=dtype)
 
+    rf_writer = None
+    dstdir = None
     if output_path is not None:
+        output_path = pathlib.Path(output_path)
+        output_path.mkdir(exist_ok=True)
+
+        dstdir = output_path / str(experiment_params.rx_channels[0])
+        if dstdir.is_dir() and clobber:
+            logger.info(f"'{dstdir}' exists and clobber is on: removing dir")
+            shutil.rmtree(dstdir)
+        elif dstdir.is_dir():
+            raise FileExistsError(f"Directory '{dstdir}' exists")
+        dstdir.mkdir(exist_ok=False)
+
         rf_writer = drf.DigitalRFWriter(
             str(dstdir),  # directory
             dtype,  # dtype
@@ -181,7 +183,7 @@ def simulate_drf(
 
                 simulated_signal[(pid * ipp_samp) : ((pid + 1) * ipp_samp)] = signal
 
-        if output_path is not None:
+        if rf_writer:
             rf_writer.rf_write(signal)
 
     if output_path is not None:
@@ -223,11 +225,12 @@ def simulate_drf(
         for key, value in bounds_params._asdict().items():
             if value is not None:
                 bounds[key] = str(value)
-
-        rf_writer.close()
+        if rf_writer:
+            rf_writer.close()
         # write metadata file
-        metafile = dstdir.parent / "metadata.ini"
-        with open(metafile, "w") as f:
-            meta.write(f)
+        if dstdir:
+            metafile = dstdir.parent / "metadata.ini"
+            with open(metafile, "w") as f:
+                meta.write(f)
 
     return simulated_signal

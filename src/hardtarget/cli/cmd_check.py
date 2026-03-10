@@ -13,7 +13,7 @@ import scipy.constants as constants
 from radardef import RadarDef
 from radardef.types import SourceFormat
 
-from hardtarget.types.types import ParserArgs, SubParser
+from hardtarget.types import ParserArgs, SubParser
 from hardtarget.utils.range_conversion import SI_to_unit, unit_to_SI
 
 from .commands import add_command
@@ -146,7 +146,7 @@ def cuda_parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
 def cuda_main(args: argparse.Namespace) -> None:
     """Validation of the cuda environment if present"""
     try:
-        import hardtarget.matched_filter.gmf.gmf_cuda as gcu
+        import hardtarget.target_estimation.gmf.gmf_cuda as gcu
 
         gcu.print_cuda_devices()
         gcu.test_cuda()

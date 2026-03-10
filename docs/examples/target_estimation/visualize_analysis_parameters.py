@@ -8,11 +8,9 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from radardef import RadarDef
-from radardef.types import TargetFormat
 
 import hardtarget
-from hardtarget.types.types import AnalysisMethod
+from hardtarget.types import AnalysisMethod
 
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
 import utils
@@ -22,18 +20,25 @@ try:
 except NameError:
     config = Path(os.path.abspath("")) / "docs" / "examples" / "cfg" / "test.ini"
 
-raw_data_dir = tempfile.TemporaryDirectory()
-raw_data = utils.download_test_data(Path(raw_data_dir.name))
-converted_data_path = tempfile.TemporaryDirectory()
-converted_files = RadarDef().convert(raw_data, TargetFormat.H5, converted_data_path.name)
-target = converted_files[0]
+# Data to analyse
+
+tmp_dir = tempfile.TemporaryDirectory()
+raw_path = Path(tmp_dir.name) / "raw"
+raw_path.mkdir(parents=True, exist_ok=True)
+converted_path = Path(tmp_dir.name) / "converted"
+raw_data = utils.download_test_data(raw_path)
+
+# Convert the data to a usable format.
+
+data = utils.convert_test_data(raw_data, converted_path)[0]
+
 
 # Extract data from the measurement, the Measurement object will load experiment and config parameters from
 # the user config and the measurement data, then from that compute the process parameters. Furthermore it
 # extracts the meta and raw data in a simple way.
 
 measurement = hardtarget.data_handling.Measurement(
-    Path(target),
+    Path(data),
     Path(config),
     AnalysisMethod.target_estimation,
 )
@@ -119,5 +124,4 @@ ax1.set_title("Stencils - single")
 ax1.legend()
 ax1.set_xlabel("Time [s]")
 plt.show()
-raw_data_dir.cleanup()
-converted_data_path.cleanup()
+tmp_dir.cleanup()

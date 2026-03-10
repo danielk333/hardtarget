@@ -9,18 +9,17 @@ import numpy as np
 from radardef import DataLoader, RadarDef
 from radardef.types import ExpParams, Pointing
 
+from hardtarget.constants import AnalysisMethod, MethodLib
 from hardtarget.data_handling.configuration import (
     compute_process_params,
     extract_config_params_from_derived_object,
     load_config_params,
 )
 from hardtarget.data_simulation.tx_model import tx_signal_model
-from hardtarget.types.constants import AnalysisMethod, MethodLib
-from hardtarget.types.types import (
+from hardtarget.types import (
     Bounds,
     CfgParams,
     ExtractedSignals,
-    GenericCfg,
     Impl,
     ProParams,
 )
@@ -86,7 +85,7 @@ class Measurement:
     def __init__(
         self,
         path: Path | str,
-        config: Path | str | GenericCfg,
+        config: Path | str | CfgParams,
         method: AnalysisMethod,
         method_lib: Optional[MethodLib] = None,
         impl: Optional[Impl] = None,

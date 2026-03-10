@@ -18,11 +18,11 @@ from radardef.types import BeamType, EiscatUHFLocation
 from spacecoords import interpolation, linalg, spherical
 
 from hardtarget import analyse, load_analysed_data
-from hardtarget.matched_filter.dpt.types import DPTCfgParams
-from hardtarget.matched_filter.gmf.types import GMFCfgParams
-from hardtarget.matched_filter.types import MFOutArgs
-from hardtarget.types.constants import AnalysisMethod, TargetEstimationMethod
-from hardtarget.types.types import CfgParams, ExpParams, ProParams
+from hardtarget.constants import AnalysisMethod, TargetEstimationMethod
+from hardtarget.target_estimation.dpt.types import DPTCfgParams
+from hardtarget.target_estimation.gmf.types import GMFCfgParams
+from hardtarget.target_estimation.types import MFOutArgs
+from hardtarget.types import CfgParams, ExpParams, ProParams
 
 from .utils import cdse
 from .utils.dt_standard import str_to_dt

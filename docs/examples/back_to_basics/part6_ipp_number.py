@@ -149,20 +149,21 @@ fig, ax = plt.subplots()
 #
 accs = np.linspace(0, 0.2e3, 20)
 err_vecs_acc = np.empty((3, len(accs)))
+pbar = None
 if enable_progress:
     pbar = tqdm(total=err_vecs_acc.size)
 for ni, n_ipp in enumerate([5, 10, 20]):
     for ai in range(len(accs)):
         peak_dop, peak = search_accel(16, n_ipp, accels, accs[ai], vel, noise_sigma=None)
         err_vecs_acc[ni, ai] = accels[np.argmax(peak)] - accs[ai]
-        if enable_progress:
+        if pbar:
             pbar.update(1)
     signal_times = n_ipp * ipp_samps / sample_rate
     freq_drift_lim = 1.0 / signal_times**2
     ax.axhline(-freq_drift_lim * 0.5, ls="--", c=cs[ni])
     ax.axhline(freq_drift_lim * 0.5, ls="--", c=cs[ni])
     ax.plot(accs, err_vecs_acc[ni, :], c=cs[ni], label=f"N_ipp={n_ipp}")
-if enable_progress:
+if pbar:
     pbar.close()
 #
 ax.axhline(0, ls="--", c="r")
@@ -181,14 +182,14 @@ for ni, n_ipp in enumerate([5, 10, 20]):
     for vi in range(len(vels)):
         peak_dop, peak = search_accel(16, n_ipp, accels, acel, vels[vi], noise_sigma=None)
         err_vecs_vel[ni, vi] = accels[np.argmax(peak)] - acel
-        if enable_progress:
+        if pbar:
             pbar.update(1)
     signal_times = n_ipp * ipp_samps / sample_rate
     freq_drift_lim = 1.0 / signal_times**2
     ax.axhline(-freq_drift_lim * 0.5, ls="--", c=cs[ni])
     ax.axhline(freq_drift_lim * 0.5, ls="--", c=cs[ni])
     ax.plot(vels, err_vecs_vel[ni, :], c=cs[ni], label=f"N_ipp={n_ipp}")
-if enable_progress:
+if pbar:
     pbar.close()
 #
 ax.axhline(0, ls="--", c="r")

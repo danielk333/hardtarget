@@ -91,8 +91,8 @@ from typing import Any, Optional, Type
 import numpy as np
 import numpy.typing as npt
 
-from hardtarget.types.constants import AnalysisMethod, ConfigSubSection, MethodLib
-from hardtarget.types.types import CfgParams, ExpParams, GenericCfg, Impl, ProParams
+from hardtarget.constants import AnalysisMethod, ConfigSubSection, MethodLib
+from hardtarget.types import CfgParams, ExpParams, Impl, ProParams
 
 
 def extract_config_section(
@@ -167,7 +167,7 @@ def load_config_params(configfile: Path | str) -> CfgParams:
     return CfgParams(**d)
 
 
-def extract_config_params_from_derived_object(cfg_derived: GenericCfg) -> CfgParams:
+def extract_config_params_from_derived_object(cfg_derived: CfgParams) -> CfgParams:
     """
     From a derived class extract the fields from the base class, this to extract the non process related
     parameters.

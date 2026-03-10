@@ -5,7 +5,7 @@ The CLI Inspect functionality, gathers the inspect functionality for both the an
 import argparse
 import logging
 
-from hardtarget.types.types import ParserArgs, SubParser
+from hardtarget.types import ParserArgs, SubParser
 
 from . import inspect_mf, inspect_raw_data
 from .commands import add_command

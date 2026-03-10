@@ -1,15 +1,15 @@
 # Install
+
 ---
 
 !!! note
-    Hardtarget installation is only supported on Linux
+Hardtarget installation is only supported on Linux
 
 ---
 
-
 ## Prerequisites
-Hardtarget depends on `gcc`, `libhdf5-dev`, and `libfftw3-dev`.
 
+Hardtarget depends on `gcc`, `libhdf5-dev`, and `libfftw3-dev`.
 
 ```bash
     sudo apt install gcc libfftw3-dev libhdf5-dev
@@ -35,13 +35,14 @@ It is recommended to install Hardtarget in a virtual environment, e.g. `virtuale
 ---
 
 ## Installation from Git
+
 Basic install.
 
 ```bash
 
     $ git clone git@github.com:danielk333/hardtarget.git
     $ cd hardtarget
-    $ pip install .[plotting]
+    $ pip install .
 ```
 
 Nightly build.

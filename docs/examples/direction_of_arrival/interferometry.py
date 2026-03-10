@@ -35,11 +35,7 @@ raw_data = utils.download_test_data(Path(tmp_dir.name) / "raw")
 
 # Convert the data to a usable format.
 
-radars = RadarDef()
-source_format = radars.get_source_format(raw_data)
-target_formats = radars.available_target_formats(source_format)
-converted_files = RadarDef().convert(raw_data, target_formats[0], str(converted_path))
-data = converted_files[0]
+data = utils.convert_test_data(raw_data, converted_path)[0]
 
 reader = RadarDef().load_data(data)
 assert reader is not None
@@ -78,7 +74,6 @@ direction_of_arrival(
     start_time=start_time,
     end_time=end_time,
     relative_time=True,
-    progress=True,
 )
 
 # Load analysed data

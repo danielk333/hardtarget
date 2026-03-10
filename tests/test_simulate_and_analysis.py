@@ -8,8 +8,8 @@ from radardef.types import BoundParams, ExpParams
 from scipy import constants
 
 import hardtarget
+from hardtarget.constants import AnalysisMethod, Impl, TargetEstimationMethod
 from hardtarget.data_simulation import DRFSimParams, simulate_drf
-from hardtarget.types.constants import AnalysisMethod, Impl, TargetEstimationMethod
 
 
 class TestBlackBoxComputeGMF:
@@ -210,15 +210,15 @@ class TestBlackBoxComputeGMF:
                     t = _out_args.t - np.min(_out_args.t)
 
                     fig, axes = plt.subplots(2, 2)
-                    hardtarget.plotting.mf_analysis.plot_peaks(
+                    hardtarget.plotting.target_estimation_plots.plot_peaks(
                         axes, _out_args, _exp_params, _cfg_params, _pro_params
                     )
                     fig, axes = plt.subplots(2, 3)
-                    hardtarget.plotting.mf_analysis.plot_detections(
+                    hardtarget.plotting.target_estimation_plots.plot_detections(
                         axes, _out_args, _exp_params, _cfg_params, _pro_params
                     )
                     fig, axes = plt.subplots(3, 1)
-                    hardtarget.plotting.mf_analysis.plot_map(
+                    hardtarget.plotting.target_estimation_plots.plot_map(
                         axes, _out_args, _exp_params, _cfg_params, _pro_params
                     )
 

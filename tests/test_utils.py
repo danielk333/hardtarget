@@ -1,6 +1,6 @@
 import datetime as dt
 
-from hardtarget.types.types import Bounds
+from hardtarget.types import Bounds
 from hardtarget.utils.time_conversion import time_interval_to_sample_bound
 
 

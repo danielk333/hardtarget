@@ -1,14 +1,11 @@
 from .process import Process  # isort: off
 
-from hardtarget.matched_filter.target_estimation_process import TargetEstimationProcess
-from hardtarget.matched_filter.dpt import DPTProcess
-from hardtarget.matched_filter.gmf import GMFProcess
-from hardtarget.matched_filter.optimize import OptimizeProcess
-from hardtarget.matched_filter.xcorr import XCorrProcess
+from hardtarget.target_estimation import TargetEstimationProcess, DPTProcess, GMFProcess
+from hardtarget.optimization import OptimizeProcess
+from hardtarget.event_detection import XCorrProcess
 from hardtarget.interferometry import DOAProcess
-from hardtarget.types.constants import Processes, AnalysisMethod, TargetEstimationMethod, MethodLib
+from hardtarget.constants import Processes, AnalysisMethod, TargetEstimationMethod, MethodLib
 from typing import Optional
-from typing import Callable
 
 # ---- Processes ----
 PROCESSES: dict[Processes, type[Process]] = {

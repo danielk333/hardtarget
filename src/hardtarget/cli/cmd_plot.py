@@ -5,19 +5,19 @@ The CLI Plot functionality,  gathers the plot functionality for both the analyse
 import argparse
 import logging
 
-from hardtarget.types.types import ParserArgs, SubParser
+from hardtarget.types import ParserArgs, SubParser
 
-from . import plot_mf, plot_raw_data
+from . import plot_analysed_data, plot_raw_data
 from .commands import add_command
 
 logger = logging.getLogger(__name__)
 
 SOURCES = {
-    "mf": SubParser(
-        main=plot_mf.main,
-        parser_build=plot_mf.parser_build,
+    "analysis": SubParser(
+        main=plot_analysed_data.main,
+        parser_build=plot_analysed_data.parser_build,
         parser_args=ParserArgs(
-            description="Plot MF file",
+            description="Plot analysed data ",
             usage="%(prog)s [options] path",
         ),
     ),

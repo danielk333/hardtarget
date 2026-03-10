@@ -9,10 +9,9 @@ from pathlib import Path
 
 from matplotlib import gridspec
 from matplotlib import pyplot as plt
-from radardef import RadarDef
 
 from hardtarget import load_analysed_data, target_estimation
-from hardtarget.plotting import mf_analysis
+from hardtarget.plotting import target_estimation_plots
 
 # Workaround to make jupyter notebook find utils
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
@@ -32,15 +31,11 @@ tmp_dir = tempfile.TemporaryDirectory()
 raw_path = Path(tmp_dir.name) / "raw"
 raw_path.mkdir(parents=True, exist_ok=True)
 converted_path = Path(tmp_dir.name) / "converted"
-raw_data = utils.download_test_data(Path(tmp_dir.name) / "raw")
+raw_data = utils.download_test_data(raw_path)
 
 # Convert the data to a usable format.
 
-radars = RadarDef()
-source_format = radars.get_source_format(raw_data)
-target_formats = radars.available_target_formats(source_format)
-converted_files = RadarDef().convert(raw_data, target_formats[0], str(converted_path))
-data = converted_files[0]
+data = utils.convert_test_data(raw_data, converted_path)[0]
 
 # ## Analyse data
 # ---
@@ -73,7 +68,7 @@ out_data, exp_params, cfg_params, pro_params = list(data_generator)[0]
 # shown.
 
 fig, axes = plt.subplots(2, 2)
-mf_analysis.plot_peaks(
+target_estimation_plots.plot_peaks(
     axes,
     out_data,
     exp_params,
@@ -87,7 +82,7 @@ fig.set_size_inches(10, 10)
 # Additionaly it also adds the acceleration and range gate relative to the range for each detection.
 
 fig, axes = plt.subplots(2, 3)
-mf_analysis.plot_detections(
+target_estimation_plots.plot_detections(
     axes,
     out_data,
     exp_params,
@@ -106,7 +101,7 @@ axes = [
     fig.add_subplot(gs[1, 0]),
     fig.add_subplot(gs[1, 1]),
 ]
-mf_analysis.plot_map(
+target_estimation_plots.plot_map(
     axes,
     out_data,
     exp_params,

@@ -7,14 +7,14 @@ from typing import Optional
 import numpy as np
 from pyant.models.array import Array, ArrayParams
 
-from hardtarget.data_handling import Measurement
-from hardtarget.process import get_analysis_process
-from hardtarget.types.constants import (
+from hardtarget.constants import (
     AnalysisMethod,
     Impl,
     MethodLib,
 )
-from hardtarget.types.types import AnalysedResult, ArrayKwargs, GenericCfg, Job
+from hardtarget.data_handling import Measurement
+from hardtarget.process import get_analysis_process
+from hardtarget.types import AnalysedResult, ArrayKwargs, GenericCfg, Job
 
 if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
     from typing_extensions import Unpack

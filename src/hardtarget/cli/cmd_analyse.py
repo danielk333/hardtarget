@@ -9,7 +9,7 @@ from radardef import RadarDef
 
 import hardtarget.utils.global_mpi
 from hardtarget.analyse import analyse
-from hardtarget.types.constants import (
+from hardtarget.constants import (
     AnalysisMethod,
     DOAMethod,
     EventDetectionMethod,
@@ -18,7 +18,7 @@ from hardtarget.types.constants import (
     StrEnum,
     TargetEstimationMethod,
 )
-from hardtarget.types.types import Array, ArrayKwargs, ArrayParams, Job
+from hardtarget.types import Array, ArrayKwargs, ArrayParams, Job
 from hardtarget.utils.profiling import get_logging_level
 
 from .commands import add_command
@@ -34,7 +34,7 @@ class AnalyseParser:
     def parser_build(self, parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         """Adds mandatory and optional positional arguments to the parser."""
 
-        parser.add_argument("rx", help="path to source directory with rx data")
+        parser.add_argument("data", help="path to source directory with rx data")
         parser.add_argument(
             "-m",
             "--method",
@@ -46,8 +46,8 @@ class AnalyseParser:
         parser.add_argument("--config", help="path to config file for GMF processing")
         parser.add_argument("-o", "--output", default=".", help="path to output directory")
         parser.add_argument("-p", "--progress", action="store_true", help="enable progress bar")
-        parser.add_argument("-s", "--start_time", default=None)
-        parser.add_argument("-e", "--end_time", default=None)
+        parser.add_argument("-s", "--start_time", default=None, type=int)
+        parser.add_argument("-e", "--end_time", default=None, type=int)
         parser.add_argument("--relative_time", action="store_true")
         parser.add_argument("--clobber", action="store_true", help="override outputs")
         parser.add_argument(
@@ -72,17 +72,13 @@ class AnalyseParser:
         # Logging
         self.logger.setLevel(get_logging_level(args.verbose))
 
-        if args.relative_time:
-            args.start_time = float(args.start_time)
-            args.end_time = float(args.end_time)
-
         # import mpi (in case script is run by mpi)
         comm = hardtarget.utils.global_mpi.import_mpi()
 
         # job
         job = Job(idx=comm.rank, N=comm.size)
 
-        if AnalysisMethod.direction_of_arrival:
+        if args.method == AnalysisMethod.direction_of_arrival:
             # TODO: How to handle inputs to the radar_station (just default now)
             radar_station = RadarDef().get_radar(args.station_id)
             if radar_station is None:
@@ -99,7 +95,7 @@ class AnalyseParser:
 
         # process
         results = analyse(
-            path=args.rx,
+            path=args.data,
             rx_channel=args.rxchnl,
             config=args.config,
             job=job,

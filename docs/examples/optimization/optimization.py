@@ -10,13 +10,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-from matplotlib import gridspec
 from matplotlib import pyplot as plt
-from radardef import RadarDef
 
 from hardtarget import analyse, load_analysed_data, load_optimized_data
-from hardtarget.plotting import mf_analysis
-from hardtarget.types.constants import AnalysisMethod, OptimizationMethod, TargetEstimationMethod
+from hardtarget.constants import AnalysisMethod, OptimizationMethod, TargetEstimationMethod
+from hardtarget.plotting import target_estimation_plots
 
 # Workaround to make jupyter notebook find utils
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
@@ -38,11 +36,7 @@ raw_data = utils.download_test_data(Path(tmp_dir.name) / "raw")
 
 # Convert the data to a usable format.
 
-radars = RadarDef()
-source_format = radars.get_source_format(raw_data)
-target_formats = radars.available_target_formats(source_format)
-converted_files = RadarDef().convert(raw_data, target_formats[0], str(converted_path))
-data = converted_files[0]
+data = utils.convert_test_data(raw_data, converted_path)[0]
 
 # ## Analyse data
 # ---
@@ -77,7 +71,7 @@ out_data, exp_params, cfg_params, pro_params = list(data_generator)[0]
 # shown.
 
 fig, axes = plt.subplots(2, 2)
-mf_analysis.plot_peaks(
+target_estimation_plots.plot_peaks(
     axes,
     out_data,
     exp_params,
@@ -139,7 +133,7 @@ optimized_data = load_optimized_data(optimization_path)
 # ---
 # The cross markings marks the optimized results.
 fig, axes = plt.subplots(2, 2)
-mf_analysis.plot_peaks(
+target_estimation_plots.plot_peaks(
     axes,
     out_data,
     exp_params,

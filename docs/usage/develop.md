@@ -9,14 +9,13 @@ in the contribution guide.
 Please refer to [GitHub](https://github.com/danielk333/hardtarget/blob/main/DEVELOP.md) for more
 details.
 
-
 ---
 
 ## Documentation
 
 Hardtarget uses google style for inline comments.
 
-In order to build html or apidoc, make sure virtual environment is pip installed with *develop* flag.
+In order to build html or apidoc, make sure virtual environment is pip installed with _develop_ flag.
 
 To generate documentation run:
 
@@ -30,7 +29,7 @@ To generate documentation run:
 ## Compiling CUDA code
 
 !!! Warning
-    In the current version of hardtarget the CUDA implementation is broken
+In the current version of hardtarget the CUDA implementation is broken
 
 Compiling cuda code can be fairly tricky as its hard to predict all combinations of GPUs with
 different compute capability ( see [GPU Compute Capability](https://developer.nvidia.com/cuda-gpus) )
@@ -53,7 +52,7 @@ Then this capability can be targeted by `nvcc` when compiling the code by adding
 Or one can use the `deviceQuery` utility that is included in the cuda installation.
 
 The easiest way to work with compiling the extension manually is to clone this repository,
-run `pip install -e .`  and then run `make` in the root. This will go into both the C and
+run `pip install -e .` and then run `make` in the root. This will go into both the C and
 CUDA extensions, run make on them individually and link the binaries into the correct place
 in the source code. Then one does not have to re-install the package to develop and
 modify the compiled code when testing it using python.
@@ -72,14 +71,13 @@ in the source directories. Then to combine the json files we can use `jq`. The
 complete script would be (assuming we start in repository root)
 
 ```bash
-cd src/mf_c_lib
+cd src/c_lib
 bear -- make
-cd ../src/gmf_cuda_lib
+cd ../src/cuda_lib
 bear -- make
 cd ..
-jq -s 'map(.[])' gmf_{c,cuda}_lib/compile_commands.json > compile_commands.json
+jq -s 'map(.[])' {c,cuda}_lib/compile_commands.json > compile_commands.json
 ```
-
 
 ## linting with ruff
 
@@ -132,28 +130,31 @@ The recommended approach is to always format on save.
 ## pytest
 
 To run entire suite
+
 ```bash
 pytest
 ```
+
 To run specific file
+
 ```bash
 pytest tests/test_gmf.py
 ```
 
 To run specific TestCase, within file
+
 ```bash
 pytest tests/test_gmf.py::TestGMF
 ```
 
 To run specific test, within TestCase, within file.
+
 ```bash
 pytest tests/test_gmf.py::TestGMF::test_gmf
 ```
 
 To run cuda tests (skipped by default).
+
 ```bash
 pytest -m cuda
 ```
-
-
-

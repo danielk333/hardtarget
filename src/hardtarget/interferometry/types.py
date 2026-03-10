@@ -4,7 +4,7 @@ from typing import NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from hardtarget.types.types import CfgParams, ProParams
+from hardtarget.types import CfgParams, ProParams
 
 
 @dataclass(frozen=True)

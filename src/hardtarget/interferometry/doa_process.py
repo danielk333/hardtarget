@@ -8,12 +8,12 @@ from typing import Callable
 import numpy as np
 from pyant.models.array import Array
 
+from hardtarget.constants import ConfigSubSection, DOAMethod, Impl
 from hardtarget.data_handling.configuration import extract_config_section
 from hardtarget.interferometry import get_doa_lib
 from hardtarget.interferometry.types import DOACfgParams, DOAProParams, DOAVars
 from hardtarget.process import Process
-from hardtarget.types.constants import ConfigSubSection, DOAMethod, Impl
-from hardtarget.types.types import (
+from hardtarget.types import (
     ArrayKwargs,
     Bounds,
     CfgParams,
@@ -59,14 +59,14 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAVars, Interfero
             **kwargs,
         )
 
-        try:
+        if "beam" in kwargs and "parameters" in kwargs:
             self.beam = kwargs["beam"]
             self.beam_parameters = kwargs["parameters"]
-
-            if not isinstance(self.beam, Array):
-                raise ValueError("Beam is not an array, not possible to run interferometery")
-        except KeyError:
+        else:
             raise ValueError("Not possible to run the interferometry calculations without beam data")
+
+        if not isinstance(self.beam, Array):
+            raise ValueError("Beam is not an array, not possible to run interferometery")
 
     def get_analysis_lib(
         self, lib: MethodLib | None, impl: Impl | None

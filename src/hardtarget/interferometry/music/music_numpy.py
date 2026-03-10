@@ -7,7 +7,7 @@ from scipy import optimize
 from spacecoords.spherical import cart_to_sph
 
 from hardtarget.interferometry.types import DOACfgParams, DOAProParams, DOAVars
-from hardtarget.types.types import ExpParams
+from hardtarget.types import ExpParams
 
 from .utils import correlation_matrix
 

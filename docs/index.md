@@ -1,13 +1,14 @@
 # Welcome to Hardtarget's documentation!
 
 !!! note
-    This project is under development.
+This project is under development.
 
 ---
+
 ## Introduction
 
 The Hardtarget library contains a set of tools used to detect and characterize
-coherent echoes in raw (complex amplitude-level) data from a radar.  At the
+coherent echoes in raw (complex amplitude-level) data from a radar. At the
 heart of the library are routines for implementing a generalised match filter
 (MF) which is used to detect targets with a quadratic phase behaviour.
 
@@ -32,8 +33,8 @@ creates a dataset and analyses it. This can be used to test the performance of
 the analysis program and to validate the results. This also includes use of an
 additional refinement step that is used to refine the detected targets:
 
-
 ---
+
 ## Quick install
 
 To install, ensure dependencies `gcc`, `libfftw3-dev`, and `libhdf5-dev` are
@@ -43,6 +44,7 @@ Then install with
 ```bash
    pip install hardtarget
 ```
+
 or the nightly build
 
 ```bash
@@ -58,6 +60,7 @@ Read the CLI description
 ```
 
 ---
+
 ## History
 
 The hardtarget library has grown out of research and developments by several
@@ -69,19 +72,18 @@ First EISCAT observations of space debris (2000-2001)
 
 ESA space debris projects SGO, IRF, UiT, NORCE (2000-2024)
 
-
 ---
+
 ## Getting Help
 
 If you have questions about using Hardtarget please open a [GitHub Issue](https://github.com/danielk333/hardtarget/issues) or email the [Hardtarget
 developers](mailto:daniel.kastinen@irf.se)
 
-
 ---
+
 ## Acknowledgements
 
 SGO, IRF, UiT, NORCE, IKS, ESA, EISCAT
 
-
-* ESOC Contract No. 13945/99/D/CD, 2002.
-* ESOC Contract No. 16646/02/D/HK(CS), 2005.
+- ESOC Contract No. 13945/99/D/CD, 2002.
+- ESOC Contract No. 16646/02/D/HK(CS), 2005.

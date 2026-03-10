@@ -1,7 +1,7 @@
+import os
 import pathlib
 
 import mkdocs_gen_files
-import os
 
 try:
     root = pathlib.Path(__file__).parent.parent.parent

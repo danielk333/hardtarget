@@ -3,14 +3,14 @@ from pathlib import Path
 
 import numpy as np
 
+from hardtarget.constants import AnalysisMethod, Impl, TargetEstimationMethod
 from hardtarget.data_handling.configuration import compute_process_params
 from hardtarget.data_handling.store_params import dump_params_to_file
-from hardtarget.matched_filter.gmf.types import GMFCfgParams
-from hardtarget.matched_filter.types import MFOutArgs
 from hardtarget.plotting.load_data import load_analysed_data
 from hardtarget.process import GMFProcess
-from hardtarget.types.constants import AnalysisMethod, Impl, TargetEstimationMethod
-from hardtarget.types.types import ExpParams
+from hardtarget.target_estimation.gmf.types import GMFCfgParams
+from hardtarget.target_estimation.types import MFOutArgs
+from hardtarget.types import ExpParams
 
 
 def test_store_and_load():

@@ -4,7 +4,7 @@ from pyant.models.array import Array, ArrayParams
 from spacecoords.spherical import cart_to_sph
 
 from hardtarget.interferometry.types import DOACfgParams, DOAProParams, DOAVars
-from hardtarget.types.types import ExpParams
+from hardtarget.types import ExpParams
 
 
 def grid_search_numpy(

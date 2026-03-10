@@ -11,7 +11,7 @@ from scipy import constants
 
 import hardtarget
 from hardtarget.data_simulation import DRFSimParams, simulate_drf
-from hardtarget.matched_filter.xcorr.types import XCorrCfgParams
+from hardtarget.event_detection.types import XCorrCfgParams
 
 
 def wip_event_detection():

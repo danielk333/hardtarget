@@ -13,7 +13,7 @@ from pathlib import Path
 from radardef import RadarDef
 from radardef.types import SourceFormat
 
-from hardtarget.types.types import Bounds
+from hardtarget.types import Bounds
 
 
 def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:

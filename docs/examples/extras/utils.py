@@ -1,15 +1,16 @@
-import numpy as np
-from pathlib import Path
-from scipy import constants
-
-from hardtarget.data_simulation import simulate_drf, DRFSimParams
-from hardtarget.data_handling import load_config_params
-from radardef.radar_stations.eiscat import load_radar_code
-from radardef.types import BoundParams, ExpParams
-from typing import Optional
 import os
 import urllib.request
+from pathlib import Path
+from typing import Optional
 
+import numpy as np
+from radardef import RadarDef
+from radardef.radar_stations.eiscat import load_radar_code
+from radardef.types import BoundParams, ExpParams
+from scipy import constants
+
+from hardtarget.data_handling import load_config_params
+from hardtarget.data_simulation import DRFSimParams, simulate_drf
 
 try:
     config = Path(__file__).parent.parent.absolute() / "cfg" / "sim_test.ini"
@@ -66,7 +67,9 @@ def sim_data(
 
     # Load user configuration and calculate start and end time
     cfg_params = load_config_params(config)
-    coh_samples = (exp_params.tx_pulse_length / exp_params.t_samp_usec) * cfg_params.n_ipp
+    coh_samples = (
+        (exp_params.t_tx_end_usec - exp_params.t_tx_start_usec) / exp_params.t_samp_usec
+    ) * cfg_params.n_ipp
     SNR = 10 ** (SNRdB / 10.0)
     if zero_noise:
         noise_sigma = 0
@@ -128,3 +131,12 @@ def download_test_data(path: Path) -> Path:
         urllib.request.urlretrieve(url, download_location)
 
     return download_location
+
+
+def convert_test_data(path: Path, dst: Path) -> list[Path]:
+    radars = RadarDef()
+    source_format = radars.get_source_format(path)
+    target_formats = radars.available_target_formats(source_format)
+    converted_files = RadarDef().convert(path, target_formats[0], str(dst))
+    assert converted_files is not None, "No available files after conversion"
+    return converted_files

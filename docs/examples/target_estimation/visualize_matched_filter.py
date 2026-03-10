@@ -19,7 +19,7 @@ from radardef.types import BoundParams, ExpParams
 from scipy import constants
 
 import hardtarget
-from hardtarget.types.constants import AnalysisMethod
+from hardtarget.constants import AnalysisMethod
 
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
 import utils

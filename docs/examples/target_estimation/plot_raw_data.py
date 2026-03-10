@@ -25,15 +25,11 @@ tmp_dir = tempfile.TemporaryDirectory()
 raw_path = Path(tmp_dir.name) / "raw"
 raw_path.mkdir(parents=True, exist_ok=True)
 converted_path = Path(tmp_dir.name) / "converted"
-raw_data = utils.download_test_data(Path(tmp_dir.name) / "raw")
+raw_data = utils.download_test_data(raw_path)
 
 # Convert the data to a usable format.
 
-radars = RadarDef()
-source_format = radars.get_source_format(raw_data)
-target_formats = radars.available_target_formats(source_format)
-converted_files = RadarDef().convert(raw_data, target_formats[0], str(converted_path))
-data = converted_files[0]
+data = utils.convert_test_data(raw_data, converted_path)[0]
 
 # Read data
 

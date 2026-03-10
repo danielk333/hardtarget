@@ -1,18 +1,20 @@
 # Configuration Parameters
+
 ---
 
 For any analysis a configuration needs to be provided, the configuration is the base of the process to
 determine coherent integration lengths, range_gates, decimation and more. It will determine the results
 quality and analysis time. There are two ways of defining the configuration parameters.
 
-
 ## Configuration **.ini** file
+
 ---
+
 The first option is with a **.ini** file, an example can be seen below. Here you can configure any parameters
 wanted and several different process specific sections at onece. The proccessing section which is the main
 section can be empty but must atleast be present, the configuration will then be based on the default values.
 The default values and desciption of the configuration parameters can be found at
-[CfgParams](../reference/hardtarget/types/types.md#hardtarget.types.types.CfgParams).
+[CfgParams](../reference/hardtarget/types.md#hardtarget.types.CfgParams).
 
 ```ini
     [processing]
@@ -92,13 +94,13 @@ result = analyse(
 
 When running the analysis in a python script or similar then the **.ini** file is not always the goto method.
 If you want to define the configuration parameters in place you could use the **Process specific CfgParams**,
-this is any derived class that has [CfgParams](../reference/hardtarget/types/types.md#hardtarget.types.types.CfgParams)
+this is any derived class that has [CfgParams](../reference/hardtarget/types.md#hardtarget.types.CfgParams)
 as base class and is connected to a specific [Process](../reference/hardtarget/process/process.md).
 In this case it is of much importance that the derived class is connected to the analysis process running,
 otherwise it will fail. An example for a gmf process configuration could be:
 
 ```python
-from hardtarget.matched_filter.gmf.types import GMFCfgParams
+from hardtarget.target_estimation import GMFCfgParams
 
 cfg = GMFCfgParams(
     n_ipp=1,
@@ -115,12 +117,13 @@ cfg = GMFCfgParams(
     acceleration_steps=1,
 )
 ```
-The acceleration_steps parameter is unique for the [GMFCfgParams](../reference/hardtarget/matched_filter/gmf/types.md#hardtarget.matched_filter.gmf.types.GMFCfgParams) and not a part of the base class [CfgParams](../reference/hardtarget/types/types.md#hardtarget.types.types.CfgParams). Examining the  [GMF](../reference/hardtarget/matched_filter/gmf/gmf_process.md) process it can be seen that it is aswell connected to the process, thus they are compatible.
+
+The acceleration_steps parameter is unique for the [GMFCfgParams](../reference/hardtarget/target_estimation/gmf/types.md#hardtarget.target_estimation.gmf.types.GMFCfgParams) and not a part of the base class [CfgParams](../reference/hardtarget/types.md#hardtarget.types.CfgParams). Examining the [GMF](../reference/hardtarget/target_estimation/gmf/gmf_process.md) process it can be seen that it is aswell connected to the process, thus they are compatible.
 The configuration object above could then be used in a analysis as:
 
 ```python
 from hardtarget import analyse
-from hardtarget.types.constants import TargetEstimationMethod, AnalysisMethod
+from hardtarget.constants import TargetEstimationMethod, AnalysisMethod
 
 result = analyse(
         path=Path("../some/measurement/"),

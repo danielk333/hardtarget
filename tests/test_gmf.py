@@ -6,13 +6,13 @@ import pytest
 from radardef.types import ExpParams
 
 import hardtarget.process.utils as utils
+from hardtarget.constants import AnalysisMethod, Impl, TargetEstimationMethod
 from hardtarget.data_handling.configuration import (
     compute_process_params,
     load_config_params,
 )
-from hardtarget.matched_filter.gmf import get_gmf_lib
-from hardtarget.matched_filter.types import MFVariables
-from hardtarget.types.constants import AnalysisMethod, Impl, TargetEstimationMethod
+from hardtarget.target_estimation.gmf import get_gmf_lib
+from hardtarget.target_estimation.types import MFVariables
 
 """
 Should ideally be able to test the different implementations of the GMF function

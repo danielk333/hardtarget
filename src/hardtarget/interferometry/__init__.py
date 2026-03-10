@@ -1,8 +1,8 @@
 import logging
 from typing import Optional
 
-from hardtarget.types.constants import DOAMethod, Impl
-from hardtarget.types.types import InterferometryLib, MethodLib
+from hardtarget.constants import DOAMethod, Impl
+from hardtarget.types import InterferometryLib, MethodLib
 
 logger = logging.getLogger(__name__)
 
@@ -51,3 +51,4 @@ def get_doa_lib(
 
 
 from .doa_process import DOAProcess
+from .types import DOACfgParams, DOAProParams, DOAVars

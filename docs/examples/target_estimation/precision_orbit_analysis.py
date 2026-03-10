@@ -11,7 +11,7 @@ from matplotlib import gridspec
 from matplotlib import pyplot as plt
 
 from hardtarget import load_analysed_data, target_estimation
-from hardtarget.plotting import mf_analysis
+from hardtarget.plotting import target_estimation_plots
 
 try:
     config = Path(__file__).parent.parent.absolute() / "cfg" / "cfg_precision_orbit.ini"
@@ -62,7 +62,7 @@ out_data, exp_params, cfg_params, pro_params = list(data_generator)[0]
 # shown.
 
 fig, axes = plt.subplots(2, 2)
-mf_analysis.plot_peaks(
+target_estimation_plots.plot_peaks(
     axes,
     out_data,
     exp_params,
@@ -76,7 +76,7 @@ fig.set_size_inches(10, 10)
 # Additionaly it also adds the acceleration and range gate relative to the range for each detection.
 
 fig, axes = plt.subplots(2, 3)
-mf_analysis.plot_detections(
+target_estimation_plots.plot_detections(
     axes,
     out_data,
     exp_params,
@@ -95,7 +95,7 @@ axes = [
     fig.add_subplot(gs[1, 0]),
     fig.add_subplot(gs[1, 1]),
 ]
-mf_analysis.plot_map(
+target_estimation_plots.plot_map(
     axes,
     out_data,
     exp_params,

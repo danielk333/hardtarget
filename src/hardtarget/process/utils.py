@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from hardtarget.types.types import Bounds, Job
+from hardtarget.types import Bounds, Job
 
 logger = logging.getLogger(__name__)
 

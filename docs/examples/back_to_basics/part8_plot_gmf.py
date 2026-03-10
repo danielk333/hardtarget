@@ -55,6 +55,7 @@ def gmf(t, signal, v, a, progress):
     t2 = t**2
     ret = np.zeros_like(v)
     total = range(a_res)
+    pbar = None
     if progress:
         pbar = tqdm(total=len(total))
     for ai in range(a_res):
@@ -63,9 +64,9 @@ def gmf(t, signal, v, a, progress):
             phase = np.mod(r / wavelength, 1) * np.pi * 2
             model = np.exp(1j * phase)
             ret[ai, vi] = np.abs(np.sum(signal * np.conj(model), axis=0))
-        if progress:
+        if pbar:
             pbar.update(1)
-    if progress:
+    if pbar:
         pbar.close()
     return ret
 
@@ -75,6 +76,7 @@ def fft_gmf(t, signal, a, progress):
     fvec = fft.fftshift(fft.fftfreq(len(t), d=1.0 / sample_rate))
     ret = np.zeros((len(a), len(fvec)), dtype=np.float64)
     total = len(a)
+    pbar = None
     if progress:
         pbar = tqdm(total=total)
     for ind in range(total):
@@ -84,9 +86,9 @@ def fft_gmf(t, signal, a, progress):
         z = signal * np.conj(model)
         spec = fft.fftshift(np.abs(fft.fft(z, axis=0)), axes=0)
         ret[ind, :] = np.abs(spec)
-        if progress:
+        if pbar:
             pbar.update(1)
-    if progress:
+    if pbar:
         pbar.close()
     return fvec, ret
 

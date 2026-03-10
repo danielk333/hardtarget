@@ -1,5 +1,5 @@
-import pathlib
 import os
+import pathlib
 
 try:
     root = pathlib.Path(__file__).parent.parent.parent

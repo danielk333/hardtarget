@@ -9,12 +9,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-from radardef import RadarDef
-from radardef.types import TargetFormat
-
 import hardtarget
-from hardtarget.types.constants import TargetEstimationMethod
-from hardtarget.types.types import Job
+from hardtarget.constants import TargetEstimationMethod
+from hardtarget.types import Job
 
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
 import utils
@@ -25,10 +22,12 @@ except NameError:
     config = Path(os.path.abspath("")) / "docs" / "examples" / "cfg" / "test.ini"
 
 
-raw_data_dir = tempfile.TemporaryDirectory()
-raw_data = utils.download_test_data(Path(raw_data_dir.name))
-converted_data_path = tempfile.TemporaryDirectory()
-converted_files = RadarDef().convert(raw_data, TargetFormat.H5, converted_data_path.name)
+tmp_dir = tempfile.TemporaryDirectory()
+raw_path = Path(tmp_dir.name) / "raw"
+raw_path.mkdir(parents=True, exist_ok=True)
+converted_path = Path(tmp_dir.name) / "converted"
+raw_data = utils.download_test_data(raw_path)
+data = utils.convert_test_data(raw_data, converted_path)[0]
 
 # Does not work if yappi is not installed
 hardtarget.profile()
@@ -38,7 +37,7 @@ hardtarget.profile()
 for impl in [hardtarget.types.Impl.c, hardtarget.types.Impl.numpy]:
     # process
     results = hardtarget.target_estimation(
-        path=converted_files[0],
+        path=data,
         config=config,
         method_lib=TargetEstimationMethod.fgmf,
         implementation=impl,
@@ -55,5 +54,4 @@ for impl in [hardtarget.types.Impl.c, hardtarget.types.Impl.numpy]:
     hardtarget.print_profile(stats, total=total, max_rows=5)
     hardtarget.profile_clear()
 
-raw_data_dir.cleanup()
-converted_data_path.cleanup()
+tmp_dir.cleanup()

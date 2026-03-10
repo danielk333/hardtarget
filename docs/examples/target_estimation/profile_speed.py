@@ -13,7 +13,7 @@ import numpy as np
 from tqdm import tqdm
 
 import hardtarget
-from hardtarget.types.constants import Impl, TargetEstimationMethod
+from hardtarget.constants import Impl, TargetEstimationMethod
 
 # Workaround to make jupyter notebook find utils
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))

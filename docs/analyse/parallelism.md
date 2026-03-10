@@ -1,21 +1,23 @@
 # Parallellism
--------------
+
+---
+
 Analysis supports parallel execution, but leaves it to developers to select
 a particular mechanism. This way, performance acceleration can be achieved in
 different ways, for example using `mpi` (multiprocess support on Linux systems),
 `cuda` (GPU-based hardware acceleration), or any other multiprocessing
 framework.
 
-
 ---
 
 ## Job Division
+
 Support for parallelism is acheived through the concept of `job`. A job
 specifies a logical part of a larger task. A particular job
-is defined by the tuple ``(index,N)``, where ``index`` identifies a particular
-job out of a total of ``N`` jobs. ``index`` and ``N`` are both non-negative
-integers ``0 <= index < N``. For instance, job ``(3,10)`` means the 4'th job out
-of 10, whereas ``(0,1)`` means the first job out of 1, which effectively means
+is defined by the tuple `(index,N)`, where `index` identifies a particular
+job out of a total of `N` jobs. `index` and `N` are both non-negative
+integers `0 <= index < N`. For instance, job `(3,10)` means the 4'th job out
+of 10, whereas `(0,1)` means the first job out of 1, which effectively means
 no subdivision -- the one job is equal to the larger task.
 
 ---
@@ -33,6 +35,7 @@ Job objects are represented as a Job type, which is a NamedTuple.
         idx: int
         N: int
 ```
+
 If no job is specified, the default is to process the entire product as one job.
 
 ```python
@@ -44,7 +47,6 @@ overlap, and that different jobs do not write results to the same file, thus avo
 race conditions.
 
 ---
-
 
 ## Parallelism with Jobs
 
@@ -81,5 +83,3 @@ Here is the relevant code within the `hardtarget analyse` script.
     comm = MPI.COMM_WORLD
     analyse(*args, job=Job(idx=comm.rank, N=comm.size), **kwargs)
 ```
-
-

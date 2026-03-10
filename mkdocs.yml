@@ -69,6 +69,7 @@ plugins:
         - examples/target_estimation/estimate_errors.py
         - examples/target_estimation/precision_orbit_analysis.py
         - examples/target_estimation/profile_speed.py
+        - examples/direction_of_arrival/interferometry.py
         - examples/back_to_basics/part3_sweep_acceleration.py
         - examples/direction_of_arrival/interferometry.py
 
@@ -101,10 +102,10 @@ nav:
   - Analyse:
       - analyse/api_analyse.md
       - Methods:
-          - Target Estimation: analyse/target_estimation.md
-          - Optimization: analyse/optimization.md
-          - Event Detection: analyse/event_detection.md
-          - Direction Of Arrival: analyse/direction_of_arrival.md
+          - Target Estimation: analyse/method/target_estimation.md
+          - Optimization: analyse/method/optimization.md
+          - Event Detection: analyse/method/event_detection.md
+          - Direction Of Arrival: analyse/method/direction_of_arrival.md
       - Configuration parameters: analyse/config_parameters.md
       - Analysis output: analyse/format_analyse.md
       - Parallelism: analyse/parallelism.md
@@ -129,6 +130,6 @@ nav:
       - Optimization:
           - Optimizing Target Estimation: examples/optimization/optimization.py
       - Event Detection:
-          - Event Detection: examples/event_detection/event_search.py
+          - Event Detection: examples/event_detection/event_detection.py
       - Extras:
           - Simulated tx signal: examples/extras/simulated_tx_signal.py

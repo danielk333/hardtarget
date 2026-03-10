@@ -10,11 +10,11 @@ import h5py
 import numpy as np
 import numpy.typing as npt
 
-from hardtarget.matched_filter.optimize.types import MFOptimizeOutArgs
-from hardtarget.matched_filter.types import MFOutArgs
+from hardtarget.constants import AnalysisMethod
+from hardtarget.optimization.types import MFOptimizeOutArgs
 from hardtarget.process import Process, get_analysis_process
-from hardtarget.types.constants import AnalysisMethod
-from hardtarget.types.types import ExpParams, GenericCfg, GenericOut, GenericPro, ProParams
+from hardtarget.target_estimation.types import MFOutArgs
+from hardtarget.types import ExpParams, GenericCfg, GenericOut, GenericPro, ProParams
 from hardtarget.utils.h5_tools import get_analysed_h5_files
 
 try:

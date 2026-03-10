@@ -22,10 +22,10 @@ else:
     from typing import Unpack
 
 import hardtarget.process.utils as utils
+from hardtarget.constants import Impl, MethodLib
 from hardtarget.data_handling import dump_params_to_file
 from hardtarget.process.utils import calculate_tasks, sample_interval_to_closest_ipp
-from hardtarget.types.constants import Impl, MethodLib
-from hardtarget.types.types import (
+from hardtarget.types import (
     AnalysedResult,
     ArrayKwargs,
     Bounds,
@@ -353,7 +353,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
         Args:
             job: Job id
-            channel_bounds: Measurement channel sample bounds
             epoch: Measurement bounds (start and end), in microseconds since epoch.
             start_time (optional): Start time, if set data before this will be neglected
             end_time (optional): End time, if set data after this will be neglected

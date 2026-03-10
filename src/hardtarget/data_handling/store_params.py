@@ -7,7 +7,7 @@ from typing import Iterable
 
 import h5py
 
-from hardtarget.types.types import DataItem, ExpParams, GenericCfg, GenericPro, ProParams
+from hardtarget.types import CfgParams, DataItem, ExpParams, GenericCfg, GenericPro, ProParams
 
 # Python StrEnum has default lowercase for auto() but is only available from py 3.11
 try:
@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 def dump_params_to_file(
     data_items: Iterable[tuple[str, DataItem]],
     exp_params: ExpParams,
-    cfg_params: GenericCfg,
-    pro_params: GenericPro,
+    cfg_params: CfgParams,
+    pro_params: ProParams,
     outfile: Path,
     clobber: bool = False,
     mode: str = "w",

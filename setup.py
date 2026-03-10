@@ -55,17 +55,17 @@ def locate_cuda():
     return cudaconfig
 
 
-cudasources = ["src/gmf_cuda_lib/gmfgpu.cu"]
+cudasources = ["src/cuda_lib/gmfgpu.cu"]
 cudalibraries = ["cufft"]
 
-clib_path = Path("src/mf_c_lib/")
+clib_path = Path("src/c_lib/")
 csources = [str(p) for p in list(clib_path.rglob("*.c"))]
 clibraries = ["fftw3f"]
 
 # Build C module
 gmfcmodule = Extension(
     # Where to store the .so file
-    name="hardtarget.matched_filter.utils.mfclib",
+    name="hardtarget.libs.clib",
     # Libraries used
     libraries=clibraries,
     extra_compile_args={
@@ -83,7 +83,7 @@ try:
 
     gmfgpumodule = Extension(
         # Where to store the .so file
-        name="hardtarget.matched_filter.utils.gmfcudalib",
+        name="hardtarget.libs.cudalib",
         library_dirs=[CUDA["lib64"]],
         # Libraries used
         libraries=cudalibraries,

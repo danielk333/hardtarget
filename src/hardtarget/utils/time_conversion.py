@@ -5,7 +5,7 @@ from typing import Optional
 
 import numpy as np
 
-from hardtarget.types.types import Bounds
+from hardtarget.types import Bounds
 
 
 def time_interval_to_sample_bound(

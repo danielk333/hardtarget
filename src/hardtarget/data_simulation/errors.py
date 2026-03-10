@@ -15,7 +15,7 @@ from radardef.types import BoundParams, ExpParams
 from scipy import constants
 
 from hardtarget import analyse, load_analysed_data
-from hardtarget.types.constants import AnalysisMethod, Impl, TargetEstimationMethod
+from hardtarget.constants import AnalysisMethod, Impl, TargetEstimationMethod
 
 from .simulate_drf import DRFSimParams, simulate_drf
 
@@ -135,7 +135,7 @@ def linearized_mle_covariance(
 
 
 def monte_carlo_sample_errors(
-    snr_db: float,
+    snr_db: npt.NDArray | float,
     range0: float,
     vel0: float,
     acel0: float,
@@ -197,12 +197,13 @@ def monte_carlo_sample_errors(
         ipp_offset=0
         min_range_gate={rg0 - rg_padding}
         max_range_gate={rg1 + rg_padding}
-        min_acceleration=-300.0
-        max_acceleration=300.0
         range_gate_step=1
-        frequency_decimation=8
         num_cohints_per_file=10
         node_gpus=1
+    [target_estimation]
+        min_acceleration=-300.0
+        max_acceleration=300.0
+        frequency_decimation=8
     [dpt]
         ipp_delay_parameter={int(n_ipp // 2)}
     [gmf]
@@ -211,7 +212,7 @@ def monte_carlo_sample_errors(
 
     config_path = output_path / "conf.cfg"
     drf_path = output_path / "data_drf"
-    gmf_path = output_path / "gmf_data"
+    analysed_path = output_path / "analysed_data"
 
     with open(config_path, "w") as fh:
         fh.write(config_str)
@@ -255,8 +256,8 @@ def monte_carlo_sample_errors(
     except FileExistsError:
         pass
 
-    if clobber and gmf_path.is_dir():
-        shutil.rmtree(gmf_path)
+    if clobber and analysed_path.is_dir():
+        shutil.rmtree(analysed_path)
 
     analyse(
         path=drf_path,
@@ -265,7 +266,7 @@ def monte_carlo_sample_errors(
         method_lib=mf_method,
         implementation=mf_implementation,
         clobber=clobber,
-        output=gmf_path,
+        output=analysed_path,
         progress=True,
         # noise_power=2 * simulation_params["noise_sigma"] ** 2, # TODO ADD TO ANALYSE
     )
@@ -276,7 +277,7 @@ def monte_carlo_sample_errors(
         "delta_a": np.full((samples * snr_len,), np.nan, dtype=np.float64),
         "delta_snr": np.full((samples * snr_len,), np.nan, dtype=np.float64),
     }
-    data_generator: Any = load_analysed_data(gmf_path)
+    data_generator: Any = load_analysed_data(analysed_path)
     index = 0
     for out_data, exp_params, cfg_params, pro_params in data_generator:
         data_len = len(out_data.r_vec)
@@ -296,5 +297,5 @@ def monte_carlo_sample_errors(
         results["delta_a"][index : (index + data_len)] = da
         results["delta_snr"][index : (index + data_len)] = dsnr
         index += data_len
-    results["cov"] = np.cov(np.stack([out_data.r_vec, out_data.v_vec, out_data.a_vec]))
+        results["cov"] = np.cov(np.stack([out_data.r_vec, out_data.v_vec, out_data.a_vec]))
     return results
