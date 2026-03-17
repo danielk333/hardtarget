@@ -175,7 +175,7 @@ class TestCLI:
         analysed_dir = get_analysed_path(tmp_dir, method.name)
 
         parser = plot_analysed_data.parser_build(argparse.ArgumentParser())
-        args = parser.parse_args([method.name, str(analysed_dir)])
+        args = parser.parse_args([str(analysed_dir)])
         plot_analysed_data.main(args)
 
     @pytest.mark.parametrize(

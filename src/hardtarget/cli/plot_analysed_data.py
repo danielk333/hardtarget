@@ -14,7 +14,6 @@ from hardtarget.plotting.load_data import load_analysed_data
 def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Adds mandatory and optional positional arguments to the parser."""
 
-    parser.add_argument("method", help="method to plot", choices=[f"{method}" for method in AnalysisMethod])
     parser.add_argument("path", help="path to analysed data")
     parser.add_argument("-s", "--start_time", default=None, type=int)
     parser.add_argument("-e", "--end_time", default=None, type=int)
@@ -27,7 +26,6 @@ def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
 def main(args: argparse.Namespace) -> None:
     plot_analysed_data(
         args.path,
-        AnalysisMethod(args.method),
         args.start_time,
         args.end_time,
         args.relative_time,
@@ -38,7 +36,6 @@ def main(args: argparse.Namespace) -> None:
 
 def plot_analysed_data(
     path: Path,
-    method: AnalysisMethod,
     start_time: Optional[int | np.datetime64] = None,
     end_time: Optional[int | np.datetime64] = None,
     relative_time: bool = False,
@@ -57,7 +54,7 @@ def plot_analysed_data(
     for data in data_generator:
         out, exp, cfg, pro = data
 
-        match method:
+        match pro.method:
             case AnalysisMethod.event_detection:
                 fig, ax = plt.subplots(2, 2)
                 plotting.plot_event_detection(ax, out, sensitivit_limit)

@@ -37,7 +37,7 @@ functionality is supported for **raw data** (supported by radardef) and all type
     $ hardtarget plot raw -h
     $ hardtarget plot analysis -h
     $ hardtarget plot raw /data/raw -s 2022-04-08T08:40:00 -e 2022-04-08T08:40:30
-    $ hardtarget plot analysis <method> /data/mf --config path/to/cfg -s 2022-04-08T08:40:00 -e 2022-04-08T08:40:30
+    $ hardtarget plot analysis /data/mf --config path/to/cfg -s 2022-04-08T08:40:00 -e 2022-04-08T08:40:30
 ```
 
 !!! note
