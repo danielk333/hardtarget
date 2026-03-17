@@ -12,13 +12,12 @@ class DPTCfgParams(TargetEstimationCfgParams):
     Args:
         ipp_delay_parameter: How many IPPs to use for estimating the numerical derivative of the phase of
                              the coherent signal if using the polynomial phase transform method.
-                             Also used by the Fast GMF method to calculate the acceleration resolution to
-                             sample. A larger number means smaller accelerations can be determined at higher
-                             resolution. Note this can never be less or equal then the n_ipp param.
+                             A larger number means smaller accelerations can be determined at higher
+                             resolution. Note this can never be larger or equal to the n_ipp param.
 
     """
 
-    ipp_delay_parameter: int = 10
+    ipp_delay_parameter: int = 1
 
 
 @dataclass(frozen=True)

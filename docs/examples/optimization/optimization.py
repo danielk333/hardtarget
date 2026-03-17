@@ -12,9 +12,9 @@ from pathlib import Path
 
 from matplotlib import pyplot as plt
 
-from hardtarget import analyse, load_analysed_data, load_optimized_data
+from hardtarget import analyse, load_analysed_data
 from hardtarget.constants import AnalysisMethod, OptimizationMethod, TargetEstimationMethod
-from hardtarget.plotting import target_estimation_plots
+from hardtarget.plotting import optimization_plots, target_estimation_plots
 
 # Workaround to make jupyter notebook find utils
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
@@ -113,7 +113,8 @@ tmp_config.seek(0)
 tmp_config_path = tmp_config.name
 
 # Now we can run the optimization process over the same time period as before.
-# The optimized variables are stored as new parameters at the same location as the previous analysis.
+# Note that the output path is different, otherwise it will add the optimized vars to available file
+# This is not compatible with the optimization plot
 
 optimization_path = Path(tmp_dir.name) / "opt"
 analyse(
@@ -127,7 +128,8 @@ analyse(
     relative_time=True,
 )
 
-optimized_data = load_optimized_data(optimization_path)
+optimized_data = load_analysed_data(optimization_path)
+out_data_opt, exp_params_opt, cfg_params_opt, pro_params_opt = list(optimized_data)[0]
 
 # ## Optimization plot
 # ---
@@ -139,7 +141,13 @@ target_estimation_plots.plot_peaks(
     exp_params,
     cfg_params,
     pro_params,
-    optimized_data,
+)
+optimization_plots.plot_optimization_peaks(
+    axes,
+    out_data_opt,
+    exp_params_opt,
+    cfg_params_opt,
+    pro_params_opt,
 )
 fig.set_size_inches(10, 10)
 

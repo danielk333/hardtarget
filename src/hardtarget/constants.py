@@ -24,17 +24,16 @@ class AnalysisMethod(StrEnum):
 class TargetEstimationMethod(StrEnum):
     """Target estimation methods"""
 
-    fgmf = "fgmf"
     fdpt = "fdpt"
-    grid_fast_no_reduce = "grid_fast_no_reduce"
-    unknown = "unknown"
+    fgmf = "fgmf"
+    # grid_fast_no_reduce = "grid_fast_no_reduce"
 
 
 class OptimizationMethod(StrEnum):
     """GMF Optimization Methods"""
 
-    optimize_scipy_gmf = "optimize-scipy-gmf"
-    optimize_grid_gmf = "optimize-grid-gmf"
+    optimize_scipy_gmf = "optimize_scipy_gmf"
+    optimize_grid_gmf = "optimize_grid_gmf"
 
 
 class EventDetectionMethod(StrEnum):
@@ -79,4 +78,4 @@ class ConfigSubSection(StrEnum):
     DPT = "dpt"
     OPTIMIZATION = "optimization"
     INTERFEROMETRY = "interferometry"
-    XCORR = "xcorr"
+    EVENT_DETECTION = "event_detection"

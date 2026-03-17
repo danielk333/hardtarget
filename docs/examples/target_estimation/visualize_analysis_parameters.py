@@ -1,8 +1,8 @@
 # # Visualisation of analysis paramters
 import os
+import sys
 
 # Workaround to make jupyter notebook find utils
-import sys
 import tempfile
 from pathlib import Path
 
@@ -12,6 +12,7 @@ import numpy as np
 import hardtarget
 from hardtarget.types import AnalysisMethod
 
+# Workaround to make jupyter notebook find utils
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
 import utils
 

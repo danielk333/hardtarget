@@ -38,10 +38,20 @@ class OptimizeProParams(ProParams):
 class MFOptimizeVariables(NamedTuple):
     """Container for compacting the variables set by the GMF Optimize function."""
 
-    peak: npt.NDArray[np.float64]  # peak location
-    peak_val: npt.NDArray[np.float64]  # peak magnitude
+    r_vec_opt: npt.NDArray[np.float64]
+    v_vec_opt: npt.NDArray[np.float64]
+    a_vec_opt: npt.NDArray[np.float64]
+    peak_vals: npt.NDArray[np.float64]  # peak magnitude
+    dc: npt.NDArray[np.float32]
+    t: npt.NDArray[np.float32]
 
 
-class MFOptimizeOutArgs(NamedTuple):
-    peaks: npt.NDArray[np.float64]
-    peak_vals: npt.NDArray[np.float64]
+MFOptimizeOutArgs = MFOptimizeVariables
+
+
+class OptStart(NamedTuple):
+    r_vec: float = 0.0
+    v_vec: float = 0.0
+    a_vec: float = 0.0
+    dc: float = 0.0
+    t: float = 0.0

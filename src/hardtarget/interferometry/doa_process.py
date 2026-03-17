@@ -7,11 +7,12 @@ from typing import Callable
 
 import numpy as np
 from pyant.models.array import Array
+from radardef.types import Pointing
 
 from hardtarget.constants import ConfigSubSection, DOAMethod, Impl
 from hardtarget.data_handling.configuration import extract_config_section
 from hardtarget.interferometry import get_doa_lib
-from hardtarget.interferometry.types import DOACfgParams, DOAProParams, DOAVars
+from hardtarget.interferometry.types import DOACfgParams, DOAOutArgs, DOAProParams, DOAVars
 from hardtarget.process import Process
 from hardtarget.types import (
     ArrayKwargs,
@@ -22,7 +23,6 @@ from hardtarget.types import (
     ExtractSignals,
     InterferometryLib,
     MethodLib,
-    Pointing,
     ProParams,
 )
 
@@ -32,7 +32,7 @@ else:
     from typing import Unpack
 
 
-class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAVars, InterferometryLib]):
+class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, InterferometryLib]):
     def __init__(
         self,
         cfg_raw: str | Path | DOACfgParams,
@@ -156,7 +156,7 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAVars, Interfero
         exp_params: ExpParams,
         cfg_params: DOACfgParams,
         pro_params: DOAProParams,
-    ) -> DOAVars:
+    ) -> DOAOutArgs:
         """
         Restructures the data to a out args object
 
@@ -172,7 +172,7 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAVars, Interfero
 
         return all_vars
 
-    def define_h5_vars(self, output: DOAVars) -> dict[str, DataItem]:
+    def define_h5_vars(self, output: DOAOutArgs) -> dict[str, DataItem]:
         """
         Appends specifications to the optimize output, such as dimensions, long names, units and more.
 

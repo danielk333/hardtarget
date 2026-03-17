@@ -18,7 +18,7 @@ except ImportError as err:
     logger.debug(f"GMF Numpy implementations failed to import:\n {err}", exc_info=True)
 else:
     GMF_LIBS[TargetEstimationMethod.fgmf][Impl.numpy] = fast_gmf_np
-    GMF_LIBS[TargetEstimationMethod.grid_fast_no_reduce][Impl.numpy] = fast_gmf_no_reduce_np
+    # GMF_LIBS[TargetEstimationMethod.grid_fast_no_reduce][Impl.numpy] = fast_gmf_no_reduce_np
 # C implementation
 try:
     from .gmf_c import fast_gmf_c

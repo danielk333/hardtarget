@@ -8,10 +8,8 @@ from typing import Any, Optional, Type
 
 import h5py
 import numpy as np
-import numpy.typing as npt
 
 from hardtarget.constants import AnalysisMethod
-from hardtarget.optimization.types import MFOptimizeOutArgs
 from hardtarget.process import Process, get_analysis_process
 from hardtarget.target_estimation.types import MFOutArgs
 from hardtarget.types import ExpParams, GenericCfg, GenericOut, GenericPro, ProParams
@@ -31,30 +29,6 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
-
-
-def load_optimized_data(path: str | Path) -> MFOptimizeOutArgs | None:
-
-    paths = get_analysed_h5_files(path)
-    paths.sort()
-
-    main_data: dict[str, npt.NDArray[np.float64]] = {}
-    for path in paths:
-        with h5py.File(path, "r") as hf:
-            group = hf["OutArgs"]  # TODO: Update to proper type
-            tmp_data = {}
-
-            for key in MFOptimizeOutArgs._fields:
-                if key in group:
-                    tmp_data[key] = group[key][()]
-                    if key in main_data:
-                        main_data[key] = np.append(main_data[key], tmp_data[key], axis=0)
-                    else:
-                        main_data[key] = tmp_data[key]
-    if not main_data:
-        return None
-    else:
-        return MFOptimizeOutArgs(**main_data)
 
 
 def load_analysed_data(
@@ -173,7 +147,7 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpParams, Gen
         Process specific types with the experiment data, configuration data, process data and the analysed
         output.
     """
-    cfg_type, pro_type, out_type = get_process_types(paths[0])
+    cfg_type, pro_type, out_type = get_process_types_from_file(paths[0])
 
     out_args: dict[str, Any] = {}
     exp_params: ExpParams | None = None
@@ -191,6 +165,8 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpParams, Gen
                 data = group[key][()]
                 if isinstance(data, bytes):
                     data = data.decode()
+                elif isinstance(data, np.ndarray) and (data.size == 0):
+                    logger.debug(f"{key} data is empty when loaded from file")
                 elif isinstance(data, np.ndarray) and isinstance(data[0], bytes):
                     data = [d.decode() for d in data]
                 return data
@@ -233,9 +209,9 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpParams, Gen
     )
 
 
-def get_process_types(path: Path) -> tuple[Any, Any, Any]:
+def get_process_types_from_file(path: Path) -> tuple[Any, Any, Any]:
     """
-    From a given file determine what process what used and return the
+    From a given file determine what process was used and return the
     compatible data types
 
     Args:
@@ -250,16 +226,21 @@ def get_process_types(path: Path) -> tuple[Any, Any, Any]:
         method_lib = file[f"{ProParams.method_lib=}".split("=")[0].split(".")[1]].asstr()[()]
         # Retrive process matching the method and get the specific generic types for that process
         process = get_analysis_process(method, method_lib)
-        if process.__bases__[0] != Process:
-            # For target estimation processes there is a double inheritance case
-            _, _, _, out_type, _ = orig_bases(process.__bases__[0])[0].__args__
-            cfg_type, pro_type = orig_bases(process)[0].__args__
-        else:
-            # Get process base types
-            generic_types = orig_bases(get_analysis_process(method, method_lib))[0].__args__
-            cfg_type, pro_type, _, out_type, _ = generic_types
 
-        return cfg_type, pro_type, out_type
+        return get_process_types(process)
+
+
+def get_process_types(process: type[Process]) -> tuple[Any, Any, Any]:
+    if process.__bases__[0] != Process:
+        # For target estimation processes there is a double inheritance case
+        _, _, _, out_type, _ = orig_bases(process.__bases__[0])[0].__args__
+        cfg_type, pro_type = orig_bases(process)[0].__args__
+    else:
+        # Get process base types
+        generic_types = orig_bases(process)[0].__args__
+        cfg_type, pro_type, _, out_type, _ = generic_types
+
+    return cfg_type, pro_type, out_type
 
 
 """

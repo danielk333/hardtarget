@@ -71,11 +71,15 @@ def get_analysed_h5_files(mf_folder: str | Path) -> list[Path]:
 
     top = Path(mf_folder)
     dir_pattern = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}-00-00")
-    subdirs = [d for d in top.iterdir() if d.is_dir() and dir_pattern.match(d.name)]
     file_pattern = re.compile(r"^mf-.*\.h5$")
+
     files = []
-    if len(subdirs) == 0:
-        files += [f for f in top.iterdir() if f.is_file() and file_pattern.match(f.name)]
-    for subdir in subdirs:
-        files += [f for f in subdir.iterdir() if f.is_file() and file_pattern.match(f.name)]
+    if top.is_dir():
+        subdirs = [d for d in top.iterdir() if d.is_dir() and dir_pattern.match(d.name)]
+        if len(subdirs) == 0:
+            files += [f for f in top.iterdir() if f.is_file() and file_pattern.match(f.name)]
+        for subdir in subdirs:
+            files += [f for f in subdir.iterdir() if f.is_file() and file_pattern.match(f.name)]
+    elif file_pattern.match(top.name):
+        files += [top]
     return files

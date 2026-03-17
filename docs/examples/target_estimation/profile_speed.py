@@ -9,7 +9,6 @@ import time
 from pathlib import Path
 from pprint import pprint
 
-import numpy as np
 from tqdm import tqdm
 
 import hardtarget

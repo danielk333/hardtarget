@@ -6,7 +6,7 @@ from . import constants, types
 from .analyse import analyse, direction_of_arrival, event_detection, optimize, target_estimation
 from .data_handling import Measurement, compute_process_params, dump_params_to_file, load_config_params
 from .data_simulation import simulate_drf
-from .plotting import load_analysed_data, load_optimized_data, rti, target_estimation_plots
+from .plotting import load_analysed_data, rti, target_estimation_plots
 from .process import (
     DOAProcess,
     DPTProcess,

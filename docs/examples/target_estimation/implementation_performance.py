@@ -3,9 +3,9 @@
 # A simple comparison between the c and numpy implementation, no cuda available.
 
 import os
+import sys
 
 # Workaround to make jupyter notebook find utils
-import sys
 import tempfile
 from pathlib import Path
 
@@ -13,6 +13,7 @@ import hardtarget
 from hardtarget.constants import TargetEstimationMethod
 from hardtarget.types import Job
 
+# Workaround to make jupyter notebook find utils
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
 import utils
 

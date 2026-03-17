@@ -21,6 +21,8 @@ if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
 else:
     from typing import Unpack
 
+from radardef.types import Pointing
+
 import hardtarget.process.utils as utils
 from hardtarget.constants import Impl, MethodLib
 from hardtarget.data_handling import dump_params_to_file
@@ -39,7 +41,6 @@ from hardtarget.types import (
     GenericPro,
     GenericVars,
     Job,
-    Pointing,
     ProParams,
 )
 from hardtarget.utils.time_conversion import time_interval_to_sample_bound, ts_from_str
@@ -136,7 +137,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self.get_data = func_get_data
         self.progress = progress
         self.get_pointing = func_get_pointing
-        self.output_dir = Path(output_dir) if output_dir is not None else None
+        self.output_dir = Path(output_dir).resolve() if output_dir is not None else None
         self.progress_bar = None
         self.store_mode = "w"
         self.store_params = True

@@ -80,6 +80,7 @@ test = [
     "spacecoords >= 0.1.6",
     "pyant",
     "requests",
+    "pytest-dependency"
 ]
 all = ["mpi4py >= 3.1.1", "matplotlib >= 3.3.4", "yappi >= 1.4.0"]
 

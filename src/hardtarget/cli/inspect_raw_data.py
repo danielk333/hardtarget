@@ -4,7 +4,6 @@ CLI interface.
 """
 
 import argparse
-import datetime
 import pprint
 import tempfile
 from collections import OrderedDict
@@ -13,7 +12,7 @@ from pathlib import Path
 from radardef import RadarDef
 from radardef.types import SourceFormat
 
-from hardtarget.types import Bounds
+from hardtarget.utils.time_conversion import str_from_ts
 
 
 def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -44,21 +43,20 @@ def main(args: argparse.Namespace) -> None:
         d = []
         channels = data_loader.channels
         for chnl in channels:
-            t_start, t_end = data_loader.bounds(chnl)
-            bounds = Bounds(t_start, t_end)
-            sample_rate = 1 / (data_loader.meta.experiment.t_ipp_usec * 1e-6)
-            dt0 = datetime.datetime.fromtimestamp(bounds.start / sample_rate, datetime.timezone.utc)
-            dt1 = datetime.datetime.fromtimestamp(bounds.end / sample_rate, datetime.timezone.utc)
-            mega_samples = (bounds.end - bounds.start) * 1e-6
+            samp_start, samp_end = data_loader.bounds(chnl)
+            sample_rate = data_loader.meta.experiment.sample_rate
+            dt_start = str_from_ts(data_loader.meta.bounds.ts_start_usec * 1e-6)
+            dt_end = str_from_ts(data_loader.meta.bounds.ts_end_usec * 1e-6)
 
             d.append(
                 OrderedDict(
-                    channel=chnl,
-                    start=f"{dt0}",  # dt.strftime("%Y-%m-%dT%H:%M:%S")
-                    end=f"{dt1}",
-                    bounds=bounds,
-                    mega_samples=mega_samples,
+                    channel=str(chnl),
+                    sample_rate=sample_rate,
+                    start=f"{dt_start}",
+                    end=f"{dt_end}",
+                    sample_bounds=[int(samp_start), int(samp_end)],
+                    samples=int(samp_end - samp_start),
                 )
             )
 
-        pprint.pprint({"Data": d, "Exp": data_loader.meta.experiment._asdict})
+        pprint.pprint({"Channels": d, "Experiment": data_loader.meta.experiment._asdict()})

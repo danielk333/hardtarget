@@ -78,7 +78,7 @@ class AnalyseParser:
         # job
         job = Job(idx=comm.rank, N=comm.size)
 
-        if args.method == AnalysisMethod.direction_of_arrival:
+        if self.method_name == AnalysisMethod.direction_of_arrival:
             # TODO: How to handle inputs to the radar_station (just default now)
             radar_station = RadarDef().get_radar(args.station_id)
             if radar_station is None:

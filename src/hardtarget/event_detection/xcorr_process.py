@@ -34,7 +34,7 @@ class XCorrProcess(Process[XCorrCfgParams, XCorrProParams, XCorrVariables, XCorr
             Process specific Optimize Configuration parameters
         """
 
-        d = extract_config_section(cfg_path, ConfigSubSection.XCORR, XCorrCfgParams, cfg_params)
+        d = extract_config_section(cfg_path, ConfigSubSection.EVENT_DETECTION, XCorrCfgParams, cfg_params)
 
         # TODO: if n_ipp is above 1 send a warning to the user and then continue, not sure if works with many
 

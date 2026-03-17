@@ -129,7 +129,6 @@ def download_test_data(path: Path) -> Path:
     if not download_location.is_file():
         url = "https://cloud.irf.se/public.php/dav/files/pXR6iYARobLxd2f/?accept=zip"
         urllib.request.urlretrieve(url, download_location)
-
     return download_location
 
 

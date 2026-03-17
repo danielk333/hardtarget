@@ -10,6 +10,7 @@ import numpy as np
 import scipy
 import scipy.constants
 import scipy.fft as fft
+from radardef.types import Pointing
 from scipy.signal import savgol_filter  # type: ignore[attr-defined]
 
 from hardtarget.constants import ConfigSubSection
@@ -30,7 +31,6 @@ from hardtarget.types import (
     DataItem,
     ExpParams,
     ExtractSignals,
-    Pointing,
     ProParams,
 )
 
@@ -136,14 +136,15 @@ class TargetEstimationProcess(
         )
 
         full_res_rgs = np.arange(
-            cfg_params.min_range_gate,
-            cfg_params.max_range_gate,
+            pro_params.range_gates[0],
+            pro_params.range_gates[-1] + cfg_params.range_gate_step,
             cfg_params.range_gate_step / cfg_params.range_gate_sub_resolution,
             dtype=np.float64,
         )
 
         ranges = ((full_res_rgs + 1) * scipy.constants.c / exp_params.sample_rate).astype(np.float64)  # m
-        assert np.all(pro_params.range_gates > 0), "Computed range gates not compatible with stencils"
+
+        assert np.all(pro_params.range_gates >= 0), "Computed range gates not compatible with stencils"
 
         if exp_params.tx_pulse_length is not None:
             _tx_pulse_samps = usec_to_samp(exp_params.tx_pulse_length)
@@ -273,7 +274,6 @@ class TargetEstimationProcess(
         snr = (np.sqrt(all_vars.vals) - np.sqrt(noise_floor[None, :])) ** 2 / noise_floor[None, :]
         # finding peaks
         r_inds = np.argmax(snr, axis=1)
-
         r_vec = pro_params.ranges[r_inds]
         v_vec = pro_params.range_rates[all_vars.v_ind[coh_ints, r_inds]]
         a_vec = pro_params.accelerations[all_vars.a_ind[coh_ints, r_inds]]  # type: ignore[attr-defined]

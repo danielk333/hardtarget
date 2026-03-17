@@ -6,6 +6,7 @@ from typing import Callable
 
 import h5py
 import numpy as np
+from radardef.types import Pointing
 
 from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl, OptimizationMethod
 from hardtarget.data_handling.configuration import extract_config_section, get_ilx_windows
@@ -15,6 +16,7 @@ from hardtarget.optimization.types import (
     MFOptimizeVariables,
     OptimizeCfgParams,
     OptimizeProParams,
+    OptStart,
 )
 from hardtarget.process import Process
 from hardtarget.target_estimation.gmf import GMFCfgParams
@@ -27,8 +29,6 @@ from hardtarget.types import (
     ExtractSignals,
     MethodLib,
     OptimizeLib,
-    OptStart,
-    Pointing,
     ProParams,
 )
 from hardtarget.utils.h5_tools import get_analysed_h5_files
@@ -66,14 +66,16 @@ class OptimizeProcess(
             progress,
         )
 
+        estimated_data = Path(self.cfg_params.path).resolve()
+        # If output directory is the same as source, add data
+        if str(estimated_data.parent) == str(self.output_dir):
+            self.store_mode = "a"
+            self.store_params = False
+
         # Extract all already analysed files
-        paths = get_analysed_h5_files(self.cfg_params.path)
+        paths = get_analysed_h5_files(estimated_data)
         paths.sort()
         self.sorted_mf_files = paths
-
-        # Override default params, add data to existing file do not save params again
-        self.store_mode = "a"
-        self.store_params = False
 
         # Verify optimization is running on the correct data
         with h5py.File(paths[0], "r") as hf:
@@ -112,6 +114,8 @@ class OptimizeProcess(
                 r_vec=hf["OutArgs"][f"{MFOutArgs.r_vec=}".split("=")[0].split(".")[1]][cohind],
                 v_vec=hf["OutArgs"][f"{MFOutArgs.v_vec=}".split("=")[0].split(".")[1]][cohind],
                 a_vec=hf["OutArgs"][f"{MFOutArgs.a_vec=}".split("=")[0].split(".")[1]][cohind],
+                dc=hf["OutArgs"][f"{MFOutArgs.dc=}".split("=")[0].split(".")[1]][cohind],
+                t=hf["OutArgs"][f"{MFOutArgs.t=}".split("=")[0].split(".")[1]][cohind],
             )
 
         return opt_start
@@ -177,28 +181,49 @@ class OptimizeProcess(
         tx_amp = np.sqrt(tx_pwr)
         tx = np.conj(tx) / tx_amp
 
+        opt_start = self.load_analysed_cohint(start_sample)
+
         gmf_vars = MFOptimizeVariables(
-            peak=np.zeros((3,), dtype=np.float64),  # TODO: Correct size
-            peak_val=np.zeros((1,), dtype=np.float64),
+            r_vec_opt=np.array([opt_start.r_vec], dtype=np.float64),
+            v_vec_opt=np.array([opt_start.r_vec], dtype=np.float64),
+            a_vec_opt=np.array([opt_start.r_vec], dtype=np.float64),
+            peak_vals=np.zeros((1,), dtype=np.float64),
+            dc=np.array([opt_start.dc]),
+            t=np.array([opt_start.r_vec]),
         )
 
         if tx_amp > self.cfg_params.tx_amp_limit:
-            gmf_vars.peak[:], gmf_vars.peak_val[0] = self.lib(
-                tx,
+            r_vec_opt, v_vec_opt, a_vec_opt, peak_vals = self.lib(
+                tx[:, 0],  # TODO: How to handle sub resolution
                 ipp,
                 self.exp_params,
                 self.cfg_params,
                 self.pro_params,
-                self.load_analysed_cohint(start_sample),
+                opt_start.r_vec,
+                opt_start.v_vec,
+                opt_start.a_vec,
             )
+            return MFOptimizeVariables(
+                r_vec_opt=np.asarray(r_vec_opt),
+                v_vec_opt=np.asarray(v_vec_opt),
+                a_vec_opt=np.asarray(a_vec_opt),
+                peak_vals=np.asarray(peak_vals),
+                dc=np.asarray(opt_start.dc),
+                t=np.asarray(opt_start.t),
+            )
+
         return gmf_vars
 
     def stack_vars(self, vars_list: list[MFOptimizeVariables]) -> MFOptimizeVariables:
         """Stack the results from the analysis"""
 
         return MFOptimizeVariables(
-            peak=np.stack([x.peak for x in vars_list], axis=0),
-            peak_val=np.stack([x.peak_val for x in vars_list], axis=0),
+            r_vec_opt=np.stack([x.r_vec_opt for x in vars_list], axis=0),
+            v_vec_opt=np.stack([x.v_vec_opt for x in vars_list], axis=0),
+            a_vec_opt=np.stack([x.a_vec_opt for x in vars_list], axis=0),
+            peak_vals=np.stack([x.peak_vals for x in vars_list], axis=0),
+            dc=np.stack([x.dc for x in vars_list], axis=0),
+            t=np.stack([x.t for x in vars_list], axis=0),
         )
 
     def generate_output(
@@ -221,10 +246,7 @@ class OptimizeProcess(
         Returns:
             Output data
         """
-        return MFOptimizeOutArgs(
-            peaks=all_vars.peak,
-            peak_vals=all_vars.peak_val,
-        )
+        return all_vars
 
     def define_h5_vars(self, output: MFOptimizeOutArgs) -> dict[str, DataItem]:
         """
@@ -237,14 +259,34 @@ class OptimizeProcess(
             A dictionary containing the output with attributes such as dimensions, long names and units.
         """
         return {
-            f"{output.peaks=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.peaks,
+            f"{output.r_vec_opt=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.r_vec_opt,
                 # dims=[("num_cohints_per_file", "t")], #TODO
-                long_name="Fine tuned range, range-rate and acceleration",
+                long_name="Fine tuned range",
+            ),
+            f"{output.v_vec_opt=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.v_vec_opt,
+                # dims=[("num_cohints_per_file", "t")], #TODO
+                long_name="Fine tuned range-rate",
+            ),
+            f"{output.a_vec_opt=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.a_vec_opt,
+                # dims=[("num_cohints_per_file", "t")], #TODO
+                long_name="Fine tuned acceleration",
             ),
             f"{output.peak_vals=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.peak_vals,
                 # dims=[("num_cohints_per_file", "t")], #TODO
                 long_name="Generalized Matched Filter fine tuned peak output values",
+            ),
+            f"{output.dc=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.dc,
+                # dims=[(str_dims_num_cohints_per_file, str_t), (str_ranges, "r")],
+                long_name="Range dependant noise floor (0-frequency gmf output)",
+            ),
+            f"{output.t=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.t,
+                long_name="time vector",
+                scale=True,
             ),
         }

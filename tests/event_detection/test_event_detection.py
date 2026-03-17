@@ -3,7 +3,6 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pytest
 import radardef.radar_stations.eiscat.utils as radardef_utils
 from radardef import RadarDef
 from radardef.types import BoundParams, ExpParams
@@ -16,7 +15,6 @@ from hardtarget.event_detection.types import XCorrCfgParams
 
 def wip_event_detection():
 
-    frequency_decimation = 10
     n_ipp = 1
 
     cfg = XCorrCfgParams(
@@ -24,10 +22,7 @@ def wip_event_detection():
         ipp_offset=0,
         min_range_gate=6640,
         max_range_gate=6750,
-        min_acceleration=-300.0,
-        max_acceleration=300.0,
         range_gate_step=1,
-        frequency_decimation=frequency_decimation,
         num_cohints_per_file=10,
         node_gpus=1,
         doppler_freq_min=-30000,

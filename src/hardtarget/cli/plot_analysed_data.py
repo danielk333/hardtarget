@@ -66,7 +66,7 @@ def plot_analysed_data(
                 fig, ax = plt.subplots(3, 2)
                 ax, ani = plotting.plot_direction_of_arrival(fig, ax, out, pro, sensitivit_limit)
                 plt.show()
-            case _:  # Target estimation and Optimization
+            case AnalysisMethod.target_estimation:
                 fig, axes = plt.subplots(2, 2)
                 plotting.target_estimation_plots.plot_peaks(
                     axes,
@@ -74,7 +74,6 @@ def plot_analysed_data(
                     exp,
                     cfg,
                     pro,
-                    plotting.load_optimized_data(path),
                     snr_dB_limit=sensitivit_limit,
                 )
                 fig, axes = plt.subplots(2, 3)
@@ -99,6 +98,17 @@ def plot_analysed_data(
                     exp,
                     cfg,
                     pro,
+                )
+                plt.show()
+            case AnalysisMethod.optimize:
+                fig, axes = plt.subplots(2, 2)
+                plotting.optimization_plots.plot_optimization_peaks(
+                    axes,
+                    out,
+                    exp,
+                    cfg,
+                    pro,
+                    snr_dB_limit=sensitivit_limit,
                 )
 
                 plt.show()

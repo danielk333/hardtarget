@@ -12,13 +12,12 @@ from typing import Any, Callable, Generic, NamedTuple, Protocol, TypeAlias, Type
 import numpy as np
 import numpy.typing as npt
 from pyant.models.array import Array, ArrayParams
-from radardef.types import ExpParams, Pointing
+from radardef.types import ExpParams
 
 from hardtarget.constants import (
     AnalysisMethod,
     Impl,
     MethodLib,
-    TargetEstimationMethod,
 )
 
 if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
@@ -88,13 +87,13 @@ class ProParams:
     """
 
     method: AnalysisMethod = AnalysisMethod.unknown
-    method_lib: MethodLib | None = TargetEstimationMethod.unknown
-    implementation: Impl | None = Impl.unknown
-    read_length: int = 0
-    rx_stencil: npt.NDArray = field(default_factory=lambda: np.ndarray([0, 0], dtype=bool))
-    tx_stencil: npt.NDArray = field(default_factory=lambda: np.ndarray([0, 0], dtype=bool))
+    method_lib: MethodLib | None = None
+    implementation: Impl | None = None
+    read_length: int = 1
+    rx_stencil: npt.NDArray = field(default_factory=lambda: np.zeros((1,), dtype=bool))
+    tx_stencil: npt.NDArray = field(default_factory=lambda: np.zeros((1,), dtype=bool))
     rel_rgs: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
-    range_gates: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
+    range_gates: npt.NDArray[np.int32] = field(default_factory=lambda: np.zeros((1,), dtype=np.int32))
 
 
 class ExtractedSignals(NamedTuple):
@@ -154,12 +153,6 @@ class Job(NamedTuple):
     N: int
 
 
-class OptStart(NamedTuple):
-    r_vec: float = 0.0
-    v_vec: float = 0.0
-    a_vec: float = 0.0
-
-
 class ArrayKwargs(TypedDict, total=False):
     beam: Array
     parameters: ArrayParams
@@ -201,15 +194,8 @@ AnalysisLib: TypeAlias = Callable[
 ]
 
 OptimizeLib: TypeAlias = Callable[
-    [
-        npt.NDArray[np.complex64],
-        npt.NDArray,
-        ExpParams,
-        GenericCfg,
-        GenericPro,
-        OptStart,
-    ],
-    tuple[npt.NDArray, npt.NDArray],
+    [npt.NDArray[np.complex64], npt.NDArray, ExpParams, GenericCfg, GenericPro, float, float, float],
+    tuple[float, float, float, float],
 ]
 
 EventSearchLib: TypeAlias = Callable[

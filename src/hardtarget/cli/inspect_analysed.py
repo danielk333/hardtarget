@@ -1,5 +1,5 @@
 """
-The CLI Inspect MF functionality, abstracts the inspect functionality for analysed files to a user friendly
+The CLI Inspect functionality, abstracts the inspect functionality for analysed files to a user friendly
 CLI interface.
 """
 
@@ -12,7 +12,7 @@ from hardtarget.utils.h5_tools import get_analysed_h5_files, inspect_h5_node
 
 def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Define argparse sub parser."""
-    parser.add_argument("path", help="path to source directory with MF data")
+    parser.add_argument("path", help="path to source directory with analysed data")
     return parser
 
 
@@ -38,12 +38,16 @@ def main(args: argparse.Namespace) -> None:
         if item["type"] == "scalar":
             print(f"-- {_path} value:{item['value']} dtype:{item['dtype']}")
         elif item["type"] == "object":
-            print(f"-- {_path} value:{item['value']}")
+            value = item["value"]
+            if isinstance(value, bytes):
+                value = value.decode()
+            print(f"-- {_path} value: {value}")
         elif item["type"] == "attributes":
-            print(f"-- {_path} attributes: " + "{")
-            for key, val in item["attrs"].items():
-                print(f"    {key}: {val}")
-            print("}")
+            if item["attrs"]:
+                print(f"-- {_path} attributes: " + "{")
+                for key, val in item["attrs"].items():
+                    print(f"    {key}: {val}")
+                print("}")
         elif item["type"] == "dataset":
             if item["scale"]:
                 print(f"-- {_path} (scale) shape:{item['shape']} dtype:{item['dtype']}")

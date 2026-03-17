@@ -7,16 +7,16 @@ import logging
 
 from hardtarget.types import ParserArgs, SubParser
 
-from . import inspect_mf, inspect_raw_data
+from . import inspect_analysed, inspect_raw_data
 from .commands import add_command
 
 logger = logging.getLogger(__name__)
 
 SOURCES = {
-    "mf": SubParser(
-        main=inspect_mf.main,
-        parser_build=inspect_raw_data.parser_build,
-        parser_args=ParserArgs(description="inspect MF file", usage="%(prog)s [options] path"),
+    "analysed": SubParser(
+        main=inspect_analysed.main,
+        parser_build=inspect_analysed.parser_build,
+        parser_args=ParserArgs(description="inspect analysed file", usage="%(prog)s [options] path"),
     ),
     "raw": SubParser(
         main=inspect_raw_data.main,

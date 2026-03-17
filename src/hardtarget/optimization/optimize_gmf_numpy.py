@@ -7,7 +7,6 @@ import scipy.optimize as sco
 from radardef.types import ExpParams
 
 from hardtarget.optimization.types import OptimizeCfgParams, OptimizeProParams
-from hardtarget.types import OptStart
 from hardtarget.utils.time_conversion import ipp_time_to_sample
 
 
@@ -17,8 +16,10 @@ def optimize_gmf_np(
     exp_params: ExpParams,
     cfg_params: OptimizeCfgParams,
     pro_params: OptimizeProParams,
-    gmf_start: OptStart,
-) -> tuple[npt.NDArray, npt.NDArray]:
+    r_vec: float,
+    v_vec: float,
+    a_vec: float,
+) -> tuple[float, float, float, float]:
     """
     Maximize the Generalized Matched Filter GMF value using function
     optimization in continuous variable space.
@@ -32,7 +33,7 @@ def optimize_gmf_np(
         gmf_start: The r/v/a value from the previous cohhind analys
 
     Returns
-        MFVariables from the analysis
+        Optimized r_vec, v_vec, a_vec, val
 
     """
     sample_inds = pro_params.il0_rx_window_indices
@@ -53,7 +54,7 @@ def optimize_gmf_np(
         sample_t = inds / sample_rate
         r = r0 + x[0] * sample_t + 0.5 * x[1] * sample_t**2.0
         phase = 2.0 * np.pi * np.mod(r / wavelength, 1)
-        model_signal = tx * np.exp(-1j * phase)
+        model_signal = tx * np.exp(-1j * phase)  # TODO: how to handle sub_resolution
 
         decoded_echo = ipp[inds] * model_signal
 
@@ -61,24 +62,24 @@ def optimize_gmf_np(
 
     # TODO: make so that the input parameters for minimize can be customized trough the config file
     # such as optimization limits and method
+
     result = sco.minimize(
         neg_gmf_direct,
-        [gmf_start.v_vec, gmf_start.a_vec],
+        [v_vec, a_vec],
         args=(
-            gmf_start.r_vec,
+            r_vec,
             sample_inds,
             exp_params.wavelength,
             exp_params.sample_rate,
             ipp_time_to_sample(exp_params.t_tx_start_usec, exp_params.sample_rate),
-            tx,
+            tx,  # TODO: how to handle sub_resolution
             ipp,
         ),
         # method="Nelder-Mead",
         method="BFGS",
     )
 
-    x = np.array([gmf_start.r_vec, result.x[0], result.x[1]])
-    return x, result.fun
+    return r_vec, result.x[0], result.x[1], result.fun
 
 
 def optimize_grid_gmf_np(
@@ -87,8 +88,10 @@ def optimize_grid_gmf_np(
     exp_params: ExpParams,
     cfg_params: OptimizeCfgParams,
     pro_params: OptimizeProParams,
-    gmf_start: OptStart,
-) -> tuple[npt.NDArray, npt.NDArray]:
+    r_vec: float,
+    v_vec: float,
+    a_vec: float,
+) -> tuple[float, float, float, float]:
     """
     Maximize the Generalized Matched Filter GMF value using function
     optimization in continuous variable space.
@@ -102,7 +105,7 @@ def optimize_grid_gmf_np(
         gmf_start: The r/v/a value from the previous cohhind analys
 
     Returns
-        MFVariables from the analysis
+        Optimized r_vec, v_vec, a_vec, val
 
     """
     sample_inds = pro_params.il0_rx_window_indices
@@ -116,16 +119,16 @@ def optimize_grid_gmf_np(
     res_a = 20
 
     max_time = exp_params.t_ipp_usec * 1e-6 * cfg_params.n_ipp
-    max_velocity_change = 0.5 * (gmf_start.a_vec + np.sign(gmf_start.a_vec) * delta_a * 0.5) * max_time**2
+    max_velocity_change = 0.5 * (a_vec + np.sign(a_vec) * delta_a * 0.5) * max_time**2
 
     delta_v = 2 * max_velocity_change
     res_v = 20
     v_mat, a_mat = np.meshgrid(
-        np.linspace(gmf_start.v_vec - delta_v * 0.5, gmf_start.v_vec + delta_v * 0.5, num=res_v),
-        np.linspace(gmf_start.a_vec - delta_a * 0.5, gmf_start.a_vec + delta_a * 0.5, num=res_a),
+        np.linspace(v_vec - delta_v * 0.5, v_vec + delta_v * 0.5, num=res_v),
+        np.linspace(a_vec - delta_a * 0.5, a_vec + delta_a * 0.5, num=res_a),
     )
 
-    rg0 = np.floor((gmf_start.r_vec / constants.c) * sample_rate).astype(np.int64)
+    rg0 = np.floor((r_vec / constants.c) * sample_rate).astype(np.int64)
     rel_rg0 = rg0 - min_rg - 1
     inds = sample_inds + rel_rg0
     sample_t = inds / sample_rate
@@ -134,12 +137,12 @@ def optimize_grid_gmf_np(
 
     for ind in range(res_v):
         r = (
-            gmf_start.r_vec
+            r_vec
             + v_mat[:, ind, None] * sample_t[None, :]
             + 0.5 * a_mat[:, ind, None] * sample_t[None, :] ** 2.0
         )
         phase = 2.0 * np.pi * np.mod(r / wavelength, 1)
-        model_signal = tx[None, :, 1] * np.exp(-1j * phase)  # TODO: How to handle the sub_res
+        model_signal = tx[None, :] * np.exp(-1j * phase)  # TODO: How to handle the sub_res
 
         decoded_echo = rx[None, :] * model_signal
 
@@ -149,7 +152,6 @@ def optimize_grid_gmf_np(
     a_inds = np.argmax(gmf_mat, axis=0)
     v_ind = np.argmax(gmf_mat[a_inds, select])
     a_ind = a_inds[v_ind]
-    x = np.array([gmf_start.r_vec, v_mat[a_ind, v_ind], a_mat[a_ind, v_ind]])
     fun = gmf_mat[a_ind, v_ind]
 
-    return x, fun
+    return r_vec, v_mat[a_ind, v_ind], a_mat[a_ind, v_ind], fun

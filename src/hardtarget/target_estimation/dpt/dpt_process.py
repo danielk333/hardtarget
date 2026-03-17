@@ -66,8 +66,8 @@ class DPTProcess(TargetEstimationProcess[DPTCfgParams, DPTProParams]):
             Process specific DPT Process parameters
         """
 
-        assert cfg_params.ipp_delay_parameter <= cfg_params.n_ipp, (
-            f"ipp_delay_parameter: {cfg_params.ipp_delay_parameter} can not be larger than n_ipp: {cfg_params.n_ipp}"
+        assert cfg_params.ipp_delay_parameter < cfg_params.n_ipp, (
+            f"ipp_delay_parameter: {cfg_params.ipp_delay_parameter} can not be larger or equal to n_ipp: {cfg_params.n_ipp}"
         )
 
         # Sample times in the decimated il0d vector

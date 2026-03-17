@@ -17,8 +17,8 @@ def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Adds mandatory and optional positional arguments to the parser."""
 
     parser.add_argument("path", help="path to source directory with raw data")
-    parser.add_argument("-s", "--start_time", default=None)
-    parser.add_argument("-e", "--end_time", default=None)
+    parser.add_argument("-s", "--start_time", default=None, type=int)
+    parser.add_argument("-e", "--end_time", default=None, type=int)
     parser.add_argument("--relative_time", action="store_true")
     parser.add_argument("--axis_units", action="store_true")
     parser.add_argument("--log", action="store_true")

@@ -8,11 +8,11 @@ from radardef.types import BoundParams, ExpParams
 from scipy import constants
 
 import hardtarget
-from hardtarget.constants import AnalysisMethod, Impl, TargetEstimationMethod
+from hardtarget.constants import Impl, TargetEstimationMethod
 from hardtarget.data_simulation import DRFSimParams, simulate_drf
 
 
-class TestBlackBoxComputeGMF:
+class TestTargetEstimation:
     """
     It is possible that CUDA support is compiled, yet still non-functional.
     """

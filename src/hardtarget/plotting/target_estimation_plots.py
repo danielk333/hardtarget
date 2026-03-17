@@ -1,47 +1,19 @@
 """Plotting tools for analysed output"""
 
-from typing import Any, Optional
-
 import numpy as np
 import numpy.typing as npt
 from matplotlib.axes import Axes
 from matplotlib.collections import QuadMesh
 from matplotlib.lines import Line2D
-from scipy import constants
 
-from hardtarget.optimization.types import MFOptimizeOutArgs
 from hardtarget.target_estimation.types import (
     ExtendedTargetEstimationProParams,
     MFOutArgs,
     TargetEstimationCfgParams,
 )
-from hardtarget.types import CfgParams, ExpParams, ProParams
-from hardtarget.utils import noise
-from hardtarget.utils.time_conversion import ipp_time_to_sample
+from hardtarget.types import ExpParams
 
-
-def _convert(data: Any, km: bool = True, monostatic: bool = True) -> npt.NDArray[Any]:
-    """Assume data is [m] and two-way range"""
-    _data = data.copy()
-    if km:
-        _data *= 0.001
-    if monostatic:
-        _data *= 0.5
-    return _data
-
-
-def to_relative_range_gate(
-    ranges: npt.NDArray[np.float64 | np.int64],
-    cfg: CfgParams,
-    exp: ExpParams,
-    pro: ExtendedTargetEstimationProParams,
-) -> npt.NDArray[np.int64]:
-    sample_rate = exp.sample_rate
-    il0_r_samp = (ranges / constants.c) * sample_rate + ipp_time_to_sample(
-        exp.t_tx_start_usec, exp.sample_rate
-    )
-    il0_min_range_gate = cfg.min_range_gate if cfg.min_range_gate > 0 else cfg.max_range_gate
-    return il0_r_samp.astype(np.int64) - il0_min_range_gate
+from .utils import _convert
 
 
 def plot_peaks(
@@ -50,7 +22,6 @@ def plot_peaks(
     exp: ExpParams,
     cfg: TargetEstimationCfgParams,
     pro: ExtendedTargetEstimationProParams,
-    optimization: Optional[MFOptimizeOutArgs] = None,
     monostatic: bool = True,
     snr_dB_limit: float = 15.0,
 ) -> tuple[npt.NDArray, None]:  # of type Axes
@@ -77,10 +48,6 @@ def plot_peaks(
     min_acc = cfg.min_acceleration
     max_acc = cfg.max_acceleration
 
-    nf_vec = np.nanmedian(out_data.dc, axis=0)
-    nf_vec = nf_vec.reshape((1, nf_vec.size))
-    nf_range = np.nanmedian(nf_vec, axis=0)
-
     snr = out_data.snr
 
     # TODO: use a interpolation of nf-range to determine the SNR of the optimized results
@@ -91,8 +58,6 @@ def plot_peaks(
     inds = snrdb > snr_dB_limit
     not_inds = np.logical_not(inds)
 
-    _inds0_sty = dict(marker="x", alpha=0.5, ls="none", color="r")
-    _not0_inds_sty = dict(marker="x", alpha=0.5, ls="none", color="b")
     _inds_sty = dict(marker=".", ls="none", color="r")
     _not_inds_sty = dict(marker=".", ls="none", color="b")
 
@@ -121,19 +86,6 @@ def plot_peaks(
     axes[1, 1].plot(t[not_inds], np.sqrt(snr[not_inds]), **_not_inds_sty)
     axes[1, 1].set_xlabel("Time [s]")
     axes[1, 1].set_ylabel("sqrt(SNR)")
-
-    if optimization is not None:
-        range_gates = to_relative_range_gate(optimization.peaks[:, 0], cfg, exp, pro)
-        snr_opt = noise.snr(optimization.peak_vals[:, 0], nf_range, range_gates=range_gates)
-
-        r0 = _convert(optimization.peaks[:, 0], monostatic=monostatic)
-        v0 = _convert(optimization.peaks[:, 1], monostatic=monostatic)
-        a0 = _convert(optimization.peaks[:, 2], monostatic=monostatic, km=False)
-        axes[0, 0].plot(t[inds], r0[inds], **_inds0_sty)
-        axes[0, 1].plot(t[inds], v0[inds], **_inds0_sty)
-        axes[1, 0].plot(t[inds], a0[inds], **_inds0_sty)
-        axes[1, 1].plot(t[inds], np.sqrt(snr_opt[inds]), **_inds0_sty)
-        axes[1, 1].plot(t[not_inds], np.sqrt(snr_opt[not_inds]), **_not0_inds_sty)
 
     return axes, None
 

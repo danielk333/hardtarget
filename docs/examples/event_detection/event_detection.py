@@ -10,6 +10,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from radardef import RadarDef
 
+import tests.utils as utils
 from hardtarget import event_detection, load_analysed_data, plotting
 
 # Workaround to make jupyter notebook find utils
