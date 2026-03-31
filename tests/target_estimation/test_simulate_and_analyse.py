@@ -3,8 +3,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import radardef.radar_stations.eiscat.utils as radardef_utils
-from radardef.types import BoundParams, ExpParams
+from radardef.radar_stations.eiscat.experiments import load_radar_code
+from radardef.types import BoundParams, ExpDef
 from scipy import constants
 
 import hardtarget
@@ -99,24 +99,22 @@ class TestTargetEstimation:
             else:
                 return np.nan
 
-        exp_params = ExpParams(
-            name="simulation",
+        exp_params = ExpDef(
+            name="leo_bpark_2.0",
             radar_frequency=929.6,
             t_ipp_usec=20000,
-            ipp_samps=20000,
-            sample_rate=1000000.0,
             t_samp_usec=1,
-            rx_channels=["sim"],
-            t_tx_start_usec=82.0,
-            t_tx_end_usec=2001.0,
+            rx_channels=["uhf"],
+            t_tx_start_usec=82,
+            t_tx_end_usec=2002,
             t_rx_start_usec=0,
             t_rx_end_usec=20000,
-            tx_channel="sim",
-            tx_pulse_length=1919,
-            t_cal_on_usec=19900.0,
-            t_cal_off_usec=19997.0,
-            wavelength=constants.c / (929.6 * 1e6),
-            code=radardef_utils.load_radar_code("leo_bpark"),
+            baud_length_usec=10,
+            tx_channel="uhf",
+            t_cal_on_usec=19900,
+            t_cal_off_usec=19997,
+            code=load_radar_code("leo_bpark"),
+            samples_per_file=12800000,
         )
 
         bounds_params = BoundParams(
@@ -163,7 +161,7 @@ class TestTargetEstimation:
             # process
             _ = hardtarget.target_estimation(
                 path=Path(tmp_sim_path).resolve(),
-                rx_channel="sim",
+                rx_channel=exp_params.rx_channels[0],
                 config=tmp_config_path,
                 start_time=simulation_params.start_time_us,
                 end_time=simulation_params.end_time_us,

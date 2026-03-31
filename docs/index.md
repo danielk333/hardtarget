@@ -1,7 +1,7 @@
 # Welcome to Hardtarget's documentation!
 
 !!! note
-This project is under development.
+    This project is under development.
 
 ---
 

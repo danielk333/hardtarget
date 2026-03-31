@@ -7,12 +7,12 @@ import argparse
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Generic, NamedTuple, Protocol, TypeAlias, TypeVar
+from typing import Any, Callable, ClassVar, Generic, NamedTuple, Protocol, TypeAlias, TypeVar
 
 import numpy as np
 import numpy.typing as npt
 from pyant.models.array import Array, ArrayParams
-from radardef.types import ExpParams
+from radardef.types import ExpDef
 
 from hardtarget.constants import (
     AnalysisMethod,
@@ -70,20 +70,12 @@ class ProParams:
     Args:
         method: Method used for the analysis.
         method_lib: Specific library used for the analyse method.
+        implementation: Implementation of the method C/Cuda/Numpy
         read_length: How many samples to read per
-        decimated_read_length: Decimated read length, the read length with the frequency decimation
-                               accounted for.
-        range_gates: Range gates, the "gates" between max and min range gate with a range gate step.
-        rel_rgs: Relative range gates, range gates relative to the min range gate.
-        il0_rgs: Index level 0 range gates.
-        ranges: Range gates (including subresolution) in meter, true ranges.
         rx_stencil: Bool stencil the size of an IPP, each sample containing a rx samples is declare True.
         tx_stencil: Bool stencil the size of an IPP, each sample containing a tx samples is declare True.
-        il1_rx_window_indices: Index level 1 receiver window indices.
-        il0_rx_window_indices: Index level 0 receiver window indices.
-        il0_dec_rx_window_indices: Index level 0 decimated receiver window indices
-                                   (il0_rx_window_indices with frequency decimation).
-        range_rates: Range rates
+        range_gates: Range gates, the "gates" between max and min range gate with a range gate step.
+        rel_rgs: Relative range gates, range gates relative to the min range gate.
     """
 
     method: AnalysisMethod = AnalysisMethod.unknown
@@ -179,7 +171,7 @@ class AnalysedResult(TypedDict, Generic[GenericOut, GenericCfg, GenericPro]):
 
     dir: str | Path | None
     files: list[str]
-    data: dict[int, tuple[GenericOut, ExpParams, GenericCfg, GenericPro]]
+    data: dict[int, tuple[GenericOut, ExpDef, GenericCfg, GenericPro]]
 
 
 AnalysisLib: TypeAlias = Callable[
@@ -194,7 +186,7 @@ AnalysisLib: TypeAlias = Callable[
 ]
 
 OptimizeLib: TypeAlias = Callable[
-    [npt.NDArray[np.complex64], npt.NDArray, ExpParams, GenericCfg, GenericPro, float, float, float],
+    [npt.NDArray[np.complex64], npt.NDArray, ExpDef, GenericCfg, GenericPro, float, float, float],
     tuple[float, float, float, float],
 ]
 
@@ -202,7 +194,7 @@ EventSearchLib: TypeAlias = Callable[
     [
         npt.NDArray[np.complex64],
         npt.NDArray[np.complex64],
-        ExpParams,
+        ExpDef,
         GenericCfg,
         GenericPro,
     ],
@@ -210,7 +202,7 @@ EventSearchLib: TypeAlias = Callable[
 ]
 
 InterferometryLib: TypeAlias = Callable[
-    [npt.NDArray[np.complex64], ExpParams, GenericCfg, GenericPro, Array, ArrayParams],
+    [npt.NDArray[np.complex64], ExpDef, GenericCfg, GenericPro, Array, ArrayParams],
     GenericVars,
 ]
 
@@ -226,3 +218,8 @@ class ExtractSignals(Protocol):
         sum_rx_channels: bool = True,
         sub_resolution: int = 1,
     ) -> ExtractedSignals: ...
+
+
+# Protocol to be able specify DataClass input
+class IsDataclass(Protocol):
+    __dataclass_fields__: ClassVar[dict[str, Any]]

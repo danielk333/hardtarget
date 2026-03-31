@@ -14,20 +14,22 @@ from hardtarget.data_simulation.tx_model import tx_signal_model
 #        |__|  |_| |_|
 # ```
 
-code = np.kron(
-    np.array(
-        [1, 1, 1, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1],
-        dtype=np.float64,
-    ),
-    np.ones(2),
-).astype(np.float64)
+code = np.array(
+    [1, 1, 1, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1],
+    dtype=np.float64,
+)
 
 # Lets say we have a ipp with 56 samples, we want to read all of them and we start at 0. We should then get
-# a signal similar to the one we inserted, but decimated.
+# a signal similar to the one we inserted, but decimated. The source of the signal has a baud length of 12 us,
+# but we want to sample the signal at 6 us, thus we will oversample it.
 
+t_samp_usec = 6
+baud_length_usec = 12
 ipp_samples = 56
 tx = tx_signal_model(
     code=code,
+    baud_length_usec=baud_length_usec,
+    t_samp_usec=t_samp_usec,
     tx_start_samp=0,
     ipp_samps=ipp_samples,
     read_length=ipp_samples,
@@ -42,6 +44,8 @@ plt.plot(np.real(tx))
 sub_resolution = 4
 tx = tx_signal_model(
     code=code,
+    baud_length_usec=baud_length_usec,
+    t_samp_usec=t_samp_usec,
     tx_start_samp=0,
     ipp_samps=ipp_samples,
     read_length=ipp_samples,

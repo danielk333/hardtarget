@@ -5,41 +5,30 @@ Digital RF simulator, used to simulate raw data in the digital rf format.
 import configparser
 import logging
 import pathlib
+import re
 import shutil
+from dataclasses import asdict
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 import digital_rf as drf
 import numpy as np
 import numpy.typing as npt
 import scipy.constants
-from radardef.types import BoundParams, ExpParams
+from radardef.types import BoundParams, ExpDef, Expparam, Metaparam
+
+from hardtarget.data_simulation.utils import noise_generator, waveform_generator
 
 from .utils import DRFSimParams
 
 logger = logging.getLogger(__name__)
 
 
-def noise_generator(noise_sigma: float, shape: tuple, dtype: Any = np.complex128) -> npt.NDArray:
-    """Noise generator"""
-    return noise_sigma * (np.random.randn(*shape) + 1j * np.random.randn(*shape)).astype(dtype)
-
-
-def waveform_generator(
-    t: npt.NDArray, baud_length: float, frequency: float, code: npt.NDArray, dtype: Any = np.complex128
-) -> npt.NDArray:
-    """Waveform generator"""
-    t_ind = (t // baud_length).astype(np.int64)
-    signal = np.zeros(t.shape, dtype=dtype)
-    inds = np.logical_and(t >= 0, t <= baud_length * len(code))
-    signal[inds] = code[t_ind[inds]]
-    return signal
-
-
 def simulate_drf(
     output_path: pathlib.Path | None,
     range_function: Callable,
     sim_params: DRFSimParams,
-    experiment_params: ExpParams,
+    experiment_params: ExpDef,
     bounds_params: BoundParams,
     snr_function: Optional[Callable] = None,
     compression_level: int = 0,
@@ -149,10 +138,10 @@ def simulate_drf(
             )
 
         tx_wave = waveform_generator(
-            t_tx,
-            30.0 * 1e-6,  # hardcoded since not a part of the experiment anymore
-            experiment_params.radar_frequency * 1e6,
-            code[pid % codes],
+            n_tx_samps=n_tx_samps,
+            sample_rate=experiment_params.sample_rate,
+            baud_length_sec=experiment_params.baud_length_usec,
+            code=code[pid % codes],
             dtype=dtype,
         )
         tx_amp0 = sim_params.tx_amp
@@ -209,28 +198,35 @@ def simulate_drf(
         meta_writer.write(tx_start_samp, pointing_data)
 
         # ------------ Metadata ---------------
-        EXP_SECTION = "experiment"
-        BOUNDS_SECTION = "bounds"
-        meta = configparser.ConfigParser()
-        meta.add_section(EXP_SECTION)
-        meta.add_section(BOUNDS_SECTION)
-        exp = meta[EXP_SECTION]
-        bounds = meta[BOUNDS_SECTION]
-        # exp["version"] = __version__
+        write_metadata(experiment_params, bounds_params, dstdir)
 
-        for key, value in experiment_params._asdict().items():
-            if value is not None:
-                exp[key] = str(value)
-
-        for key, value in bounds_params._asdict().items():
-            if value is not None:
-                bounds[key] = str(value)
         if rf_writer:
             rf_writer.close()
-        # write metadata file
-        if dstdir:
-            metafile = dstdir.parent / "metadata.ini"
-            with open(metafile, "w") as f:
-                meta.write(f)
 
     return simulated_signal
+
+
+def write_metadata(exp_def: ExpDef, bounds_params: BoundParams, dstdir: Optional[Path] = None) -> None:
+    meta = configparser.ConfigParser()
+    meta.add_section(Metaparam.EXPERIMENT)
+    meta.add_section(Metaparam.BOUNDS)
+    exp = meta[Metaparam.EXPERIMENT]
+    bounds = meta[Metaparam.BOUNDS]
+
+    for key, value in asdict(exp_def).items():
+        if key == "name":
+            result = re.search(r"^(\D*)(.*)$", value)
+            exp[Expparam.NAME] = result.group(1)[:-1] if result else "unknown"
+            exp[Expparam.VERSION] = result.group(2) if result else "unknown"
+            continue
+        if value is not None:
+            exp[key] = str(value)
+
+    for key, value in bounds_params._asdict().items():
+        if value is not None:
+            bounds[key] = str(value)
+    # write metadata file
+    if dstdir:
+        metafile = dstdir.parent / "metadata.ini"
+        with open(metafile, "w") as f:
+            meta.write(f)

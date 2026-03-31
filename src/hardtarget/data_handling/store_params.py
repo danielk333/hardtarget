@@ -7,7 +7,7 @@ from typing import Iterable
 
 import h5py
 
-from hardtarget.types import CfgParams, DataItem, ExpParams, GenericCfg, GenericPro, ProParams
+from hardtarget.types import CfgParams, DataItem, ExpDef, GenericCfg, GenericPro, ProParams
 
 # Python StrEnum has default lowercase for auto() but is only available from py 3.11
 try:
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def dump_params_to_file(
     data_items: Iterable[tuple[str, DataItem]],
-    exp_params: ExpParams,
+    exp_params: ExpDef,
     cfg_params: CfgParams,
     pro_params: ProParams,
     outfile: Path,
@@ -32,7 +32,7 @@ def dump_params_to_file(
     include_params: bool = True,
 ) -> None:
     """
-    Stores any Analysed output, ExpParams, CfgParams and ProParams and any class inherited from these in
+    Stores any Analysed output, ExpDef, CfgParams and ProParams and any class inherited from these in
     a standardized h5 format.
 
     ```
@@ -42,7 +42,7 @@ def dump_params_to_file(
         ├ OutArgs
         |      ├ data item 1
         |      └ data item 2
-        ├ <Class<ExpParams>.__name__
+        ├ <Class<ExpDef>.__name__
         |      ├ parameter 1
         |      └ parameter 2
         ├ <Class<CfgParams>.__name__
@@ -112,7 +112,7 @@ def dump_params_to_file(
 
         if include_params:
 
-            def dump_params(file: h5py.File, param: GenericCfg | ExpParams | GenericPro) -> None:
+            def dump_params(file: h5py.File, param: GenericCfg | ExpDef | GenericPro) -> None:
                 grp_name = type(param).__name__
                 if grp_name not in file:
                     grp = file.create_group(grp_name)

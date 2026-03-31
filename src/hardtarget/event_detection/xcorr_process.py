@@ -11,7 +11,7 @@ from hardtarget.data_handling.configuration import extract_config_section
 from hardtarget.event_detection import get_event_detection_lib
 from hardtarget.event_detection.types import XCorrCfgParams, XCorrOutArgs, XCorrProParams, XCorrVariables
 from hardtarget.process import Process
-from hardtarget.types import CfgParams, DataItem, EventSearchLib, ExpParams, MethodLib, ProParams
+from hardtarget.types import CfgParams, DataItem, EventSearchLib, ExpDef, MethodLib, ProParams
 
 
 class XCorrProcess(Process[XCorrCfgParams, XCorrProParams, XCorrVariables, XCorrOutArgs, EventSearchLib]):
@@ -41,7 +41,7 @@ class XCorrProcess(Process[XCorrCfgParams, XCorrProParams, XCorrVariables, XCorr
         return XCorrCfgParams(**d)
 
     def get_process_params(
-        self, exp_params: ExpParams, cfg_params: XCorrCfgParams, pro_params: ProParams
+        self, exp_params: ExpDef, cfg_params: XCorrCfgParams, pro_params: ProParams
     ) -> XCorrProParams:
         """
         Calculate Optimize specific process parameters
@@ -92,7 +92,7 @@ class XCorrProcess(Process[XCorrCfgParams, XCorrProParams, XCorrVariables, XCorr
         self,
         all_vars: XCorrVariables,
         file_idx_sample: int,
-        exp_params: ExpParams,
+        exp_params: ExpDef,
         cfg_params: XCorrCfgParams,
         pro_params: XCorrProParams,
     ) -> XCorrOutArgs:

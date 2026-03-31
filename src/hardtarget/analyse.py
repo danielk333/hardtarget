@@ -1,11 +1,11 @@
 import datetime as dt
-import logging
 import sys
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
 from pyant.models.array import Array, ArrayParams
+from radardef.types.types import ExpDef
 
 from hardtarget.constants import (
     AnalysisMethod,
@@ -21,9 +21,10 @@ if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
 else:
     from typing import Unpack
 
+
 def analyse(
     path: str | Path,
-    config: str | Path | GenericCfg,
+    config: str | Path | GenericCfg | dict,
     method: AnalysisMethod,
     method_lib: Optional[MethodLib] = None,
     implementation: Optional[Impl] = None,
@@ -31,6 +32,7 @@ def analyse(
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
+    exp_params: Optional[ExpDef] = None,
     job: Optional[Job] = None,
     progress: bool = False,
     clobber: bool = True,
@@ -52,6 +54,7 @@ def analyse(
         start_time (optional): Start time of analysis
         end_time (optional): End time of analysis
         relative_time (optional): If to use relative time
+        exp_params (optional): If working with custom experiments it is needed to be able to load the data.
         job (optional): For parallelization the job to run the specific analysis on can be choosen.
         progress (optional): If a progress bar should be visualized.
         clobber (optional): If previous analysis should be overwritten.
@@ -71,6 +74,7 @@ def analyse(
         method_lib=method_lib,
         impl=implementation,
         rx_channel=rx_channel,
+        exp_params=exp_params,
     )
 
     # determine process to run
@@ -105,13 +109,14 @@ def analyse(
 
 def target_estimation(
     path: str | Path,
-    config: str | Path | GenericCfg,
+    config: str | Path | GenericCfg | dict,
     method_lib: Optional[MethodLib] = None,
     implementation: Optional[Impl] = None,
     rx_channel: Optional[str | int] = None,
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
+    exp_params: Optional[ExpDef] = None,
     job: Optional[Job] = None,
     progress: bool = False,
     clobber: bool = True,
@@ -129,6 +134,7 @@ def target_estimation(
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
+        exp_params=exp_params,
         job=job,
         progress=progress,
         clobber=clobber,
@@ -138,13 +144,14 @@ def target_estimation(
 
 def optimize(
     path: str | Path,
-    config: str | Path | GenericCfg,
+    config: str | Path | GenericCfg | dict,
     method_lib: Optional[MethodLib] = None,
     implementation: Optional[Impl] = None,
     rx_channel: Optional[str | int] = None,
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
+    exp_params: Optional[ExpDef] = None,
     job: Optional[Job] = None,
     progress: bool = False,
     clobber: bool = True,
@@ -162,6 +169,7 @@ def optimize(
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
+        exp_params=exp_params,
         job=job,
         progress=progress,
         clobber=clobber,
@@ -171,13 +179,14 @@ def optimize(
 
 def event_detection(
     path: str | Path,
-    config: str | Path | GenericCfg,
+    config: str | Path | GenericCfg | dict,
     method_lib: Optional[MethodLib] = None,
     implementation: Optional[Impl] = None,
     rx_channel: Optional[str | int] = None,
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
+    exp_params: Optional[ExpDef] = None,
     job: Optional[Job] = None,
     progress: bool = False,
     clobber: bool = True,
@@ -195,6 +204,7 @@ def event_detection(
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
+        exp_params=exp_params,
         job=job,
         progress=progress,
         clobber=clobber,
@@ -204,7 +214,7 @@ def event_detection(
 
 def direction_of_arrival(
     path: str | Path,
-    config: str | Path | GenericCfg,
+    config: str | Path | GenericCfg | dict,
     array_beam: Array,
     beam_params: ArrayParams,
     method_lib: Optional[MethodLib] = None,
@@ -213,6 +223,7 @@ def direction_of_arrival(
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
+    exp_params: Optional[ExpDef] = None,
     job: Optional[Job] = None,
     progress: bool = False,
     clobber: bool = True,
@@ -230,6 +241,7 @@ def direction_of_arrival(
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
+        exp_params=exp_params,
         job=job,
         progress=progress,
         clobber=clobber,

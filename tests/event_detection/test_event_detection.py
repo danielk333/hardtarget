@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import radardef.radar_stations.eiscat.utils as radardef_utils
 from radardef import RadarDef
-from radardef.types import BoundParams, ExpParams
+from radardef.types import BoundParams, ExpDef
 from scipy import constants
 
 import hardtarget
@@ -30,7 +30,7 @@ def wip_event_detection():
         doppler_freq_step=1000,
     )
 
-    exp_params = ExpParams(
+    exp_params = ExpDef(
         name="simulation",
         radar_frequency=929.6,
         t_ipp_usec=20000,

@@ -40,6 +40,16 @@ class TargetEstimationCfgParams(CfgParams):
 class TargetEstimationProParams(ProParams):
     """
     Target estimation general process parameters
+
+    Args:
+        decimated_read_length: Decimated read_length based on frequency decimation.
+        il0_rgs: Index level 0 range gates.
+        ranges: Range gates (including subresolution) in meter, true ranges.
+        il1_rx_window_indices: Index level 1 receiver window indices.
+        il0_rx_window_indices: Index level 0 receiver window indices.
+        il0_dec_rx_window_indices: Index level 0 decimated receiver window indices
+                                    (il0_rx_window_indices with frequency decimation).
+        range_rates: Range rates
     """
 
     decimated_read_length: int = 0

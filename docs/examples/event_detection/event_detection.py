@@ -47,8 +47,8 @@ assert reader is not None
 # In this case we choose to visualize the 500 first ipps of the measurement
 
 output_path = Path(tmp_dir.name) / "analysed"
-start_time = int(reader.meta.experiment.t_ipp_usec * 950)
-end_time = start_time + int(reader.meta.experiment.t_ipp_usec * 150)
+start_time = int(reader.experiment.t_ipp_usec * 950)
+end_time = start_time + int(reader.experiment.t_ipp_usec * 150)
 
 event_detection(
     path=data,
@@ -82,6 +82,7 @@ _, handles = plotting.rti(
     relative_time=True,
     colorbar=False,
 )
+fig.set_size_inches(10, 10)
 #
 plt.show()
 tmp_dir.cleanup()

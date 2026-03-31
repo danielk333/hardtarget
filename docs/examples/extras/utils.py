@@ -5,9 +5,8 @@ from typing import Optional
 
 import numpy as np
 from radardef import RadarDef
-from radardef.radar_stations.eiscat import load_radar_code
-from radardef.types import BoundParams, ExpParams
-from scipy import constants
+from radardef.radar_stations.eiscat.experiments import load_radar_code
+from radardef.types import BoundParams, ExpDef
 
 from hardtarget.data_handling import load_config_params
 from hardtarget.data_simulation import DRFSimParams, simulate_drf
@@ -20,7 +19,7 @@ except NameError:
 
 def sim_data(
     output_path: Path,
-    exp_params: Optional[ExpParams] = None,
+    exp_params: Optional[ExpDef] = None,
     bounds_params: Optional[BoundParams] = None,
     config: Optional[Path] = None,
     range0: float = 2000e3,
@@ -33,12 +32,10 @@ def sim_data(
     samples = 200
 
     if exp_params is None:
-        exp_params = ExpParams(
+        exp_params = ExpDef(
             name="test",
             radar_frequency=929.6,
             t_ipp_usec=20000,
-            ipp_samps=20000,
-            sample_rate=1000000,
             t_samp_usec=1,
             rx_channels=["sim"],
             t_tx_start_usec=82.0,
@@ -46,11 +43,11 @@ def sim_data(
             t_rx_start_usec=0,
             t_rx_end_usec=20000,
             tx_channel="sim",
-            tx_pulse_length=1920,
             t_cal_on_usec=19900.0,
             t_cal_off_usec=19997.0,
-            wavelength=constants.c / (929.6 * 1e6),
             code=load_radar_code("leo_bpark"),
+            baud_length_usec=30,
+            samples_per_file=12800000,
         )
 
     if bounds_params is None:

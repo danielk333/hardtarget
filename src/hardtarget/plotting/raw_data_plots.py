@@ -61,17 +61,17 @@ def rti(
         Axis and pmesh
     """
     time_bounds_us = Bounds(
-        int(data_loader.meta.bounds.ts_start_usec), int(data_loader.meta.bounds.ts_end_usec)
+        int(data_loader.epoch_bounds.ts_start_usec), int(data_loader.epoch_bounds.ts_end_usec)
     )
     request_bounds = time_interval_to_sample_bound(
         time_bounds=time_bounds_us,
         start_time=start_time,
         end_time=end_time,
-        sample_rate=data_loader.meta.experiment.sample_rate,
+        sample_rate=data_loader.experiment.sample_rate,
         relative_time=relative_time,
     )
 
-    ipp_samps = data_loader.meta.experiment.ipp_samps
+    ipp_samps = data_loader.experiment.ipp_samps
     start, end = data_loader.bounds(data_loader.channels[0])
     sample_bounds = Bounds(start, end)
     ipp_n0 = (request_bounds.start - sample_bounds.start) // ipp_samps
@@ -91,39 +91,35 @@ def rti(
 
     data_vec.flatten()
 
-    T_ipp = data_loader.meta.experiment.t_ipp_usec * 1e-6
-    sample_rate = data_loader.meta.experiment.sample_rate
+    T_ipp = data_loader.experiment.t_ipp_usec * 1e-6
+    sample_rate = data_loader.experiment.sample_rate
 
-    T_samp = data_loader.meta.experiment.t_samp_usec
+    T_samp = data_loader.experiment.t_samp_usec
 
     # Use np.round and case to int to avoid floating point errors in floor
     T_rx_start_samp = np.round(
-        data_loader.meta.experiment.t_rx_start_usec / data_loader.meta.experiment.t_samp_usec
+        data_loader.experiment.t_rx_start_usec / data_loader.experiment.t_samp_usec
     ).astype(np.int64)
     T_rx_end_samp = np.round(
-        data_loader.meta.experiment.t_rx_end_usec / data_loader.meta.experiment.t_samp_usec
+        data_loader.experiment.t_rx_end_usec / data_loader.experiment.t_samp_usec
     ).astype(np.int64)
 
     T_tx_start_samp = np.round(
-        data_loader.meta.experiment.t_tx_start_usec / data_loader.meta.experiment.t_samp_usec
+        data_loader.experiment.t_tx_start_usec / data_loader.experiment.t_samp_usec
     ).astype(np.int64)
     T_tx_end_samp = np.round(
-        data_loader.meta.experiment.t_tx_end_usec / data_loader.meta.experiment.t_samp_usec
+        data_loader.experiment.t_tx_end_usec / data_loader.experiment.t_samp_usec
     ).astype(np.int64)
 
     t_cal_on_usec = (
-        data_loader.meta.experiment.t_cal_on_usec
-        if data_loader.meta.experiment.t_cal_on_usec is not None
-        else 0
+        data_loader.experiment.t_cal_on_usec if data_loader.experiment.t_cal_on_usec is not None else 0
     )
     t_cal_off_usec = (
-        data_loader.meta.experiment.t_cal_off_usec
-        if data_loader.meta.experiment.t_cal_off_usec is not None
-        else 0
+        data_loader.experiment.t_cal_off_usec if data_loader.experiment.t_cal_off_usec is not None else 0
     )
 
-    T_cal_start_samp = np.round(t_cal_on_usec / data_loader.meta.experiment.t_samp_usec).astype(np.int64)
-    T_cal_end_samp = np.round(t_cal_off_usec / data_loader.meta.experiment.t_samp_usec).astype(np.int64)
+    T_cal_start_samp = np.round(t_cal_on_usec / data_loader.experiment.t_samp_usec).astype(np.int64)
+    T_cal_end_samp = np.round(t_cal_off_usec / data_loader.experiment.t_samp_usec).astype(np.int64)
 
     range_T = T_tx_start_samp / sample_rate
     samp_vec = np.arange(ipp_samps)

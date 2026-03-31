@@ -61,7 +61,7 @@ def plot_analysed_data(
                 plt.show()
             case AnalysisMethod.direction_of_arrival:
                 fig, ax = plt.subplots(3, 2)
-                ax, ani = plotting.plot_direction_of_arrival(fig, ax, out, pro, sensitivit_limit)
+                ax = plotting.plot_direction_of_arrival(ax, out, pro, sensitivit_limit)
                 plt.show()
             case AnalysisMethod.target_estimation:
                 fig, axes = plt.subplots(2, 2)

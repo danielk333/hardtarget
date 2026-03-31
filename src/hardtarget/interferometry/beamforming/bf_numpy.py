@@ -4,12 +4,12 @@ from pyant.models.array import Array, ArrayParams
 from spacecoords.spherical import cart_to_sph
 
 from hardtarget.interferometry.types import DOACfgParams, DOAProParams, DOAVars
-from hardtarget.types import ExpParams
+from hardtarget.types import ExpDef
 
 
 def grid_search_numpy(
     rx: npt.NDArray,
-    exp: ExpParams,
+    exp: ExpDef,
     cfg: DOACfgParams,
     pro: DOAProParams,
     beam: Array,
@@ -35,5 +35,4 @@ def grid_search_numpy(
         peak=vals[max_ind],
         azimuth=sph[0],
         elevation=sph[1],
-        vals=vals,
     )

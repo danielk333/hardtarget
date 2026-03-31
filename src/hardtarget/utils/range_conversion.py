@@ -3,6 +3,8 @@ Range conversion tools
 """
 
 import numpy as np
+import numpy.typing as npt
+import scipy.constants
 import scipy.constants as constants
 
 LUNAR_DISTANCE = 3.84399e8  # m
@@ -72,3 +74,13 @@ def range_gate_to_unit(val: float | int, unit: str, sample_rate: int | float) ->
         return val
     val = constants.c * val / sample_rate + 1
     return SI_to_unit(val, unit)
+
+
+def range_to_range_gate(range: float | npt.NDArray, sample_rate: float) -> int:
+    """Convert range to range gate size"""
+    return int((range / scipy.constants.c) * sample_rate)
+
+
+def range_gate_to_range(range_gates: npt.NDArray, sample_rate: float) -> npt.NDArray:
+    """Convert range gate to range"""
+    return range_gates * scipy.constants.c / sample_rate

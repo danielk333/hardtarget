@@ -69,9 +69,8 @@ plugins:
         - examples/target_estimation/estimate_errors.py
         - examples/target_estimation/precision_orbit_analysis.py
         - examples/target_estimation/profile_speed.py
-        - examples/direction_of_arrival/interferometry.py
         - examples/back_to_basics/part3_sweep_acceleration.py
-        - examples/direction_of_arrival/interferometry.py
+        - examples/direction_of_arrival/doa_error_per_resolution.py
 
       include_source: false
       ignore: ["_wip*"]
@@ -131,5 +130,9 @@ nav:
           - Optimizing Target Estimation: examples/optimization/optimization.py
       - Event Detection:
           - Event Detection: examples/event_detection/event_detection.py
-      - Extras:
-          - Simulated tx signal: examples/extras/simulated_tx_signal.py
+      - Direction of Arrival:
+          - Direction of Arrival: examples/direction_of_arrival/interferometry.py
+      - Simulation:
+          - Simulated tx signal: examples/simulation/simulated_tx_signal.py
+          - Simulated array beam data: examples/simulation/multichannel_simulation.py
+          - Analysis of simulated data: examples/simulation/analyse_simulation.py

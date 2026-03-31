@@ -3,30 +3,18 @@
 import datetime as dt
 import logging
 from collections.abc import Generator
+from dataclasses import fields
 from pathlib import Path
-from typing import Any, Optional, Type
+from typing import Any, Optional, TypeVar
 
 import h5py
 import numpy as np
 
 from hardtarget.constants import AnalysisMethod
-from hardtarget.process import Process, get_analysis_process
+from hardtarget.process import get_analysis_process
 from hardtarget.target_estimation.types import MFOutArgs
-from hardtarget.types import ExpParams, GenericCfg, GenericOut, GenericPro, ProParams
+from hardtarget.types import ExpDef, GenericCfg, GenericOut, GenericPro, IsDataclass, ProParams
 from hardtarget.utils.h5_tools import get_analysed_h5_files
-
-try:
-    # Only available from python 3.12
-    from types import get_original_bases  # type: ignore[attr-defined,unused-ignore]
-
-    def orig_bases(cls: Type) -> tuple[Any, ...]:
-        return get_original_bases(cls)
-
-except ImportError:
-
-    def orig_bases(cls: Type) -> tuple[Any, ...]:
-        return cls.__orig_bases__
-
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +25,7 @@ def load_analysed_data(
     end_time: Optional[int | np.datetime64] = None,
     relative_time: bool = False,
     chunk_size: Optional[int] = None,
-) -> Generator[tuple[GenericOut, ExpParams, GenericCfg, GenericPro], None, None]:
+) -> Generator[tuple[GenericOut, ExpDef, GenericCfg, GenericPro], None, None]:
     """
     Loads and concatenates all analysed output data from 'data_dir'. Optionally specific timespans can be
     extracted, the result will be yielded in sizes of 'chunk_size' if given.
@@ -134,7 +122,7 @@ def collect_paths(
     return fl
 
 
-def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpParams, GenericCfg, GenericPro]:
+def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, GenericCfg, GenericPro]:
     """
     From the stored analysed data, determines what method was used during analysis and loads
     the data to the appropriate analys process specfic types. If mulitple files are given, the data is merged
@@ -150,7 +138,7 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpParams, Gen
     cfg_type, pro_type, out_type = get_process_types_from_file(paths[0])
 
     out_args: dict[str, Any] = {}
-    exp_params: ExpParams | None = None
+    exp_params: ExpDef | None = None
     cfg_params: GenericCfg | None = None
     pro_params: GenericPro | None = None
 
@@ -171,9 +159,19 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpParams, Gen
                     data = [d.decode() for d in data]
                 return data
 
+            GenericDC = TypeVar("GenericDC", bound=IsDataclass)
+
+            def extract_dataclass(file: h5py.File, dc_type: type[GenericDC]) -> GenericDC:
+                # If init is false for the dataclass, ignore it
+                excluded_keys = [field.name for field in fields(dc_type) if not field.init]
+                # Extract keys
+                group = file[dc_type.__name__]
+                return dc_type(
+                    **{key: read_key(group, key) for key in group.keys() if key not in excluded_keys}
+                )
+
             if exp_params is None:
-                group = hf[ExpParams.__name__]
-                exp_params = ExpParams(**{key: read_key(group, key) for key in group.keys()})
+                exp_params = extract_dataclass(hf, ExpDef)
             if cfg_params is None:
                 group = hf[cfg_type.__name__]
                 cfg_params = cfg_type(**{key: read_key(group, key) for key in group.keys()})
@@ -201,11 +199,15 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpParams, Gen
 
         out_args = _append_data(out_args, out_tmp, logger)
 
+    if not exp_params or not cfg_params or not pro_params:
+        raise FileNotFoundError(
+            f"Exp present: {exp_params is not None}, Cfg present: {cfg_params is not None}, Pro present: {pro_params is not None} "
+        )
     return (
         out_type(**out_args),
-        exp_params if exp_params is not None else ExpParams(),
-        cfg_params if cfg_params is not None else cfg_type(),
-        pro_params if pro_params is not None else pro_type(),
+        exp_params,
+        cfg_params,
+        pro_params,
     )
 
 
@@ -227,20 +229,7 @@ def get_process_types_from_file(path: Path) -> tuple[Any, Any, Any]:
         # Retrive process matching the method and get the specific generic types for that process
         process = get_analysis_process(method, method_lib)
 
-        return get_process_types(process)
-
-
-def get_process_types(process: type[Process]) -> tuple[Any, Any, Any]:
-    if process.__bases__[0] != Process:
-        # For target estimation processes there is a double inheritance case
-        _, _, _, out_type, _ = orig_bases(process.__bases__[0])[0].__args__
-        cfg_type, pro_type = orig_bases(process)[0].__args__
-    else:
-        # Get process base types
-        generic_types = orig_bases(process)[0].__args__
-        cfg_type, pro_type, _, out_type, _ = generic_types
-
-    return cfg_type, pro_type, out_type
+        return process.get_types()
 
 
 """

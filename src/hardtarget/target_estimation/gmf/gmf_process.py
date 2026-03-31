@@ -4,7 +4,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
-from radardef.types import ExpParams
+from radardef.types import ExpDef
 
 from hardtarget.constants import ConfigSubSection, Impl, TargetEstimationMethod
 from hardtarget.data_handling.configuration import extract_config_section
@@ -51,7 +51,7 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
 
     def get_lib_specific_process_params(
         self,
-        exp_params: ExpParams,
+        exp_params: ExpDef,
         cfg_params: GMFCfgParams,
         pro_params: TargetEstimationProParams,
     ) -> GMFProParams:

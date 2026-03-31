@@ -4,7 +4,7 @@ import numpy as np
 import numpy.typing as npt
 from scipy import constants
 
-from hardtarget.types import CfgParams, ExpParams
+from hardtarget.types import CfgParams, ExpDef
 
 
 def _convert(data: Any, km: bool = True, monostatic: bool = True) -> npt.NDArray[Any]:
@@ -20,7 +20,7 @@ def _convert(data: Any, km: bool = True, monostatic: bool = True) -> npt.NDArray
 def to_relative_range_gate(
     ranges: npt.NDArray[np.float64 | np.int64],
     cfg: CfgParams,
-    exp: ExpParams,
+    exp: ExpDef,
 ) -> npt.NDArray[np.int64]:
     sample_rate = exp.sample_rate
     tx_start_samp = exp.t_tx_start_usec / exp.t_samp_usec

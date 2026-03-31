@@ -7,14 +7,15 @@ from pathlib import Path
 from typing import Callable, Generic, TypeVar
 
 import numpy as np
-import scipy
-import scipy.constants
 import scipy.fft as fft
 from radardef.types import Pointing
 from scipy.signal import savgol_filter  # type: ignore[attr-defined]
 
 from hardtarget.constants import ConfigSubSection
-from hardtarget.data_handling.configuration import extract_config_section, get_ilx_windows
+from hardtarget.data_handling.configuration import (
+    extract_config_section,
+    get_ilx_windows,
+)
 from hardtarget.process import Process
 from hardtarget.target_estimation.types import (
     ExtendedTargetEstimationProParams,
@@ -29,10 +30,11 @@ from hardtarget.types import (
     Bounds,
     CfgParams,
     DataItem,
-    ExpParams,
+    ExpDef,
     ExtractSignals,
     ProParams,
 )
+from hardtarget.utils.range_conversion import range_gate_to_range
 
 if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
     from typing_extensions import Unpack
@@ -56,7 +58,7 @@ class TargetEstimationProcess(
     def __init__(
         self,
         cfg_raw: str | Path | TeLibCfg,
-        exp_params: ExpParams,
+        exp_params: ExpDef,
         cfg_params: CfgParams,
         pro_params: ProParams,
         epoch_bounds: Bounds,
@@ -80,7 +82,7 @@ class TargetEstimationProcess(
         )
         if isinstance(cfg_raw, TargetEstimationCfgParams):
             self.cfg_params: TeLibCfg = cfg_raw
-        else:
+        elif not isinstance(cfg_raw, dict):
             self.cfg_params = self.get_lib_specific_conf_params(Path(cfg_raw), self.cfg_params)
         self.pro_params: TeLibPro = self.get_lib_specific_process_params(
             exp_params, self.cfg_params, self.pro_params
@@ -109,7 +111,7 @@ class TargetEstimationProcess(
         pass
 
     def get_process_params(
-        self, exp_params: ExpParams, cfg_params: TargetEstimationCfgParams, pro_params: ProParams
+        self, exp_params: ExpDef, cfg_params: TargetEstimationCfgParams, pro_params: ProParams
     ) -> TargetEstimationProParams:
         """
         Calculate Optimize specific process parameters
@@ -142,19 +144,11 @@ class TargetEstimationProcess(
             dtype=np.float64,
         )
 
-        ranges = ((full_res_rgs + 1) * scipy.constants.c / exp_params.sample_rate).astype(np.float64)  # m
+        ranges = range_gate_to_range(full_res_rgs + 1, exp_params.sample_rate).astype(np.float64)  # m
 
         assert np.all(pro_params.range_gates >= 0), "Computed range gates not compatible with stencils"
 
-        if exp_params.tx_pulse_length is not None:
-            _tx_pulse_samps = usec_to_samp(exp_params.tx_pulse_length)
-            assert _tx_pulse_samps == tx_end_samp - tx_start_samp, (
-                f"tx pulse lengths does not correspond to tx start and stop values:\n"
-                f"   - tx_pulse_samps: {_tx_pulse_samps}\n"
-                f"   - end_samp-start_samp: {tx_end_samp - tx_start_samp}"
-            )
-        else:
-            _tx_pulse_samps = tx_end_samp - tx_start_samp
+        _tx_pulse_samps = tx_end_samp - tx_start_samp
 
         il0_rgs, il0_rx_window_indices, il1_rx_window_indices = get_ilx_windows(
             exp_params, cfg_params, pro_params
@@ -227,7 +221,7 @@ class TargetEstimationProcess(
     @abstractmethod
     def get_lib_specific_process_params(
         self,
-        exp_params: ExpParams,
+        exp_params: ExpDef,
         cfg_params: TeLibCfg,
         pro_params: TargetEstimationProParams,
     ) -> TeLibPro:
@@ -248,7 +242,7 @@ class TargetEstimationProcess(
         self,
         all_vars: MFVariables,
         file_idx_sample: int,
-        exp_params: ExpParams,
+        exp_params: ExpDef,
         cfg_params: TargetEstimationCfgParams,
         pro_params: TargetEstimationProParams,
     ) -> MFOutArgs:

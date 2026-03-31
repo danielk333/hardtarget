@@ -7,7 +7,7 @@ from hardtarget.event_detection.types import (
     XCorrVariables,
 )
 from hardtarget.libs import load_c_lib
-from hardtarget.types import ExpParams
+from hardtarget.types import ExpDef
 
 mfclib = load_c_lib()
 
@@ -15,7 +15,7 @@ mfclib = load_c_lib()
 def xcorr_c(
     tx: npt.NDArray[np.complex64],
     rx: npt.NDArray[np.complex64],
-    exp_params: ExpParams,
+    exp_params: ExpDef,
     cfg_params: XCorrCfgParams,
     pro_params: XCorrProParams,
 ) -> XCorrVariables:

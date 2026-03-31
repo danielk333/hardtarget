@@ -14,9 +14,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.fft as fft
-from radardef.radar_stations.eiscat import load_radar_code
-from radardef.types import BoundParams, ExpParams
-from scipy import constants
+from radardef.radar_stations.eiscat.experiments import load_radar_code
+from radardef.types import BoundParams, ExpDef
 
 import hardtarget
 from hardtarget.constants import AnalysisMethod
@@ -33,24 +32,22 @@ except NameError:
 # ---
 
 # Exp
-exp = ExpParams(
+exp = ExpDef(
     name="simulation",
     radar_frequency=929.6,
     t_ipp_usec=20000,
-    ipp_samps=20000,
-    sample_rate=1000000,
     t_samp_usec=1,
     rx_channels=["sim"],
-    t_tx_start_usec=82.0,
-    t_tx_end_usec=2002.0,
+    t_tx_start_usec=82,
+    t_tx_end_usec=2002,
     t_rx_start_usec=0,
     t_rx_end_usec=20000,
+    baud_length_usec=30,
     tx_channel="sim",
-    tx_pulse_length=1920,
     t_cal_on_usec=19900.0,
     t_cal_off_usec=19997.0,
-    wavelength=constants.c / (929.6 * 1e6),
     code=load_radar_code("leo_bpark"),
+    samples_per_file=12800000,
 )
 # Bounds
 bounds_params = BoundParams(
@@ -71,7 +68,9 @@ range0, vel0, acel0, t_rel, t_abs, SNR, echo_len, _ = utils.sim_data(
 # ---
 # Read the measurement and then start a process to get the correct process parameters
 
-measurement = hardtarget.Measurement(Path(tmp_sim_path.name), config, AnalysisMethod.target_estimation)
+measurement = hardtarget.Measurement(
+    Path(tmp_sim_path.name), config, AnalysisMethod.target_estimation, exp_params=exp
+)
 analyse_process = hardtarget.process.GMFProcess(
     config,
     measurement.exp_params,
@@ -140,9 +139,9 @@ echo = np.sum(xcorr, axis=-1)
 c_echo = echo * phasors
 
 # Calculate the decimated parameters
-
+tx_pulse_length = int((exp.t_tx_end_usec - exp.t_tx_start_usec) / exp.t_samp_usec)
 dec_rgs = np.floor(pro_params.rel_rgs / cfg_params.frequency_decimation).astype(np.int32)
-dec_txlen = (exp.tx_pulse_length / exp.t_samp_usec) // cfg_params.frequency_decimation
+dec_txlen = (tx_pulse_length / exp.t_samp_usec) // cfg_params.frequency_decimation
 dec_sig_samps = np.arange(pro_params.decimated_read_length)
 dec_signal_vec = np.zeros((pro_params.decimated_read_length,), dtype=np.complex64)
 dec_rx_window_indices = pro_params.il0_dec_rx_window_indices  # + dec_rgs
@@ -174,14 +173,14 @@ axes[0].set_title("Raw signal power")
 axes[1].plot(comp_samps, np.real(sel_rxs) / np.sum(np.abs(sel_rxs)), "-g", label="RX")
 axes[1].plot(comp_samps, np.real(z.tx) / np.sum(np.abs(z.tx)), "-r", alpha=0.5, label="TX")
 for ind in range(n_ipp):
-    axes[1].axvline((exp.tx_pulse_length / exp.t_samp_usec) * (ind + 1), ls="--", c="c")
+    axes[1].axvline((tx_pulse_length / exp.t_samp_usec) * (ind + 1), ls="--", c="c")
 axes[1].set_title("Stenciled signals")
 axes[1].legend()
 #
 axes[2].plot(comp_samps, np.real(xcorr), "-k")
 axes[2].plot(comp_samps, np.abs(xcorr), "--k")
 for ind in range(n_ipp):
-    axes[2].axvline((exp.tx_pulse_length / exp.t_samp_usec) * (ind + 1), ls="--", c="c")
+    axes[2].axvline((tx_pulse_length / exp.t_samp_usec) * (ind + 1), ls="--", c="c")
 axes[2].set_title("Correlated echo")
 fig.set_size_inches(10, 10)
 
@@ -189,7 +188,7 @@ fig, axes = plt.subplots(3, 2)
 axes[0, 0].plot(comp_samps, np.real(xcorr), "-k")
 axes[0, 0].plot(comp_samps, np.abs(xcorr), "--k")
 for ind in range(n_ipp):
-    axes[0, 0].axvline((exp.tx_pulse_length / exp.t_samp_usec) * (ind + 1), ls="--", c="c")
+    axes[0, 0].axvline((tx_pulse_length / exp.t_samp_usec) * (ind + 1), ls="--", c="c")
 axes[0, 0].set_title("Correlated echo")
 #
 axes[0, 1].plot(nfft, np.real(phasors))

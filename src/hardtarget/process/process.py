@@ -11,21 +11,16 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable, Generic, Optional
+from typing import Any, Callable, Generic, Optional, Type
 
 import numpy as np
-from tqdm import tqdm
-
-if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
-    from typing_extensions import Unpack
-else:
-    from typing import Unpack
-
 from radardef.types import Pointing
+from tqdm import tqdm
 
 import hardtarget.process.utils as utils
 from hardtarget.constants import Impl, MethodLib
 from hardtarget.data_handling import dump_params_to_file
+from hardtarget.data_handling.configuration import extract_config_from_dict
 from hardtarget.process.utils import calculate_tasks, sample_interval_to_closest_ipp
 from hardtarget.types import (
     AnalysedResult,
@@ -33,7 +28,7 @@ from hardtarget.types import (
     Bounds,
     CfgParams,
     DataItem,
-    ExpParams,
+    ExpDef,
     ExtractSignals,
     GenericCfg,
     GenericLib,
@@ -44,6 +39,23 @@ from hardtarget.types import (
     ProParams,
 )
 from hardtarget.utils.time_conversion import time_interval_to_sample_bound, ts_from_str
+
+if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
+    from typing_extensions import Unpack
+else:
+    from typing import Unpack
+
+try:
+    # Only available from python 3.12
+    from types import get_original_bases  # type: ignore[attr-defined,unused-ignore]
+
+    def orig_bases(cls: Type) -> tuple[Any, ...]:
+        return get_original_bases(cls)
+
+except ImportError:
+
+    def orig_bases(cls: Type) -> tuple[Any, ...]:
+        return cls.__orig_bases__
 
 
 class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, GenericLib]):
@@ -114,7 +126,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
     def __init__(
         self,
         cfg_raw: str | Path | GenericCfg,
-        exp_params: ExpParams,
+        exp_params: ExpDef,
         cfg_params: CfgParams,
         pro_params: ProParams,
         epoch_bounds: Bounds,
@@ -126,10 +138,15 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
     ) -> None:
         self._logger = logging.getLogger(__name__)
         self.exp_params = exp_params
+
         if isinstance(cfg_raw, CfgParams):
             self.cfg_params = cfg_raw
+        elif isinstance(cfg_raw, dict):
+            cfg_type, _, _ = self.get_types()
+            self.cfg_params = extract_config_from_dict(cfg_raw, cfg_type)
         else:
             self.cfg_params = self.get_conf_params(Path(cfg_raw), cfg_params)
+
         self.lib, lib_name, impl = self.get_analysis_lib(pro_params.method_lib, pro_params.implementation)
         pro_params = self.define_method_lib(pro_params, lib_name, impl)
         self.pro_params = self.get_process_params(self.exp_params, self.cfg_params, pro_params)
@@ -141,6 +158,19 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self.progress_bar = None
         self.store_mode = "w"
         self.store_params = True
+
+    @classmethod
+    def get_types(cls) -> tuple[type[GenericCfg], type[GenericPro], type[GenericOut]]:
+        if cls.__bases__[0] != Process:
+            # For target estimation processes there is a double inheritance case
+            _, _, _, out_type, _ = orig_bases(cls.__bases__[0])[0].__args__
+            cfg_type, pro_type = orig_bases(cls)[0].__args__
+        else:
+            # Get process base types
+            generic_types = orig_bases(cls)[0].__args__
+            cfg_type, pro_type, _, out_type, _ = generic_types
+
+        return cfg_type, pro_type, out_type
 
     @abstractmethod
     def get_analysis_lib(
@@ -172,7 +202,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
     @abstractmethod
     def get_process_params(
-        self, exp_params: ExpParams, cfg_params: GenericCfg, pro_params: ProParams
+        self, exp_params: ExpDef, cfg_params: GenericCfg, pro_params: ProParams
     ) -> GenericPro:
         """Abstract method, process specific parameters"""
         pass
@@ -201,7 +231,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self,
         all_vars: GenericVars,
         file_idx_sample: int,
-        exp_params: ExpParams,
+        exp_params: ExpDef,
         cfg_params: GenericCfg,
         pro_params: GenericPro,
     ) -> GenericOut:

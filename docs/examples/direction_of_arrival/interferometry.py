@@ -1,4 +1,4 @@
-# # Interferometry
+# # Direction of arrival
 # ---
 # How to trigger analysis and then inspect the output
 
@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from radardef import ExpParams, Mu, RadarDef
+from radardef import ExpDef, Mu, RadarDef
 
 from hardtarget import direction_of_arrival, load_analysed_data, plotting
 from hardtarget.interferometry.types import DOACfgParams, DOAProParams, DOAVars
@@ -47,11 +47,8 @@ mu_station = Mu()
 # In this case we choose to visualize the 500 first ipps of the measurement
 
 output_path = Path(tmp_dir.name) / "analysed"
-start_time = int(reader.meta.experiment.t_ipp_usec * 40)
-end_time = start_time + int(reader.meta.experiment.t_ipp_usec * 150)
-# Alternative object
-# start_time = int(reader.meta.experiment.t_ipp_usec * 3450)  # 3350
-# end_time = start_time + int(reader.meta.experiment.t_ipp_usec * 150)
+start_time = int(reader.experiment.t_ipp_usec * 50)
+end_time = start_time + int(reader.experiment.t_ipp_usec * 120)
 cfg = DOACfgParams(
     n_ipp=1,
     ipp_offset=0,
@@ -60,11 +57,10 @@ cfg = DOACfgParams(
     range_gate_step=1,
     num_cohints_per_file=500,
     elevation_limit=0,
-    resolution=100,
+    resolution=150,
 )
 
 # Run analysis
-
 direction_of_arrival(
     path=data,
     config=cfg,
@@ -79,24 +75,15 @@ direction_of_arrival(
 # Load analysed data
 
 data_generator = load_analysed_data(output_path)
-output: tuple[DOAVars, ExpParams, DOACfgParams, DOAProParams] = list(data_generator)[0]
+output: tuple[DOAVars, ExpDef, DOACfgParams, DOAProParams] = list(data_generator)[0]
 out_data, exp_params, cfg_params, pro_params = output
 
-# Plot results
+# ## Plot results
+# ---
+# Plot the estimated path over the beam and the azimuth and elevation.
 
-fig, ax = plt.subplots(3, 2)
-ax, ani = plotting.plot_direction_of_arrival(fig, ax, out_data, pro_params, 10.0)
-#
-ax[2, 1].set_title("Raw data (summed channels)")
-_, handles = plotting.rti(
-    ax[2, 1],
-    reader,
-    start_time=start_time,
-    end_time=end_time,
-    axis_units=True,
-    log=True,
-    relative_time=True,
-    colorbar=False,
-)
+fig, ax = plt.subplots(2, 2)
+ax = plotting.plot_direction_of_arrival(ax, out_data, pro_params, 10.0)
+fig.set_size_inches(10, 10)
 #
 plt.show()

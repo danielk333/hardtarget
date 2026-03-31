@@ -4,7 +4,7 @@ import numpy as np
 import numpy.typing as npt
 import scipy.constants as constants
 import scipy.optimize as sco
-from radardef.types import ExpParams
+from radardef.types import ExpDef
 
 from hardtarget.optimization.types import OptimizeCfgParams, OptimizeProParams
 from hardtarget.utils.time_conversion import ipp_time_to_sample
@@ -13,7 +13,7 @@ from hardtarget.utils.time_conversion import ipp_time_to_sample
 def optimize_gmf_np(
     tx: npt.NDArray[np.complexfloating],
     ipp: npt.NDArray,
-    exp_params: ExpParams,
+    exp_params: ExpDef,
     cfg_params: OptimizeCfgParams,
     pro_params: OptimizeProParams,
     r_vec: float,
@@ -85,7 +85,7 @@ def optimize_gmf_np(
 def optimize_grid_gmf_np(
     tx: npt.NDArray[np.complexfloating],
     ipp: npt.NDArray,
-    exp_params: ExpParams,
+    exp_params: ExpDef,
     cfg_params: OptimizeCfgParams,
     pro_params: OptimizeProParams,
     r_vec: float,

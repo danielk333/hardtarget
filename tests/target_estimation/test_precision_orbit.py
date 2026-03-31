@@ -22,7 +22,7 @@ from hardtarget.constants import AnalysisMethod, TargetEstimationMethod
 from hardtarget.target_estimation.dpt.types import DPTCfgParams
 from hardtarget.target_estimation.gmf.types import GMFCfgParams
 from hardtarget.target_estimation.types import MFOutArgs
-from hardtarget.types import CfgParams, ExpParams, ProParams
+from hardtarget.types import CfgParams, ExpDef, ProParams
 
 from .utils import cdse
 from .utils.dt_standard import str_to_dt
@@ -130,7 +130,7 @@ def test_verify_analysis_orbit_data(params: tuple[TargetEstimationMethod, CfgPar
     assert result["dir"] is not None
 
     # Load results
-    load_ret: tuple[MFOutArgs, ExpParams, GMFCfgParams, ProParams]
+    load_ret: tuple[MFOutArgs, ExpDef, GMFCfgParams, ProParams]
     load_ret = list(load_analysed_data(result["dir"]))[0]
     out, exp, cfg, pro = load_ret
 
@@ -218,7 +218,7 @@ def test_verify_analysis_orbit_data(params: tuple[TargetEstimationMethod, CfgPar
         pointing_cart = spherical.sph_to_cart(
             np.array([out.pointing_vec[0, 0], out.pointing_vec[0, 1], 1]),
             degrees=True,
-        )
+        ).round(decimals=8)
         satellite_cart = satellite_enu[:3, :] / np.linalg.norm(satellite_enu[:3, :], axis=0)
         off_axis_angle = linalg.vector_angle(
             satellite_cart,

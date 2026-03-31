@@ -10,8 +10,8 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
-from radardef.radar_stations.eiscat import load_radar_code
-from radardef.types import BoundParams, ExpParams
+from radardef.radar_stations.eiscat.experiments import load_radar_code
+from radardef.types import BoundParams, ExpDef
 from scipy import constants
 
 from hardtarget import analyse, load_analysed_data
@@ -31,24 +31,22 @@ def linearized_mle_covariance(
     da: float = 1.0,
 ) -> npt.NDArray[np.floating]:
     """ """
-    experiment_params = ExpParams(
+    experiment_params = ExpDef(
         name="simulation",
         radar_frequency=929.6,
         t_ipp_usec=20000,
-        ipp_samps=20000,
-        sample_rate=1000000,
         t_samp_usec=1,
         rx_channels=["sim"],
-        t_tx_start_usec=82.0,
-        t_tx_end_usec=2002.0,
+        t_tx_start_usec=82,
+        t_tx_end_usec=2002,
         t_rx_start_usec=0,
         t_rx_end_usec=20000,
+        baud_length_usec=10,
         tx_channel="sim",
-        tx_pulse_length=1920,
         t_cal_on_usec=19900.0,
         t_cal_off_usec=19997.0,
-        wavelength=constants.c / (929.6 * 1e6),
         code=load_radar_code("leo_bpark"),
+        samples_per_file=12800000,
     )
     snr = 10.0 ** (snr_db * 0.1)
     simulation_params = DRFSimParams(
@@ -123,11 +121,11 @@ def linearized_mle_covariance(
     A[:, 1] = z_diff_v
     A[:, 2] = z_diff_a
 
-    assert experiment_params.tx_pulse_length is not None
+    tx_pulse_length = int(
+        (experiment_params.t_tx_end_usec - experiment_params.t_tx_start_usec) / experiment_params.t_samp_usec
+    )
 
-    tx_pulse_samps = np.round(
-        experiment_params.tx_pulse_length * 1e-6 * experiment_params.sample_rate
-    ).astype(np.int64)
+    tx_pulse_samps = np.round(tx_pulse_length * 1e-6 * experiment_params.sample_rate).astype(np.int64)
     coh_samples = tx_pulse_samps * n_ipp
     z_sigma_inv = snr / (2 * coh_samples)
     S = np.linalg.inv(np.real(np.transpose(np.conj(A)) @ A * z_sigma_inv))
@@ -152,29 +150,27 @@ def monte_carlo_sample_errors(
 ) -> dict[str, npt.NDArray]:
 
     tx_start = 0
-    tx_end = tx_pulse_length * 1e6 - 1
+    tx_end = int(tx_pulse_length * 1e6 - 1)
     rx_start = 0
-    rx_end = t_ipp_s * 1e6
+    rx_end = int(t_ipp_s * 1e6)
     tx_pulse_length = int(tx_pulse_length * 1e6) - 1  # should be (end-start) - t_samp_usec
-    t_samp_usec = (1 / sample_rate) * 1e6
-    experiment_params = ExpParams(
+    t_samp_usec = int((1 / sample_rate) * 1e6)
+    experiment_params = ExpDef(
         name="simulation",
         radar_frequency=radar_frequency * 1e-6,
         t_ipp_usec=int(t_ipp_s * 1e6),
-        ipp_samps=20000,  # needs to corrected
-        sample_rate=sample_rate,
         t_samp_usec=t_samp_usec,
         rx_channels=["sim"],
         t_tx_start_usec=tx_start,
         t_tx_end_usec=tx_end,
         t_rx_start_usec=rx_start,
         t_rx_end_usec=rx_end,
+        baud_length_usec=10,  # TODO
         tx_channel="sim",
-        tx_pulse_length=tx_pulse_length,
         t_cal_on_usec=0,
         t_cal_off_usec=0,
-        wavelength=constants.c / radar_frequency,
         code=load_radar_code("leo_bpark"),
+        samples_per_file=12800000,
     )
 
     bounds_params = BoundParams()

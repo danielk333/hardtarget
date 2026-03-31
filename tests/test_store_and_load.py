@@ -5,6 +5,7 @@ from typing import NamedTuple
 import numpy as np
 import pytest
 import radardef
+from radardef.radar_stations.eiscat.experiments import leo_mpark_2_1u
 
 from hardtarget.constants import AnalysisMethod
 from hardtarget.data_handling import compute_process_params, dump_params_to_file
@@ -12,7 +13,7 @@ from hardtarget.data_handling.configuration import extract_config_params_from_de
 from hardtarget.event_detection.types import XCorrCfgParams, XCorrOutArgs, XCorrProParams
 from hardtarget.interferometry.types import DOACfgParams, DOAOutArgs, DOAProParams
 from hardtarget.optimization.types import MFOptimizeOutArgs, OptimizeCfgParams, OptimizeProParams
-from hardtarget.plotting.load_data import get_process_types, load_analysed_data, orig_bases
+from hardtarget.plotting.load_data import load_analysed_data
 from hardtarget.process import (
     DOAProcess,
     DPTProcess,
@@ -26,7 +27,7 @@ from hardtarget.process import (
 from hardtarget.target_estimation.dpt.types import DPTCfgParams, DPTProParams
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, GMFProParams
 from hardtarget.target_estimation.types import MFOutArgs
-from hardtarget.types import ArrayKwargs, CfgParams, ExpParams
+from hardtarget.types import ArrayKwargs, CfgParams, ExpDef
 
 
 class TestStoreAndLoad:
@@ -53,7 +54,7 @@ class TestStoreAndLoad:
     @pytest.mark.parametrize("process, cfg_type, pro_type, out_type", process_and_types)
     def test_get_process_types(self, process, cfg_type, pro_type, out_type):
 
-        cfg, pro, out = get_process_types(process)
+        cfg, pro, out = process.get_types()
 
         assert cfg is cfg_type, (
             f"{process.__name__}: {cfg.__name__} is not the expected cfg type: {cfg_type.__name__}"
@@ -65,32 +66,12 @@ class TestStoreAndLoad:
             f"{process.__name__}: {out.__name__} is not the expected out type: {out_type.__name__}"
         )
 
-    exp_org = ExpParams(
-        name="leo_bpark",
-        radar_frequency=929.6,
-        t_ipp_usec=20000,
-        ipp_samps=20000,
-        t_samp_usec=1,
-        rx_channels=["uhf"],
-        tx_channel="uhf",
-        tx_pulse_length=1920,
-        t_rx_start_usec=2.0,
-        t_rx_end_usec=19997.0,
-        t_tx_start_usec=82.0,
-        t_tx_end_usec=2002.0,
-        t_cal_on_usec=19900.0,
-        t_cal_off_usec=19997.0,
-        wavelength=1,
-        sample_rate=1000000,
-        data=None,
-        code=None,
-        pulse=None,
-    )
+    exp_org = leo_mpark_2_1u
 
     @pytest.mark.parametrize("process", [GMFProcess, DPTProcess])
     def test_target_estimation_data(self, process: type[TargetEstimationProcess]):
 
-        cfg_type, _ = orig_bases(process)[0].__args__
+        cfg_type, _, _ = process.get_types()
         cfg_org = cfg_type(n_ipp=2)
         t_size = 10
         out_org = MFOutArgs(
@@ -133,7 +114,6 @@ class TestStoreAndLoad:
     def test_direction_of_arrival(self):
         cfg_org = DOACfgParams()
         out_org = DOAOutArgs(
-            vals=np.random.rand(cfg_org.num_cohints_per_file, 25, 25).astype(np.complex64),
             k_vec=np.random.rand(cfg_org.num_cohints_per_file, 3).astype(np.float32),
             peak=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex64),
             azimuth=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float32),
@@ -148,7 +128,7 @@ class TestStoreAndLoad:
 
     def store_and_load(
         self,
-        exp_org: ExpParams,
+        exp_org: ExpDef,
         cfg_org: CfgParams,
         out_org: NamedTuple,
         process: type[Process],
@@ -199,12 +179,11 @@ class TestStoreAndLoad:
                 except ValueError:
                     (out_d[key] == value).all()
             # validate exp data
-            exp_d = exp._asdict()
-            for key, value in exp_org._asdict().items():
+            for key, value in exp_org.__dict__.items():
                 try:
-                    assert exp_d[key] == value
+                    assert exp.__dict__[key] == value
                 except ValueError:
-                    (exp_d[key] == value).all()
+                    (exp.__dict__[key] == value).all()
             # validate config data
             for key, value in cfg_org.__dict__.items():
                 try:

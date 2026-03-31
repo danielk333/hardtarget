@@ -11,7 +11,7 @@ from hardtarget.target_estimation.types import (
     MFOutArgs,
     TargetEstimationCfgParams,
 )
-from hardtarget.types import ExpParams
+from hardtarget.types import ExpDef
 
 from .utils import _convert
 
@@ -19,7 +19,7 @@ from .utils import _convert
 def plot_peaks(
     axes: npt.NDArray,  # of type Axes
     out_data: MFOutArgs,
-    exp: ExpParams,
+    exp: ExpDef,
     cfg: TargetEstimationCfgParams,
     pro: ExtendedTargetEstimationProParams,
     monostatic: bool = True,
@@ -93,7 +93,7 @@ def plot_peaks(
 def plot_detections(
     axes: npt.NDArray,  # of type axes
     out_data: MFOutArgs,
-    exp: ExpParams,
+    exp: ExpDef,
     cfg: TargetEstimationCfgParams,
     pro: ExtendedTargetEstimationProParams,
     monostatic: bool = True,
@@ -174,7 +174,7 @@ def plot_detections(
 def plot_map(
     axes: list[Axes],
     out_data: MFOutArgs,
-    exp: ExpParams,
+    exp: ExpDef,
     cfg: TargetEstimationCfgParams,
     pro: ExtendedTargetEstimationProParams,
 ) -> tuple[list[Axes], list[QuadMesh | list[Line2D]]]:

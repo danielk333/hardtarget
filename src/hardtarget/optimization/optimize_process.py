@@ -25,7 +25,7 @@ from hardtarget.types import (
     Bounds,
     CfgParams,
     DataItem,
-    ExpParams,
+    ExpDef,
     ExtractSignals,
     MethodLib,
     OptimizeLib,
@@ -45,7 +45,7 @@ class OptimizeProcess(
     def __init__(
         self,
         cfg_path: Path,
-        exp_params: ExpParams,
+        exp_params: ExpDef,
         cfg_params: CfgParams,
         pro_params: ProParams,
         epoch_bounds: Bounds,
@@ -143,7 +143,7 @@ class OptimizeProcess(
         return OptimizeCfgParams(**d)
 
     def get_process_params(
-        self, exp_params: ExpParams, cfg_params: OptimizeCfgParams, pro_params: ProParams
+        self, exp_params: ExpDef, cfg_params: OptimizeCfgParams, pro_params: ProParams
     ) -> OptimizeProParams:
         """
                 Calculate Optimize specific process parameters
@@ -230,7 +230,7 @@ class OptimizeProcess(
         self,
         all_vars: MFOptimizeVariables,
         file_idx_sample: int,
-        exp_params: ExpParams,
+        exp_params: ExpDef,
         cfg_params: OptimizeCfgParams,
         pro_params: OptimizeProParams,
     ) -> MFOptimizeOutArgs:

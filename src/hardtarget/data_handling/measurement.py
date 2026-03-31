@@ -7,11 +7,12 @@ from typing import Optional
 
 import numpy as np
 from radardef import DataLoader, RadarDef
-from radardef.types import ExpParams, Pointing
+from radardef.types import ExpDef, Pointing
 
 from hardtarget.constants import AnalysisMethod, MethodLib
 from hardtarget.data_handling.configuration import (
     compute_process_params,
+    extract_config_from_dict,
     extract_config_params_from_derived_object,
     load_config_params,
 )
@@ -42,7 +43,7 @@ class Measurement:
     """
 
     @property
-    def exp_params(self) -> ExpParams:
+    def exp_params(self) -> ExpDef:
         """Experiment paramters from the measurement file"""
         return self.__exp_params
 
@@ -74,7 +75,7 @@ class Measurement:
     @property
     def epoch(self) -> Bounds:
         """Start and stop in microseconds"""
-        t_start_usec, t_end_usec = self.data_loader.meta.bounds
+        t_start_usec, t_end_usec = self.data_loader.epoch_bounds
         return Bounds(int(t_start_usec), int(t_end_usec))
 
     @property
@@ -85,28 +86,31 @@ class Measurement:
     def __init__(
         self,
         path: Path | str,
-        config: Path | str | CfgParams,
+        config: Path | str | CfgParams | dict,
         method: AnalysisMethod,
         method_lib: Optional[MethodLib] = None,
         impl: Optional[Impl] = None,
         rx_channel: Optional[str | int] = None,
         excluded_channels: Optional[list[str] | list[int]] = None,
+        exp_params: Optional[ExpDef] = None,
     ) -> None:
 
         # Access measurement data
         self.__path = Path(path)
-        data_loader = RadarDef().load_data(self.__path)
+        data_loader = RadarDef().load_data(self.__path, experiment=exp_params)
         if data_loader is None:
             raise Exception(f"Not possible to load data file from: {self.__path}")
         else:
             self.__data_loader = data_loader
-        self.__exp_params = self.data_loader.meta.experiment
+        self.__exp_params = self.data_loader.experiment
         self._rx_channel, self._tx_channel = self.extract_channels(self.exp_params, rx_channel)
         self._excluded_channels = excluded_channels if excluded_channels is not None else []
 
         # Extract user config, .ini file or CfgParams type object
         if isinstance(config, CfgParams):
             self.__cfg_params = extract_config_params_from_derived_object(config)
+        elif isinstance(config, dict):
+            self.__cfg_params = extract_config_from_dict(config, CfgParams)
         else:
             self.__cfg_params = load_config_params(config)
 
@@ -120,7 +124,7 @@ class Measurement:
         )
 
     def extract_channels(
-        self, exp_params: ExpParams, rx_channel: Optional[int | str] = None
+        self, exp_params: ExpDef, rx_channel: Optional[int | str] = None
     ) -> tuple[int | str | None, int | str | None]:
         """
         From experiment parameters and requested rx channel extract the correct ones from the data file
@@ -193,6 +197,8 @@ class Measurement:
             )
             tx = tx_signal_model(
                 code=self.exp_params.code,
+                baud_length_usec=self.exp_params.baud_length_usec,
+                t_samp_usec=self.exp_params.t_samp_usec,
                 tx_start_samp=int(self.exp_params.t_tx_start_usec / self.exp_params.t_samp_usec),
                 start_samp=(start_sample % self.exp_params.ipp_samps) - self.cfg_params.samp_offset,
                 read_length=read_length,

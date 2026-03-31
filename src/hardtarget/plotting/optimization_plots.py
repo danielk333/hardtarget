@@ -3,14 +3,14 @@ import numpy.typing as npt
 
 from hardtarget.optimization.types import MFOptimizeOutArgs, OptimizeCfgParams, OptimizeProParams
 from hardtarget.plotting.utils import _convert, to_relative_range_gate
-from hardtarget.types import ExpParams
+from hardtarget.types import ExpDef
 from hardtarget.utils import noise
 
 
 def plot_optimization_peaks(
     axes: npt.NDArray,  # of type Axes
     out_data: MFOptimizeOutArgs,
-    exp: ExpParams,
+    exp: ExpDef,
     cfg: OptimizeCfgParams,
     pro: OptimizeProParams,
     monostatic: bool = True,

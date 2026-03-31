@@ -15,7 +15,7 @@ import numpy as np
 import numpy.typing as npt
 
 from hardtarget.constants import AnalysisMethod, ConfigSubSection, MethodLib
-from hardtarget.types import CfgParams, ExpParams, Impl, ProParams
+from hardtarget.types import CfgParams, ExpDef, GenericCfg, Impl, ProParams
 
 
 def extract_config_section(
@@ -73,6 +73,15 @@ def extract_config_section(
     return default_dict
 
 
+def extract_config_from_dict(d: dict, cfg_type: Type[GenericCfg]) -> GenericCfg:
+    new_dict = {}
+    for field in fields(cfg_type):
+        if field.name in d:
+            new_dict[field.name] = d[field.name]
+
+    return cfg_type(**new_dict)
+
+
 def load_config_params(configfile: Path | str) -> CfgParams:
     """
     Load config parameters from the processing section.
@@ -112,7 +121,7 @@ def extract_config_params_from_derived_object(cfg_derived: CfgParams) -> CfgPara
 
 
 def compute_process_params(
-    exp_params: ExpParams,
+    exp_params: ExpDef,
     cfg_params: CfgParams,
     analysis_method: AnalysisMethod,
     method_lib: Optional[MethodLib] = None,
@@ -191,7 +200,7 @@ def compute_process_params(
 
 
 def get_ilx_windows(
-    exp_params: ExpParams, cfg_params: CfgParams, pro_params: ProParams
+    exp_params: ExpDef, cfg_params: CfgParams, pro_params: ProParams
 ) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
     rx_end_samp = int(exp_params.t_rx_end_usec / exp_params.t_samp_usec)
     tx_start_samp = int(exp_params.t_tx_start_usec / exp_params.t_samp_usec)

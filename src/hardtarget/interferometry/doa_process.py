@@ -19,7 +19,7 @@ from hardtarget.types import (
     Bounds,
     CfgParams,
     DataItem,
-    ExpParams,
+    ExpDef,
     ExtractSignals,
     InterferometryLib,
     MethodLib,
@@ -36,7 +36,7 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
     def __init__(
         self,
         cfg_raw: str | Path | DOACfgParams,
-        exp_params: ExpParams,
+        exp_params: ExpDef,
         cfg_params: CfgParams,
         pro_params: ProParams,
         epoch_bounds: Bounds,
@@ -96,7 +96,7 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
         return DOACfgParams(**d)
 
     def get_process_params(
-        self, exp_params: ExpParams, cfg_params: DOACfgParams, pro_params: ProParams
+        self, exp_params: ExpDef, cfg_params: DOACfgParams, pro_params: ProParams
     ) -> DOAProParams:
         """
         Calculate interferometry specific process parameters
@@ -117,7 +117,11 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
 
         kz = np.sqrt(1 - np.square(kx) - np.square(ky))
 
-        return DOAProParams(**asdict(pro_params), kx=kx, ky=ky, kz=kz)
+        k_1d_index = np.linspace(0, cfg_params.resolution - 1, cfg_params.resolution, dtype=int)
+        x_ind, y_ind = np.meshgrid(k_1d_index, k_1d_index)
+        k_2d_index = np.rec.fromarrays((y_ind, x_ind))
+
+        return DOAProParams(**asdict(pro_params), kx=kx, ky=ky, kz=kz, k_index=k_2d_index)
 
     def analyse_ipps(self, start_sample: int) -> DOAVars:
         """
@@ -146,14 +150,13 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
             peak=np.stack([x.peak for x in vars_list], axis=0),
             azimuth=np.stack([x.azimuth for x in vars_list], axis=0),
             elevation=np.stack([x.elevation for x in vars_list], axis=0),
-            vals=np.stack([x.vals for x in vars_list], axis=0),
         )
 
     def generate_output(
         self,
         all_vars: DOAVars,
         file_idx_sample: int,
-        exp_params: ExpParams,
+        exp_params: ExpDef,
         cfg_params: DOACfgParams,
         pro_params: DOAProParams,
     ) -> DOAOutArgs:
@@ -199,9 +202,5 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
             f"{output.elevation=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.elevation,
                 long_name="elevation for each coherent integration",
-            ),
-            f"{output.vals=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.vals,
-                long_name="TMP!!!",
             ),
         }

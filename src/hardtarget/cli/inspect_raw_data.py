@@ -7,6 +7,7 @@ import argparse
 import pprint
 import tempfile
 from collections import OrderedDict
+from dataclasses import asdict
 from pathlib import Path
 
 from radardef import RadarDef
@@ -44,9 +45,9 @@ def main(args: argparse.Namespace) -> None:
         channels = data_loader.channels
         for chnl in channels:
             samp_start, samp_end = data_loader.bounds(chnl)
-            sample_rate = data_loader.meta.experiment.sample_rate
-            dt_start = str_from_ts(data_loader.meta.bounds.ts_start_usec * 1e-6)
-            dt_end = str_from_ts(data_loader.meta.bounds.ts_end_usec * 1e-6)
+            sample_rate = data_loader.experiment.sample_rate
+            dt_start = str_from_ts(data_loader.epoch_bounds.ts_start_usec * 1e-6)
+            dt_end = str_from_ts(data_loader.epoch_bounds.ts_end_usec * 1e-6)
 
             d.append(
                 OrderedDict(
@@ -59,4 +60,4 @@ def main(args: argparse.Namespace) -> None:
                 )
             )
 
-        pprint.pprint({"Channels": d, "Experiment": data_loader.meta.experiment._asdict()})
+        pprint.pprint({"Channels": d, "Experiment": asdict(data_loader.experiment)})

@@ -9,9 +9,11 @@ import scipy.interpolate as interpolate
 
 def tx_signal_model(
     code: npt.NDArray[np.float64],
+    baud_length_usec: int,
+    t_samp_usec: int,
     tx_start_samp: int,
-    read_length: int,
     ipp_samps: int,
+    read_length: int,
     start_samp: int = 0,
     sub_resolution: int = 1,
     kind: str = "linear",
@@ -22,9 +24,11 @@ def tx_signal_model(
 
     Args:
         code: Transmitted code
+        baud_length_usec: Transmission baud length
+        t_samp_usec: Receiver sample time
         tx_start_samp: tx start sample relative to the inter pulse period
-        start_samp: start sample relative to the inter pulse period
-        read_length: How many samples are read
+        start_samp: start sample relative to the inter pulse period, the generated data will start at this point.
+        read_length: How many samples to generate
         ipp_samps: interpulse period samples
         sub_resolution: Datapoints per sample to use when upsampling the tx signal
         kind: interpolation kind {'linear', 'nearest', 'nearest-up', 'zero',
@@ -36,7 +40,15 @@ def tx_signal_model(
 
     # Zero pad code to not miss any start/end shifts
     code = np.concatenate([np.array([0]), code, np.array([0])])
-    sample = np.arange(tx_start_samp, tx_start_samp + len(code))  # TODO change to tx_start, tx_start+code
+
+    # As the reciver side is oversampling the code needs to be upsampled
+    transmitted_code_size = len(code)
+    upsample_scale = baud_length_usec // t_samp_usec
+    received_code_size = transmitted_code_size * upsample_scale
+    if received_code_size > transmitted_code_size:
+        code = np.repeat(code, upsample_scale)
+
+    sample = np.arange(tx_start_samp, tx_start_samp + received_code_size)
     fun = interpolate.interp1d(
         sample,
         code,
