@@ -19,7 +19,7 @@ from spacecoords import interpolation
 
 from hardtarget import (
     direction_of_arrival,
-    event_detection,
+    echo_search,
     load_analysed_data,
     plotting,
     target_estimation,
@@ -107,7 +107,7 @@ cfg = {
 # Run an echo search and see that we have a 100% match of an event.
 
 output_path = Path(tmp_dir.name) / "echo_search"
-event_detection(
+echo_search(
     path=data_path,
     config=cfg,
     output=output_path,
@@ -121,7 +121,7 @@ data_generator = load_analysed_data(output_path)
 out_data, exp_params, cfg_params, pro_params = list(data_generator)[0]
 #
 fig, ax = plt.subplots(2, 2)
-plotting.plot_event_detection(ax, out_data, pro_params)
+plotting.plot_echo_search(ax, out_data, pro_params)
 _, handles = plotting.rti(
     ax[1, 1],
     reader,

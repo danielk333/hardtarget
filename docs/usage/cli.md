@@ -65,7 +65,7 @@ Use the **analyse** tool to launch the analysis. The different analysis methods 
 ```bash
     $ hardtarget target_estimation /data/path --config cfg.ini --progress -o /data/
     $ hardtarget optimization /data/path --config cfg.ini --progress -o /data/
-    $ hardtarget event_detection /data/path --config cfg.ini --progress -o /data/
+    $ hardtarget echo_search /data/path --config cfg.ini --progress -o /data/
     $ hardtarget direction_of_arrival /data/path <radar_station> --config cfg.ini --progress -o /data/
 
 ```

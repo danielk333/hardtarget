@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from radardef import RadarDef
 
 import tests.utils as utils
-from hardtarget import event_detection, load_analysed_data, plotting
+from hardtarget import echo_search, load_analysed_data, plotting
 
 # Workaround to make jupyter notebook find utils
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
@@ -50,7 +50,7 @@ output_path = Path(tmp_dir.name) / "analysed"
 start_time = int(reader.experiment.t_ipp_usec * 950)
 end_time = start_time + int(reader.experiment.t_ipp_usec * 150)
 
-event_detection(
+echo_search(
     path=data,
     config=config,
     output=output_path,
@@ -69,7 +69,7 @@ out_data, exp_params, cfg_params, pro_params = list(data_generator)[0]
 # Then we can visualize it with different plots
 
 fig, ax = plt.subplots(2, 2)
-plotting.plot_event_detection(ax, out_data, pro_params)
+plotting.plot_echo_search(ax, out_data, pro_params)
 #
 # plot raw data power
 _, handles = plotting.rti(

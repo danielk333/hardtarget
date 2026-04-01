@@ -177,7 +177,7 @@ def optimize(
     )
 
 
-def event_detection(
+def echo_search(
     path: str | Path,
     config: str | Path | GenericCfg | dict,
     method_lib: Optional[MethodLib] = None,
@@ -192,12 +192,12 @@ def event_detection(
     clobber: bool = True,
     output: Optional[str | Path] = None,
 ) -> AnalysedResult:
-    """Wrapper around analyse for Event Detection"""
+    """Wrapper around analyse for echo search"""
 
     return analyse(
         path=path,
         config=config,
-        method=AnalysisMethod.event_detection,
+        method=AnalysisMethod.echo_search,
         method_lib=method_lib,
         implementation=implementation,
         rx_channel=rx_channel,

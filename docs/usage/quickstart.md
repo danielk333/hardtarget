@@ -1,7 +1,7 @@
 # Quickstart
 
 These are the basic steps working with radar data using Hardtarget. This is the CLI approach, more detailed
-examples for each method can be found at [target estimation example](../examples/target_estimation/analyse_and_inspect.py), [optimization example](../examples/optimization/optimization.py), [event detection example](../examples/event_detection/event_detection.py) and [direction of arrival example](../examples/direction_of_arrival/interferometry.py).
+examples for each method can be found at [target estimation example](../examples/target_estimation/analyse_and_inspect.py), [optimization example](../examples/optimization/optimization.py), [echo search example](../examples/echo_search/echo_search.py) and [direction of arrival example](../examples/direction_of_arrival/interferometry.py).
 
 ---
 

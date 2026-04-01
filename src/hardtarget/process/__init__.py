@@ -2,7 +2,7 @@ from .process import Process  # isort: off
 
 from hardtarget.target_estimation import TargetEstimationProcess, DPTProcess, GMFProcess
 from hardtarget.optimization import OptimizeProcess
-from hardtarget.event_detection import XCorrProcess
+from hardtarget.echo_search import XCorrProcess
 from hardtarget.interferometry import DOAProcess
 from hardtarget.constants import Processes, AnalysisMethod, TargetEstimationMethod, MethodLib
 from typing import Optional
@@ -29,7 +29,7 @@ def get_analysis_process(method: AnalysisMethod, method_lib: Optional[MethodLib]
             return PROCESSES[Processes.GMF]
     elif method == AnalysisMethod.optimize:
         return PROCESSES[Processes.Optimization]
-    elif method == AnalysisMethod.event_detection:
+    elif method == AnalysisMethod.echo_search:
         return PROCESSES[Processes.XCORR]
     elif method == AnalysisMethod.direction_of_arrival:
         return PROCESSES[Processes.DOA]

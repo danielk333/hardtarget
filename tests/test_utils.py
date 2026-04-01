@@ -4,7 +4,7 @@ from pathlib import Path
 
 from hardtarget.constants import ConfigSubSection
 from hardtarget.data_handling.configuration import extract_config_section, load_config_params
-from hardtarget.event_detection.types import XCorrCfgParams
+from hardtarget.echo_search.types import XCorrCfgParams
 from hardtarget.optimization.types import OptimizeCfgParams
 from hardtarget.process.utils import sample_interval_to_closest_ipp
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, TargetEstimationCfgParams
@@ -126,7 +126,7 @@ def test_extract_config_section():
         ipp_delay_parameter=3
     [optimization]
         path = "example/path"
-    [event_detection]
+    [echo_search]
         doppler_freq_min= -30000
         doppler_freq_max = 5000
         doppler_freq_step = 1000
@@ -171,13 +171,13 @@ def test_extract_config_section():
         )
         assert optimize_params["path"] == "example/path"
 
-        # --- Event Detection section ---
-        event_detection_params = extract_config_section(
-            tmp_config_path, ConfigSubSection.EVENT_DETECTION, XCorrCfgParams
+        # --- Echo search section ---
+        echo_search_params = extract_config_section(
+            tmp_config_path, ConfigSubSection.ECHO_SEARCH, XCorrCfgParams
         )
-        assert event_detection_params["doppler_freq_min"] == -30000
-        assert event_detection_params["doppler_freq_max"] == 5000
-        assert event_detection_params["doppler_freq_step"] == 1000
+        assert echo_search_params["doppler_freq_min"] == -30000
+        assert echo_search_params["doppler_freq_max"] == 5000
+        assert echo_search_params["doppler_freq_step"] == 1000
 
 
 def test_sample_interval_to_closest_ipp():

@@ -4,7 +4,7 @@
 
 To determine the direction of arrival of an object it can be analysed with the direction of arrival tool. This will run a interferometry analysis to determine the elevation and azimuth of the object.
 
-The different supported libraries for event detection are:
+The different supported libraries for direction of arrival are:
 
 ::: hardtarget.constants.DOAMethod
 

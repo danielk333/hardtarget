@@ -103,7 +103,7 @@ nav:
       - Methods:
           - Target Estimation: analyse/method/target_estimation.md
           - Optimization: analyse/method/optimization.md
-          - Event Detection: analyse/method/event_detection.md
+          - Echo Search: analyse/method/echo_search.md
           - Direction Of Arrival: analyse/method/direction_of_arrival.md
       - Configuration parameters: analyse/config_parameters.md
       - Analysis output: analyse/format_analyse.md
@@ -128,8 +128,8 @@ nav:
           - Visualization of raw data: examples/target_estimation/plot_raw_data.py
       - Optimization:
           - Optimizing Target Estimation: examples/optimization/optimization.py
-      - Event Detection:
-          - Event Detection: examples/event_detection/event_detection.py
+      - Echo Search:
+          - Echo Search: examples/echo_search/echo_search.py
       - Direction of Arrival:
           - Direction of Arrival: examples/direction_of_arrival/interferometry.py
       - Simulation:

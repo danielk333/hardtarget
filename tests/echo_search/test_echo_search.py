@@ -10,10 +10,10 @@ from scipy import constants
 
 import hardtarget
 from hardtarget.data_simulation import DRFSimParams, simulate_drf
-from hardtarget.event_detection.types import XCorrCfgParams
+from hardtarget.echo_search.types import XCorrCfgParams
 
 
-def wip_event_detection():
+def wip_echo_search():
 
     n_ipp = 1
 
@@ -100,7 +100,7 @@ def wip_event_detection():
         )
 
         # process
-        _ = hardtarget.event_detection(
+        _ = hardtarget.echo_search(
             path=Path(tmp_sim_path).resolve(),
             rx_channel="sim",
             config=cfg,

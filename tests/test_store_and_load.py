@@ -10,7 +10,7 @@ from radardef.radar_stations.eiscat.experiments import leo_mpark_2_1u
 from hardtarget.constants import AnalysisMethod
 from hardtarget.data_handling import compute_process_params, dump_params_to_file
 from hardtarget.data_handling.configuration import extract_config_params_from_derived_object
-from hardtarget.event_detection.types import XCorrCfgParams, XCorrOutArgs, XCorrProParams
+from hardtarget.echo_search.types import XCorrCfgParams, XCorrOutArgs, XCorrProParams
 from hardtarget.interferometry.types import DOACfgParams, DOAOutArgs, DOAProParams
 from hardtarget.optimization.types import MFOptimizeOutArgs, OptimizeCfgParams, OptimizeProParams
 from hardtarget.plotting.load_data import load_analysed_data
@@ -34,7 +34,7 @@ class TestStoreAndLoad:
     method_and_process = [
         (AnalysisMethod.target_estimation, GMFProcess),
         (AnalysisMethod.optimize, OptimizeProcess),
-        (AnalysisMethod.event_detection, XCorrProcess),
+        (AnalysisMethod.echo_search, XCorrProcess),
         (AnalysisMethod.direction_of_arrival, DOAProcess),
     ]
 
@@ -97,7 +97,7 @@ class TestStoreAndLoad:
 
         self.store_and_load(self.exp_org, cfg_org, out_org, process, AnalysisMethod.target_estimation)
 
-    def test_event_detection(self):
+    def test_echo_search(self):
 
         cfg_org = XCorrCfgParams()
         out_org = XCorrOutArgs(
@@ -109,7 +109,7 @@ class TestStoreAndLoad:
             ipps_pow=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
         )
 
-        self.store_and_load(self.exp_org, cfg_org, out_org, XCorrProcess, AnalysisMethod.event_detection)
+        self.store_and_load(self.exp_org, cfg_org, out_org, XCorrProcess, AnalysisMethod.echo_search)
 
     def test_direction_of_arrival(self):
         cfg_org = DOACfgParams()

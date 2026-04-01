@@ -12,7 +12,7 @@ from hardtarget.analyse import analyse
 from hardtarget.constants import (
     AnalysisMethod,
     DOAMethod,
-    EventDetectionMethod,
+    EchoSearchMethod,
     Impl,
     OptimizationMethod,
     StrEnum,
@@ -117,7 +117,7 @@ class AnalyseParser:
 method_and_sub_method = [
     (AnalysisMethod.target_estimation, TargetEstimationMethod),
     (AnalysisMethod.optimize, OptimizationMethod),
-    (AnalysisMethod.event_detection, EventDetectionMethod),
+    (AnalysisMethod.echo_search, EchoSearchMethod),
     (AnalysisMethod.direction_of_arrival, DOAMethod),
 ]
 

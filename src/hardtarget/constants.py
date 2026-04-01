@@ -16,7 +16,7 @@ class AnalysisMethod(StrEnum):
 
     target_estimation = "target_estimation"
     optimize = "optimize"
-    event_detection = "event_detection"
+    echo_search = "echo_search"
     direction_of_arrival = "direction_of_arrival"
     unknown = "unknown"
 
@@ -36,8 +36,8 @@ class OptimizationMethod(StrEnum):
     optimize_grid_gmf = "optimize_grid_gmf"
 
 
-class EventDetectionMethod(StrEnum):
-    """Event detection methods"""
+class EchoSearchMethod(StrEnum):
+    """Echo search methods"""
 
     xcorr = "xcorr"
 
@@ -49,7 +49,7 @@ class DOAMethod(StrEnum):
     beamforming_grid_search = "beamforming_grid_search"
 
 
-MethodLib: TypeAlias = TargetEstimationMethod | OptimizationMethod | EventDetectionMethod | DOAMethod
+MethodLib: TypeAlias = TargetEstimationMethod | OptimizationMethod | EchoSearchMethod | DOAMethod
 
 
 class Impl(StrEnum):
@@ -78,4 +78,4 @@ class ConfigSubSection(StrEnum):
     DPT = "dpt"
     OPTIMIZATION = "optimization"
     INTERFEROMETRY = "interferometry"
-    EVENT_DETECTION = "event_detection"
+    ECHO_SEARCH = "echo_search"

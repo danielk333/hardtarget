@@ -6,10 +6,10 @@ from pathlib import Path
 
 import numpy as np
 
-from hardtarget.constants import ConfigSubSection, EventDetectionMethod, Impl
+from hardtarget.constants import ConfigSubSection, EchoSearchMethod, Impl
 from hardtarget.data_handling.configuration import extract_config_section
-from hardtarget.event_detection import get_event_detection_lib
-from hardtarget.event_detection.types import XCorrCfgParams, XCorrOutArgs, XCorrProParams, XCorrVariables
+from hardtarget.echo_search import get_echo_search_lib
+from hardtarget.echo_search.types import XCorrCfgParams, XCorrOutArgs, XCorrProParams, XCorrVariables
 from hardtarget.process import Process
 from hardtarget.types import CfgParams, DataItem, EventSearchLib, ExpDef, MethodLib, ProParams
 
@@ -19,8 +19,8 @@ class XCorrProcess(Process[XCorrCfgParams, XCorrProParams, XCorrVariables, XCorr
 
     def get_analysis_lib(
         self, lib: MethodLib | None, impl: Impl | None
-    ) -> tuple[EventSearchLib, EventDetectionMethod, Impl]:
-        return get_event_detection_lib(lib, impl)
+    ) -> tuple[EventSearchLib, EchoSearchMethod, Impl]:
+        return get_echo_search_lib(lib, impl)
 
     def get_conf_params(self, cfg_path: Path, cfg_params: CfgParams) -> XCorrCfgParams:
         """
@@ -34,7 +34,7 @@ class XCorrProcess(Process[XCorrCfgParams, XCorrProParams, XCorrVariables, XCorr
             Process specific Optimize Configuration parameters
         """
 
-        d = extract_config_section(cfg_path, ConfigSubSection.EVENT_DETECTION, XCorrCfgParams, cfg_params)
+        d = extract_config_section(cfg_path, ConfigSubSection.ECHO_SEARCH, XCorrCfgParams, cfg_params)
 
         # TODO: if n_ipp is above 1 send a warning to the user and then continue, not sure if works with many
 

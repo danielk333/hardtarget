@@ -1,16 +1,16 @@
 import numpy as np
 import numpy.typing as npt
 
-from hardtarget.event_detection.types import XCorrOutArgs
+from hardtarget.echo_search.types import XCorrOutArgs
 
 
-def plot_event_detection(
+def plot_echo_search(
     axes: npt.NDArray,
     out_data: XCorrOutArgs,
     limit: float = 0.5,
 ) -> npt.NDArray:  # of type axes
     """
-    Plot result from event detection, axis of size (2,2) is a must
+    Plot result from echo search, axis of size (2,2) is a must
     """
 
     # filter = out_data.max_peak > limit

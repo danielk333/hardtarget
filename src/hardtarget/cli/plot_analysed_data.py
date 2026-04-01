@@ -55,9 +55,9 @@ def plot_analysed_data(
         out, exp, cfg, pro = data
 
         match pro.method:
-            case AnalysisMethod.event_detection:
+            case AnalysisMethod.echo_search:
                 fig, ax = plt.subplots(2, 2)
-                plotting.plot_event_detection(ax, out, sensitivit_limit)
+                plotting.plot_echo_search(ax, out, sensitivit_limit)
                 plt.show()
             case AnalysisMethod.direction_of_arrival:
                 fig, ax = plt.subplots(3, 2)

@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.typing as npt
 
-from hardtarget.event_detection.types import (
+from hardtarget.echo_search.types import (
     XCorrCfgParams,
     XCorrProParams,
     XCorrVariables,

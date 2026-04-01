@@ -11,7 +11,7 @@ from hardtarget.cli.cmd_analyse import AnalyseParser
 from hardtarget.constants import (
     AnalysisMethod,
     DOAMethod,
-    EventDetectionMethod,
+    EchoSearchMethod,
     OptimizationMethod,
     TargetEstimationMethod,
 )
@@ -60,7 +60,7 @@ class TestCLI:
             ipp_delay_parameter=1
         [optimization]
             path = {str(get_analysed_path(path, AnalysisMethod.target_estimation.name))}
-        [event_detection]
+        [echo_search]
             doppler_freq_min= -30000
             doppler_freq_max = 5000
             doppler_freq_step = 1000
@@ -91,9 +91,9 @@ class TestCLI:
                 marks=pytest.mark.dependency(name=AnalysisMethod.optimize),
             ),
             pytest.param(
-                AnalysisMethod.event_detection,
-                EventDetectionMethod,
-                marks=pytest.mark.dependency(name=AnalysisMethod.event_detection),
+                AnalysisMethod.echo_search,
+                EchoSearchMethod,
+                marks=pytest.mark.dependency(name=AnalysisMethod.echo_search),
             ),
             pytest.param(
                 AnalysisMethod.direction_of_arrival,
@@ -156,8 +156,8 @@ class TestCLI:
                 marks=pytest.mark.dependency(depends=[AnalysisMethod.optimize]),
             ),
             pytest.param(
-                AnalysisMethod.event_detection,
-                marks=pytest.mark.dependency(depends=[AnalysisMethod.event_detection]),
+                AnalysisMethod.echo_search,
+                marks=pytest.mark.dependency(depends=[AnalysisMethod.echo_search]),
             ),
             pytest.param(
                 AnalysisMethod.direction_of_arrival,
@@ -190,8 +190,8 @@ class TestCLI:
                 marks=pytest.mark.dependency(depends=[AnalysisMethod.optimize]),
             ),
             pytest.param(
-                AnalysisMethod.event_detection,
-                marks=pytest.mark.dependency(depends=[AnalysisMethod.event_detection]),
+                AnalysisMethod.echo_search,
+                marks=pytest.mark.dependency(depends=[AnalysisMethod.echo_search]),
             ),
             pytest.param(
                 AnalysisMethod.direction_of_arrival,

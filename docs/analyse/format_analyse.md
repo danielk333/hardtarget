@@ -37,7 +37,7 @@ analyse the analysis. Furthermore the analysis output is stored, the output is n
 format as during the analysis, each object in the output has had further attributes added to
 it, following the [DataItem](../reference/hardtarget/types.md#hardtarget.types.DataItem) structure.
 Depending on the method/process running (e.g [Target Estimation](method/target_estimation.md)/[Optimization](method/optimization.md)/
-[Event Detection](method/event_detection.md)/[Direction Of Arrival](method/direction_of_arrival.md))
+[Echo search](method/echo_search.md)/[Direction Of Arrival](method/direction_of_arrival.md))
 the data will be different as the output will vary.
 
 ::: hardtarget.types.DataItem
