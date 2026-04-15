@@ -91,7 +91,7 @@ def run_hardtarget(
             )
     else:
         hardtarget.analyse(
-            path=sim_path,
+            data=sim_path,
             config=config,
             method=gmfmethod,
             implementation=gmfimpl,

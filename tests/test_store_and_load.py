@@ -7,34 +7,34 @@ import pytest
 import radardef
 from radardef.radar_stations.eiscat.experiments import leo_mpark_2_1u
 
-from hardtarget.constants import AnalysisMethod
+from hardtarget.constants import AnalysisMethod, DOAMethod, EchoSearchMethod, Impl, TargetEstimationMethod
 from hardtarget.data_handling import compute_process_params, dump_params_to_file
 from hardtarget.data_handling.configuration import extract_config_params_from_derived_object
-from hardtarget.echo_search.types import XCorrCfgParams, XCorrOutArgs, XCorrProParams
+from hardtarget.echo_search.types import EchoSearchCfgParams, EchoSearchOutArgs, EchoSearchProParams
 from hardtarget.interferometry.types import DOACfgParams, DOAOutArgs, DOAProParams
 from hardtarget.optimization.types import MFOptimizeOutArgs, OptimizeCfgParams, OptimizeProParams
-from hardtarget.plotting.load_data import load_analysed_data
+from hardtarget.plotting.load_data import load_analysed_data, stack_analysed_data
 from hardtarget.process import (
     DOAProcess,
     DPTProcess,
+    EchoSearchProcess,
     GMFProcess,
     OptimizeProcess,
     Process,
     TargetEstimationProcess,
-    XCorrProcess,
     get_analysis_process,
 )
 from hardtarget.target_estimation.dpt.types import DPTCfgParams, DPTProParams
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, GMFProParams
 from hardtarget.target_estimation.types import MFOutArgs
-from hardtarget.types import ArrayKwargs, CfgParams, ExpDef
+from hardtarget.types import AnalysedResult, ArrayKwargs, CfgParams, ExpDef, MethodLib
 
 
 class TestStoreAndLoad:
     method_and_process = [
         (AnalysisMethod.target_estimation, GMFProcess),
         (AnalysisMethod.optimize, OptimizeProcess),
-        (AnalysisMethod.echo_search, XCorrProcess),
+        (AnalysisMethod.echo_search, EchoSearchProcess),
         (AnalysisMethod.direction_of_arrival, DOAProcess),
     ]
 
@@ -47,7 +47,7 @@ class TestStoreAndLoad:
         (GMFProcess, GMFCfgParams, GMFProParams, MFOutArgs),
         (DPTProcess, DPTCfgParams, DPTProParams, MFOutArgs),
         (OptimizeProcess, OptimizeCfgParams, OptimizeProParams, MFOptimizeOutArgs),
-        (XCorrProcess, XCorrCfgParams, XCorrProParams, XCorrOutArgs),
+        (EchoSearchProcess, EchoSearchCfgParams, EchoSearchProParams, EchoSearchOutArgs),
         (DOAProcess, DOACfgParams, DOAProParams, DOAOutArgs),
     ]
 
@@ -68,8 +68,12 @@ class TestStoreAndLoad:
 
     exp_org = leo_mpark_2_1u
 
-    @pytest.mark.parametrize("process", [GMFProcess, DPTProcess])
-    def test_target_estimation_data(self, process: type[TargetEstimationProcess]):
+    @pytest.mark.parametrize(
+        "process, lib", [(GMFProcess, TargetEstimationMethod.fgmf), (DPTProcess, TargetEstimationMethod.fdpt)]
+    )
+    def test_target_estimation_data(
+        self, process: type[TargetEstimationProcess], lib: TargetEstimationMethod
+    ):
 
         cfg_type, _, _ = process.get_types()
         cfg_org = cfg_type(n_ipp=2)
@@ -95,12 +99,20 @@ class TestStoreAndLoad:
             t=np.random.rand(t_size).astype(np.float32),
         )
 
-        self.store_and_load(self.exp_org, cfg_org, out_org, process, AnalysisMethod.target_estimation)
+        self.store_and_load(
+            self.exp_org,
+            cfg_org,
+            out_org,
+            process,
+            AnalysisMethod.target_estimation,
+            lib,
+            Impl.c,
+        )
 
     def test_echo_search(self):
 
-        cfg_org = XCorrCfgParams()
-        out_org = XCorrOutArgs(
+        cfg_org = EchoSearchCfgParams()
+        out_org = EchoSearchOutArgs(
             max_pow=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
             max_pow_norm=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
             max_peak=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
@@ -109,7 +121,15 @@ class TestStoreAndLoad:
             ipps_pow=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
         )
 
-        self.store_and_load(self.exp_org, cfg_org, out_org, XCorrProcess, AnalysisMethod.echo_search)
+        self.store_and_load(
+            self.exp_org,
+            cfg_org,
+            out_org,
+            EchoSearchProcess,
+            AnalysisMethod.echo_search,
+            EchoSearchMethod.xcorr,
+            Impl.numpy,
+        )
 
     def test_direction_of_arrival(self):
         cfg_org = DOACfgParams()
@@ -123,7 +143,14 @@ class TestStoreAndLoad:
         array_kwargs = ArrayKwargs(beam=radardef.Mu().beam, parameters=radardef.Mu().beam_parameters)
 
         self.store_and_load(
-            self.exp_org, cfg_org, out_org, DOAProcess, AnalysisMethod.direction_of_arrival, **array_kwargs
+            self.exp_org,
+            cfg_org,
+            out_org,
+            DOAProcess,
+            AnalysisMethod.direction_of_arrival,
+            DOAMethod.music_grid_search,
+            Impl.numpy,
+            **array_kwargs,
         )
 
     def store_and_load(
@@ -133,16 +160,18 @@ class TestStoreAndLoad:
         out_org: NamedTuple,
         process: type[Process],
         method: AnalysisMethod,
+        method_lib: MethodLib,
+        impl: Impl,
         **kwargs: ArrayKwargs,
     ):
         _cfg = extract_config_params_from_derived_object(cfg_org)
         _pro = compute_process_params(
-            exp_org,
-            _cfg,
-            analysis_method=method,
+            exp_org, _cfg, analysis_method=method, method_lib=method_lib, implementation=impl
         )
-        _process = process(cfg_org, exp_org, _cfg, _pro, None, None, None, **kwargs)
-        pro_org = _process.pro_params
+
+        pro_org = process.get_process_params(None, exp_org, cfg_org, _pro)
+        if issubclass(process, TargetEstimationProcess):
+            pro_org = process.get_lib_specific_process_params(None, exp_org, cfg_org, pro_org)
 
         # Create a temporary file for gmf out
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -151,7 +180,7 @@ class TestStoreAndLoad:
             outfile.parent.mkdir(parents=True, exist_ok=True)
 
             # store data
-            h5_vars = _process.define_h5_vars(out_org).items()
+            h5_vars = process.define_h5_vars(None, out_org).items()
             dump_params_to_file(h5_vars, exp_org, cfg_org, pro_org, outfile)
 
             # load
@@ -196,3 +225,48 @@ class TestStoreAndLoad:
                     assert pro.__dict__[key] == value
                 except ValueError:
                     (pro.__dict__[key] == value).all()
+
+    def test_stack_data_from_ram(self):
+        cfg_org = EchoSearchCfgParams()
+        out_org = EchoSearchOutArgs(
+            max_pow=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
+            max_pow_norm=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
+            max_peak=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
+            max_pow_ind=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
+            best_doppler=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
+            ipps_pow=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+        )
+        self.exp_org
+        _cfg = extract_config_params_from_derived_object(cfg_org)
+        _pro = compute_process_params(
+            self.exp_org,
+            _cfg,
+            analysis_method=AnalysisMethod.echo_search,
+            method_lib=EchoSearchMethod.xcorr,
+            implementation=Impl.c,
+        )
+
+        pro_org = EchoSearchProcess.get_process_params(None, self.exp_org, cfg_org, _pro)
+
+        analysed_results: AnalysedResult = {
+            "dir": None,
+            "files": [],
+            "data": {
+                1: (out_org, self.exp_org, cfg_org, pro_org),
+                2: (out_org, self.exp_org, cfg_org, pro_org),
+                3: (out_org, self.exp_org, cfg_org, pro_org),
+            },
+        }
+
+        out, exp, cfg, pro = stack_analysed_data(analysed_results["data"])
+
+        assert len(out.max_pow) == 3 * cfg_org.num_cohints_per_file
+        assert len(out.max_pow_norm) == 3 * cfg_org.num_cohints_per_file
+        assert len(out.max_peak) == 3 * cfg_org.num_cohints_per_file
+        assert len(out.max_pow_ind) == 3 * cfg_org.num_cohints_per_file
+        assert len(out.best_doppler) == 3 * cfg_org.num_cohints_per_file
+        assert len(out.ipps_pow) == 3 * cfg_org.num_cohints_per_file
+
+        assert exp == self.exp_org
+        assert cfg_org == cfg
+        assert pro_org == pro

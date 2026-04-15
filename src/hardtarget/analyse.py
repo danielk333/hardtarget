@@ -5,6 +5,8 @@ from typing import Optional
 
 import numpy as np
 from pyant.models.array import Array, ArrayParams
+from radardef import RadarDef
+from radardef.components import DataLoader
 from radardef.types.types import ExpDef
 
 from hardtarget.constants import (
@@ -12,9 +14,9 @@ from hardtarget.constants import (
     Impl,
     MethodLib,
 )
-from hardtarget.data_handling import Measurement
 from hardtarget.process import get_analysis_process
-from hardtarget.types import AnalysedResult, ArrayKwargs, GenericCfg, Job
+from hardtarget.types import AnalysedResult, ArrayKwargs, GenericCfg
+from hardtarget.utils import global_mpi
 
 if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
     from typing_extensions import Unpack
@@ -23,27 +25,28 @@ else:
 
 
 def analyse(
-    path: str | Path,
+    data: str | Path | DataLoader,
     config: str | Path | GenericCfg | dict,
     method: AnalysisMethod,
     method_lib: Optional[MethodLib] = None,
     implementation: Optional[Impl] = None,
     rx_channel: Optional[str | int] = None,
+    excluded_channels: Optional[list[str] | list[int]] = None,
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
     exp_params: Optional[ExpDef] = None,
-    job: Optional[Job] = None,
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
+    comm: global_mpi.CommObject = global_mpi.CommMock(),
     **kwargs: Unpack[ArrayKwargs],
 ) -> AnalysedResult:
     """
     Perform matched filter analysis.
 
     Args:
-        path: path to measurement file
+        data: path to measurement file or data loader
         config: path to user config (.ini) or a config object matching the process e.g GMFCfgParams/DPTCfgParams
                 assert that it is compatible with the process you want to run.
         method: Method to be used during the analysis
@@ -55,7 +58,6 @@ def analyse(
         end_time (optional): End time of analysis
         relative_time (optional): If to use relative time
         exp_params (optional): If working with custom experiments it is needed to be able to load the data.
-        job (optional): For parallelization the job to run the specific analysis on can be choosen.
         progress (optional): If a progress bar should be visualized.
         clobber (optional): If previous analysis should be overwritten.
         output (optional): Output directory for the analysed files, if None no files will be saved.
@@ -63,41 +65,39 @@ def analyse(
 
     """
 
-    if job is None:
-        job = Job(idx=0, N=1)
+    if comm.rank == 0:
+        # Access data
+        if isinstance(data, str) or isinstance(data, Path):
+            data_loader = RadarDef().load_data(Path(data), experiment=exp_params)
+            if data_loader is None:
+                raise ValueError(f"Not possible to load data file from: {data}")
+        else:
+            data_loader = data
 
-    # create measurement object to access measurement data
-    measurement = Measurement(
-        path=path,
-        config=config,
-        method=method,
-        method_lib=method_lib,
-        impl=implementation,
-        rx_channel=rx_channel,
-        exp_params=exp_params,
-    )
+        # Determine process to run
+        process_lib = get_analysis_process(method, method_lib)
 
-    # determine process to run
-    process_lib = get_analysis_process(method, method_lib)
+        # Initiate process
+        process = process_lib(
+            config=config,
+            data=data_loader,
+            method_lib=method_lib,
+            impl=implementation,
+            rx_channel=rx_channel,
+            excluded_channels=excluded_channels,
+            output_dir=output,
+            progress=progress,
+            **kwargs,
+        )
+    else:
+        process = None
 
-    # Initiate process
-    process = process_lib(
-        config,
-        exp_params=measurement.exp_params,
-        cfg_params=measurement.cfg_params,
-        pro_params=measurement.pro_params,
-        epoch_bounds=measurement.epoch,
-        func_get_data=measurement.extract_signals,
-        func_get_pointing=measurement.pointing,
-        output_dir=output,
-        progress=progress,
-        **kwargs,
-    )
+    process = comm.bcast(process, root=0)
 
     # run analysis
     results = process.run(
-        job=job,
-        epoch=measurement.epoch,
+        comm_rank=comm.rank,
+        comm_size=comm.size,
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
@@ -108,144 +108,152 @@ def analyse(
 
 
 def target_estimation(
-    path: str | Path,
+    data: str | Path | DataLoader,
     config: str | Path | GenericCfg | dict,
     method_lib: Optional[MethodLib] = None,
     implementation: Optional[Impl] = None,
     rx_channel: Optional[str | int] = None,
+    excluded_channels: Optional[list[str] | list[int]] = None,
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
     exp_params: Optional[ExpDef] = None,
-    job: Optional[Job] = None,
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
+    comm: global_mpi.CommObject = global_mpi.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for Target Estimations"""
 
     return analyse(
-        path=path,
+        data=data,
         config=config,
         method=AnalysisMethod.target_estimation,
         method_lib=method_lib,
         implementation=implementation,
         rx_channel=rx_channel,
+        excluded_channels=excluded_channels,
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
         exp_params=exp_params,
-        job=job,
         progress=progress,
         clobber=clobber,
         output=output,
+        comm=comm,
     )
 
 
 def optimize(
-    path: str | Path,
+    data: str | Path | DataLoader,
     config: str | Path | GenericCfg | dict,
     method_lib: Optional[MethodLib] = None,
     implementation: Optional[Impl] = None,
     rx_channel: Optional[str | int] = None,
+    excluded_channels: Optional[list[str] | list[int]] = None,
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
     exp_params: Optional[ExpDef] = None,
-    job: Optional[Job] = None,
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
+    comm: global_mpi.CommObject = global_mpi.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for Target Estimation optimization"""
 
     return analyse(
-        path=path,
+        data=data,
         config=config,
         method=AnalysisMethod.optimize,
         method_lib=method_lib,
         implementation=implementation,
         rx_channel=rx_channel,
+        excluded_channels=excluded_channels,
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
         exp_params=exp_params,
-        job=job,
         progress=progress,
         clobber=clobber,
         output=output,
+        comm=comm,
     )
 
 
 def echo_search(
-    path: str | Path,
+    data: str | Path | DataLoader,
     config: str | Path | GenericCfg | dict,
     method_lib: Optional[MethodLib] = None,
     implementation: Optional[Impl] = None,
     rx_channel: Optional[str | int] = None,
+    excluded_channels: Optional[list[str] | list[int]] = None,
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
     exp_params: Optional[ExpDef] = None,
-    job: Optional[Job] = None,
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
+    comm: global_mpi.CommObject = global_mpi.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for echo search"""
 
     return analyse(
-        path=path,
+        data=data,
         config=config,
         method=AnalysisMethod.echo_search,
         method_lib=method_lib,
         implementation=implementation,
         rx_channel=rx_channel,
+        excluded_channels=excluded_channels,
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
         exp_params=exp_params,
-        job=job,
         progress=progress,
         clobber=clobber,
         output=output,
+        comm=comm,
     )
 
 
 def direction_of_arrival(
-    path: str | Path,
+    data: str | Path | DataLoader,
     config: str | Path | GenericCfg | dict,
     array_beam: Array,
     beam_params: ArrayParams,
     method_lib: Optional[MethodLib] = None,
     implementation: Optional[Impl] = None,
     rx_channel: Optional[str | int] = None,
+    excluded_channels: Optional[list[str] | list[int]] = None,
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
     exp_params: Optional[ExpDef] = None,
-    job: Optional[Job] = None,
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
+    comm: global_mpi.CommObject = global_mpi.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for Direction of Arrival"""
 
     return analyse(
-        path=path,
+        data=data,
         config=config,
         method=AnalysisMethod.direction_of_arrival,
         method_lib=method_lib,
         implementation=implementation,
         rx_channel=rx_channel,
+        excluded_channels=excluded_channels,
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
         exp_params=exp_params,
-        job=job,
         progress=progress,
         clobber=clobber,
         output=output,
         beam=array_beam,
         parameters=beam_params,
+        comm=comm,
     )

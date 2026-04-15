@@ -6,23 +6,24 @@ from pathlib import Path
 
 import numpy as np
 
-from hardtarget.types import Bounds, Job
+from hardtarget.types import Bounds
 
 logger = logging.getLogger(__name__)
 
 
-def compute_job_tasks(job: Job, n_tasks: int) -> list[int]:
+def compute_job_tasks(comm_rank: int, comm_size: int, n_tasks: int) -> list[int]:
     """
-    Generates a list of task indexes for given job.
+    Generates a list of task indexes for given job/rank.
 
     Args:
-        job: Which job
+        comm_rank: Current jobs id/rank.
+        comm_size: Amount of parallel jobs
         n_tasks: Total number of tasks
 
     Returns:
-        List of task indexes for the given job.
+        List of task indexes for the given job/rank.
     """
-    return list(range(job.idx, n_tasks, job.N))
+    return list(range(comm_rank, n_tasks, comm_size))
 
 
 def compute_total_tasks(ipp_samps: int, n_ipp: int, num_cohints_per_file: int, bounds: Bounds) -> int:
@@ -46,13 +47,14 @@ def compute_total_tasks(ipp_samps: int, n_ipp: int, num_cohints_per_file: int, b
 
 
 def calculate_tasks(
-    job: Job, n_ipp: int, num_cohints_per_file: int, ipp_samps: int, bounds: Bounds
+    comm_rank: int, comm_size: int, n_ipp: int, num_cohints_per_file: int, ipp_samps: int, bounds: Bounds
 ) -> tuple[list[int], int]:
     """
     Calculate the current jobs tasks and coherent integrations.
 
     Args:
-        job: The current job.
+        comm_rank: Current jobs id/rank.
+        comm_size: Amount of parallel jobs available
         n_ipp:  Number or interpulse periods to coherently integrate.
         num_cohints_per_file: Number of coherent integrations per file.
         ipp_samps: Samples per interpulse period.
@@ -69,7 +71,7 @@ def calculate_tasks(
         bounds,
     )
 
-    job_tasks = compute_job_tasks(job, total_tasks)
+    job_tasks = compute_job_tasks(comm_rank, comm_size, total_tasks)
 
     if len(job_tasks) == 0:
         # Most likely more processes than tasks available

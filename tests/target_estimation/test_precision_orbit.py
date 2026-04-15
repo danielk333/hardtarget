@@ -17,8 +17,8 @@ from pyant.plotting import gain_heatmap
 from radardef.types import BeamType, EiscatUHFLocation
 from spacecoords import interpolation, linalg, spherical
 
-from hardtarget import analyse, load_analysed_data
-from hardtarget.constants import AnalysisMethod, TargetEstimationMethod
+from hardtarget import load_analysed_data, target_estimation
+from hardtarget.constants import TargetEstimationMethod
 from hardtarget.target_estimation.dpt.types import DPTCfgParams
 from hardtarget.target_estimation.gmf.types import GMFCfgParams
 from hardtarget.target_estimation.types import MFOutArgs
@@ -115,15 +115,14 @@ def test_verify_analysis_orbit_data(params: tuple[TargetEstimationMethod, CfgPar
     radar_station = radardef.EiscatUHF(location=EiscatUHFLocation.TROMSO, beam_type=BeamType.CASSEGRAIN)
 
     # Analyse data
-    result = analyse(
-        path=get_eiscat_data(start_time, end_time),
+    result = target_estimation(
+        data=get_eiscat_data(start_time, end_time),
         config=cfg,
         output=Path(tmp_dir.name) / "analysed",
         start_time=start_time,
         end_time=end_time,
         relative_time=False,
         progress=False,
-        method=AnalysisMethod.target_estimation,
         method_lib=method_lib,
     )
 

@@ -1,4 +1,5 @@
 import datetime as dt
+from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -22,7 +23,7 @@ def plot_true_vs_estimated_trajectory(
     measurement_end: dt.datetime,
     target_start_us: int,
     target_end_us: int,
-    sensitivity: float = 10.0,
+    detection_limit: Optional[float] = None,
 ) -> Axes:
     """
     Plot the true trajectory of object and the estimated trajectory relative to the radarstation.
@@ -36,12 +37,13 @@ def plot_true_vs_estimated_trajectory(
         doa_azimuth: Azimuth vector for each coherent integration from DOA analysis
         doa_elevation: Elevation vector for each coherent integration from DOA analysis
         ranges: Range vector for each coherent integration from target estimation analysis
-        station_pointing: pointing in spherical coordinates (azimuth, elevation)
+        pointing: pointing in spherical coordinates (azimuth, elevation)
         measurement_start: Start time of measurement
         measurement_end: End time of measurement
         target_start_us: target start relative to the measurement start in microseconds
         target_end_us: target end relative to the measurement start in microseconds
-        sensitivity: min value of doa peak to visualize, everything below this will be filtered out
+        detection_limit (optional): min value of doa peak to visualize, everything below this will be filtered out.
+                                    If not set all datapoints will be shown.
     """
     ax.set_title("Real vs Estimated trajectory")
     measurement_length_us = (measurement_end - measurement_start).total_seconds() * 1e6
@@ -81,7 +83,11 @@ def plot_true_vs_estimated_trajectory(
     ax.plot(
         [0, pointing_cart[0]], [0, pointing_cart[1]], [0, pointing_cart[2]], "-y", label="Pointing direction"
     )
-    doa_detections = doa_peaks > sensitivity
+    if detection_limit:
+        doa_detections = doa_peaks > detection_limit
+    else:
+        doa_detections = np.ones(doa_peaks.shape, dtype=np.bool)
+
     estimated_trajectory = spherical.sph_to_cart(
         np.vstack([doa_azimuth[doa_detections], doa_elevation[doa_detections], ranges[doa_detections]]),
         degrees=True,

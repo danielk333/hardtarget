@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 import numpy.typing as npt
 
@@ -14,8 +16,12 @@ def plot_optimization_peaks(
     cfg: OptimizeCfgParams,
     pro: OptimizeProParams,
     monostatic: bool = True,
-    snr_dB_limit: float = 15.0,
+    snr_dB_limit: Optional[float] = None,
 ) -> npt.NDArray:  # of type Axes
+    """
+    Plot peaks after optimization.
+    If limit is set data points above limit will be highlighted.
+    """
 
     nf_vec = np.nanmedian(out_data.dc, axis=0)
     nf_vec = nf_vec.reshape((1, nf_vec.size))
@@ -26,7 +32,10 @@ def plot_optimization_peaks(
     snr = noise.snr(out_data.peak_vals, nf_range, range_gates=range_gates)
 
     snrdb = 10 * np.log10(snr)
-    inds = snrdb > snr_dB_limit
+    if snr_dB_limit:
+        inds = snrdb > snr_dB_limit
+    else:
+        inds = np.zeros(out_data.t.shape, dtype=np.bool)
     not_inds = np.logical_not(inds)
 
     r0 = _convert(out_data.r_vec_opt, monostatic=monostatic)

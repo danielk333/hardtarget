@@ -39,14 +39,17 @@ pytest:
     matrix:
       - VERSION: ["3.10", "3.11", "3.12", "3.13"]
   script:
+    # Note that the bookworm slim image has mpi compability issues when using openmpi, thus mpich is installed.
+    # Randomizes tests aswell as the mpi tests freezees if run at the same time in parallel
     - uv python install $VERSION
     - apt-get update
     - apt-get -y install git
-    - apt-get install -y gcc libfftw3-dev libhdf5-dev
+    - apt-get install -y gcc libfftw3-dev libhdf5-dev mpich
     - uv venv --python $VERSION
     - source .venv/bin/activate
-    - uv pip install .[develop,test]
-    - uv run pytest
+    - uv pip install .[develop,test,mpi]
+    - uv pip install mpich pytest-random-order
+    - uv run pytest --cov --random-order-seed=$VERSION
   coverage: /TOTAL.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
   rules:
     - !reference [.merge_request_rules, rules]
@@ -59,7 +62,7 @@ mypy:
   allow_failure: false
   script:
     - pip install .[type_checker]
-    - mypy src/hardtarget --follow-untyped-imports --disallow-untyped-defs --warn-unused-ignores
+    - mypy
   rules:
     - !reference [.merge_request_rules, rules]
 

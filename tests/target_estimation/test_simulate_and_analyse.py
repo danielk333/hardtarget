@@ -160,8 +160,7 @@ class TestTargetEstimation:
 
             # process
             _ = hardtarget.target_estimation(
-                path=Path(tmp_sim_path).resolve(),
-                rx_channel=exp_params.rx_channels[0],
+                data=Path(tmp_sim_path).resolve(),
                 config=tmp_config_path,
                 start_time=simulation_params.start_time_us,
                 end_time=simulation_params.end_time_us,
@@ -209,7 +208,12 @@ class TestTargetEstimation:
 
                     fig, axes = plt.subplots(2, 2)
                     hardtarget.plotting.target_estimation_plots.plot_peaks(
-                        axes, _out_args, _exp_params, _cfg_params, _pro_params
+                        axes,
+                        _out_args,
+                        _exp_params,
+                        _cfg_params,
+                        _pro_params,
+                        snr_dB_limit=15.0,
                     )
                     fig, axes = plt.subplots(2, 3)
                     hardtarget.plotting.target_estimation_plots.plot_detections(

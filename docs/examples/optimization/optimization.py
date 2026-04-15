@@ -46,7 +46,7 @@ data = utils.convert_test_data(raw_data, converted_path)[0]
 
 output_path = Path(tmp_dir.name) / "analysed"
 analyse(
-    path=data,
+    data=data,
     config=config,
     method=AnalysisMethod.target_estimation,
     method_lib=TargetEstimationMethod.fgmf,
@@ -77,6 +77,7 @@ target_estimation_plots.plot_peaks(
     exp_params,
     cfg_params,
     pro_params,
+    snr_dB_limit=15.0,
 )
 fig.set_size_inches(10, 10)
 
@@ -118,7 +119,7 @@ tmp_config_path = tmp_config.name
 
 optimization_path = Path(tmp_dir.name) / "opt"
 analyse(
-    path=data,
+    data=data,
     config=tmp_config_path,
     method=AnalysisMethod.optimize,
     method_lib=OptimizationMethod.optimize_grid_gmf,
@@ -148,6 +149,7 @@ optimization_plots.plot_optimization_peaks(
     exp_params_opt,
     cfg_params_opt,
     pro_params_opt,
+    snr_dB_limit=15.0,
 )
 fig.set_size_inches(10, 10)
 

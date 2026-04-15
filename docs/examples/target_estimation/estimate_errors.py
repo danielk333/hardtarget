@@ -12,7 +12,6 @@ from hardtarget.data_simulation.errors import monte_carlo_sample_errors
 tmp_path = tempfile.TemporaryDirectory()
 results = monte_carlo_sample_errors(
     snr_db=np.linspace(10, 40, num=10),
-    # snr_db=10,
     range0=2000e3,
     vel0=0.3e3,
     acel0=-0.1e3,

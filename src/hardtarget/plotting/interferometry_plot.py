@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 import numpy.typing as npt
 
@@ -8,13 +10,16 @@ def plot_direction_of_arrival(
     axes: npt.NDArray,  # of type Axes
     out_data: DOAVars,
     pro: DOAProParams,
-    limit: float = 10.0,
+    limit: Optional[float] = None,
 ) -> npt.NDArray:  # of type Axes:
     """
     Plots direction of arrival results, axes needs to be of atleast size (2,2).
     """
 
-    detections = out_data.peak >= limit
+    if limit:
+        detections = out_data.peak >= limit
+    else:
+        detections = np.zeros(out_data.peak.shape, dtype=np.bool)
 
     # Plot azimut and elvation over time
     axes[0, 0].plot(out_data.elevation)

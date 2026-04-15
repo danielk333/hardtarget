@@ -12,6 +12,29 @@ from hardtarget.types import ExpDef
 from .utils import correlation_matrix
 
 
+def landscape_function(
+    k: npt.NDArray, eig_vec: npt.NDArray, beam: Array, beam_params: ArrayParams
+) -> npt.NDArray[np.complex64] | np.complex64:
+    """
+    Landscape function
+
+    Args:
+        k: x,y,z position (3,N) array or (3,) array
+    Returns:
+        Scalar value or (N,) array
+    """
+
+    if k.ndim > 1:
+        res = np.zeros((k.shape[1],), dtype=np.complex64)
+        a = beam.channel_signals(k, beam_params)
+        for i in range(k.shape[1]):
+            res[i] = (a[:, i].conj().T @ a[:, i]) / (a[:, i].conj().T @ eig_vec @ eig_vec.conj().T @ a[:, i])
+        return res
+    else:
+        a = beam.channel_signals(k, beam_params)
+        return (a.conj().T @ a) / (a.conj().T @ eig_vec @ eig_vec.conj().T @ a)
+
+
 def grid_search_numpy(
     rx_per_channel: npt.NDArray,
     exp: ExpDef,
@@ -56,32 +79,16 @@ def grid_search_numpy(
     k_vec = k_vec[:, elevation_filter]
     k_index = k_index[elevation_filter]
 
-    # Define landscape function
-    def landscape_function(k: npt.NDArray) -> npt.NDArray[np.complex64] | np.complex64:
-        """
-        Landscape function
-
-        Args:
-            k: x,y,z position (3,N) array or (3,) array
-        Returns:
-            Scalar value or (N,) array
-        """
-
-        if k.ndim > 1:
-            res = np.zeros((k.shape[1],), dtype=np.complex64)
-            a = beam.channel_signals(k, beam_params)
-            for i in range(k.shape[1]):
-                res[i] = (a[:, i].conj().T @ a[:, i]) / (
-                    a[:, i].conj().T @ eig_vec @ eig_vec.conj().T @ a[:, i]
-                )
-            return res
-        else:
-            a = beam.channel_signals(k, beam_params)
-            return (a.conj().T @ a) / (a.conj().T @ eig_vec @ eig_vec.conj().T @ a)
+    landscape_func = lambda k: landscape_function(
+        k=k,
+        eig_vec=eig_vec,
+        beam=beam,
+        beam_params=beam_params,
+    )
 
     # Calculate peaks
     vals = np.zeros((pro.kx.shape[0], pro.ky.shape[0]), dtype=np.complex64)
-    vals[k_index[:, 0], k_index[:, 1]] = landscape_function(k_vec)
+    vals[k_index[:, 0], k_index[:, 1]] = landscape_func(k_vec)
 
     # Extract N peaks to run gradient ascent from
     peak_inds = get_distributed_peaks(vals, cfg.distributed_peaks)
@@ -97,7 +104,7 @@ def grid_search_numpy(
     val_opt = np.complex64(0)
     k_opt = np.empty((3,), dtype=np.float32)
     for k_start in k_peaks:
-        k_vec, val = gradient_ascent(func=landscape_function, k_start=k_start)
+        k_vec, val = gradient_ascent(func=landscape_func, k_start=k_start)
         if val > val_opt:
             val_opt = val
             k_opt = k_vec

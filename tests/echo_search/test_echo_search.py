@@ -3,21 +3,20 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import radardef.radar_stations.eiscat.utils as radardef_utils
 from radardef import RadarDef
+from radardef.radar_stations.eiscat.experiments import load_radar_code
 from radardef.types import BoundParams, ExpDef
-from scipy import constants
 
 import hardtarget
 from hardtarget.data_simulation import DRFSimParams, simulate_drf
-from hardtarget.echo_search.types import XCorrCfgParams
+from hardtarget.echo_search.types import EchoSearchCfgParams
 
 
 def wip_echo_search():
 
     n_ipp = 1
 
-    cfg = XCorrCfgParams(
+    cfg = EchoSearchCfgParams(
         n_ipp=n_ipp,
         ipp_offset=0,
         min_range_gate=6640,
@@ -31,23 +30,21 @@ def wip_echo_search():
     )
 
     exp_params = ExpDef(
-        name="simulation",
+        name="leo_bpark",
         radar_frequency=929.6,
         t_ipp_usec=20000,
-        ipp_samps=20000,
-        sample_rate=1000000.0,
         t_samp_usec=1,
         rx_channels=["sim"],
-        t_tx_start_usec=82.0,
-        t_tx_end_usec=2001.0,
+        t_tx_start_usec=82,
+        t_tx_end_usec=2002,
         t_rx_start_usec=0,
         t_rx_end_usec=20000,
         tx_channel="sim",
-        tx_pulse_length=1919,
         t_cal_on_usec=19900.0,
         t_cal_off_usec=19997.0,
-        wavelength=constants.c / (929.6 * 1e6),
-        code=radardef_utils.load_radar_code("leo_bpark"),
+        code=load_radar_code("leo_bpark"),
+        baud_length_usec=30,
+        samples_per_file=12800000,
     )
 
     bounds_params = BoundParams(
@@ -101,7 +98,7 @@ def wip_echo_search():
 
         # process
         _ = hardtarget.echo_search(
-            path=Path(tmp_sim_path).resolve(),
+            data=Path(tmp_sim_path).resolve(),
             rx_channel="sim",
             config=cfg,
             start_time=simulation_params.start_time_us,

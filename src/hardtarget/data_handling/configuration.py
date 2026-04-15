@@ -124,8 +124,8 @@ def compute_process_params(
     exp_params: ExpDef,
     cfg_params: CfgParams,
     analysis_method: AnalysisMethod,
-    method_lib: Optional[MethodLib] = None,
-    implementation: Optional[Impl] = None,
+    method_lib: MethodLib,
+    implementation: Impl,
 ) -> ProParams:
     """
     Computes the processing parameters from the experiment and configuration parameters.

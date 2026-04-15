@@ -54,7 +54,7 @@ with tempfile.TemporaryDirectory() as tmp_dir:
     for res_i, resolution in enumerate(res_steps):
         for peak_i, n_peaks in enumerate(distributed_peaks):
             result = direction_of_arrival(
-                path=simulation_path,
+                data=simulation_path,
                 config=DOACfgParams(
                     n_ipp=1,
                     min_range_gate=81,

@@ -4,19 +4,19 @@ import sys
 from abc import abstractmethod
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable, Generic, TypeVar
+from typing import Generic, Optional, TypeVar
 
 import numpy as np
 import scipy.fft as fft
-from radardef.types import Pointing
 from scipy.signal import savgol_filter  # type: ignore[attr-defined]
 
-from hardtarget.constants import ConfigSubSection
+from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl
 from hardtarget.data_handling.configuration import (
     extract_config_section,
     get_ilx_windows,
 )
 from hardtarget.process import Process
+from hardtarget.process.process import DataLoader
 from hardtarget.target_estimation.types import (
     ExtendedTargetEstimationProParams,
     MFOutArgs,
@@ -26,20 +26,19 @@ from hardtarget.target_estimation.types import (
 )
 from hardtarget.types import (
     AnalysisLib,
-    ArrayKwargs,
-    Bounds,
     CfgParams,
     DataItem,
     ExpDef,
-    ExtractSignals,
+    MethodLib,
     ProParams,
 )
+from hardtarget.utils import noise
 from hardtarget.utils.range_conversion import range_gate_to_range
 
 if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
-    from typing_extensions import Unpack
+    pass
 else:
-    from typing import Unpack
+    pass
 
 TeLibCfg = TypeVar("TeLibCfg", bound=TargetEstimationCfgParams)
 TeLibPro = TypeVar("TeLibPro", bound=ExtendedTargetEstimationProParams)
@@ -55,37 +54,35 @@ class TargetEstimationProcess(
     ],
     Generic[TeLibCfg, TeLibPro],
 ):
+    method = AnalysisMethod.target_estimation
+
     def __init__(
         self,
-        cfg_raw: str | Path | TeLibCfg,
-        exp_params: ExpDef,
-        cfg_params: CfgParams,
-        pro_params: ProParams,
-        epoch_bounds: Bounds,
-        func_get_data: ExtractSignals,
-        func_get_pointing: Callable[[int], Pointing],
-        output_dir: str | Path | None = None,
+        config: str | Path | TeLibCfg,
+        data: DataLoader,
+        method_lib: Optional[MethodLib] = None,
+        impl: Optional[Impl] = None,
+        rx_channel: Optional[str | int] = None,
+        excluded_channels: Optional[list[str] | list[int]] = None,
+        output_dir: Optional[str | Path] = None,
         progress: bool = False,
-        **kwargs: Unpack[ArrayKwargs],
     ) -> None:
         super().__init__(
-            cfg_raw,
-            exp_params,
-            cfg_params,
-            pro_params,
-            epoch_bounds,
-            func_get_data,
-            func_get_pointing,
+            config,
+            data,
+            method_lib,
+            impl,
+            rx_channel,
+            excluded_channels,
             output_dir,
             progress,
-            **kwargs,
         )
-        if isinstance(cfg_raw, TargetEstimationCfgParams):
-            self.cfg_params: TeLibCfg = cfg_raw
-        elif not isinstance(cfg_raw, dict):
-            self.cfg_params = self.get_lib_specific_conf_params(Path(cfg_raw), self.cfg_params)
+        if isinstance(config, TargetEstimationCfgParams):
+            self.cfg_params: TeLibCfg = config
+        elif not isinstance(config, dict):
+            self.cfg_params = self.get_lib_specific_conf_params(Path(config), self.cfg_params)
         self.pro_params: TeLibPro = self.get_lib_specific_process_params(
-            exp_params, self.cfg_params, self.pro_params
+            self.exp_params, self.cfg_params, self.pro_params
         )
 
     def get_conf_params(self, cfg_path: Path, cfg_params: CfgParams) -> TargetEstimationCfgParams:
@@ -265,7 +262,10 @@ class TargetEstimationProcess(
         # Substracting background level
         noise_floor = np.nanmedian(all_vars.dc, axis=0)
         noise_floor = savgol_filter(noise_floor, 2000, 1, mode="nearest")
-        snr = (np.sqrt(all_vars.vals) - np.sqrt(noise_floor[None, :])) ** 2 / noise_floor[None, :]
+
+        # Calculating signal to noise ratio
+        snr = noise.snr(all_vars.vals, noise_floor)
+
         # finding peaks
         r_inds = np.argmax(snr, axis=1)
         r_vec = pro_params.ranges[r_inds]

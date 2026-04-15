@@ -9,18 +9,19 @@ import logging
 import sys
 import time
 from abc import ABC, abstractmethod
-from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Callable, Generic, Optional, Type
+from typing import Any, Generic, Optional, Type
 
 import numpy as np
+from radardef.components import DataLoader
 from radardef.types import Pointing
 from tqdm import tqdm
 
 import hardtarget.process.utils as utils
-from hardtarget.constants import Impl, MethodLib
-from hardtarget.data_handling import dump_params_to_file
+from hardtarget.constants import AnalysisMethod, Impl, MethodLib
+from hardtarget.data_handling import compute_process_params, dump_params_to_file, load_config_params
 from hardtarget.data_handling.configuration import extract_config_from_dict
+from hardtarget.data_simulation.tx_model import tx_signal_model
 from hardtarget.process.utils import calculate_tasks, sample_interval_to_closest_ipp
 from hardtarget.types import (
     AnalysedResult,
@@ -29,13 +30,12 @@ from hardtarget.types import (
     CfgParams,
     DataItem,
     ExpDef,
-    ExtractSignals,
+    ExtractedSignals,
     GenericCfg,
     GenericLib,
     GenericOut,
     GenericPro,
     GenericVars,
-    Job,
     ProParams,
 )
 from hardtarget.utils.time_conversion import time_interval_to_sample_bound, ts_from_str
@@ -110,50 +110,68 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
 
     Args:
-        cfg_raw: path to user config file or CfgParams object matching the specfic process
-        exp_params: experiment parameters derived from the radar data
-        cfg_params: base configurable processing params
-        pro_params: base calculated processing params
-        epoch_bounds: time bounds of the data
-        func_get_data: function that extracts N rx and tx samples from a given start sample
-        func_get_pointing_data: function that extract pointing data at a given sample
-        lib: The analysis library
-        output_dir: Path to output directory
+        config: path to user config file or CfgParams object matching the specfic process
+        data: Data loader to access the measurement data
+        method_lib (optional): Specific method library
+        impl (optional): Implementation to be used during analyse (C/Cuda/Numpy)
+        rx_channel (optional): If only a specific rx channel should be analysed, if None all rx channels will be used for analysis.
+        excluded_channels (optional): Rx channels to ignore if the data contains multiple channels.
+        progress (optional): Enable progress bar.
+        output_dir (optional): Path to output directory, if none data will only be stored in ram
         **kwargs: Extra data such as Beam and Beam parameters (needed for interferometry)
 
     """
 
+    method: AnalysisMethod
+
     def __init__(
         self,
-        cfg_raw: str | Path | GenericCfg,
-        exp_params: ExpDef,
-        cfg_params: CfgParams,
-        pro_params: ProParams,
-        epoch_bounds: Bounds,
-        func_get_data: ExtractSignals,
-        func_get_pointing: Callable[[int], Pointing],
+        config: str | Path | GenericCfg,
+        data: DataLoader,
+        method_lib: Optional[MethodLib] = None,
+        impl: Optional[Impl] = None,
+        rx_channel: Optional[str | int] = None,
+        excluded_channels: Optional[list[str] | list[int]] = None,
         output_dir: Optional[str | Path] = None,
         progress: bool = False,
         **kwargs: Unpack[ArrayKwargs],
     ) -> None:
+        # Local logger
         self._logger = logging.getLogger(__name__)
-        self.exp_params = exp_params
 
-        if isinstance(cfg_raw, CfgParams):
-            self.cfg_params = cfg_raw
-        elif isinstance(cfg_raw, dict):
+        # Experiment definition and data acquisition
+        self.data = data
+        self.exp_params = self.data.experiment
+        self._rx_channel, self._tx_channel = self.extract_channels(self.exp_params, rx_channel)
+        self._excluded_channels = excluded_channels if excluded_channels is not None else []
+
+        # Define configuration
+        if isinstance(config, CfgParams):
+            self.cfg_params = config
+        elif isinstance(config, dict):
             cfg_type, _, _ = self.get_types()
-            self.cfg_params = extract_config_from_dict(cfg_raw, cfg_type)
+            self.cfg_params = extract_config_from_dict(config, cfg_type)
         else:
-            self.cfg_params = self.get_conf_params(Path(cfg_raw), cfg_params)
+            cfg_base = load_config_params(Path(config))
+            self.cfg_params = self.get_conf_params(Path(config), cfg_base)
 
-        self.lib, lib_name, impl = self.get_analysis_lib(pro_params.method_lib, pro_params.implementation)
-        pro_params = self.define_method_lib(pro_params, lib_name, impl)
-        self.pro_params = self.get_process_params(self.exp_params, self.cfg_params, pro_params)
-        self.epoch = epoch_bounds
-        self.get_data = func_get_data
+        # Define library to be used during process
+        self.lib, lib_name, impl = self.get_analysis_lib(method_lib, impl)
+
+        # Derive process parameters
+        pro_base = compute_process_params(
+            self.exp_params,
+            self.cfg_params,
+            analysis_method=self.method,
+            method_lib=lib_name,
+            implementation=impl,
+        )
+        self.pro_params = self.get_process_params(self.exp_params, self.cfg_params, pro_base)
+
+        # Other needed parameters
+        t_start_usec, t_end_usec = self.data.epoch_bounds
+        self.epoch = Bounds(int(t_start_usec), int(t_end_usec))
         self.progress = progress
-        self.get_pointing = func_get_pointing
         self.output_dir = Path(output_dir).resolve() if output_dir is not None else None
         self.progress_bar = None
         self.store_mode = "w"
@@ -182,23 +200,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
     def get_conf_params(self, cfg_path: Path, cfg_params: CfgParams) -> GenericCfg:
         """Abstract method, process specific configuration parameters"""
         pass
-
-    def define_method_lib(self, pro_params: ProParams, lib_name: MethodLib, impl: Impl) -> ProParams:
-        """
-        If method lib and implementation is not defined or not matching with what is declared in the process
-        parameters, correct process parameters and return.
-        """
-
-        method_lib_correction = pro_params.method_lib is None or pro_params.method_lib is not lib_name
-        implementation_correction = pro_params.implementation is None or pro_params.implementation is not impl
-
-        if method_lib_correction or implementation_correction:
-            pro_dict = asdict(pro_params)
-            pro_dict[f"{ProParams.method_lib=}".split("=")[0].split(".")[1]] = lib_name
-            pro_dict[f"{ProParams.implementation=}".split("=")[0].split(".")[1]] = impl
-            return ProParams(**pro_dict)
-        else:
-            return pro_params
 
     @abstractmethod
     def get_process_params(
@@ -367,8 +368,8 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
     def run(
         self,
-        job: Job,
-        epoch: Bounds,
+        comm_rank: int,
+        comm_size: int,
         start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
         end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
         relative_time: bool = False,
@@ -384,7 +385,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
         Args:
             job: Job id
-            epoch: Measurement bounds (start and end), in microseconds since epoch.
             start_time (optional): Start time, if set data before this will be neglected
             end_time (optional): End time, if set data after this will be neglected
             relative_time (optional): If relative time should be used
@@ -400,13 +400,16 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             end_time = int(ts_from_str(end_time) * 1e6)
 
         # bounds
-        sample_bounds = time_interval_to_sample_bound(
-            start_time=start_time,
-            end_time=end_time,
-            time_bounds=epoch,
-            sample_rate=self.exp_params.sample_rate,
-            relative_time=relative_time,
-        )
+        if start_time or end_time:
+            sample_bounds = time_interval_to_sample_bound(
+                start_time=start_time,
+                end_time=end_time,
+                time_bounds=self.epoch,
+                sample_rate=self.exp_params.sample_rate,
+                relative_time=relative_time,
+            )
+        else:
+            sample_bounds = Bounds(*self.data.bounds(self.exp_params.rx_channels[0]))
 
         # round off to closest ipp, starting in the middle of a ipp will cause issues to the analysis
         sample_bounds = sample_interval_to_closest_ipp(
@@ -414,16 +417,17 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         )
 
         # add potential sample offset
-        self.sample_bounds = Bounds(
+        sample_bounds = Bounds(
             sample_bounds.start + self.cfg_params.samp_offset, sample_bounds.end + self.cfg_params.samp_offset
         )
 
         job_tasks, job_cohints = calculate_tasks(
-            job,
+            comm_rank,
+            comm_size,
             self.cfg_params.n_ipp,
             self.cfg_params.num_cohints_per_file,
             self.exp_params.ipp_samps,
-            self.sample_bounds,
+            sample_bounds,
         )
 
         progress_desc = "Coherent integrations"
@@ -438,7 +442,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 total=total,
             )
 
-        self._logger.info(f"starting job {job.idx}/{job.N} with {len(job_tasks)} tasks")
+        self._logger.info(f"starting job {comm_rank}/{comm_size} with {len(job_tasks)} tasks")
 
         results: AnalysedResult = {"dir": self.output_dir, "files": [], "data": {}}
         for idx, task_idx in enumerate(job_tasks):
@@ -454,16 +458,16 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 * self.exp_params.ipp_samps
                 * self.cfg_params.n_ipp
                 * self.cfg_params.num_cohints_per_file
-                + self.sample_bounds.start
+                + sample_bounds.start
             )
 
             task_data = self.process_task(
-                task_idx=task_idx, file_idx_sample=file_idx_sample, bounds=self.sample_bounds
+                task_idx=task_idx, file_idx_sample=file_idx_sample, bounds=sample_bounds
             )
 
             # Create directory if output is defined
             if self.output_dir is not None:
-                output_path = Path(self.output_dir) / utils.get_filepath(epoch.start, file_idx_sample)
+                output_path = Path(self.output_dir) / utils.get_filepath(self.epoch.start, file_idx_sample)
                 # create directory
                 dirname = Path(output_path).parent
                 dirname.mkdir(parents=True, exist_ok=True)
@@ -480,5 +484,94 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
         if self.progress_bar is not None:
             self.progress_bar.close()
-        self._logger.info(f"finishing job {job.idx}/{job.N} with {len(job_tasks)} tasks")
+        self._logger.info(f"finishing job {comm_rank}/{comm_size} with {len(job_tasks)} tasks")
         return results
+
+    def get_pointing(self, start_sample: int) -> Pointing:
+        """Pointing data to define radar pointing direction in spherical coordinates"""
+        return self.data.pointing(start_sample)
+
+    def extract_channels(
+        self, exp_params: ExpDef, rx_channel: Optional[int | str] = None
+    ) -> tuple[int | str | None, int | str | None]:
+        """
+        From experiment parameters and requested rx channel extract the correct ones from the data file
+        """
+
+        _tx_channel = exp_params.tx_channel
+        _rx_channel = None
+        if rx_channel is not None:
+            _rx_channel = rx_channel
+            if _rx_channel not in exp_params.rx_channels:
+                raise ValueError(f"rx_channel: {rx_channel} is not a valid channel in the measurement file")
+        elif len(exp_params.rx_channels) == 1:
+            # Only one available rx_channel during the experiment, thus we can declare it here
+            _rx_channel = exp_params.rx_channels[0]
+
+        return _rx_channel, _tx_channel
+
+    def get_data(
+        self,
+        start_sample: int,
+        read_length: int,
+        sum_rx_channels: bool = True,
+        sub_resolution: int = 1,
+    ) -> ExtractedSignals:
+        """
+        Extract rx and tx data at the given sample.
+
+        Args:
+            start_sample: Start sample
+            read_length: Amount of sample to read from the start sample
+            sum_rx_channels (optional): If multiple rx channels available they will all be summed.
+        Returns:
+            Rx and Tx samples, either as a array (read_length,) or if multiple channels requested
+            (n_channels, read_length).
+            If no tx channel is available a tx model will be used to simulate the tx signal
+        """
+
+        # if no rx channel specified all channels will be summed for full analysis
+        if sum_rx_channels:
+            if self._rx_channel is None:
+                ipp = np.zeros((read_length,), dtype=np.complex128)
+                for chnl in self.data.channels:
+                    if chnl != self._tx_channel and chnl not in self._excluded_channels:
+                        ipp += self.data.read(chnl, start_sample, read_length)
+            else:
+                ipp = self.data.read(self._rx_channel, start_sample, read_length)
+            # Extract rx samples
+            rx = ipp[self.pro_params.rx_stencil].copy()
+        else:
+            ipp = np.zeros((len(self.exp_params.rx_channels), read_length), dtype=np.complex128)
+            for i, chnl in enumerate[int | str](self.data.channels):
+                ipp[i, :] = self.data.read(chnl, start_sample, read_length)
+            # Extract rx samples
+            rx = ipp[:, self.pro_params.rx_stencil].copy()
+
+        # Extracting tx data
+        if self._tx_channel != self._rx_channel and self._tx_channel is not None:
+            tx = self.data.read(self._tx_channel, start_sample, read_length)
+            tx = np.broadcast_to(tx.reshape((tx.size, 1)), (tx.size, sub_resolution))
+        elif self._tx_channel == self._rx_channel and self._tx_channel is not None:
+            tx = ipp.copy()
+            tx = np.broadcast_to(tx.reshape((tx.size, 1)), (tx.size, sub_resolution))
+        else:
+            assert self.exp_params.code is not None, (
+                "No code available from the metadata, not possible to simulate tx"
+            )
+            tx = tx_signal_model(
+                code=self.exp_params.code,
+                baud_length_usec=self.exp_params.baud_length_usec,
+                t_samp_usec=self.exp_params.t_samp_usec,
+                tx_start_samp=int(self.exp_params.t_tx_start_usec / self.exp_params.t_samp_usec),
+                start_samp=(start_sample % self.exp_params.ipp_samps) - self.cfg_params.samp_offset,
+                read_length=read_length,
+                ipp_samps=self.exp_params.ipp_samps,
+                sub_resolution=sub_resolution,
+                kind="linear",
+            )
+        tx = tx[self.pro_params.tx_stencil, :]
+
+        return ExtractedSignals(
+            tx=tx.astype(np.complex64), rx=rx.astype(np.complex64), ipp=ipp.astype(np.complex64)
+        )

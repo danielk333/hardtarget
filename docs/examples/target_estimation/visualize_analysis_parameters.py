@@ -8,9 +8,9 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from radardef.radar_def import RadarDef
 
 import hardtarget
-from hardtarget.types import AnalysisMethod
 
 # Workaround to make jupyter notebook find utils
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
@@ -31,29 +31,13 @@ raw_data = utils.download_test_data(raw_path)
 
 # Convert the data to a usable format.
 
-data = utils.convert_test_data(raw_data, converted_path)[0]
+data_path = utils.convert_test_data(raw_data, converted_path)[0]
 
 
-# Extract data from the measurement, the Measurement object will load experiment and config parameters from
-# the user config and the measurement data, then from that compute the process parameters. Furthermore it
-# extracts the meta and raw data in a simple way.
+# Create a process which will extract the configuration and process parameters
 
-measurement = hardtarget.data_handling.Measurement(
-    Path(data),
-    Path(config),
-    AnalysisMethod.target_estimation,
-)
-
-process = hardtarget.GMFProcess(
-    config,
-    measurement.exp_params,
-    measurement.cfg_params,
-    measurement.pro_params,
-    None,
-    None,
-    None,
-)
-
+data = RadarDef().load_data(data_path)
+process = hardtarget.GMFProcess(config=config, data=data)
 exp = process.exp_params
 cfg = process.cfg_params
 pro = process.pro_params

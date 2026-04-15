@@ -2,11 +2,11 @@
 
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable
+from typing import Optional
 
 import h5py
 import numpy as np
-from radardef.types import Pointing
+from radardef.components import DataLoader
 
 from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl, OptimizationMethod
 from hardtarget.data_handling.configuration import extract_config_section, get_ilx_windows
@@ -22,11 +22,9 @@ from hardtarget.process import Process
 from hardtarget.target_estimation.gmf import GMFCfgParams
 from hardtarget.target_estimation.types import MFOutArgs
 from hardtarget.types import (
-    Bounds,
     CfgParams,
     DataItem,
     ExpDef,
-    ExtractSignals,
     MethodLib,
     OptimizeLib,
     ProParams,
@@ -37,6 +35,8 @@ from hardtarget.utils.h5_tools import get_analysed_h5_files
 class OptimizeProcess(
     Process[OptimizeCfgParams, OptimizeProParams, MFOptimizeVariables, MFOptimizeOutArgs, OptimizeLib]
 ):
+    method = AnalysisMethod.optimize
+
     def get_analysis_lib(
         self, lib: MethodLib | None, impl: Impl | None
     ) -> tuple[OptimizeLib, OptimizationMethod, Impl]:
@@ -44,24 +44,22 @@ class OptimizeProcess(
 
     def __init__(
         self,
-        cfg_path: Path,
-        exp_params: ExpDef,
-        cfg_params: CfgParams,
-        pro_params: ProParams,
-        epoch_bounds: Bounds,
-        func_get_data: ExtractSignals,
-        func_get_pointing: Callable[[int], Pointing],
-        output_dir: str | Path | None = None,
+        config: str | Path | OptimizeCfgParams,
+        data: DataLoader,
+        method_lib: Optional[MethodLib] = None,
+        impl: Optional[Impl] = None,
+        rx_channel: Optional[str | int] = None,
+        excluded_channels: Optional[list[str] | list[int]] = None,
+        output_dir: Optional[str | Path] = None,
         progress: bool = False,
     ) -> None:
         super().__init__(
-            cfg_path,
-            exp_params,
-            cfg_params,
-            pro_params,
-            epoch_bounds,
-            func_get_data,
-            func_get_pointing,
+            config,
+            data,
+            method_lib,
+            impl,
+            rx_channel,
+            excluded_channels,
             output_dir,
             progress,
         )
@@ -78,7 +76,7 @@ class OptimizeProcess(
         self.sorted_mf_files = paths
 
         # Verify optimization is running on the correct data
-        with h5py.File(paths[0], "r") as hf:
+        with h5py.File(self.sorted_mf_files[0], "r") as hf:
             method = AnalysisMethod(hf[f"{ProParams.method=}".split("=")[0].split(".")[1]].asstr()[()])
             if method != AnalysisMethod.target_estimation:
                 raise ValueError(
@@ -88,6 +86,9 @@ class OptimizeProcess(
                 self.sub_resolution: int = hf[GMFCfgParams.__name__][
                     f"{GMFCfgParams.range_gate_sub_resolution=}".split("=")[0].split(".")[1]
                 ][()]
+                self.mf_sample_start: int = int(
+                    hf["OutArgs"][f"{MFOutArgs.epoch=}".split("=")[0].split(".")[1]][()] * 1e6
+                )
             except KeyError:
                 raise ValueError("Optimization is only compatible with a previous gmf analysis")
 
@@ -102,7 +103,7 @@ class OptimizeProcess(
             Range, velocity and acceleration estimation from previous analysis for the specific cohint
         """
 
-        relative_sample_index = start_sample - self.sample_bounds.start
+        relative_sample_index = start_sample - self.mf_sample_start
         samples_per_cohint = self.exp_params.ipp_samps * self.cfg_params.n_ipp
         samples_per_file = samples_per_cohint * self.cfg_params.num_cohints_per_file
         file_id = relative_sample_index // samples_per_file

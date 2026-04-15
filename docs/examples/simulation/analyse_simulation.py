@@ -75,7 +75,8 @@ simulate_h5(
     beam_params=station.beam_parameters,
 )
 # Load the raw data so it's available if needed.
-reader = station.load_data(data_path, experiment=mu_exp)
+data = station.load_data(data_path, experiment=mu_exp)
+assert data is not None, "Not possible to load data"
 
 # ## Analysis configuration
 # ---
@@ -108,7 +109,7 @@ cfg = {
 
 output_path = Path(tmp_dir.name) / "echo_search"
 echo_search(
-    path=data_path,
+    data=data,
     config=cfg,
     output=output_path,
 )
@@ -121,10 +122,10 @@ data_generator = load_analysed_data(output_path)
 out_data, exp_params, cfg_params, pro_params = list(data_generator)[0]
 #
 fig, ax = plt.subplots(2, 2)
-plotting.plot_echo_search(ax, out_data, pro_params)
+plotting.plot_echo_search(ax, exp_params, out_data, limit=0.6)
 _, handles = plotting.rti(
     ax[1, 1],
-    reader,
+    data,
     axis_units=True,
     log=True,
     relative_time=True,
@@ -138,7 +139,7 @@ fig.set_size_inches(10, 10)
 
 output_path = Path(tmp_dir.name) / "target_estimation"
 target_estimation(
-    path=data_path,
+    data=data,
     config=cfg,
     output=output_path,
     exp_params=experiment,
@@ -162,6 +163,7 @@ plotting.target_estimation_plots.plot_peaks(
     exp_params,
     cfg_params,
     pro_params,
+    snr_dB_limit=15.0,
 )
 fig.set_size_inches(10, 10)
 
@@ -206,7 +208,7 @@ ranges = out_data.r_vec
 
 output_path = Path(tmp_dir.name) / "direction_of_arrival"
 direction_of_arrival(
-    path=data_path,
+    data=data,
     config=cfg,
     array_beam=station.beam,
     beam_params=station.beam_parameters,
@@ -242,11 +244,12 @@ ax = plotting.plot_true_vs_estimated_trajectory(
     doa_azimuth=out_data.azimuth,
     doa_elevation=out_data.elevation,
     ranges=ranges,
-    pointing=np.array([reader.pointing(0)[0], reader.pointing(0)[1]]),
+    pointing=np.array([data.pointing(0)[0], data.pointing(0)[1]]),
     measurement_start=measurement_start,
     measurement_end=measurement_end,
     target_start_us=target_start_time_us,
     target_end_us=target_end_time_us,
+    detection_limit=10.0,
 )
 fig.set_size_inches(10, 10)
 

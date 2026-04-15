@@ -1,4 +1,4 @@
-LIBS=src/mf_c_lib src/gmf_cuda_lib
+LIBS=src/c_lib src/cuda_lib
 
 all:
 	for dr in $(LIBS); do \

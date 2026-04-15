@@ -14,8 +14,9 @@ from radardef.radar_stations.eiscat.experiments import load_radar_code
 from radardef.types import BoundParams, ExpDef
 from scipy import constants
 
-from hardtarget import analyse, load_analysed_data
-from hardtarget.constants import AnalysisMethod, Impl, TargetEstimationMethod
+from hardtarget import load_analysed_data
+from hardtarget.analyse import target_estimation
+from hardtarget.constants import Impl, TargetEstimationMethod
 
 from .simulate_drf import DRFSimParams, simulate_drf
 
@@ -32,7 +33,7 @@ def linearized_mle_covariance(
 ) -> npt.NDArray[np.floating]:
     """ """
     experiment_params = ExpDef(
-        name="simulation",
+        name="leo_bpark",
         radar_frequency=929.6,
         t_ipp_usec=20000,
         t_samp_usec=1,
@@ -255,10 +256,10 @@ def monte_carlo_sample_errors(
     if clobber and analysed_path.is_dir():
         shutil.rmtree(analysed_path)
 
-    analyse(
-        path=drf_path,
+    target_estimation(
+        data=drf_path,
         config=config_path,
-        method=AnalysisMethod.target_estimation,
+        exp_params=experiment_params,
         method_lib=mf_method,
         implementation=mf_implementation,
         clobber=clobber,

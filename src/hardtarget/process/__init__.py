@@ -1,37 +1,45 @@
 from .process import Process  # isort: off
 
-from hardtarget.target_estimation import TargetEstimationProcess, DPTProcess, GMFProcess
+from hardtarget.target_estimation import DPTProcess, GMFProcess, TargetEstimationProcess
 from hardtarget.optimization import OptimizeProcess
-from hardtarget.echo_search import XCorrProcess
+from hardtarget.echo_search import EchoSearchProcess
 from hardtarget.interferometry import DOAProcess
-from hardtarget.constants import Processes, AnalysisMethod, TargetEstimationMethod, MethodLib
+from hardtarget.constants import AnalysisMethod, TargetEstimationMethod, MethodLib
 from typing import Optional
 
 # ---- Processes ----
-PROCESSES: dict[Processes, type[Process]] = {
-    Processes.GMF: GMFProcess,
-    Processes.DPT: DPTProcess,
-    Processes.Optimization: OptimizeProcess,
-    Processes.XCORR: XCorrProcess,
-    Processes.DOA: DOAProcess,
+PROCESSES: dict[AnalysisMethod, type[Process] | dict[MethodLib, type[Process]]] = {
+    AnalysisMethod.target_estimation: {
+        TargetEstimationMethod.fgmf: GMFProcess,
+        TargetEstimationMethod.fdpt: DPTProcess,
+    },
+    OptimizeProcess.method: OptimizeProcess,  # type: ignore[has-type]
+    EchoSearchProcess.method: EchoSearchProcess,  # type: ignore[has-type]
+    DOAProcess.method: DOAProcess,  # type: ignore[has-type]
 }
 
 
 def get_analysis_process(method: AnalysisMethod, method_lib: Optional[MethodLib] = None) -> type[Process]:
+    """
+    Get process for the intended method and specific method_lib if requested
 
-    if method == AnalysisMethod.target_estimation:
-        if method_lib:
-            if method_lib == TargetEstimationMethod.fdpt:
-                return PROCESSES[Processes.DPT]
+    Args:
+        method: Analysis method
+        method_lib (optional): Specific library for the intented method
+    Returns:
+        Process compatible with the method
+
+    """
+
+    try:
+        process = PROCESSES[method]
+
+        if isinstance(process, dict):
+            if method_lib:
+                return process[method_lib]
             else:
-                return PROCESSES[Processes.GMF]
+                return GMFProcess  # TODO: Better handling of default value
         else:
-            return PROCESSES[Processes.GMF]
-    elif method == AnalysisMethod.optimize:
-        return PROCESSES[Processes.Optimization]
-    elif method == AnalysisMethod.echo_search:
-        return PROCESSES[Processes.XCORR]
-    elif method == AnalysisMethod.direction_of_arrival:
-        return PROCESSES[Processes.DOA]
-    else:
-        raise Exception(f"No available process for method: {method}, lib: {method_lib}")
+            return process
+    except KeyError:
+        raise KeyError(f"No available process for method: {method}")

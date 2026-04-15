@@ -61,14 +61,6 @@ class Impl(StrEnum):
     unknown = "unknown"
 
 
-class Processes(StrEnum):
-    GMF = "gmf"
-    DPT = "dpt"
-    Optimization = "optimization"
-    XCORR = "xcorr"
-    DOA = "doa"
-
-
 class ConfigSubSection(StrEnum):
     """Subsections in configuration .ini file"""
 

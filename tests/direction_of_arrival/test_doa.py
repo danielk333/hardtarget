@@ -50,7 +50,7 @@ class TestDOA:
                 distributed_peaks=5,
             )
             result = direction_of_arrival(
-                path=simulation_path,
+                data=simulation_path,
                 config=cfg,
                 array_beam=station.beam,
                 beam_params=station.beam_parameters,

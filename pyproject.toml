@@ -80,7 +80,8 @@ test = [
     "spacecoords >= 0.1.6",
     "pyant",
     "requests",
-    "pytest-dependency"
+    "pytest-dependency",
+    "mpi-pytest",
 ]
 all = ["mpi4py >= 3.1.1", "matplotlib >= 3.3.4", "yappi >= 1.4.0"]
 
@@ -91,6 +92,12 @@ license-files = ["LICENSE"]
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.mypy]
+disallow_untyped_defs = true
+follow_untyped_imports = true
+warn_unused_ignores = true
+packages = ["hardtarget"]
+
 [tool.ruff]
 line-length = 110
 
@@ -100,9 +107,17 @@ line-length = 110
 [tool.ruff.lint]
 ignore = ["E203","D203","E251","E501","E226"]
 
-[tool.pytest.ini_options]
-addopts = "-v --cov=hardtarget -m 'not cuda' -p no:warnings"
+[tool.pytest]
+addopts =["-v","-m","not cuda","-p","no:warnings"]
 testpaths = ["tests"]
+
+[tool.coverage]
+parallel = true
+combine = true
+
+[tool.coverage.run]
+include= ["hardtarget"]
+source = ["./src/"]
 
 [tool.coverage.report]
 exclude_also = [

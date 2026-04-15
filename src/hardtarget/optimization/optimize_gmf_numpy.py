@@ -30,7 +30,10 @@ def optimize_gmf_np(
         exp_params: Experiment parameters
         cfg_params: Configuration parameters
         pro_params: Process parameters
-        gmf_start: The r/v/a value from the previous cohhind analys
+        r_vec: The estimated range value from the previous coherent integration in the matched filter analysis.
+        v_vec: The estimated velocity value from the previous coherent integration in the matched filter analysis.
+        a_vec: The estimated acceleration value from the previous coherent integration in the matched filter analysis.
+
 
     Returns
         Optimized r_vec, v_vec, a_vec, val
@@ -102,7 +105,9 @@ def optimize_grid_gmf_np(
         exp_params: Experiment parameters
         cfg_params: Configuration parameters
         pro_params: Process parameters
-        gmf_start: The r/v/a value from the previous cohhind analys
+        r_vec: The estimated range value from the previous coherent integration in the matched filter analysis.
+        v_vec: The estimated velocity value from the previous coherent integration in the matched filter analysis.
+        a_vec: The estimated acceleration value from the previous coherent integration in the matched filter analysis.
 
     Returns
         Optimized r_vec, v_vec, a_vec, val

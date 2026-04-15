@@ -45,7 +45,7 @@ data = utils.convert_test_data(raw_data, converted_path)[0]
 
 output_path = Path(tmp_dir.name) / "analysed"
 target_estimation(
-    path=data,
+    data=data,
     config=config,
     output=output_path,
     start_time=0,
@@ -74,6 +74,7 @@ target_estimation_plots.plot_peaks(
     exp_params,
     cfg_params,
     pro_params,
+    snr_dB_limit=15.0,
 )
 fig.set_size_inches(10, 10)
 

@@ -62,7 +62,7 @@ cfg = DOACfgParams(
 
 # Run analysis
 direction_of_arrival(
-    path=data,
+    data=data,
     config=cfg,
     array_beam=mu_station.beam,
     beam_params=mu_station.beam_parameters,

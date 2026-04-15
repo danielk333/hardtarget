@@ -4,16 +4,16 @@ from hardtarget.constants import AnalysisMethod, Impl
 
 from . import constants, types
 from .analyse import analyse, direction_of_arrival, echo_search, optimize, target_estimation
-from .data_handling import Measurement, compute_process_params, dump_params_to_file, load_config_params
+from .data_handling import compute_process_params, dump_params_to_file, load_config_params
 from .data_simulation import simulate_drf
-from .plotting import load_analysed_data, rti, target_estimation_plots
+from .plotting import load_analysed_data, rti, stack_analysed_data, target_estimation_plots
 from .process import (
     DOAProcess,
     DPTProcess,
+    EchoSearchProcess,
     GMFProcess,
     OptimizeProcess,
     Process,
-    XCorrProcess,
     get_analysis_process,
 )
 from .utils import noise

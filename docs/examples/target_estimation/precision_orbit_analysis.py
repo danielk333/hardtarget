@@ -39,7 +39,7 @@ end_time = dt.datetime.strptime("2024-07-04T10:21:21.000", "%Y-%m-%dT%H:%M:%S.%f
 )
 
 target_estimation(
-    path=data,
+    data=data,
     config=config,
     output=output_path,
     start_time=start_time,
@@ -68,6 +68,7 @@ target_estimation_plots.plot_peaks(
     exp_params,
     cfg_params,
     pro_params,
+    snr_dB_limit=15.0,
 )
 fig.set_size_inches(10, 10)
 

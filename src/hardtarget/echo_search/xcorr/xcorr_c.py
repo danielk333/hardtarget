@@ -2,9 +2,9 @@ import numpy as np
 import numpy.typing as npt
 
 from hardtarget.echo_search.types import (
-    XCorrCfgParams,
-    XCorrProParams,
-    XCorrVariables,
+    EchoSearchCfgParams,
+    EchoSearchProParams,
+    EchoSearchVars,
 )
 from hardtarget.libs import load_c_lib
 from hardtarget.types import ExpDef
@@ -16,9 +16,9 @@ def xcorr_c(
     tx: npt.NDArray[np.complex64],
     rx: npt.NDArray[np.complex64],
     exp_params: ExpDef,
-    cfg_params: XCorrCfgParams,
-    pro_params: XCorrProParams,
-) -> XCorrVariables:
+    cfg_params: EchoSearchCfgParams,
+    pro_params: EchoSearchProParams,
+) -> EchoSearchVars:
 
     pows = np.zeros([pro_params.doppler_freq_size, (len(rx) + len(tx))], dtype=np.complex64)
     pows_normalized = np.zeros([pro_params.doppler_freq_size, (len(rx) + len(tx))], dtype=np.complex64)
@@ -51,7 +51,7 @@ def xcorr_c(
 
     assert error_code == 0, f"Event search C-function returned error {error_code}"
 
-    return XCorrVariables(
+    return EchoSearchVars(
         max_pow=np.max(pows, axis=0),
         max_pow_norm=np.max(pows_normalized, axis=0),
         max_peak=max_pow_per_doppler[best_value_index],

@@ -10,7 +10,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from radardef import RadarDef
 
-import tests.utils as utils
 from hardtarget import echo_search, load_analysed_data, plotting
 
 # Workaround to make jupyter notebook find utils
@@ -51,7 +50,7 @@ start_time = int(reader.experiment.t_ipp_usec * 950)
 end_time = start_time + int(reader.experiment.t_ipp_usec * 150)
 
 echo_search(
-    path=data,
+    data=data,
     config=config,
     output=output_path,
     start_time=start_time,
@@ -68,12 +67,16 @@ out_data, exp_params, cfg_params, pro_params = list(data_generator)[0]
 
 # Then we can visualize it with different plots
 
-fig, ax = plt.subplots(2, 2)
-plotting.plot_echo_search(ax, out_data, pro_params)
+fig, ax = plt.subplots(3, 2)
+plotting.plot_echo_search(ax, exp_params, out_data, pro_params, limit=0.7)
 #
-# plot raw data power
+# plot raw data power in 2 blocks
+long_plot = ax[1, 0].get_gridspec()
+for axis in ax[2, 0:]:
+    axis.remove()
+long_plot_ax = fig.add_subplot(long_plot[2, 0:])
 _, handles = plotting.rti(
-    ax[1, 1],
+    long_plot_ax,
     reader,
     start_time=start_time,
     end_time=end_time,
@@ -82,7 +85,7 @@ _, handles = plotting.rti(
     relative_time=True,
     colorbar=False,
 )
-fig.set_size_inches(10, 10)
+fig.set_size_inches(12, 10)
 #
 plt.show()
 tmp_dir.cleanup()

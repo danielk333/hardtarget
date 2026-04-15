@@ -1,5 +1,7 @@
 """Plotting tools for analysed output"""
 
+from typing import Optional
+
 import numpy as np
 import numpy.typing as npt
 from matplotlib.axes import Axes
@@ -23,7 +25,7 @@ def plot_peaks(
     cfg: TargetEstimationCfgParams,
     pro: ExtendedTargetEstimationProParams,
     monostatic: bool = True,
-    snr_dB_limit: float = 15.0,
+    snr_dB_limit: Optional[float] = None,
 ) -> tuple[npt.NDArray, None]:  # of type Axes
     """
     Plot peaks
@@ -35,8 +37,7 @@ def plot_peaks(
         cfg: Configuration parameters
         pro: Process parameters
         monostatic (optional): Receiver and tranceiver located at the same location.
-        snr_dB_limit (optional): Signal to noise decibel limit, filter out indexes that does not meet the
-                                 limit.
+        snr_dB_limit (optional): Signal to noise decibel limit, if set data points above limit will be highlighted.
 
     Returns:
         Updated axes
@@ -49,13 +50,13 @@ def plot_peaks(
     max_acc = cfg.max_acceleration
 
     snr = out_data.snr
-
-    # TODO: use a interpolation of nf-range to determine the SNR of the optimized results
-    # snr = noise.snr(data["gmf_optimized"], data["nf_range"])
     snr = snr[coh_inds, r_inds]
     snrdb = 10 * np.log10(snr)
 
-    inds = snrdb > snr_dB_limit
+    if snr_dB_limit:
+        inds = snrdb > snr_dB_limit
+    else:
+        inds = np.zeros(out_data.t.shape, dtype=np.bool)
     not_inds = np.logical_not(inds)
 
     _inds_sty = dict(marker=".", ls="none", color="r")
@@ -80,7 +81,8 @@ def plot_peaks(
     axes[1, 0].plot(t[not_inds], a[not_inds], **_not_inds_sty)
     axes[1, 0].set_xlabel("Time [s]")
     axes[1, 0].set_ylabel("acceleration [m/s/s]")
-    axes[1, 0].set_ylim([min_acc, max_acc])
+    if min_acc != max_acc:
+        axes[1, 0].set_ylim([min_acc, max_acc])
 
     axes[1, 1].plot(t[inds], np.sqrt(snr[inds]), **_inds_sty)
     axes[1, 1].plot(t[not_inds], np.sqrt(snr[not_inds]), **_not_inds_sty)
@@ -148,7 +150,8 @@ def plot_detections(
     )
     axes[1, 0].set_xlabel("Time [s]")
     axes[1, 0].set_ylabel("acceleration [m/s/s]")
-    axes[1, 0].set_ylim([min_acc, max_acc])
+    if min_acc != max_acc:
+        axes[1, 0].set_ylim([min_acc, max_acc])
 
     h11 = axes[1, 1].plot(out_data.t[inds], snrdb[inds], **_style)
     axes[1, 1].set_xlabel("Time [s]")
@@ -165,7 +168,8 @@ def plot_detections(
     h11 = axes[1, 2].plot(range_data, acceleration_data, **_style)
     axes[1, 2].set_xlabel("range [km]")
     axes[1, 2].set_ylabel("acceleration [km/s/s]")
-    axes[1, 2].set_ylim([min_acc, max_acc])
+    if min_acc != max_acc:
+        axes[1, 2].set_ylim([min_acc, max_acc])
 
     handles = [[h00, h01], [h10, h11]]
     return axes, handles

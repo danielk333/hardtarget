@@ -1,3 +1,7 @@
+"""
+Simulate multichannel h5 data.
+"""
+
 import datetime as dt
 from pathlib import Path
 from typing import Callable, Optional
@@ -10,19 +14,6 @@ from radardef.types import ExpDef
 
 from hardtarget.data_simulation.utils import TrajectoryFunction, noise_generator, waveform_generator
 from hardtarget.utils.range_conversion import range_to_range_gate
-
-"""
-MUI h5 generator
-
-Data is structured as
-
-channel, ipp, rx_sample
-
-Thus only rx interval is involved
-
-
-
-"""
 
 
 def default_trajectory_function(t: npt.NDArray) -> npt.NDArray:
@@ -71,8 +62,21 @@ def simulate_h5(
     noise_sigma: Optional[float] = None,
 ) -> Path:
     """
-    The MU radar only store the rx samples, padded when read from dataloader
+    Simulate H5 data from a multichannel radar, note only rx samples are stored. The dataloader is padding the data later.
 
+    Args:
+        output_dir: Output directory.
+        exp_params: Experiment definition.
+        start_time: Start time of measurement, either in datetime or usec.
+        end_time: End time of measurement, either in datetime or usec.
+        target_start_time (optional): Start time of object in the measurement, either in datetime or usec.
+        target_end_time (optional): End time of object in the measurement, either in datetime or usec.
+        target_relative_time (optional): If the target times are relative to the start time.
+        trajectory_function (optional): Function modeling the trajectory of a object over time.
+        beam (optional): Beam of the radar stations. Only optional if no object is present.
+        beam_params (optional): Beam paramters of the radar stations. Only optional if no object is present.
+        snr_function (optional): Function modeling the signal to noise ratio over time.
+        noise_sigma (optional): Noise.
     """
 
     # Extract timepoints
@@ -193,6 +197,23 @@ def generate_rx_vectors(
     noise_sigma: Optional[float] = None,
     snr_function: Optional[Callable] = None,
 ) -> npt.NDArray:
+    """
+    Generate rx vectors for each channel.
+
+    Args:
+        exp: Experiment definition.
+        ipp_n: Ipp index
+        is_object_present: Should an object be present in the data.
+        tx_wave: Transmitted wave.
+        trajectory_function: Function modeling the trajectory over time.
+        beam (optional): Beam of the radar stations. Only optional if no object is present.
+        beam_params (optional): Beam paramters of the radar stations. Only optional if no object is present.
+        noise_sigma (optional): Noise.
+        snr_function (optional): Function modeling the signal to noise ratio over time.
+    Returns:
+        Rx waves for one ipp in the shape (Channels, rx_samps)
+    """
+
     rx_samps = int((exp.t_rx_end_usec - exp.t_rx_start_usec) / exp.t_samp_usec)
     rx_vector = np.zeros((len(exp.rx_channels), rx_samps), np.complex64)
 
@@ -244,11 +265,16 @@ def generate_rx_wave(
     noise_sigma: Optional[float] = None,
 ) -> npt.NDArray[np.complex64]:
     """
-    Generate an rx wave from the existing tx wave based on given range function.
+    Generate an rx wave from the existing tx wave based on what range the object is at.
 
     Args:
         exp: Experiment definition
-        t_tx_start_seconds: Start time of transmitted signal
+        tx_wave: the transmitted wave
+        ranges: array of range of object.
+        snr: signal to noise ratio.
+        noise_sigma (optional): noise
+    Returns:
+        reciver wave
     """
 
     if noise_sigma:

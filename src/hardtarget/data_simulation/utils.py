@@ -21,6 +21,11 @@ SIMULATION_DATA = [
 
 # Type hinting for a common declaration of a trajectory function
 class TrajectoryFunction(Protocol):
+    def __call__(
+        self,
+        t: npt.NDArray,
+    ) -> npt.NDArray: ...
+
     """Trajectory function
 
     Args:
@@ -29,11 +34,6 @@ class TrajectoryFunction(Protocol):
     Returns:
         Trajectory as a (3,N timepoints) numpy array
     """
-
-    def __call__(
-        self,
-        t: npt.NDArray,
-    ) -> npt.NDArray: ...
 
 
 class DRFSimParams(NamedTuple):

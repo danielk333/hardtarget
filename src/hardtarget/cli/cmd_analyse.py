@@ -7,7 +7,6 @@ import logging
 
 from radardef import RadarDef
 
-import hardtarget.utils.global_mpi
 from hardtarget.analyse import analyse
 from hardtarget.constants import (
     AnalysisMethod,
@@ -18,7 +17,8 @@ from hardtarget.constants import (
     StrEnum,
     TargetEstimationMethod,
 )
-from hardtarget.types import Array, ArrayKwargs, ArrayParams, Job
+from hardtarget.types import Array, ArrayKwargs, ArrayParams
+from hardtarget.utils.global_mpi import get_mpi
 from hardtarget.utils.profiling import get_logging_level
 
 from .commands import add_command
@@ -42,8 +42,8 @@ class AnalyseParser:
             choices=[f"{method}" for method in self.sub_methods],
             default=None,
         )
-        parser.add_argument("--rxchnl", help="RX channel")
-        parser.add_argument("--config", help="path to config file for GMF processing")
+        parser.add_argument("--config", help="path to analysis config file")
+        parser.add_argument("--rxchnl", default=None, help="specfic rx channel to analyse")
         parser.add_argument("-o", "--output", default=".", help="path to output directory")
         parser.add_argument("-p", "--progress", action="store_true", help="enable progress bar")
         parser.add_argument("-s", "--start_time", default=None, type=int)
@@ -72,12 +72,6 @@ class AnalyseParser:
         # Logging
         self.logger.setLevel(get_logging_level(args.verbose))
 
-        # import mpi (in case script is run by mpi)
-        comm = hardtarget.utils.global_mpi.import_mpi()
-
-        # job
-        job = Job(idx=comm.rank, N=comm.size)
-
         if self.method_name == AnalysisMethod.direction_of_arrival:
             # TODO: How to handle inputs to the radar_station (just default now)
             radar_station = RadarDef().get_radar(args.station_id)
@@ -95,10 +89,9 @@ class AnalyseParser:
 
         # process
         results = analyse(
-            path=args.data,
+            data=args.data,
             rx_channel=args.rxchnl,
             config=args.config,
-            job=job,
             method=self.method_name,
             method_lib=args.method,
             implementation=args.implementation,
@@ -108,6 +101,7 @@ class AnalyseParser:
             end_time=args.end_time,
             relative_time=args.relative_time,
             progress=args.progress,
+            comm=get_mpi(),
             **kwargs,
         )
 

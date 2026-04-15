@@ -21,7 +21,7 @@ To simplify or rather clarify the usage of [analyse](../api_analyse.md) for echo
 
 ---
 
-::: hardtarget.echo_search.XCorrProcess
+::: hardtarget.echo_search.EchoSearchProcess
 
 ## Type specifics
 

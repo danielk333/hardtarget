@@ -2,7 +2,6 @@
 Range conversion tools
 """
 
-import numpy as np
 import numpy.typing as npt
 import scipy.constants
 import scipy.constants as constants
@@ -46,7 +45,7 @@ def SI_to_unit(val: float | int, unit: str) -> float:
     return val
 
 
-def unit_to_range_gate(val: float | int, unit: str, sample_rate: int | float) -> np.int64:
+def unit_to_range_gate(val: float | int, unit: str, sample_rate: int | float) -> int:
     """Converts unit value to range gate
 
     Args:
@@ -56,10 +55,10 @@ def unit_to_range_gate(val: float | int, unit: str, sample_rate: int | float) ->
     """
 
     if unit == "sample":
-        return np.int64(val)
+        return int(val)
     val = unit_to_SI(val, unit)
     val = sample_rate * val / constants.c - 1
-    return np.round(val).astype(np.int64)
+    return int(val)
 
 
 def range_gate_to_unit(val: float | int, unit: str, sample_rate: int | float) -> float:

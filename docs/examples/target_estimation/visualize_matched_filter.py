@@ -14,11 +14,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.fft as fft
+from radardef.radar_def import RadarDef
 from radardef.radar_stations.eiscat.experiments import load_radar_code
 from radardef.types import BoundParams, ExpDef
 
 import hardtarget
-from hardtarget.constants import AnalysisMethod
 
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
 import utils
@@ -33,7 +33,7 @@ except NameError:
 
 # Exp
 exp = ExpDef(
-    name="simulation",
+    name="sim",
     radar_frequency=929.6,
     t_ipp_usec=20000,
     t_samp_usec=1,
@@ -66,21 +66,10 @@ range0, vel0, acel0, t_rel, t_abs, SNR, echo_len, _ = utils.sim_data(
 
 # ## Setup process and access the data
 # ---
-# Read the measurement and then start a process to get the correct process parameters
-
-measurement = hardtarget.Measurement(
-    Path(tmp_sim_path.name), config, AnalysisMethod.target_estimation, exp_params=exp
-)
-analyse_process = hardtarget.process.GMFProcess(
-    config,
-    measurement.exp_params,
-    measurement.cfg_params,
-    measurement.pro_params,
-    None,
-    None,
-    None,
-    None,
-)
+# Create a process to get the correct process parameters
+data = RadarDef().load_data(tmp_sim_path.name, experiment=exp)
+analyse_process = hardtarget.process.GMFProcess(config, data)
+exp_params = analyse_process.exp_params
 pro_params = analyse_process.pro_params
 cfg_params = analyse_process.cfg_params
 
@@ -102,15 +91,15 @@ print("Acceleration: ", pro_params.accelerations[acc_ind] * 1e-3, " km/s^2")
 
 # Start sample and amount of samples
 
-n_ipp = measurement.cfg_params.n_ipp
+n_ipp = cfg_params.n_ipp
 start_sample = np.round(look_time * exp.sample_rate).astype(np.int64)
 start_sample = (start_sample // exp.ipp_samps) * exp.ipp_samps
-start_sample += measurement.rx_sample_bounds.start
+start_sample += data.bounds(exp_params.rx_channels[0])[0]
 delta_samples = exp.ipp_samps * n_ipp
 print(f"read amount of samples: {delta_samples}, size tx_stencil = {pro_params.tx_stencil.shape}")
 
 # Extract rx and tx data
-z = measurement.extract_signals(start_sample, delta_samples)
+z = analyse_process.get_data(start_sample, delta_samples)
 
 
 # Calculate the time vector, filter for used and unused signals and extract il1 rx windows from the rx samples

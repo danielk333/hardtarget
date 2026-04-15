@@ -13,7 +13,14 @@ import numpy as np
 from hardtarget.constants import AnalysisMethod
 from hardtarget.process import get_analysis_process
 from hardtarget.target_estimation.types import MFOutArgs
-from hardtarget.types import ExpDef, GenericCfg, GenericOut, GenericPro, IsDataclass, ProParams
+from hardtarget.types import (
+    ExpDef,
+    GenericCfg,
+    GenericOut,
+    GenericPro,
+    IsDataclass,
+    ProParams,
+)
 from hardtarget.utils.h5_tools import get_analysed_h5_files
 
 logger = logging.getLogger(__name__)
@@ -31,7 +38,7 @@ def load_analysed_data(
     extracted, the result will be yielded in sizes of 'chunk_size' if given.
 
     Args:
-        folder: Directory containing the analysed output
+        data_dir: Directory containing the analysed output
         start_time (optional): start time, files containing data before this will be ignored.
         end_time (optional): end time, files containing data after this will be ignored.
         relative_time (optional): If relative time should be used.
@@ -159,9 +166,9 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
                     data = [d.decode() for d in data]
                 return data
 
-            GenericDC = TypeVar("GenericDC", bound=IsDataclass)
+            GenericDataclass = TypeVar("GenericDataclass", bound=IsDataclass)
 
-            def extract_dataclass(file: h5py.File, dc_type: type[GenericDC]) -> GenericDC:
+            def extract_dataclass(file: h5py.File, dc_type: type[GenericDataclass]) -> GenericDataclass:
                 # If init is false for the dataclass, ignore it
                 excluded_keys = [field.name for field in fields(dc_type) if not field.init]
                 # Extract keys
@@ -230,6 +237,45 @@ def get_process_types_from_file(path: Path) -> tuple[Any, Any, Any]:
         process = get_analysis_process(method, method_lib)
 
         return process.get_types()
+
+
+def stack_analysed_data(
+    data: dict[int, tuple[GenericOut, ExpDef, GenericCfg, GenericPro]],
+) -> tuple[GenericOut, ExpDef, GenericCfg, GenericPro]:
+    """
+    Gather data from several different outputs to one common.
+
+    Args:
+        data: data output from analysed results. Shall be a dict containing a key for the start time with a tuple with all needed data.
+    Returns:
+        Tuple containting the output of all items in the inputs.
+    """
+
+    if not data:
+        raise ValueError(
+            "No data available in memory from analysis, could it have been stored in storage instead?"
+        )
+
+    sorted_data_list = list(dict(sorted(data.items())).values())
+    out_type = type(sorted_data_list[0][0])
+
+    gathered_data = {}
+    output_start, exp_def, cfg, pro = sorted_data_list[0]
+    for field in out_type._fields:
+        attr = getattr(output_start, field)
+        if isinstance(attr, np.ndarray):
+            if attr.ndim >= 2:
+                gathered_data[field] = np.vstack(
+                    [getattr(output, field) for output, _, _, _ in sorted_data_list]
+                )
+            else:
+                gathered_data[field] = np.hstack(
+                    [getattr(output, field) for output, _, _, _ in sorted_data_list]
+                )
+        elif not gathered_data[field]:
+            gathered_data[field] = getattr(output_start, field)
+
+    return out_type(**gathered_data), exp_def, cfg, pro  # type: ignore[call-overload]
 
 
 """

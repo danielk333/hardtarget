@@ -3,24 +3,22 @@
 import sys
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable
+from typing import Optional
 
 import numpy as np
 from pyant.models.array import Array
-from radardef.types import Pointing
+from radardef.components import DataLoader
 
-from hardtarget.constants import ConfigSubSection, DOAMethod, Impl
+from hardtarget.constants import AnalysisMethod, ConfigSubSection, DOAMethod, Impl
 from hardtarget.data_handling.configuration import extract_config_section
 from hardtarget.interferometry import get_doa_lib
 from hardtarget.interferometry.types import DOACfgParams, DOAOutArgs, DOAProParams, DOAVars
 from hardtarget.process import Process
 from hardtarget.types import (
     ArrayKwargs,
-    Bounds,
     CfgParams,
     DataItem,
     ExpDef,
-    ExtractSignals,
     InterferometryLib,
     MethodLib,
     ProParams,
@@ -33,27 +31,27 @@ else:
 
 
 class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, InterferometryLib]):
+    method = AnalysisMethod.direction_of_arrival
+
     def __init__(
         self,
-        cfg_raw: str | Path | DOACfgParams,
-        exp_params: ExpDef,
-        cfg_params: CfgParams,
-        pro_params: ProParams,
-        epoch_bounds: Bounds,
-        func_get_data: ExtractSignals,
-        func_get_pointing: Callable[[int], Pointing],
-        output_dir: str | Path | None = None,
+        config: str | Path | DOACfgParams,
+        data: DataLoader,
+        method_lib: Optional[MethodLib] = None,
+        impl: Optional[Impl] = None,
+        rx_channel: Optional[str | int] = None,
+        excluded_channels: Optional[list[str] | list[int]] = None,
+        output_dir: Optional[str | Path] = None,
         progress: bool = False,
         **kwargs: Unpack[ArrayKwargs],
     ) -> None:
         super().__init__(
-            cfg_raw,
-            exp_params,
-            cfg_params,
-            pro_params,
-            epoch_bounds,
-            func_get_data,
-            func_get_pointing,
+            config,
+            data,
+            method_lib,
+            impl,
+            rx_channel,
+            excluded_channels,
             output_dir,
             progress,
             **kwargs,

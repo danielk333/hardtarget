@@ -45,5 +45,5 @@ def get_echo_search_lib(
     return lib, method_lib, implementation
 
 
-from .types import XCorrCfgParams, XCorrOutArgs, XCorrProParams, XCorrVariables
-from .xcorr_process import XCorrProcess
+from .echo_search_process import EchoSearchProcess
+from .types import EchoSearchCfgParams, EchoSearchOutArgs, EchoSearchProParams, EchoSearchVars

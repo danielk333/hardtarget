@@ -29,7 +29,7 @@ To generate documentation run:
 ## Compiling CUDA code
 
 !!! Warning
-In the current version of hardtarget the CUDA implementation is broken
+    In the current version of hardtarget the CUDA implementation is broken
 
 Compiling cuda code can be fairly tricky as its hard to predict all combinations of GPUs with
 different compute capability ( see [GPU Compute Capability](https://developer.nvidia.com/cuda-gpus) )

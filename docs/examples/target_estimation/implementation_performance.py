@@ -11,7 +11,6 @@ from pathlib import Path
 
 import hardtarget
 from hardtarget.constants import TargetEstimationMethod
-from hardtarget.types import Job
 
 # Workaround to make jupyter notebook find utils
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
@@ -38,11 +37,10 @@ hardtarget.profile()
 for impl in [hardtarget.types.Impl.c, hardtarget.types.Impl.numpy]:
     # process
     results = hardtarget.target_estimation(
-        path=data,
+        data=data,
         config=config,
         method_lib=TargetEstimationMethod.fgmf,
         implementation=impl,
-        job=Job(idx=0, N=1),
         start_time=0,
         end_time=200000,
         relative_time=True,

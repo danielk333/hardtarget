@@ -4,7 +4,7 @@ from pathlib import Path
 
 from hardtarget.constants import ConfigSubSection
 from hardtarget.data_handling.configuration import extract_config_section, load_config_params
-from hardtarget.echo_search.types import XCorrCfgParams
+from hardtarget.echo_search.types import EchoSearchCfgParams
 from hardtarget.optimization.types import OptimizeCfgParams
 from hardtarget.process.utils import sample_interval_to_closest_ipp
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, TargetEstimationCfgParams
@@ -173,7 +173,7 @@ def test_extract_config_section():
 
         # --- Echo search section ---
         echo_search_params = extract_config_section(
-            tmp_config_path, ConfigSubSection.ECHO_SEARCH, XCorrCfgParams
+            tmp_config_path, ConfigSubSection.ECHO_SEARCH, EchoSearchCfgParams
         )
         assert echo_search_params["doppler_freq_min"] == -30000
         assert echo_search_params["doppler_freq_max"] == 5000
