@@ -7,7 +7,6 @@ from pathlib import Path
 import numpy as np
 
 from hardtarget.constants import AnalysisMethod, ConfigSubSection, EchoSearchMethod, Impl
-from hardtarget.data_handling.configuration import extract_config_section
 from hardtarget.echo_search import get_echo_search_lib
 from hardtarget.echo_search.types import (
     EchoSearchCfgParams,
@@ -16,6 +15,7 @@ from hardtarget.echo_search.types import (
     EchoSearchVars,
 )
 from hardtarget.process import Process
+from hardtarget.process.configuration import extract_config_section
 from hardtarget.types import CfgParams, DataItem, EventSearchLib, ExpDef, MethodLib, ProParams
 
 

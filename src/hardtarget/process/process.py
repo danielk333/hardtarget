@@ -19,9 +19,13 @@ from tqdm import tqdm
 
 import hardtarget.process.utils as utils
 from hardtarget.constants import AnalysisMethod, Impl, MethodLib
-from hardtarget.data_handling import compute_process_params, dump_params_to_file, load_config_params
-from hardtarget.data_handling.configuration import extract_config_from_dict
+from hardtarget.data_handling import dump_params_to_file
 from hardtarget.data_simulation.tx_model import tx_signal_model
+from hardtarget.process.configuration import (
+    compute_process_params,
+    extract_config_from_dict,
+    load_config_params,
+)
 from hardtarget.process.utils import calculate_tasks, sample_interval_to_closest_ipp
 from hardtarget.types import (
     AnalysedResult,
@@ -146,6 +150,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self._excluded_channels = excluded_channels if excluded_channels is not None else []
 
         # Define configuration
+        self.raw_config = config
         if isinstance(config, CfgParams):
             self.cfg_params = config
         elif isinstance(config, dict):
@@ -177,8 +182,22 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self.store_mode = "w"
         self.store_params = True
 
+        self.kwargs = kwargs
+        self.__post_init__()
+
+    def __post_init__(self) -> None:
+        """Post init"""
+        pass
+
     @classmethod
     def get_types(cls) -> tuple[type[GenericCfg], type[GenericPro], type[GenericOut]]:
+        """
+        Class method to get the class specific defined types
+
+        Return:
+            Configuration type, Process type and Output type
+        """
+
         if cls.__bases__[0] != Process:
             # For target estimation processes there is a double inheritance case
             _, _, _, out_type, _ = orig_bases(cls.__bases__[0])[0].__args__
@@ -194,6 +213,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
     def get_analysis_lib(
         self, lib: MethodLib | None, impl: Impl | None
     ) -> tuple[GenericLib, MethodLib, Impl]:
+        """Get specific library to run analysis"""
         pass
 
     @abstractmethod
@@ -438,7 +458,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             curr_num = "1".ljust(extend_str_len, " ")
             subprog_str = f"[file {curr_num}/{total_num}]"
             self.progress_bar = tqdm(
-                desc=f"{progress_desc} {subprog_str}",
+                desc=f"{self.method}: {progress_desc} {subprog_str}",
                 total=total,
             )
 

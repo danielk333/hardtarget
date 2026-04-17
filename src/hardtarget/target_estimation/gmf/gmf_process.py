@@ -7,7 +7,7 @@ import numpy as np
 from radardef.types import ExpDef
 
 from hardtarget.constants import ConfigSubSection, Impl, TargetEstimationMethod
-from hardtarget.data_handling.configuration import extract_config_section
+from hardtarget.process.configuration import extract_config_section
 from hardtarget.target_estimation.gmf import get_gmf_lib
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, GMFProParams
 from hardtarget.target_estimation.target_estimation_process import TargetEstimationProcess

@@ -1,5 +1,6 @@
 from .process import Process  # isort: off
 
+from .configuration import compute_process_params, extract_config_section, load_config_params
 from hardtarget.target_estimation import DPTProcess, GMFProcess, TargetEstimationProcess
 from hardtarget.optimization import OptimizeProcess
 from hardtarget.echo_search import EchoSearchProcess

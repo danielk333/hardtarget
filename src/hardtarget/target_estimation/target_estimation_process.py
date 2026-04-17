@@ -4,19 +4,18 @@ import sys
 from abc import abstractmethod
 from dataclasses import asdict
 from pathlib import Path
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 import numpy as np
 import scipy.fft as fft
 from scipy.signal import savgol_filter  # type: ignore[attr-defined]
 
-from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl
-from hardtarget.data_handling.configuration import (
+from hardtarget.constants import AnalysisMethod, ConfigSubSection
+from hardtarget.process import Process
+from hardtarget.process.configuration import (
     extract_config_section,
     get_ilx_windows,
 )
-from hardtarget.process import Process
-from hardtarget.process.process import DataLoader
 from hardtarget.target_estimation.types import (
     ExtendedTargetEstimationProParams,
     MFOutArgs,
@@ -29,7 +28,6 @@ from hardtarget.types import (
     CfgParams,
     DataItem,
     ExpDef,
-    MethodLib,
     ProParams,
 )
 from hardtarget.utils import noise
@@ -56,31 +54,13 @@ class TargetEstimationProcess(
 ):
     method = AnalysisMethod.target_estimation
 
-    def __init__(
-        self,
-        config: str | Path | TeLibCfg,
-        data: DataLoader,
-        method_lib: Optional[MethodLib] = None,
-        impl: Optional[Impl] = None,
-        rx_channel: Optional[str | int] = None,
-        excluded_channels: Optional[list[str] | list[int]] = None,
-        output_dir: Optional[str | Path] = None,
-        progress: bool = False,
-    ) -> None:
-        super().__init__(
-            config,
-            data,
-            method_lib,
-            impl,
-            rx_channel,
-            excluded_channels,
-            output_dir,
-            progress,
-        )
-        if isinstance(config, TargetEstimationCfgParams):
-            self.cfg_params: TeLibCfg = config
-        elif not isinstance(config, dict):
-            self.cfg_params = self.get_lib_specific_conf_params(Path(config), self.cfg_params)
+    def __post_init__(self) -> None:
+        """Extract configuration parameters for the specfic child class"""
+
+        if isinstance(self.raw_config, TargetEstimationCfgParams):
+            self.cfg_params: TeLibCfg = self.raw_config  # type: ignore[assignment]
+        elif not isinstance(self.raw_config, dict):
+            self.cfg_params = self.get_lib_specific_conf_params(Path(self.raw_config), self.cfg_params)
         self.pro_params: TeLibPro = self.get_lib_specific_process_params(
             self.exp_params, self.cfg_params, self.pro_params
         )

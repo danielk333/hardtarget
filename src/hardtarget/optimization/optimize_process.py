@@ -9,7 +9,6 @@ import numpy as np
 from radardef.components import DataLoader
 
 from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl, OptimizationMethod
-from hardtarget.data_handling.configuration import extract_config_section, get_ilx_windows
 from hardtarget.optimization import get_optimize_lib
 from hardtarget.optimization.types import (
     MFOptimizeOutArgs,
@@ -19,6 +18,7 @@ from hardtarget.optimization.types import (
     OptStart,
 )
 from hardtarget.process import Process
+from hardtarget.process.configuration import extract_config_section, get_ilx_windows
 from hardtarget.target_estimation.gmf import GMFCfgParams
 from hardtarget.target_estimation.types import MFOutArgs
 from hardtarget.types import (

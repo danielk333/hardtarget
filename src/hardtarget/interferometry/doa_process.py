@@ -3,19 +3,16 @@
 import sys
 from dataclasses import asdict
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 from pyant.models.array import Array
-from radardef.components import DataLoader
 
 from hardtarget.constants import AnalysisMethod, ConfigSubSection, DOAMethod, Impl
-from hardtarget.data_handling.configuration import extract_config_section
 from hardtarget.interferometry import get_doa_lib
 from hardtarget.interferometry.types import DOACfgParams, DOAOutArgs, DOAProParams, DOAVars
 from hardtarget.process import Process
+from hardtarget.process.configuration import extract_config_section
 from hardtarget.types import (
-    ArrayKwargs,
     CfgParams,
     DataItem,
     ExpDef,
@@ -25,41 +22,20 @@ from hardtarget.types import (
 )
 
 if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
-    from typing_extensions import Unpack
+    pass
 else:
-    from typing import Unpack
+    pass
 
 
 class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, InterferometryLib]):
     method = AnalysisMethod.direction_of_arrival
 
-    def __init__(
-        self,
-        config: str | Path | DOACfgParams,
-        data: DataLoader,
-        method_lib: Optional[MethodLib] = None,
-        impl: Optional[Impl] = None,
-        rx_channel: Optional[str | int] = None,
-        excluded_channels: Optional[list[str] | list[int]] = None,
-        output_dir: Optional[str | Path] = None,
-        progress: bool = False,
-        **kwargs: Unpack[ArrayKwargs],
-    ) -> None:
-        super().__init__(
-            config,
-            data,
-            method_lib,
-            impl,
-            rx_channel,
-            excluded_channels,
-            output_dir,
-            progress,
-            **kwargs,
-        )
+    def __post_init__(self) -> None:
+        """Extract beam and beam parameters"""
 
-        if "beam" in kwargs and "parameters" in kwargs:
-            self.beam = kwargs["beam"]
-            self.beam_parameters = kwargs["parameters"]
+        if "beam" in self.kwargs and "parameters" in self.kwargs:
+            self.beam = self.kwargs["beam"]
+            self.beam_parameters = self.kwargs["parameters"]
         else:
             raise ValueError("Not possible to run the interferometry calculations without beam data")
 

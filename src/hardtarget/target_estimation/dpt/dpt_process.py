@@ -8,7 +8,7 @@ import scipy.fft as fft
 from radardef.types import ExpDef
 
 from hardtarget.constants import ConfigSubSection, Impl, TargetEstimationMethod
-from hardtarget.data_handling.configuration import extract_config_section
+from hardtarget.process.configuration import extract_config_section
 from hardtarget.target_estimation.dpt import get_dbt_lib
 from hardtarget.target_estimation.dpt.types import DPTCfgParams, DPTProParams
 from hardtarget.target_estimation.target_estimation_process import TargetEstimationProcess

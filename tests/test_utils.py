@@ -3,9 +3,9 @@ import tempfile
 from pathlib import Path
 
 from hardtarget.constants import ConfigSubSection
-from hardtarget.data_handling.configuration import extract_config_section, load_config_params
 from hardtarget.echo_search.types import EchoSearchCfgParams
 from hardtarget.optimization.types import OptimizeCfgParams
+from hardtarget.process.configuration import extract_config_section, load_config_params
 from hardtarget.process.utils import sample_interval_to_closest_ipp
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, TargetEstimationCfgParams
 from hardtarget.types import Bounds, CfgParams

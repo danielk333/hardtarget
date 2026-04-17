@@ -8,8 +8,7 @@ import radardef
 from radardef.radar_stations.eiscat.experiments import leo_mpark_2_1u
 
 from hardtarget.constants import AnalysisMethod, DOAMethod, EchoSearchMethod, Impl, TargetEstimationMethod
-from hardtarget.data_handling import compute_process_params, dump_params_to_file
-from hardtarget.data_handling.configuration import extract_config_params_from_derived_object
+from hardtarget.data_handling import dump_params_to_file
 from hardtarget.echo_search.types import EchoSearchCfgParams, EchoSearchOutArgs, EchoSearchProParams
 from hardtarget.interferometry.types import DOACfgParams, DOAOutArgs, DOAProParams
 from hardtarget.optimization.types import MFOptimizeOutArgs, OptimizeCfgParams, OptimizeProParams
@@ -22,8 +21,10 @@ from hardtarget.process import (
     OptimizeProcess,
     Process,
     TargetEstimationProcess,
+    compute_process_params,
     get_analysis_process,
 )
+from hardtarget.process.configuration import extract_config_params_from_derived_object
 from hardtarget.target_estimation.dpt.types import DPTCfgParams, DPTProParams
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, GMFProParams
 from hardtarget.target_estimation.types import MFOutArgs

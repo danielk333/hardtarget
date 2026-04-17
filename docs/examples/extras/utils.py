@@ -8,8 +8,8 @@ from radardef import RadarDef
 from radardef.radar_stations.eiscat.experiments import load_radar_code
 from radardef.types import BoundParams, ExpDef
 
-from hardtarget.data_handling import load_config_params
 from hardtarget.data_simulation import DRFSimParams, simulate_drf
+from hardtarget.process import load_config_params
 
 try:
     config = Path(__file__).parent.parent.absolute() / "cfg" / "sim_test.ini"
