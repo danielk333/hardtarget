@@ -473,6 +473,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                     f"{progress_desc} {subprog_str}",
                 )
 
+            # Calculate start sample of task
             file_idx_sample = (
                 task_idx
                 * self.exp_params.ipp_samps
@@ -481,11 +482,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 + sample_bounds.start
             )
 
-            task_data = self.process_task(
-                task_idx=task_idx, file_idx_sample=file_idx_sample, bounds=sample_bounds
-            )
-
-            # Create directory if output is defined
+            # Create directory and define filename.
             if self.output_dir is not None:
                 output_path = Path(self.output_dir) / utils.get_filepath(self.epoch.start, file_idx_sample)
                 # create directory
@@ -494,15 +491,29 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             else:
                 output_path = None
 
-            self.save_task_data(
-                file_idx_sample=file_idx_sample,
-                out_data=task_data,
-                results=results,
-                filepath=output_path,
-                clobber=clobber,
-            )
+            # If file exists and clobber off, skip analysis.
+            if output_path and output_path.is_file() and not clobber:
+                results["files"].append(output_path.name)
+                self._logger.debug(
+                    f"File already existing and clobber is off, file: {output_path.name} is skipped."
+                )
+                if self.progress_bar:
+                    self.progress_bar.update(self.cfg_params.num_cohints_per_file)
+            # Else run analysis
+            else:
+                task_data = self.process_task(
+                    task_idx=task_idx, file_idx_sample=file_idx_sample, bounds=sample_bounds
+                )
 
-        if self.progress_bar is not None:
+                self.save_task_data(
+                    file_idx_sample=file_idx_sample,
+                    out_data=task_data,
+                    results=results,
+                    filepath=output_path,
+                    clobber=clobber,
+                )
+
+        if self.progress_bar:
             self.progress_bar.close()
         self._logger.info(f"finishing job {comm_rank}/{comm_size} with {len(job_tasks)} tasks")
         return results

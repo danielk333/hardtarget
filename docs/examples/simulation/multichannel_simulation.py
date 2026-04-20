@@ -52,7 +52,7 @@ def trajectory_func(t: npt.NDArray) -> npt.NDArray:
     k0 = np.array([0.1, 0.1, 0.8])
     # 3d position
     x_start = k0 * r0
-    # Velocity vector, object moving along x-axis
+    # Velocity vector
     v_vec = np.array([0.75, 0.25, 0])
     distance_traveled = v0 * t + a0 * 0.5 * t**2
     # trajectory

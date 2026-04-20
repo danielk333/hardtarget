@@ -46,8 +46,8 @@ class AnalyseParser:
         parser.add_argument("--rxchnl", default=None, help="specfic rx channel to analyse")
         parser.add_argument("-o", "--output", default=".", help="path to output directory")
         parser.add_argument("-p", "--progress", action="store_true", help="enable progress bar")
-        parser.add_argument("-s", "--start_time", default=None, type=int)
-        parser.add_argument("-e", "--end_time", default=None, type=int)
+        parser.add_argument("-s", "--start_time", default=None, type=str)
+        parser.add_argument("-e", "--end_time", default=None, type=str)
         parser.add_argument("--relative_time", action="store_true")
         parser.add_argument("--clobber", action="store_true", help="override outputs")
         parser.add_argument(
@@ -97,8 +97,8 @@ class AnalyseParser:
             implementation=args.implementation,
             clobber=args.clobber,
             output=args.output,
-            start_time=args.start_time,
-            end_time=args.end_time,
+            start_time=int(args.start_time) if args.relative_time else args.start_time,
+            end_time=int(args.end_time) if args.relative_time else args.end_time,
             relative_time=args.relative_time,
             progress=args.progress,
             comm=get_mpi(),

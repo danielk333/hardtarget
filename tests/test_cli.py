@@ -135,6 +135,7 @@ def test_analysis(method, sub_methods, get_data):
             "0",
             "--e",
             "10000",
+            "--clobber",
         ]
         if method == AnalysisMethod.direction_of_arrival:
             args_str.append("mu")

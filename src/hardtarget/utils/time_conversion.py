@@ -81,7 +81,7 @@ def ts_from_str(datetime_str: str, as_local: bool = False) -> float:
     the string is interpreted as local time.
     """
     # Parse the string into a naive datetime object
-    _datetime = dt.datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S")
+    _datetime = dt.datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S.%f")
 
     if as_local:
         # Make it timezone-aware as local time

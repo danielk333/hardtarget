@@ -1,134 +1,112 @@
+import datetime as dt
 import tempfile
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
-from radardef import RadarDef
-from radardef.radar_stations.eiscat.experiments import load_radar_code
-from radardef.types import BoundParams, ExpDef
+import numpy.typing as npt
+import pytest
+from radardef.radar_stations import Mu
+from radardef.types import ExpDef
 
 import hardtarget
-from hardtarget.data_simulation import DRFSimParams, simulate_drf
+from hardtarget.data_simulation import simulate_h5
+from hardtarget.echo_search import EchoSearchOutArgs, EchoSearchProParams
 from hardtarget.echo_search.types import EchoSearchCfgParams
 
 
-def wip_echo_search():
-
-    n_ipp = 1
-
-    cfg = EchoSearchCfgParams(
-        n_ipp=n_ipp,
-        ipp_offset=0,
-        min_range_gate=6640,
-        max_range_gate=6750,
-        range_gate_step=1,
-        num_cohints_per_file=10,
-        node_gpus=1,
-        doppler_freq_min=-30000,
-        doppler_freq_max=5000,
-        doppler_freq_step=1000,
-    )
-
+def test_echo():
     exp_params = ExpDef(
-        name="leo_bpark",
-        radar_frequency=929.6,
-        t_ipp_usec=20000,
-        t_samp_usec=1,
-        rx_channels=["sim"],
-        t_tx_start_usec=82,
-        t_tx_end_usec=2002,
-        t_rx_start_usec=0,
-        t_rx_end_usec=20000,
-        tx_channel="sim",
-        t_cal_on_usec=19900.0,
-        t_cal_off_usec=19997.0,
-        code=load_radar_code("leo_bpark"),
-        baud_length_usec=30,
-        samples_per_file=12800000,
+        name="Mu",
+        radar_frequency=46.5,
+        t_ipp_usec=3120,
+        t_samp_usec=6,
+        t_rx_start_usec=486,
+        t_rx_end_usec=486 + 6 * 85,
+        t_tx_start_usec=0,
+        t_tx_end_usec=13 * 2 * 6,
+        baud_length_usec=12,
+        code=np.array(
+            [1, 1, 1, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1],
+            dtype=np.float64,
+        ),
+        rx_channels=np.arange(1, 26).tolist(),
+        samples_per_file=10000000,
     )
 
-    bounds_params = BoundParams(
-        ts_start_usec=1445511612800000,
-        ts_end_usec=1445551228800000,
-    )
+    # ## Define a objects trajectory function,
+    # ---
 
-    t_start = 0
-    t_end = exp_params.t_ipp_usec * 750
-    target_start = t_start + (exp_params.t_ipp_usec * 200)
-    target_end = t_start + (exp_params.t_ipp_usec * 300)
-    coh_int_len = exp_params.t_ipp_usec * n_ipp
-    t_abs_us = np.arange(0, t_end + coh_int_len, coh_int_len)
-    t_abs = t_abs_us * 1e-6
+    def trajectory_func(t: npt.NDArray) -> npt.NDArray:
+        # Initial values
+        r0: float = 220e3
+        v0: float = -0.4e3
+        a0: float = -0.20e3
+        # Initial position over radar
+        k0 = np.array([0, 0, 1])
+        # 3d position
+        x_pos = k0 * r0
+        # Velocity vector
+        v_vec = np.array([1, 0, 0])
+        distance_traveled = v0 * t + a0 * 0.5 * t**2
+        # trajectory
+        return x_pos[:, None] + v_vec[:, None] * distance_traveled[None, :]
 
-    simulation_params = DRFSimParams(
-        epoch="2021-04-12T12:15:40",
-        start_time_us=t_start,
-        end_time_us=t_end,
-        target_start_time_us=target_start,
-        target_end_time_us=target_end,
-        noise_sigma=0.2,
-    )
+    # ## Simulate the experiment with the MU radars beam.
+    # ---
 
-    range0 = 2000e3
-    vel0 = 0.4e3
-    acel0 = 0.10e3
-
-    def range_function(t):
-        inds = np.logical_and(t >= t_abs[0], t <= t_abs[-1])
-        if np.any(inds):
-            return range0 + vel0 * t[inds] + acel0 * 0.5 * t[inds] ** 2
-        else:
-            return np.nan
-
-    with (
-        tempfile.TemporaryDirectory(suffix="_drf") as tmp_sim_path,
-        tempfile.TemporaryDirectory() as tmp_analysis_path,
-    ):
-        simulate_drf(
-            Path(tmp_sim_path),
-            range_function,
-            simulation_params,
-            exp_params,
-            bounds_params,
-            snr_function=None,
-            dtype=np.complex64,
-            clobber=True,
-            include_tx_signal=True,
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_path = Path(temp_dir) / "sim"
+        station = Mu()
+        measurement_length_us = exp_params.t_ipp_usec * 10
+        target_start_time_us = exp_params.t_ipp_usec * 4
+        target_end_time_us = exp_params.t_ipp_usec * 6
+        simulate_h5(
+            output_dir=output_path,
+            exp_params=exp_params,
+            start_time=dt.datetime.now(),
+            end_time=dt.datetime.now() + dt.timedelta(microseconds=measurement_length_us),
+            target_start_time=target_start_time_us,
+            target_end_time=target_end_time_us,
+            target_relative_time=True,
+            trajectory_function=trajectory_func,
+            noise_sigma=0,
+            beam=station.beam,
+            beam_params=station.beam_parameters,
         )
 
-        # process
+        # Analyse data
+
+        cfg = EchoSearchCfgParams(
+            n_ipp=1,
+            ipp_offset=0,
+            min_range_gate=81,
+            max_range_gate=140,
+            num_cohints_per_file=10,
+            doppler_freq_min=-30000,
+            doppler_freq_max=5000,
+            doppler_freq_step=1000,
+        )
+
+        output_analysis = Path(temp_dir) / "echo"
         _ = hardtarget.echo_search(
-            data=Path(tmp_sim_path).resolve(),
-            rx_channel="sim",
+            data=Path(output_path).resolve(),
             config=cfg,
-            start_time=simulation_params.start_time_us,
-            end_time=simulation_params.end_time_us,
             relative_time=True,
             clobber=False,
-            output=tmp_analysis_path,
+            output=output_analysis,
             progress=False,
+            exp_params=exp_params,
         )
+        output: tuple[EchoSearchOutArgs, ExpDef, EchoSearchCfgParams, EchoSearchProParams] = list(
+            hardtarget.load_analysed_data(output_analysis)
+        )[0]
 
-        reader = RadarDef().load_data(Path(tmp_sim_path))
-        assert reader is not None
+        out, exp, _cfg, pro = output
 
-        fig, ax = plt.subplots()
-        # plot raw data power
-        _, handles = hardtarget.plotting.rti(
-            ax,
-            reader,
-            start_time=t_start,
-            end_time=t_end,
-            axis_units=True,
-            log=True,
-            relative_time=True,
-            colorbar=False,
+        cohint_timepoints = np.arange(0, measurement_length_us, exp.t_ipp_usec * _cfg.n_ipp)
+        target_filter = np.logical_and(
+            cohint_timepoints >= target_start_time_us, cohint_timepoints <= target_end_time_us
         )
-        out, exp, _cfg, pro = list(hardtarget.load_analysed_data(tmp_analysis_path))[0]
-        ax_twin = ax.twinx()
-        ax_twin.plot(
-            np.arange(t_start * 1e-6, t_end * 1e-6, step=coh_int_len * 1e-6),
-            np.abs(out.max_peak),
-        )
-
-        plt.show()
+        no_target_filter = np.invert(target_filter)
+        assert out.max_peak[target_filter] == pytest.approx(1.0)
+        assert out.max_peak[no_target_filter] == pytest.approx(0.0)
