@@ -81,20 +81,26 @@ class EchoSearchProcess(
             Outcome of xcorr analysis
         """
 
-        tx, rx, ipp = self.get_data(start_sample, self.pro_params.read_length)
+        tx, rx, ipp = self.get_data(start_sample, self.pro_params.read_length, sum_rx_channels=False)
 
-        return self.lib(tx, rx, self.exp_params, self.cfg_params, self.pro_params)
+        return self.lib(
+            tx,
+            rx,
+            self.exp_params,
+            self.cfg_params,
+            self.pro_params,
+        )
 
     def stack_vars(self, vars_list: list[EchoSearchVars]) -> EchoSearchVars:
         """Stack the results from the analysis"""
 
         return EchoSearchVars(
-            max_pow=np.stack([x.max_pow for x in vars_list], axis=0),
-            max_pow_norm=np.stack([x.max_pow_norm for x in vars_list], axis=0),
-            max_peak=np.stack([x.max_peak for x in vars_list], axis=0),
-            max_pow_ind=np.stack([x.max_pow_ind for x in vars_list], axis=0),
+            max_corr=np.stack([x.max_corr for x in vars_list], axis=0),
+            max_corr_ind=np.stack([x.max_corr_ind for x in vars_list], axis=0),
             best_doppler=np.stack([x.best_doppler for x in vars_list], axis=0),
-            ipps_pow=np.stack([x.ipps_pow for x in vars_list], axis=0),
+            tot_pow=np.stack([x.tot_pow for x in vars_list], axis=0),
+            mean=np.stack([x.mean for x in vars_list], axis=0),
+            std_dev=np.stack([x.std_dev for x in vars_list], axis=0),
         )
 
     def generate_output(
@@ -110,7 +116,7 @@ class EchoSearchProcess(
 
          Args:
              all_vars: All cohints analysed data stacked together
-             file_idx_sample: File id, microseconds since epoch.
+             file_idx_sample: File id, sample relative to file start.
              exp_params: Experiment parameters
              cfg_params: Configuration parameters
 
@@ -119,24 +125,23 @@ class EchoSearchProcess(
         """
 
         return EchoSearchOutArgs(
-            max_pow=all_vars.max_pow
-            if isinstance(all_vars.max_pow, np.ndarray)
-            else np.array(all_vars.max_pow),
-            max_pow_norm=all_vars.max_pow_norm
-            if isinstance(all_vars.max_pow_norm, np.ndarray)
-            else np.array(all_vars.max_pow_norm),
-            max_peak=all_vars.max_peak
-            if isinstance(all_vars.max_peak, np.ndarray)
-            else np.array(all_vars.max_peak),
-            max_pow_ind=all_vars.max_pow_ind
-            if isinstance(all_vars.max_pow_ind, np.ndarray)
-            else np.array(all_vars.max_pow_ind),
+            max_corr=all_vars.max_corr
+            if isinstance(all_vars.max_corr, np.ndarray)
+            else np.array(all_vars.max_corr),
+            max_corr_ind=all_vars.max_corr_ind
+            if isinstance(all_vars.max_corr_ind, np.ndarray)
+            else np.array(all_vars.max_corr_ind),
             best_doppler=all_vars.best_doppler
             if isinstance(all_vars.best_doppler, np.ndarray)
             else np.array(all_vars.best_doppler),
-            ipps_pow=all_vars.ipps_pow
-            if isinstance(all_vars.ipps_pow, np.ndarray)
-            else np.array(all_vars.ipps_pow),
+            tot_pow=all_vars.tot_pow
+            if isinstance(all_vars.tot_pow, np.ndarray)
+            else np.array(all_vars.tot_pow),
+            mean=all_vars.mean if isinstance(all_vars.mean, np.ndarray) else np.array(all_vars.mean),
+            std_dev=all_vars.std_dev
+            if isinstance(all_vars.std_dev, np.ndarray)
+            else np.array(all_vars.std_dev),
+            epoch_us=int(file_idx_sample * exp_params.t_samp_usec),
         )
 
     def define_h5_vars(self, output: EchoSearchOutArgs) -> dict[str, DataItem]:
@@ -150,28 +155,34 @@ class EchoSearchProcess(
             A dictionary containing the output with attributes such as dimensions, long names and units.
         """
         return {
-            f"{output.max_pow=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.max_pow,
-                long_name="TODO",
+            f"{output.max_corr=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.max_corr,
+                long_name=" Best correlation from all doppler frequencies.",
             ),
-            f"{output.max_pow_norm=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.max_pow_norm,
-                long_name="TODO",
-            ),
-            f"{output.max_peak=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.max_peak,
-                long_name="TODO",
-            ),
-            f"{output.max_pow_ind=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.max_pow_ind,
-                long_name="TODO",
+            f"{output.max_corr_ind=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.max_corr_ind,
+                long_name="Index of the max_corr within the correlation array for the best doppler.",
             ),
             f"{output.best_doppler=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.best_doppler,
-                long_name="TODO",
+                long_name="Doppler frequency that contained the best correlation.",
             ),
-            f"{output.ipps_pow=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.ipps_pow,
-                long_name="Total power for each ipp",
+            f"{output.tot_pow=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.tot_pow,
+                long_name="The total power of the IPP",
+            ),
+            f"{output.mean=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.mean,
+                long_name="Mean power per ipp",
+                # shape: ipps, channels
+            ),
+            f"{output.std_dev=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.std_dev,
+                long_name="Standard deviation of power per ipp",
+                # shape: ipps, channels
+            ),
+            f"{output.epoch_us=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.epoch_us,
+                long_name="Start time of this analysis relative to the file start.",
             ),
         }

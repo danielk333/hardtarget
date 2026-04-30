@@ -32,7 +32,7 @@ dependencies = [
     "scipy >= 1.4.1",
     "tqdm >=  4.66.1",
     "lxml",
-    "radardef>=0.4.0",
+    "radardef>=0.4.4",
     "strenum ; python_version<'3.11'",
     "typing_extensions ; python_version<'3.11'"
 ]
@@ -100,9 +100,10 @@ packages = ["hardtarget"]
 
 [tool.ruff]
 line-length = 110
+include = ["src/hardtarget/**"]
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]
+"__init__.py" = ["F401","E402"]
 
 [tool.ruff.lint]
 ignore = ["E203","D203","E251","E501","E226"]

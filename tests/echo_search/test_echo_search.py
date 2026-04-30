@@ -108,5 +108,6 @@ def test_echo():
             cohint_timepoints >= target_start_time_us, cohint_timepoints <= target_end_time_us
         )
         no_target_filter = np.invert(target_filter)
-        assert out.max_peak[target_filter] == pytest.approx(1.0)
-        assert out.max_peak[no_target_filter] == pytest.approx(0.0)
+
+        assert out.max_corr[target_filter] == pytest.approx(1.0)
+        assert out.max_corr[no_target_filter] == pytest.approx(0.0)

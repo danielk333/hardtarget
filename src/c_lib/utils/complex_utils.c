@@ -34,17 +34,16 @@ void crosscorrelate(
     float complex* result
 ) {
     assert(max_delay > min_delay);
-    int count = 0;
+    int counter = 0;
     for (int i = max_delay; i > min_delay; i--) {
-        crosscorrelate_single_delay(x, size_x, y, size_y, i, &result[count]);
-        count++;
+        crosscorrelate_single_delay(x, size_x, y, size_y, i, &result[counter]);
+        counter++;
     }
 }
 
-// Sets the value of abs_rx_sum from start to stop on outarray
-void set_norm_coefs(float complex* abs_rx_sum, int start, int stop, float complex* outarray) {
+void set_value_at_indices(float complex* value, int start, int stop, float complex* outarray) {
     for (int i = start; i < stop; i++) {
-        outarray[i] = abs_rx_sum[0];
+        outarray[i] = value[0];
     }
 }
 
@@ -57,9 +56,9 @@ float complex complex_sum(float complex* inarray, int size) {
 }
 
 void elementwise_cabs_square(float complex* inarray, int start, int stop, float complex* outarray) {
-    int temp = 0;
+    int counter = 0;
     for (int i = start; i < stop; i++) {
-        outarray[temp] = inarray[i] * conj(inarray[i]);
-        temp++;
+        outarray[counter] = inarray[i] * conj(inarray[i]);
+        counter++;
     }
 }

@@ -64,37 +64,42 @@ int xcorr_echo_search(
     memset(max_pow_ind, (int)0, (size_t)max_pow_ind_size);
     memset(norm_coefs, (float complex)0, (size_t)decoded_size);
 
-    // Calculate the absolute value complex_sum of the rx from 0 to tx_len
-    for (int i = tx_len; i < rx_len + tx_len; i++) {
+    // Calculate the absolute value complex sum of rx with a sliding window of size tx_len
+    for (int i = tx_len; i <= rx_len; i++) {
         elementwise_cabs_square(rx, i - tx_len, i, abs_rx);
         abs_rx_sum = complex_sum(abs_rx, tx_len);
         norm_coefs[i] = abs_rx_sum;
     }
-    elementwise_cabs_square(rx, 0, tx_len, abs_rx);
-    abs_rx_sum = complex_sum(abs_rx, tx_len);
-    set_norm_coefs(&abs_rx_sum, 0, tx_len, norm_coefs);
 
-    elementwise_cabs_square(rx, rx_len - tx_len, rx_len, abs_rx);
-    abs_rx_sum = complex_sum(abs_rx, tx_len);
-    set_norm_coefs(&abs_rx_sum, rx_len, rx_len + tx_len, norm_coefs);
+    // Set first tx_len datapoints to the norm coefs of the first window
+    set_value_at_indices(&norm_coefs[tx_len], 0, tx_len, norm_coefs);
+    // Set the last tx_len datapoints to the norm coefs of the last valid window
+    set_value_at_indices(&norm_coefs[rx_len], rx_len, rx_len + tx_len, norm_coefs);
 
+    // For each doppler frequency
     for (int i = 0; i < doppler_freq_size; i++) {
+
+        // Calculate tx signal model
         for (int j = 0; j < tx_len; j++) {
             doppler_freq_samp = (j + 1) * 2 * M_PI * doppler_freq[i] * t_samp_usec *1e6;
             signal_model[j] = (sin(doppler_freq_samp) * I + cos(doppler_freq_samp)) * tx[j];
         }
 
+        // Calculate tx signal absolute sum
         elementwise_cabs_square(signal_model, 0, tx_len, signal_model_abs_arr);
         double complex signal_model_abs_sum = complex_sum(signal_model_abs_arr, tx_len);
 
+        // Cross correlate rx and tx signal
         crosscorrelate(
             rx, rx_len, signal_model, tx_len, -rx_len, tx_len, decoded
         );
 
+        // Find index with best match from cross correlation
         for (int j = 0; j < decoded_size; j++) {
             if (cabs(norm_coefs[j]) < FLT_EPSILON) {
                 norm_coefs[j] = 1;
             }
+
             output_power[j] = decoded[j] / (sqrt(norm_coefs[j]) * sqrt(signal_model_abs_sum));
             output_power[j] = cpow(cabs(output_power[j]), 2);
 
@@ -102,12 +107,12 @@ int xcorr_echo_search(
                 max_pow_per_doppler[i] = output_power[j];
                 max_pow_ind[i] = j;
             }
-        }
-        max_pow_ind[i] = max_pow_ind[i] - tx_len;
-        for (int j = 0; j < decoded_size; j++) {
+
             pows_normalized[i * decoded_size + j] = output_power[j];
             pows[i * decoded_size + j] = decoded[j];
         }
+
+        max_pow_ind[i] = max_pow_ind[i] - tx_len;
     }
     return 0;
 }

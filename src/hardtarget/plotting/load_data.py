@@ -272,7 +272,7 @@ def stack_analysed_data(
                 gathered_data[field] = np.hstack(
                     [getattr(output, field) for output, _, _, _ in sorted_data_list]
                 )
-        elif not gathered_data[field]:
+        elif field not in gathered_data:
             gathered_data[field] = getattr(output_start, field)
 
     return out_type(**gathered_data), exp_def, cfg, pro  # type: ignore[call-overload]

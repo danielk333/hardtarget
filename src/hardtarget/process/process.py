@@ -146,8 +146,8 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         # Experiment definition and data acquisition
         self.data = data
         self.exp_params = self.data.experiment
-        self._rx_channel, self._tx_channel = self.extract_channels(self.exp_params, rx_channel)
-        self._excluded_channels = excluded_channels if excluded_channels is not None else []
+        self._rx_channels, self._tx_channel = self.extract_channels(self.exp_params, rx_channel)
+        self._excluded_channels = excluded_channels if excluded_channels else []
 
         # Define configuration
         self.raw_config = config
@@ -523,23 +523,29 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         return self.data.pointing(start_sample)
 
     def extract_channels(
-        self, exp_params: ExpDef, rx_channel: Optional[int | str] = None
-    ) -> tuple[int | str | None, int | str | None]:
+        self,
+        exp_params: ExpDef,
+        rx_channel: Optional[int | str] = None,
+        excluded_channels: list[int] | list[str] = [],
+    ) -> tuple[int | str | list[int] | list[str], int | str | None]:
         """
         From experiment parameters and requested rx channel extract the correct ones from the data file
         """
 
-        _tx_channel = exp_params.tx_channel
-        _rx_channel = None
-        if rx_channel is not None:
-            _rx_channel = rx_channel
-            if _rx_channel not in exp_params.rx_channels:
+        if rx_channel:
+            if rx_channel not in exp_params.rx_channels:
                 raise ValueError(f"rx_channel: {rx_channel} is not a valid channel in the measurement file")
+            return rx_channel, exp_params.tx_channel
         elif len(exp_params.rx_channels) == 1:
             # Only one available rx_channel during the experiment, thus we can declare it here
-            _rx_channel = exp_params.rx_channels[0]
+            return exp_params.rx_channels[0], exp_params.tx_channel
+        elif not rx_channel:
+            _rx_channel = exp_params.rx_channels
+            for chnl in _rx_channel:
+                if chnl in excluded_channels:
+                    _rx_channel.remove(chnl)  # type: ignore[arg-type]
 
-        return _rx_channel, _tx_channel
+            return _rx_channel, exp_params.tx_channel
 
     def get_data(
         self,
@@ -561,32 +567,20 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             If no tx channel is available a tx model will be used to simulate the tx signal
         """
 
-        # if no rx channel specified all channels will be summed for full analysis
-        if sum_rx_channels:
-            if self._rx_channel is None:
-                ipp = np.zeros((read_length,), dtype=np.complex128)
-                for chnl in self.data.channels:
-                    if chnl != self._tx_channel and chnl not in self._excluded_channels:
-                        ipp += self.data.read(chnl, start_sample, read_length)
-            else:
-                ipp = self.data.read(self._rx_channel, start_sample, read_length)
-            # Extract rx samples
-            rx = ipp[self.pro_params.rx_stencil].copy()
+        # Extract rx data
+        ipp = self.data.read(self._rx_channels, start_sample, read_length)
+
+        if sum_rx_channels and ipp.ndim >= 2:
+            # Only applicable if multiple channels available
+            ipp = np.sum(ipp, axis=0)
+
+        if ipp.ndim > 1:
+            rx = ipp[:, self.pro_params.rx_stencil]
         else:
-            ipp = np.zeros((len(self.exp_params.rx_channels), read_length), dtype=np.complex128)
-            for i, chnl in enumerate[int | str](self.data.channels):
-                ipp[i, :] = self.data.read(chnl, start_sample, read_length)
-            # Extract rx samples
-            rx = ipp[:, self.pro_params.rx_stencil].copy()
+            rx = ipp[self.pro_params.rx_stencil]
 
         # Extracting tx data
-        if self._tx_channel != self._rx_channel and self._tx_channel is not None:
-            tx = self.data.read(self._tx_channel, start_sample, read_length)
-            tx = np.broadcast_to(tx.reshape((tx.size, 1)), (tx.size, sub_resolution))
-        elif self._tx_channel == self._rx_channel and self._tx_channel is not None:
-            tx = ipp.copy()
-            tx = np.broadcast_to(tx.reshape((tx.size, 1)), (tx.size, sub_resolution))
-        else:
+        if not self._tx_channel:
             assert self.exp_params.code is not None, (
                 "No code available from the metadata, not possible to simulate tx"
             )
@@ -601,6 +595,13 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 sub_resolution=sub_resolution,
                 kind="linear",
             )
+        elif self._tx_channel == self._rx_channels:
+            tx = ipp.copy()
+            tx = np.broadcast_to(tx.reshape((tx.size, 1)), (tx.size, sub_resolution))
+        else:
+            tx = self.data.read(self._tx_channel, start_sample, read_length)
+            tx = np.broadcast_to(tx.reshape((tx.size, 1)), (tx.size, sub_resolution))
+
         tx = tx[self.pro_params.tx_stencil, :]
 
         return ExtractedSignals(

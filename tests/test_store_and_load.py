@@ -114,12 +114,13 @@ class TestStoreAndLoad:
 
         cfg_org = EchoSearchCfgParams()
         out_org = EchoSearchOutArgs(
-            max_pow=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
-            max_pow_norm=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
-            max_peak=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
-            max_pow_ind=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
+            max_corr=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
+            max_corr_ind=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
             best_doppler=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
-            ipps_pow=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            tot_pow=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            mean=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            std_dev=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            epoch_us=int(np.random.rand()),
         )
 
         self.store_and_load(
@@ -230,14 +231,15 @@ class TestStoreAndLoad:
     def test_stack_data_from_ram(self):
         cfg_org = EchoSearchCfgParams()
         out_org = EchoSearchOutArgs(
-            max_pow=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
-            max_pow_norm=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
-            max_peak=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
-            max_pow_ind=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
+            max_corr=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
+            max_corr_ind=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
             best_doppler=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
-            ipps_pow=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            tot_pow=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            mean=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            std_dev=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            epoch_us=int(np.random.rand()),
         )
-        self.exp_org
+
         _cfg = extract_config_params_from_derived_object(cfg_org)
         _pro = compute_process_params(
             self.exp_org,
@@ -261,12 +263,10 @@ class TestStoreAndLoad:
 
         out, exp, cfg, pro = stack_analysed_data(analysed_results["data"])
 
-        assert len(out.max_pow) == 3 * cfg_org.num_cohints_per_file
-        assert len(out.max_pow_norm) == 3 * cfg_org.num_cohints_per_file
-        assert len(out.max_peak) == 3 * cfg_org.num_cohints_per_file
-        assert len(out.max_pow_ind) == 3 * cfg_org.num_cohints_per_file
+        assert len(out.max_corr) == 3 * cfg_org.num_cohints_per_file
+        assert len(out.max_corr_ind) == 3 * cfg_org.num_cohints_per_file
         assert len(out.best_doppler) == 3 * cfg_org.num_cohints_per_file
-        assert len(out.ipps_pow) == 3 * cfg_org.num_cohints_per_file
+        assert len(out.tot_pow) == 3 * cfg_org.num_cohints_per_file
 
         assert exp == self.exp_org
         assert cfg_org == cfg

@@ -21,7 +21,7 @@ void crosscorrelate(
     float complex* result
 );
 
-void set_norm_coefs(float complex* abs_rx_sum, int start, int stop, float complex* outarray);
+void set_value_at_indices(float complex* value, int start, int stop, float complex* outarray);
 
 float complex complex_sum(float complex* inarray, int size);
 

@@ -151,13 +151,14 @@ def compute_process_params(
     tx_stencil = np.full((read_length,), False, dtype=bool)
 
     # ---- start and end samples ----
-    rx_start_samp = usec_to_samp(exp_params.t_rx_start_usec)
     rx_end_samp = usec_to_samp(exp_params.t_rx_end_usec)
     tx_start_samp = usec_to_samp(exp_params.t_tx_start_usec)
     tx_end_samp = usec_to_samp(exp_params.t_tx_end_usec)
     tx_pulse_samps = tx_end_samp - tx_start_samp
 
     # ---- Range gates ----
+
+    # Sample index in ipp
     _il0_rgs_min = tx_start_samp + 1
     _il0_rgs_max = rx_end_samp - tx_pulse_samps
     _il0_min_range_gate = cfg_params.min_range_gate
@@ -168,6 +169,7 @@ def compute_process_params(
     min_range_gate = _il0_min_range_gate - _il0_rgs_min
     max_range_gate = _il0_max_range_gate - _il0_rgs_min
 
+    # Samples traveled
     range_gates = np.arange(
         min_range_gate,
         max_range_gate,

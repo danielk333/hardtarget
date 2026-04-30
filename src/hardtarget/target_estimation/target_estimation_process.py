@@ -228,7 +228,7 @@ class TargetEstimationProcess(
 
         Args:
             all_vars: All cohints analysed data stacked together
-            file_idx_sample: File id, microseconds since epoch.
+            file_idx_sample: File id, sample relative to file start.
             exp_params: Experiment parameters
             cfg_params: Configuration parameters
 
@@ -254,7 +254,7 @@ class TargetEstimationProcess(
         g_vec = all_vars.vals[coh_ints, r_inds]
 
         # TODO: Should we save it in usec instead to keep it consistent
-        epoch_seconds = file_idx_sample * 1e-6
+        epoch_seconds = file_idx_sample * exp_params.t_samp_usec * 1e-6
 
         _t_conv = (cfg_params.n_ipp * exp_params.t_ipp_usec) * 1e-6
         t = (np.arange(num_cohints) + 1) * _t_conv + epoch_seconds

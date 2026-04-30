@@ -68,7 +68,7 @@ def grid_search_numpy(
     # Calculate landscape values the fast non understandable way
 
     # Filter out Nan values
-    nan_filter = np.isnan(pro.kz) == False
+    nan_filter = np.invert(np.isnan(pro.kz))
     k_vec = np.vstack(
         [pro.kx[nan_filter].flatten(), pro.ky[nan_filter].flatten(), pro.kz[nan_filter].flatten()]
     )
@@ -79,16 +79,14 @@ def grid_search_numpy(
     k_vec = k_vec[:, elevation_filter]
     k_index = k_index[elevation_filter]
 
-    landscape_func = lambda k: landscape_function(
-        k=k,
+    # Calculate peaks
+    vals = np.zeros((pro.kx.shape[0], pro.ky.shape[0]), dtype=np.complex64)
+    vals[k_index[:, 0], k_index[:, 1]] = landscape_function(
+        k=k_vec,
         eig_vec=eig_vec,
         beam=beam,
         beam_params=beam_params,
     )
-
-    # Calculate peaks
-    vals = np.zeros((pro.kx.shape[0], pro.ky.shape[0]), dtype=np.complex64)
-    vals[k_index[:, 0], k_index[:, 1]] = landscape_func(k_vec)
 
     # Extract N peaks to run gradient ascent from
     peak_inds = get_distributed_peaks(vals, cfg.distributed_peaks)
@@ -104,7 +102,15 @@ def grid_search_numpy(
     val_opt = np.complex64(0)
     k_opt = np.empty((3,), dtype=np.float32)
     for k_start in k_peaks:
-        k_vec, val = gradient_ascent(func=landscape_func, k_start=k_start)
+        k_vec, val = gradient_ascent(
+            func=lambda k: landscape_function(
+                k=k,
+                eig_vec=eig_vec,
+                beam=beam,
+                beam_params=beam_params,
+            ),
+            k_start=k_start,
+        )
         if val > val_opt:
             val_opt = val
             k_opt = k_vec
@@ -130,8 +136,7 @@ def gradient_ascent(func: Callable[[npt.NDArray], Any], k_start: npt.NDArray) ->
 
     """
 
-    min_func = lambda x: -np.abs(func(x))
-    k_opt = optimize.fmin(func=min_func, x0=k_start, disp=False)
+    k_opt = optimize.fmin(func=lambda x: -np.abs(func(x)), x0=k_start, disp=False)
 
     return k_opt, func(k_opt)
 

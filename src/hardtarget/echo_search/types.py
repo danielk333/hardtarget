@@ -20,18 +20,35 @@ class EchoSearchProParams(ProParams):
 
 
 class EchoSearchVars(NamedTuple):
-    max_pow: np.complex128 | npt.NDArray[np.complex128]
-    max_pow_norm: np.complex128 | npt.NDArray[np.complex128]
-    max_peak: np.complex128 | npt.NDArray[np.complex128]
-    max_pow_ind: np.integer | npt.NDArray[np.integer]
+    """
+    max_corr: Best correlation from all doppler frequencies.
+    max_corr_ind: Index of the max_corr within the correlation array for the specific doppler frequency.
+    best_doppler: Doppler frequency that contained the best correlation.
+    tot_pow: Sum of all readings from the raw data of the ipp.
+    mean: Mean value of the raw data reading.
+    std_dev: Standard deviation of the raw data reading.
+
+
+    """
+
+    max_corr: np.complex128 | npt.NDArray[np.complex128]
+    max_corr_ind: np.integer | npt.NDArray[np.integer]
     best_doppler: np.integer | npt.NDArray[np.integer]
-    ipps_pow: float | npt.NDArray[np.floating]
+    tot_pow: float | npt.NDArray[np.floating]
+    mean: np.floating | npt.NDArray[np.floating]
+    std_dev: np.floating | npt.NDArray[np.floating]
 
 
 class EchoSearchOutArgs(NamedTuple):
-    max_pow: npt.NDArray[np.complex128]
-    max_pow_norm: npt.NDArray[np.complex128]
-    max_peak: npt.NDArray[np.complex128]
-    max_pow_ind: npt.NDArray[np.integer]
+    """
+    Each object is per ipp except epoch
+
+    """
+
+    max_corr: npt.NDArray[np.complex128]
+    max_corr_ind: npt.NDArray[np.integer]
     best_doppler: npt.NDArray[np.integer]
-    ipps_pow: npt.NDArray[np.floating]
+    tot_pow: npt.NDArray[np.floating]
+    mean: npt.NDArray[np.floating]
+    std_dev: npt.NDArray[np.floating]
+    epoch_us: int

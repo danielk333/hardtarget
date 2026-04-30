@@ -13,8 +13,7 @@ stages:
   before_script:
     - python -V
     - pip install -U pip
-    - pip install virtualenv
-    - virtualenv venv
+    - python -m venv venv
     - source venv/bin/activate
     - apt update
     - apt install -y gcc libfftw3-dev libhdf5-dev
@@ -63,6 +62,16 @@ mypy:
   script:
     - pip install .[type_checker]
     - mypy
+  rules:
+    - !reference [.merge_request_rules, rules]
+
+Ruff:
+  stage: type_checking
+  extends:
+    - .devsetup
+  allow_failure: false
+  script:
+    - ruff check
   rules:
     - !reference [.merge_request_rules, rules]
 

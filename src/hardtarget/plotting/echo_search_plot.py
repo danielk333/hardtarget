@@ -26,29 +26,29 @@ def plot_echo_search(
     """
 
     if limit:
-        filter = out_data.max_peak > limit
+        filter = out_data.max_corr > limit
     else:
-        filter = np.zeros(out_data.max_peak.shape, dtype=np.bool)
+        filter = np.zeros(out_data.max_corr.shape, dtype=np.bool)
 
-    ipps = np.arange(out_data.max_peak.shape[0])
+    ipps = np.arange(out_data.max_corr.shape[0])
 
     # Max peak per ipp
-    axes[0, 0].plot(ipps, np.abs(out_data.max_peak))
-    axes[0, 0].plot(ipps[filter], np.abs(out_data.max_peak[filter]), "r.")
+    axes[0, 0].plot(ipps, np.abs(out_data.max_corr))
+    axes[0, 0].plot(ipps[filter], np.abs(out_data.max_corr[filter]), "r.")
 
     axes[0, 0].set_ylabel("Max peak value")
     axes[0, 0].set_xlabel("Ipp")
 
     # total power per ipp
-    axes[1, 0].plot(ipps, np.abs(out_data.ipps_pow))
-    axes[1, 0].plot(ipps[filter], np.abs(out_data.ipps_pow[filter]), "r.")
+    axes[1, 0].plot(ipps, np.abs(out_data.tot_pow))
+    axes[1, 0].plot(ipps[filter], np.abs(out_data.tot_pow[filter]), "r.")
     axes[1, 0].set_ylabel("Ipp power")
     axes[1, 0].set_xlabel("Ipp")
 
     if convert_axis:
         # Range based on max power indicies.
         range = (
-            (out_data.max_pow_ind * exp.t_samp_usec + exp.t_rx_start_usec)
+            (out_data.max_corr_ind * exp.t_samp_usec + exp.t_rx_start_usec)
             * 1e-6
             * 0.5
             * scipy.constants.c
@@ -67,8 +67,8 @@ def plot_echo_search(
         axes[1, 1].set_xlabel("Ipp")
 
     else:
-        axes[0, 1].plot(ipps, out_data.max_pow_ind)
-        axes[0, 1].plot(ipps[filter], out_data.max_pow_ind[filter], "r.")
+        axes[0, 1].plot(ipps, out_data.max_corr_ind)
+        axes[0, 1].plot(ipps[filter], out_data.max_corr_ind[filter], "r.")
         axes[0, 1].set_ylabel("Max power indices")
         axes[0, 1].set_xlabel("Ipp")
 

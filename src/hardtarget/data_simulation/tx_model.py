@@ -38,17 +38,20 @@ def tx_signal_model(
         Tx signal of size (read_length, sub resolution) containing the interpolated signal based on the code
     """
 
-    # Zero pad code to not miss any start/end shifts
-    code = np.concatenate([np.array([0]), code, np.array([0])])
-
-    # As the reciver side is oversampling the code needs to be upsampled
+    # If the reciver side is oversampling the code needs to be upsampled
     transmitted_code_size = len(code)
     upsample_scale = baud_length_usec // t_samp_usec
     received_code_size = transmitted_code_size * upsample_scale
     if received_code_size > transmitted_code_size:
         code = np.repeat(code, upsample_scale)
 
-    sample = np.arange(tx_start_samp, tx_start_samp + received_code_size)
+    # Zero pad code to not miss any start/end shifts
+    code = np.concatenate([np.array([0]), code, np.array([0])])
+    # Adjust startsample according to the padding.
+    start_samp += 1
+
+    # Create interpolator for code
+    sample = np.arange(tx_start_samp, tx_start_samp + len(code))
     fun = interpolate.interp1d(
         sample,
         code,
@@ -57,14 +60,15 @@ def tx_signal_model(
         fill_value=0,
     )
 
-    tx = np.zeros(
-        (read_length, sub_resolution),
-        dtype=np.complex128,
-    )
+    # Array of tx indicies
+    tx_indicies = np.repeat(
+        np.arange(start_samp, start_samp + read_length).reshape((read_length, 1)),
+        sub_resolution,
+        axis=1,
+    ) % ipp_samps + np.linspace(0, 1, sub_resolution, endpoint=False)
 
-    # TODO: try to only loop over subresolution instead
-    for i in range(start_samp, start_samp + read_length):
-        tx[i - start_samp, :] = fun((i % (ipp_samps)) + 1 - np.linspace(0, 1, sub_resolution, endpoint=False))
-    for i in range(sub_resolution):
-        tx[:, i] /= np.sum(np.conj(tx[:, i]) * tx[:, i])
+    # Signal value of tx_indices
+    tx = fun(tx_indicies)
+    tx /= np.sum(np.conj(tx) * tx, axis=0)
+
     return tx
