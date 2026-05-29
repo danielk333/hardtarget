@@ -73,6 +73,8 @@ def main() -> None:
         if args.version:
             print(__version__)
             exit()
+        else:
+            parser.print_help()
     else:
         cmd_function = COMMANDS[args.command]["function"]
         logger.info(f"Executing command {args.command}")
