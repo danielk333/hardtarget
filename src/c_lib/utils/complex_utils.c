@@ -1,7 +1,8 @@
 #include "complex_utils.h"
+
 #include <assert.h>
-
-
+#include <complex.h>
+#include <stdint.h>
 
 void crosscorrelate_single_delay(
     float complex* x,
@@ -18,7 +19,7 @@ void crosscorrelate_single_delay(
         if (j < 0 || j >= size_y) {
             correlation += 0.0 + 0.0 * I;
         } else {
-            correlation += x[i] * conj(y[j]);
+            correlation += y[j] * conjf(x[i]);
         }
     }
     *result = correlation;
@@ -34,10 +35,8 @@ void crosscorrelate(
     float complex* result
 ) {
     assert(max_delay > min_delay);
-    int counter = 0;
-    for (int i = max_delay; i > min_delay; i--) {
-        crosscorrelate_single_delay(x, size_x, y, size_y, i, &result[counter]);
-        counter++;
+    for (int i = min_delay; i < max_delay; i++) {
+        crosscorrelate_single_delay(x, size_x, y, size_y, i, &result[i - min_delay]);
     }
 }
 
@@ -56,9 +55,7 @@ float complex complex_sum(float complex* inarray, int size) {
 }
 
 void elementwise_cabs_square(float complex* inarray, int start, int stop, float complex* outarray) {
-    int counter = 0;
     for (int i = start; i < stop; i++) {
-        outarray[counter] = inarray[i] * conj(inarray[i]);
-        counter++;
+        outarray[i - start] = inarray[i] * conjf(inarray[i]);
     }
 }

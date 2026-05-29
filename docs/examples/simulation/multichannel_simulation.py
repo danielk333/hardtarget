@@ -43,9 +43,9 @@ exp_params = ExpDef(
 # ---
 
 
-def trajectory_func(t: npt.NDArray) -> npt.NDArray:
+def trajectory_func(t: npt.NDArray) -> tuple[npt.NDArray, npt.NDArray]:
     # Initial values
-    r0: float = 220e3
+    r0: float = 110e3
     v0: float = -0.4e3
     a0: float = -0.20e3
     # Initial position over radar
@@ -56,7 +56,14 @@ def trajectory_func(t: npt.NDArray) -> npt.NDArray:
     v_vec = np.array([0.75, 0.25, 0])
     distance_traveled = v0 * t + a0 * 0.5 * t**2
     # trajectory
-    return x_start[:, None] + v_vec[:, None] * distance_traveled[None, :]
+    trajectory = x_start[:, None] + v_vec[:, None] * distance_traveled[None, :]
+
+    r = np.linalg.norm(trajectory, axis=0)
+    two_way_range = 2 * r
+    rx_k_vecs = trajectory / r
+
+    # trajectory
+    return two_way_range, rx_k_vecs
 
 
 # ## Simulate the experiment with the MU radars beam.

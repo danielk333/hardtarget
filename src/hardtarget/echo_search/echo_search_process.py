@@ -64,11 +64,14 @@ class EchoSearchProcess(
             Process specific Optimize Process parameters
         """
 
-        doppler_freq_size = int(
-            ((cfg_params.doppler_freq_max - cfg_params.doppler_freq_min) / cfg_params.doppler_freq_step) + 1
+        doppler_frequencies = np.arange(
+            cfg_params.doppler_freq_min,
+            cfg_params.doppler_freq_max + cfg_params.doppler_freq_step,
+            cfg_params.doppler_freq_step,
+            dtype=np.int32,
         )
 
-        return EchoSearchProParams(**asdict(pro_params), doppler_freq_size=doppler_freq_size)
+        return EchoSearchProParams(**asdict(pro_params), doppler_frequencies=doppler_frequencies)
 
     def analyse_ipps(self, start_sample: int) -> EchoSearchVars:
         """
@@ -97,6 +100,7 @@ class EchoSearchProcess(
         return EchoSearchVars(
             max_corr=np.stack([x.max_corr for x in vars_list], axis=0),
             max_corr_ind=np.stack([x.max_corr_ind for x in vars_list], axis=0),
+            max_corr_delay=np.stack([x.max_corr_delay for x in vars_list], axis=0),
             best_doppler=np.stack([x.best_doppler for x in vars_list], axis=0),
             tot_pow=np.stack([x.tot_pow for x in vars_list], axis=0),
             mean=np.stack([x.mean for x in vars_list], axis=0),
@@ -124,6 +128,8 @@ class EchoSearchProcess(
              Output data
         """
 
+        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_params.t_samp_usec)
+
         return EchoSearchOutArgs(
             max_corr=all_vars.max_corr
             if isinstance(all_vars.max_corr, np.ndarray)
@@ -131,6 +137,9 @@ class EchoSearchProcess(
             max_corr_ind=all_vars.max_corr_ind
             if isinstance(all_vars.max_corr_ind, np.ndarray)
             else np.array(all_vars.max_corr_ind),
+            max_corr_delay=all_vars.max_corr_delay
+            if isinstance(all_vars.max_corr_delay, np.ndarray)
+            else np.array(all_vars.max_corr_delay),
             best_doppler=all_vars.best_doppler
             if isinstance(all_vars.best_doppler, np.ndarray)
             else np.array(all_vars.best_doppler),
@@ -141,7 +150,7 @@ class EchoSearchProcess(
             std_dev=all_vars.std_dev
             if isinstance(all_vars.std_dev, np.ndarray)
             else np.array(all_vars.std_dev),
-            epoch_us=int(file_idx_sample * exp_params.t_samp_usec),
+            epoch_us=epoch_us,
         )
 
     def define_h5_vars(self, output: EchoSearchOutArgs) -> dict[str, DataItem]:
@@ -163,6 +172,10 @@ class EchoSearchProcess(
                 data=output.max_corr_ind,
                 long_name="Index of the max_corr within the correlation array for the best doppler.",
             ),
+            f"{output.max_corr_delay=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.max_corr_delay,
+                long_name="Delay of the max_corr_ind within the correlation array for the best doppler.",
+            ),
             f"{output.best_doppler=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.best_doppler,
                 long_name="Doppler frequency that contained the best correlation.",
@@ -183,6 +196,6 @@ class EchoSearchProcess(
             ),
             f"{output.epoch_us=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.epoch_us,
-                long_name="Start time of this analysis relative to the file start.",
+                long_name="Epoch of the first analysed datapoint in microseconds",
             ),
         }

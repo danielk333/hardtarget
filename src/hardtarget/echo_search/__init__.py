@@ -19,6 +19,13 @@ except ImportError as err:
 else:
     ECHO_SEARCH_LIBS[EchoSearchMethod.xcorr][Impl.c] = xcorr_c
 
+try:
+    from .xcorr.xcorr_numpy import xcorr_numpy
+except ImportError as err:
+    logger.debug(f"Event search Numpy implementations failed to import:\n {err}", exc_info=True)
+else:
+    ECHO_SEARCH_LIBS[EchoSearchMethod.xcorr][Impl.numpy] = xcorr_numpy
+
 
 def get_echo_search_lib(
     method_lib: Optional[MethodLib] = None, implementation: Optional[Impl] = None

@@ -16,14 +16,13 @@ from hardtarget.data_simulation.utils import TrajectoryFunction, noise_generator
 from hardtarget.utils.range_conversion import range_to_range_gate
 
 
-def default_trajectory_function(t: npt.NDArray) -> npt.NDArray:
+def default_trajectory_function(t: npt.NDArray) -> tuple[npt.NDArray, npt.NDArray]:
     """
-
     Args:
         t: timepoints in seconds
 
     Returns:
-        3d pos  (3,N)
+        Two way range (len(t),) and Trajectory as a (3,len(t)) numpy array
 
     """
 
@@ -43,8 +42,13 @@ def default_trajectory_function(t: npt.NDArray) -> npt.NDArray:
 
     distance_traveled = v0 * t + a0 * 0.5 * t**2
 
+    trajectory = x_start[:, None] + v_vec[:, None] * distance_traveled[None, :]
+    r = np.linalg.norm(trajectory, axis=0)
+    two_way_range = 2 * r
+    rx_k_vecs = trajectory / r
+
     # trajectory
-    return x_start[:, None] + v_vec[:, None] * distance_traveled[None, :]
+    return two_way_range, rx_k_vecs
 
 
 def simulate_h5(
@@ -221,29 +225,28 @@ def generate_rx_vectors(
         samp_ind = ipp_n * exp.ipp_samps
         tx_start_ind = samp_ind + (exp.t_tx_start_usec / exp.t_samp_usec)
         t_tx_seconds = (np.arange(len(tx_wave)) / exp.sample_rate) + (tx_start_ind / exp.sample_rate)
-        trajectory = trajectory_function(t_tx_seconds)
-        ranges = np.linalg.norm(trajectory, axis=0)
-        if not isinstance(ranges, np.ndarray):
-            ranges = np.array([ranges])
+        two_way_range, rx_k_vecs = trajectory_function(t_tx_seconds)
+        if not isinstance(two_way_range, np.ndarray):
+            two_way_range = np.array([two_way_range])
         # Check so that range is noticable within the signal, otherwise skip
-        if is_range_within_rx_gate(range=ranges[0], exp=exp):
+        if is_range_within_rx_gate(range=two_way_range[0], exp=exp):
             # Generate rx_wave per channel
             rx_waves = np.zeros((len(exp.rx_channels), len(tx_wave)), np.complex64)
             rx_waves[:] = generate_rx_wave(
                 exp=exp,
                 tx_wave=tx_wave,
                 snr=snr_function(t_tx_seconds) if snr_function else 1.0,
-                ranges=ranges,
+                ranges=two_way_range,
                 noise_sigma=noise_sigma,
             )
             # If beam available add channel specifics
             if beam and beam_params:
-                chs = beam.channel_signals(trajectory / ranges, beam_params)
+                chs = beam.channel_signals(rx_k_vecs, beam_params)
                 rx_waves *= chs if chs.ndim > 1 else chs.reshape(len(exp.rx_channels), 1)
 
             # allocate the wave correctly within the rx interval
             tx_rx_start_delta = int((exp.t_rx_start_usec - exp.t_tx_start_usec) / exp.t_samp_usec)
-            range_gate = range_to_range_gate(ranges[0], exp.sample_rate)
+            range_gate = range_to_range_gate(two_way_range[0], exp.sample_rate)
             rx_wave_start_samp = range_gate - tx_rx_start_delta
 
             # Check so that signal fits, else just extract the samps that is within the rx interval

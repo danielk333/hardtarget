@@ -86,6 +86,9 @@ def collect_paths(
     """
 
     fl = get_analysed_h5_files(folder)
+    if not fl:
+        return []
+
     fl.sort()
     fl_epochs = [int(file.stem.split("-")[1]) * 1e-6 for file in fl]
 
@@ -142,6 +145,9 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
         Process specific types with the experiment data, configuration data, process data and the analysed
         output.
     """
+    if not paths:
+        raise FileNotFoundError("No data present at given location")
+
     cfg_type, pro_type, out_type = get_process_types_from_file(paths[0])
 
     out_args: dict[str, Any] = {}
@@ -153,18 +159,8 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
         out_tmp = {}
         with h5py.File(path, "r") as hf:
             group = hf["OutArgs"]  # TODO: Update to proper type
-            out_tmp = {key: group[key][()] for key in out_type._fields}
 
-            def read_key(group: h5py.Group, key: str) -> Any:
-                """h5py saves dataset string as byte strings, needs to be decoded"""
-                data = group[key][()]
-                if isinstance(data, bytes):
-                    data = data.decode()
-                elif isinstance(data, np.ndarray) and (data.size == 0):
-                    logger.debug(f"{key} data is empty when loaded from file")
-                elif isinstance(data, np.ndarray) and isinstance(data[0], bytes):
-                    data = [d.decode() for d in data]
-                return data
+            out_tmp = {key: read_key(group, key) for key in out_type._fields}
 
             GenericDataclass = TypeVar("GenericDataclass", bound=IsDataclass)
 
@@ -189,18 +185,17 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
         def _append_data(main_data: dict, tmp_data: dict, logger: logging.Logger) -> dict:
             if not main_data:
                 for key in tmp_data:
-                    logger.debug(f"Init mat {key}: {tmp_data[key].shape} [{tmp_data[key].dtype}]")
                     main_data[key] = tmp_data[key]
             else:
                 for key in tmp_data:
                     # only interested in the epoch start of the measurement TODO: adjust this
-                    if key == f"{MFOutArgs.epoch=}".split("=")[0].split(".")[1]:
+                    if key == f"{MFOutArgs.epoch_us=}".split("=")[0].split(".")[1]:
                         continue
                     if isinstance(tmp_data[key], np.ndarray):
                         logger.debug(f"Append mat {key}: {tmp_data[key].shape} [{tmp_data[key].dtype}]")
                         main_data[key] = np.append(main_data[key], tmp_data[key], axis=0)
                     else:
-                        logger.debug(f"Add {key}: {tmp_data[key].dtype}")
+                        logger.debug(f"Add {key}: {type(tmp_data[key])}")
                         main_data[key] = main_data[key] + tmp_data[key]
             return main_data
 
@@ -216,6 +211,22 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
         cfg_params,
         pro_params,
     )
+
+
+def read_key(group: h5py.Group, key: str, logger: Optional[logging.Logger] = None) -> Any:
+    """h5py saves dataset string as byte strings, needs to be decoded"""
+    data = group[key][()]
+    if isinstance(data, bytes):
+        data = data.decode()
+    elif isinstance(data, np.ndarray) and (data.size == 0):
+        if logger:
+            logger.debug(f"{key} data is empty when loaded from file")
+    elif isinstance(data, np.ndarray) and isinstance(data[0], bytes):
+        data = [d.decode() for d in data]
+    elif isinstance(data, np.integer):
+        data = int(data)
+
+    return data
 
 
 def get_process_types_from_file(path: Path) -> tuple[Any, Any, Any]:

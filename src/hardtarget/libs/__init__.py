@@ -74,19 +74,28 @@ def load_c_lib() -> ctypes.CDLL:
             ctypes.c_int,  #  2
             nptype(np.complex64, 1),  # 3
             ctypes.c_int,  # 4
-            ctypes.c_int,  # 5
+            nptype(np.int32, 1),  # 5
             ctypes.c_int,  # 6
             ctypes.c_int,  # 7
             ctypes.c_int,  # 8
-            ctypes.c_int,  # 9
-            nptype(np.complex64, 2, w=True),  # 10
-            nptype(np.int32, 1, w=True),  # 11
-            nptype(np.complex64, 2, w=True),  # 12
-            nptype(np.int32, 1, w=True),  # 13
-            nptype(np.complex64, 1, w=True),  # 14
-            ctypes.c_int,  # 15
-            nptype(np.int32, 1, w=True),  # 16
-            ctypes.c_int,  # 17
+            nptype(np.complex64, 2, w=True),  # 9
+            nptype(np.int32, 1, w=True),  # 10
+            nptype(np.complex64, 2, w=True),  # 11
+            nptype(np.int32, 1, w=True),  # 12
+            nptype(np.complex64, 1, w=True),  # 13
+            ctypes.c_int,  # 14
+            nptype(np.int32, 1, w=True),  # 15
+            ctypes.c_int,  # 16
+        ]
+
+        clib.crosscorrelate.argtypes = [
+            nptype(np.complex64, 1),
+            ctypes.c_int,
+            nptype(np.complex64, 1),
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            nptype(np.complex64, 1, w=True),
         ]
 
     else:

@@ -178,7 +178,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self.epoch = Bounds(int(t_start_usec), int(t_end_usec))
         self.progress = progress
         self.output_dir = Path(output_dir).resolve() if output_dir is not None else None
-        self.progress_bar = None
         self.store_mode = "w"
         self.store_params = True
 
@@ -284,7 +283,9 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         """
         pass
 
-    def process_task(self, task_idx: int, file_idx_sample: int, bounds: Bounds) -> GenericOut:
+    def process_task(
+        self, task_idx: int, file_idx_sample: int, bounds: Bounds, progress_bar: Optional[tqdm]
+    ) -> GenericOut:
         """
         Process one task, extract amount of samples to process, analyse the samples for each coherent
         integration, gather results and generate the output result.
@@ -318,8 +319,8 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             start_sample = file_idx_sample + coh_ind * ipp_samp * n_ipp
             vars = self.analyse_ipps(start_sample)
 
-            if self.progress_bar is not None:
-                self.progress_bar.update(1)
+            if progress_bar is not None:
+                progress_bar.update(1)
 
             collected_vars.append(vars)
 
@@ -393,6 +394,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
         end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
         relative_time: bool = False,
+        sub_directory: Optional[str] = None,
         clobber: bool = True,
     ) -> AnalysedResult:
         """
@@ -404,10 +406,12 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         4. Store data
 
         Args:
-            job: Job id
+            comm_rank: rank of the current mpi comm
+            comm_size: Amount of available ranks
             start_time (optional): Start time, if set data before this will be neglected
             end_time (optional): End time, if set data after this will be neglected
             relative_time (optional): If relative time should be used
+            sub_directory (optional): If data should be stored in a sub directory of the designated output directory.
             clobber (optional): Overwrite previous datasets, default True
         Returns:
             Analysed result, a collection of the directory and paths with the location of the result. If
@@ -415,10 +419,15 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         """
 
         if isinstance(start_time, str):
-            start_time = int(ts_from_str(start_time) * 1e6)
+            try:
+                start_time = int(ts_from_str(start_time) * 1e6)
+            except ValueError:
+                start_time = int(start_time)
         if isinstance(end_time, str):
-            end_time = int(ts_from_str(end_time) * 1e6)
-
+            try:
+                end_time = int(ts_from_str(end_time) * 1e6)
+            except ValueError:
+                end_time = int(end_time)
         # bounds
         if start_time or end_time:
             sample_bounds = time_interval_to_sample_bound(
@@ -457,19 +466,18 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         if self.progress:
             curr_num = "1".ljust(extend_str_len, " ")
             subprog_str = f"[file {curr_num}/{total_num}]"
-            self.progress_bar = tqdm(
-                desc=f"{self.method}: {progress_desc} {subprog_str}",
-                total=total,
-            )
+            progress_bar = tqdm(desc=f"{progress_desc} {subprog_str}", total=total, position=comm_rank)
+        else:
+            progress_bar = None
 
         self._logger.info(f"starting job {comm_rank}/{comm_size} with {len(job_tasks)} tasks")
 
         results: AnalysedResult = {"dir": self.output_dir, "files": [], "data": {}}
         for idx, task_idx in enumerate(job_tasks):
-            if self.progress_bar is not None:
+            if progress_bar is not None:
                 curr_num = f"{idx + 1}".ljust(extend_str_len, " ")
                 subprog_str = f"[file {curr_num}/{total_num}]"
-                self.progress_bar.set_description(
+                progress_bar.set_description(
                     f"{progress_desc} {subprog_str}",
                 )
 
@@ -484,7 +492,12 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
             # Create directory and define filename.
             if self.output_dir is not None:
-                output_path = Path(self.output_dir) / utils.get_filepath(self.epoch.start, file_idx_sample)
+                output_path = Path(self.output_dir) / utils.get_filepath(
+                    epoch_unix_us=self.epoch.start,
+                    sample_id_us=file_idx_sample,
+                    method=self.method,
+                    sub_directory=sub_directory,
+                )
                 # create directory
                 dirname = Path(output_path).parent
                 dirname.mkdir(parents=True, exist_ok=True)
@@ -497,12 +510,15 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 self._logger.debug(
                     f"File already existing and clobber is off, file: {output_path.name} is skipped."
                 )
-                if self.progress_bar:
-                    self.progress_bar.update(self.cfg_params.num_cohints_per_file)
+                if progress_bar:
+                    progress_bar.update(self.cfg_params.num_cohints_per_file)
             # Else run analysis
             else:
                 task_data = self.process_task(
-                    task_idx=task_idx, file_idx_sample=file_idx_sample, bounds=sample_bounds
+                    task_idx=task_idx,
+                    file_idx_sample=file_idx_sample,
+                    bounds=sample_bounds,
+                    progress_bar=progress_bar,
                 )
 
                 self.save_task_data(
@@ -513,8 +529,8 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                     clobber=clobber,
                 )
 
-        if self.progress_bar:
-            self.progress_bar.close()
+        if progress_bar:
+            progress_bar.close()
         self._logger.info(f"finishing job {comm_rank}/{comm_size} with {len(job_tasks)} tasks")
         return results
 
@@ -569,7 +585,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
         # Extract rx data
         ipp = self.data.read(self._rx_channels, start_sample, read_length)
-
         if sum_rx_channels and ipp.ndim >= 2:
             # Only applicable if multiple channels available
             ipp = np.sum(ipp, axis=0)
@@ -577,7 +592,12 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         if ipp.ndim > 1:
             rx = ipp[:, self.pro_params.rx_stencil]
         else:
-            rx = ipp[self.pro_params.rx_stencil]
+            if self._tx_channel == self._rx_channels:
+                _ipp = ipp.copy()
+                _ipp[self.pro_params.tx_stencil] = 0
+                rx = _ipp[self.pro_params.rx_stencil]
+            else:
+                rx = ipp[self.pro_params.rx_stencil]
 
         # Extracting tx data
         if not self._tx_channel:

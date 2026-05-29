@@ -1,5 +1,21 @@
 # Target estimation
 
+Given that the targets phase function can be completely described by at most a second order
+polynomial, there are at least three ways to process a matched filter output:
+
+1. Directly compute the output as a function of all three polynomial coefficients
+2. Perform one FFT over one of the components, and directly compensate for the other
+2. Perform two FFT's over two of the components, and directly compensate for the other
+
+We here implement all three possible variants, where option 1) is named echo search (??? fix),
+options 2) is called GMF, and option 3) is called DPT.
+
+Technically we also have a version of 1) that is usable as a refinement method, named "optimization", which
+basically does a gradient ascent or similar optimization on the full matched filter function to
+refine an initial result found by the other methods (which usually use grid-evaluation to find peaks
+in the matched filter).
+
+
 ---
 
 Target estimation is done through the Generalized Matched Filter (GMF). The GMF for a certain

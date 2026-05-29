@@ -29,6 +29,7 @@ from hardtarget.target_estimation.dpt.types import DPTCfgParams, DPTProParams
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, GMFProParams
 from hardtarget.target_estimation.types import MFOutArgs
 from hardtarget.types import AnalysedResult, ArrayKwargs, CfgParams, ExpDef, MethodLib
+from src.hardtarget.constants import MethodAbbreviation
 
 
 class TestStoreAndLoad:
@@ -96,7 +97,7 @@ class TestStoreAndLoad:
             a_vec=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float64),
             g_vec=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float32),
             pointing_vec=np.random.rand(cfg_org.num_cohints_per_file, 2).astype(np.float32),
-            epoch=100.0,
+            epoch_us=100,
             t=np.random.rand(t_size).astype(np.float32),
         )
 
@@ -116,6 +117,7 @@ class TestStoreAndLoad:
         out_org = EchoSearchOutArgs(
             max_corr=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
             max_corr_ind=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
+            max_corr_delay=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
             best_doppler=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
             tot_pow=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
             mean=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
@@ -140,6 +142,7 @@ class TestStoreAndLoad:
             peak=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex64),
             azimuth=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float32),
             elevation=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float32),
+            epoch_us=int(np.random.rand()),
         )
 
         array_kwargs = ArrayKwargs(beam=radardef.Mu().beam, parameters=radardef.Mu().beam_parameters)
@@ -178,7 +181,9 @@ class TestStoreAndLoad:
         # Create a temporary file for gmf out
         with tempfile.TemporaryDirectory() as temp_dir:
             # mockup name for subfolder and gmf file
-            outfile = Path(temp_dir) / "2015-10-22T11-00-00" / "mf-1445515198000000.h5"
+            outfile = (
+                Path(temp_dir) / "2015-10-22T11-00-00" / f"{MethodAbbreviation[method]}-1445515198000000.h5"
+            )
             outfile.parent.mkdir(parents=True, exist_ok=True)
 
             # store data
@@ -233,6 +238,7 @@ class TestStoreAndLoad:
         out_org = EchoSearchOutArgs(
             max_corr=np.random.rand(cfg_org.num_cohints_per_file).astype(np.complex128),
             max_corr_ind=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
+            max_corr_delay=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
             best_doppler=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int64),
             tot_pow=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
             mean=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),

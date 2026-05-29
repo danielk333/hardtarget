@@ -88,8 +88,8 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
             np.linspace(-1, 1, cfg_params.resolution),
             np.linspace(-1, 1, cfg_params.resolution),
         )
-
-        kz = np.sqrt(1 - np.square(kx) - np.square(ky))
+        with np.errstate(invalid="ignore"):
+            kz = np.sqrt(1 - np.square(kx) - np.square(ky))
 
         k_1d_index = np.linspace(0, cfg_params.resolution - 1, cfg_params.resolution, dtype=int)
         x_ind, y_ind = np.meshgrid(k_1d_index, k_1d_index)
@@ -146,8 +146,15 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
         Returns:
             Output data
         """
+        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_params.t_samp_usec)
 
-        return all_vars
+        return DOAOutArgs(
+            k_vec=all_vars.k_vec,
+            peak=all_vars.peak,
+            azimuth=all_vars.azimuth,
+            elevation=all_vars.elevation,
+            epoch_us=epoch_us,
+        )
 
     def define_h5_vars(self, output: DOAOutArgs) -> dict[str, DataItem]:
         """
@@ -176,5 +183,9 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
             f"{output.elevation=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.elevation,
                 long_name="elevation for each coherent integration",
+            ),
+            f"{output.epoch_us=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.epoch_us,
+                long_name="Epoch of the first analysed datapoint in microseconds",
             ),
         }

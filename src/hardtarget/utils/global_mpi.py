@@ -7,6 +7,8 @@ class CommObject(Protocol):
 
     def bcast(self, obj: Any, root: int = 0) -> Any: ...
     def gather(self, sendobj: Any, root: int = 0) -> list[Any] | None: ...
+    def Split(self, color: int, key: int) -> "CommObject": ...
+    def barrier(self) -> None: ...
 
 
 class CommMock(CommObject):
@@ -18,6 +20,12 @@ class CommMock(CommObject):
 
     def gather(self, sendobj: Any, root: int = 0) -> list[Any]:
         return [sendobj]
+
+    def Split(self, color: int, key: int) -> CommObject:
+        return self
+
+    def barrier(self) -> None:
+        return None
 
 
 _COMM: CommObject = CommMock()

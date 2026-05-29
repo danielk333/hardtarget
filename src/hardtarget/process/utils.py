@@ -3,9 +3,11 @@
 import datetime as dt
 import logging
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 
+from hardtarget.constants import AnalysisMethod, MethodAbbreviation
 from hardtarget.types import Bounds
 
 logger = logging.getLogger(__name__)
@@ -94,7 +96,9 @@ def calculate_tasks(
     return job_tasks, job_cohints
 
 
-def get_filepath(epoch_unix_us: int, sample_id_us: int) -> Path:
+def get_filepath(
+    epoch_unix_us: int, sample_id_us: int, method: AnalysisMethod, sub_directory: Optional[str] = None
+) -> Path:
     """
     Generates a file path for a h5 file.
 
@@ -107,7 +111,12 @@ def get_filepath(epoch_unix_us: int, sample_id_us: int) -> Path:
     """
     _dt = dt.datetime.fromtimestamp(epoch_unix_us * 1e-6, dt.timezone.utc)
     time_string = _dt.strftime("%Y-%m-%dT%H-00-00")
-    return Path(time_string) / f"mf-{sample_id_us:08d}.h5"
+    dir = Path(time_string[0:10]) / time_string[11:19]
+
+    if sub_directory:
+        dir = dir / sub_directory
+
+    return dir / f"{MethodAbbreviation[method]}-{sample_id_us:08d}.h5"
 
 
 def sample_interval_to_closest_ipp(sample_bounds: Bounds, ipp_samps: int) -> Bounds:

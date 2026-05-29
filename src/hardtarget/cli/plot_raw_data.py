@@ -17,8 +17,8 @@ def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Adds mandatory and optional positional arguments to the parser."""
 
     parser.add_argument("path", help="path to source directory with raw data")
-    parser.add_argument("-s", "--start_time", default=None, type=int)
-    parser.add_argument("-e", "--end_time", default=None, type=int)
+    parser.add_argument("-s", "--start_time", default=None, type=str)
+    parser.add_argument("-e", "--end_time", default=None, type=str)
     parser.add_argument("--relative_time", action="store_true")
     parser.add_argument("--axis_units", action="store_true")
     parser.add_argument("--log", action="store_true")
@@ -75,8 +75,8 @@ def main(args: argparse.Namespace) -> None:
             ax, handles = plotting.rti(
                 ax,
                 data_loader=data_loader,
-                start_time=args.start_time,
-                end_time=args.end_time,
+                start_time=int(args.start_time) if args.relative_time else args.start_time,
+                end_time=int(args.end_time) if args.relative_time else args.end_time,
                 relative_time=args.relative_time,
                 axis_units=args.axis_units,
                 log=args.log,

@@ -121,6 +121,8 @@ def test_analysis(method, sub_methods, get_data):
         cfg = create_cfg(tmp_dir)
         analysed_data_path = get_analysed_path(tmp_dir, method.name)
 
+        # if method == AnalysisMethod.optimize:
+        # breakpoint()
         # CLI request
         args_str = [
             str(data_dir),

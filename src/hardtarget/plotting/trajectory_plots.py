@@ -48,10 +48,14 @@ def plot_true_vs_estimated_trajectory(
     ax.set_title("Real vs Estimated trajectory")
     measurement_length_us = (measurement_end - measurement_start).total_seconds() * 1e6
     t_us = np.arange(measurement_length_us, step=exp_params.t_samp_usec)
-    full_trajectory = trajectory_func(t_us * 1e-6)
+    two_way_range, k_vec = trajectory_func(t_us * 1e-6)
+
+    full_trajectory = k_vec * two_way_range
 
     t_target_us = np.arange(target_start_us, stop=target_end_us, step=exp_params.t_samp_usec)
-    noticable_trajectory = trajectory_func(t_target_us * 1e-6)
+    two_way_range, k_vec = trajectory_func(t_target_us * 1e-6)
+
+    noticable_trajectory = k_vec * two_way_range
 
     # Trajectory of object
     ax.plot(

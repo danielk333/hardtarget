@@ -86,8 +86,13 @@ class OptimizeProcess(
                 self.sub_resolution: int = hf[GMFCfgParams.__name__][
                     f"{GMFCfgParams.range_gate_sub_resolution=}".split("=")[0].split(".")[1]
                 ][()]
+                # Extract sample relative to file start
                 self.mf_sample_start: int = int(
-                    hf["OutArgs"][f"{MFOutArgs.epoch=}".split("=")[0].split(".")[1]][()] * 1e6
+                    (
+                        self.data.epoch_bounds[0]
+                        - int(hf["OutArgs"][f"{MFOutArgs.epoch_us=}".split("=")[0].split(".")[1]][()])
+                    )
+                    / self.exp_params.t_samp_usec
                 )
             except KeyError:
                 raise ValueError("Optimization is only compatible with a previous gmf analysis")

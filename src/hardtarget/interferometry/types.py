@@ -36,4 +36,9 @@ class DOAVars(NamedTuple):
     elevation: npt.NDArray[np.float32]
 
 
-DOAOutArgs = DOAVars
+class DOAOutArgs(NamedTuple):
+    k_vec: npt.NDArray[np.float32]
+    peak: npt.NDArray[np.complex64] | np.complex64
+    azimuth: npt.NDArray[np.float32]
+    elevation: npt.NDArray[np.float32]
+    epoch_us: int

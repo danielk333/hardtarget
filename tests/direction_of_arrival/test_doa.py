@@ -24,8 +24,8 @@ class TestDOA:
             [0.25467, 0.3216, 1.0]
         )  # np.array([np.random.rand(), np.random.rand(), 1])
 
-        def trajectory_func(t: npt.NDArray) -> npt.NDArray:
-            return target_location * 210e3
+        def trajectory_func(t: npt.NDArray) -> tuple[npt.NDArray, npt.NDArray]:
+            return np.ones((len(t),)) * 210e3, np.repeat(np.atleast_2d(target_location), len(t), axis=0).T
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             simulation_path = Path(tmp_dir) / "sim_data"

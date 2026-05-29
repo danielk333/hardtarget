@@ -8,12 +8,12 @@ import numpy as np
 import scipy.constants as constants
 from matplotlib.axes import Axes
 from matplotlib.collections import QuadMesh
-from radardef import DataLoader
+from radardef import DataLoader, ExpDef
 
 from hardtarget.process.utils import sample_interval_to_closest_ipp
 from hardtarget.types import Bounds
 from hardtarget.utils.range_conversion import unit_to_range_gate
-from hardtarget.utils.time_conversion import time_interval_to_sample_bound
+from hardtarget.utils.time_conversion import time_interval_to_sample_bound, ts_from_str
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +21,14 @@ logger = logging.getLogger(__name__)
 def rti(
     ax: Axes,
     data_loader: DataLoader,
-    start_time: Optional[np.datetime64 | int] = None,
-    end_time: Optional[np.datetime64 | int] = None,
+    start_time: Optional[np.datetime64 | int | str] = None,
+    end_time: Optional[np.datetime64 | int | str] = None,
     relative_time: bool = False,
     keep_tx: bool = False,
     axis_units: bool = False,
     log: bool = False,
-    start_range_gate: Optional[float] = None,
-    end_range_gate: Optional[float] = None,
+    start_range_gate: Optional[int] = None,
+    end_range_gate: Optional[int] = None,
     range_gate_unit: str = "sample",
     monostatic: bool = False,
     colorbar: bool = True,
@@ -62,6 +62,20 @@ def rti(
         Axis and pmesh
     """
 
+    if isinstance(start_time, str):
+        try:
+            ts_from_str(start_time)
+            start_time = int(ts_from_str(start_time) * 1e6)
+        except ValueError:
+            start_time = int(start_time)
+
+    if isinstance(end_time, str):
+        try:
+            ts_from_str(end_time)
+            end_time = int(ts_from_str(end_time) * 1e6)
+        except ValueError:
+            end_time = int(end_time)
+
     # Extract bounds
     if start_time or end_time:
         request_bounds = time_interval_to_sample_bound(
@@ -80,10 +94,12 @@ def rti(
 
     # Extract data within bounds
     n_samp = samp_bounds.end - samp_bounds.start
-    data_vec = np.zeros((n_samp,), dtype=np.complex128)
-    for chnl in data_loader.channels:
-        data_vec += data_loader.read(chnl, samp_bounds.start, n_samp)
-    data_vec.flatten()
+    data_vec = data_loader.read(
+        channel=data_loader.experiment.rx_channels, start_sample=samp_bounds.start, vector_length=n_samp
+    )
+
+    if data_vec.ndim > 1:
+        data_vec = np.sum(data_vec, axis=0)
 
     # Define experiment tx and rx intervals
     def usec_to_sample(t_usec: int) -> int:
@@ -118,15 +134,9 @@ def rti(
     mat_shape = (data_vec.size // data_loader.experiment.ipp_samps, data_loader.experiment.ipp_samps)
     data_ipp_vec = data_vec.reshape(mat_shape).T
 
-    if start_range_gate is None:
-        il0_rg0 = t_rx_start_samp
-    else:
-        rg0 = unit_to_range_gate(
-            val=start_range_gate,
-            unit=range_gate_unit,
-            sample_rate=data_loader.experiment.sample_rate,
-        )
-        il0_rg0 = rg0 + t_tx_start_samp
+    il0_rg0, il0_rg1 = extract_requested_range_gates(
+        start_range_gate, end_range_gate, range_gate_unit, data_loader.experiment
+    )
     assert il0_rg0 >= t_rx_start_samp, (
         f"requested start range gate {il0_rg0} before measurement start {t_rx_start_samp}"
     )
@@ -134,15 +144,6 @@ def rti(
         f"requested start range gate {il0_rg0} after measurement end {t_rx_end_samp}"
     )
 
-    if end_range_gate is None:
-        il0_rg1 = t_rx_end_samp
-    else:
-        rg1 = unit_to_range_gate(
-            val=end_range_gate,
-            unit=range_gate_unit,
-            sample_rate=data_loader.experiment.sample_rate,
-        )
-        il0_rg1 = rg1 + t_tx_start_samp
     assert il0_rg1 >= t_rx_start_samp, (
         f"requested end range gate {il0_rg1} before measurement start {t_rx_start_samp}"
     )
@@ -185,3 +186,29 @@ def rti(
         cbar.set_label("Power [arbitrary units]")
 
     return ax, [pmesh]
+
+
+def extract_requested_range_gates(
+    start_range_gate: int | None, end_range_gate: int | None, range_gate_unit: str, exp_def: ExpDef
+) -> tuple[int, int]:
+    if start_range_gate is None:
+        il0_rg0 = exp_def.t_rx_start_usec / exp_def.t_samp_usec
+    else:
+        rg0 = unit_to_range_gate(
+            val=start_range_gate,
+            unit=range_gate_unit,
+            sample_rate=exp_def.sample_rate,
+        )
+        il0_rg0 = rg0 + (exp_def.t_tx_start_usec / exp_def.t_samp_usec)
+
+    if end_range_gate is None:
+        il0_rg1 = exp_def.t_rx_end_usec / exp_def.t_samp_usec
+    else:
+        rg1 = unit_to_range_gate(
+            val=end_range_gate,
+            unit=range_gate_unit,
+            sample_rate=exp_def.sample_rate,
+        )
+        il0_rg1 = rg1 + (exp_def.t_tx_start_usec / exp_def.t_samp_usec)
+
+    return int(il0_rg0), int(il0_rg1)

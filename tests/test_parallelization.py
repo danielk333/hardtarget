@@ -28,12 +28,20 @@ def get_test_data():
     data_path = Path(tmp_dir.name) / "data"
 
     # Define trajectory of an object
-    def trajectory_func(t: npt.NDArray) -> npt.NDArray:
+    def trajectory_func(t: npt.NDArray) -> tuple[npt.NDArray, npt.NDArray]:
         # simple trajectory moving the object from one end of the beam to the next
         path = np.array([[-1, 0.5, 1], [0, 0, 0.95], [1, -0.5, 0.90]]) * 220e3
         t_samps = np.linspace(0, 1.0, path.shape[0])
         fun = interpolation.Linear(states=path.T, t=t_samps)
-        return fun.get_state(t)
+
+        trajectory = fun.get_state(t)
+
+        r = np.linalg.norm(trajectory, axis=0)
+        two_way_range = 2 * r
+        rx_k_vecs = trajectory / r
+
+        # trajectory
+        return two_way_range, rx_k_vecs
 
     measurement_start = dt.datetime.now()
     measurement_end = measurement_start + dt.timedelta(seconds=1)  # + dt.timedelta(seconds=4)

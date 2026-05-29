@@ -27,18 +27,6 @@ from hardtarget.types import CfgParams, ExpDef, ProParams
 from .utils import cdse
 from .utils.dt_standard import str_to_dt
 
-# ------- USER VARS ----------
-COPERNICUS_USR = "TODO"
-COPERNICUS_PWD = "TODO"
-EISCAT_UHF_MEASUREMENT = Path("/Eiscat/leo/EISCAT_leo_mpark_2.1u_EI@uhf_20240704_100019_278878.hdf5")
-# ----------------------------
-
-
-def get_eiscat_data(dt_start: dt.datetime, dt_end: dt.datetime) -> Path:
-    # TODO: When possible fix so this actually searches or gets data from the Eiscat database
-    return EISCAT_UHF_MEASUREMENT
-
-
 # Process specific configurations
 gmf_cfg = GMFCfgParams(
     n_ipp=1,
@@ -72,13 +60,12 @@ dpt_cfg = DPTCfgParams(
 
 
 # Verify precision orbit estimation for different methods
-@pytest.mark.skipif(COPERNICUS_USR == "TODO", reason="Copernicus username missing")
-@pytest.mark.skipif(COPERNICUS_PWD == "TODO", reason="Copernicus password missing")
-@pytest.mark.skipif(not EISCAT_UHF_MEASUREMENT.exists(), reason="Local file is missing")
 @pytest.mark.parametrize(
     "params", [(TargetEstimationMethod.fgmf, gmf_cfg), (TargetEstimationMethod.fdpt, dpt_cfg)]
 )
-def test_verify_analysis_orbit_data(params: tuple[TargetEstimationMethod, CfgParams]):
+def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstimationMethod, CfgParams]):
+
+    COPERNICUS_USR, COPERNICUS_PWD, MEASUREMENT = data_params
 
     method_lib, cfg = params
 
@@ -116,13 +103,13 @@ def test_verify_analysis_orbit_data(params: tuple[TargetEstimationMethod, CfgPar
 
     # Analyse data
     result = target_estimation(
-        data=get_eiscat_data(start_time, end_time),
+        data=MEASUREMENT,
         config=cfg,
         output=Path(tmp_dir.name) / "analysed",
         start_time=start_time,
         end_time=end_time,
         relative_time=False,
-        progress=False,
+        progress=True,
         method_lib=method_lib,
     )
 
@@ -164,9 +151,7 @@ def test_verify_analysis_orbit_data(params: tuple[TargetEstimationMethod, CfgPar
     dv = np.abs(v_rel[inds] - out.v_vec[inds])
     dv_limit = 12
 
-    # For debugging, if True debug plots will be shown
-    debug = False
-    if debug:
+    if plot:
         # --- Plot estimation vs real range/velocity ---
         fix, ax = plt.subplots(2, 2)
 

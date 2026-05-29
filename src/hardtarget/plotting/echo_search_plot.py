@@ -25,55 +25,54 @@ def plot_echo_search(
     limit (optional): limit for confirmed echo, if set data points above limit will be highlighted.
     """
 
+    # TODO Make two way optional
+
     if limit:
-        filter = out_data.max_corr > limit
+        detections = out_data.max_corr > limit
     else:
-        filter = np.zeros(out_data.max_corr.shape, dtype=np.bool)
+        detections = np.zeros(out_data.max_corr.shape, dtype=np.bool)
 
     ipps = np.arange(out_data.max_corr.shape[0])
 
     # Max peak per ipp
     axes[0, 0].plot(ipps, np.abs(out_data.max_corr))
-    axes[0, 0].plot(ipps[filter], np.abs(out_data.max_corr[filter]), "r.")
+    axes[0, 0].plot(ipps[detections], np.abs(out_data.max_corr[detections]), "r.")
 
     axes[0, 0].set_ylabel("Max peak value")
     axes[0, 0].set_xlabel("Ipp")
 
     # total power per ipp
     axes[1, 0].plot(ipps, np.abs(out_data.tot_pow))
-    axes[1, 0].plot(ipps[filter], np.abs(out_data.tot_pow[filter]), "r.")
+    axes[1, 0].plot(ipps[detections], np.abs(out_data.tot_pow[detections]), "r.")
     axes[1, 0].set_ylabel("Ipp power")
     axes[1, 0].set_xlabel("Ipp")
 
     if convert_axis:
         # Range based on max power indicies.
-        range = (
-            (out_data.max_corr_ind * exp.t_samp_usec + exp.t_rx_start_usec)
-            * 1e-6
-            * 0.5
-            * scipy.constants.c
-            * 1e-3
+        t_offset_usec = exp.t_rx_start_usec - exp.t_tx_start_usec
+        obs_range = (
+            (out_data.max_corr_delay * exp.t_samp_usec + t_offset_usec) * 1e-6 * scipy.constants.c * 1e-3
         )
-        axes[0, 1].plot(ipps, range)
-        axes[0, 1].plot(ipps[filter], range[filter], "r.")
+        axes[0, 1].plot(ipps, obs_range)
+        axes[0, 1].plot(ipps[detections], obs_range[detections], "r.")
         axes[0, 1].set_ylabel("Range [km]")
         axes[0, 1].set_xlabel("Ipp")
 
         # Doppler
-        doppler_kms = (out_data.best_doppler / exp.radar_frequency) * scipy.constants.c * 1e-3
+        doppler_kms = (out_data.best_doppler / (exp.radar_frequency * 1e6)) * scipy.constants.c * 1e-3
         axes[1, 1].plot(ipps, doppler_kms)
-        axes[1, 1].plot(ipps[filter], doppler_kms[filter], "r.")
+        axes[1, 1].plot(ipps[detections], doppler_kms[detections], "r.")
         axes[1, 1].set_ylabel("Doppler [km/s]")
         axes[1, 1].set_xlabel("Ipp")
 
     else:
         axes[0, 1].plot(ipps, out_data.max_corr_ind)
-        axes[0, 1].plot(ipps[filter], out_data.max_corr_ind[filter], "r.")
+        axes[0, 1].plot(ipps[detections], out_data.max_corr_ind[detections], "r.")
         axes[0, 1].set_ylabel("Max power indices")
         axes[0, 1].set_xlabel("Ipp")
 
         axes[1, 1].plot(ipps, out_data.best_doppler)
-        axes[1, 1].plot(ipps[filter], out_data.best_doppler[filter], "r.")
+        axes[1, 1].plot(ipps[detections], out_data.best_doppler[detections], "r.")
         axes[1, 1].set_ylabel("Doppler [Hz]")
         axes[1, 1].set_xlabel("Ipp")
 

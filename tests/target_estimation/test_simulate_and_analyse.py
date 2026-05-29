@@ -18,18 +18,18 @@ class TestTargetEstimation:
     """
 
     @pytest.mark.parametrize("mf_impl", [Impl.numpy, Impl.c])
-    def test_dpt(self, mf_impl):
-        self.run_test(TargetEstimationMethod.fdpt, mf_impl)
+    def test_dpt(self, mf_impl, plot):
+        self.run_test(TargetEstimationMethod.fdpt, mf_impl, plot)
 
     @pytest.mark.parametrize("mf_impl", [Impl.numpy, Impl.c])
-    def test_gmf(self, mf_impl):
-        self.run_test(TargetEstimationMethod.fgmf, mf_impl)
+    def test_gmf(self, mf_impl, plot):
+        self.run_test(TargetEstimationMethod.fgmf, mf_impl, plot)
 
     @pytest.mark.cuda
-    def test_gmf_cuda(self):
-        self.run_test(TargetEstimationMethod.fgmf, Impl.cuda)
+    def test_gmf_cuda(self, plot):
+        self.run_test(TargetEstimationMethod.fgmf, Impl.cuda, plot)
 
-    def run_test(self, mf_method, mf_impl):
+    def run_test(self, mf_method, mf_impl, plot):
         """Simulate echoes without noise and analyse the echoes to verify parameters are recovered.
 
         There is a minimum acceleration thats theoretically detectable depending
@@ -44,7 +44,6 @@ class TestTargetEstimation:
 
         mf_impl = mf_impl.name
 
-        debug_test = False
         frequency_decimation = 10
         n_ipp = 10
         tau_ipp = 5
@@ -199,7 +198,7 @@ class TestTargetEstimation:
                 assert_simulated_vs_estimated(da, accel_gate, "delta_a")
 
             # # This is test debugging code
-            if debug_test:
+            if plot:
                 import matplotlib.pyplot as plt
 
                 data_generator = hardtarget.load_analysed_data(tmp_analysis_path)

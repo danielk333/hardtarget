@@ -5,6 +5,8 @@ from typing import Any
 import h5py
 import numpy as np
 
+from hardtarget.constants import MethodAbbreviation
+
 
 def is_scale(obj: h5py.Dataset) -> bool:
     """Dataset is a scalar"""
@@ -55,31 +57,22 @@ def inspect_h5_leaf(
     return path, item
 
 
-def get_analysed_h5_files(mf_folder: str | Path) -> list[Path]:
+def get_analysed_h5_files(path: str | Path) -> list[Path]:
     """
     Collects paths to each file in the directory matching the analysed output naming convention
 
-    ```
-        naming convention: 'yyyy-mm-ddThh-00-00/mf-*.h5'
-    ```
     Args:
-        mf_folder: Directory containing the analyse output.
+        path: Directory containing the analyse output.
 
     Returns:
         List of files matching the output naming convention.
     """
 
-    top = Path(mf_folder)
-    dir_pattern = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}-00-00")
-    file_pattern = re.compile(r"^mf-.*\.h5$")
+    file_pattern = re.compile(rf"(^|,)({'|'.join(abb for abb in MethodAbbreviation)})-.*\.h5$")
 
     files = []
-    if top.is_dir():
-        subdirs = [d for d in top.iterdir() if d.is_dir() and dir_pattern.match(d.name)]
-        if len(subdirs) == 0:
-            files += [f for f in top.iterdir() if f.is_file() and file_pattern.match(f.name)]
-        for subdir in subdirs:
-            files += [f for f in subdir.iterdir() if f.is_file() and file_pattern.match(f.name)]
-    elif file_pattern.match(top.name):
-        files += [top]
+    for _path in [p for p in Path(path).rglob("*.*")]:
+        if re.match(file_pattern, _path.name):
+            files.append(_path)
+
     return files

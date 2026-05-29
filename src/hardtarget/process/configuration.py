@@ -68,7 +68,7 @@ def extract_config_section(
                 default_dict[key] = config.get(section, key).strip("'").strip('"')
     except KeyError:
         if logger:
-            logger.warning(f"No subsection {section} available in config file, default values will be used")
+            logger.debug(f"No subsection {section} available in config file, default values will be used")
 
     return default_dict
 

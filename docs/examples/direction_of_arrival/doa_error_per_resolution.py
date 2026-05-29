@@ -22,8 +22,8 @@ exp_def = mu_exp
 target_location = np.array([0.323, 0.577, 1.0])
 
 
-def trajectory_func(t: npt.NDArray) -> npt.NDArray:
-    return target_location * 210e3
+def trajectory_func(t: npt.NDArray) -> tuple[npt.NDArray, npt.NDArray]:
+    return np.ones((len(t),)) * 210e3, np.repeat(np.atleast_2d(target_location), len(t), axis=0).T
 
 
 res_steps = np.arange(10, 150, 2)

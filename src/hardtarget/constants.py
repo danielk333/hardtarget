@@ -21,6 +21,13 @@ class AnalysisMethod(StrEnum):
     unknown = "unknown"
 
 
+class MethodAbbreviation(StrEnum):
+    target_estimation = "te"
+    optimize = "opt"
+    echo_search = "echo"
+    direction_of_arrival = "doa"
+
+
 class TargetEstimationMethod(StrEnum):
     """Target estimation methods"""
 

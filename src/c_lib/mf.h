@@ -63,21 +63,20 @@ int fdpt(
 );
 
 int xcorr_echo_search(
-    float complex* tx,
-    int tx_len,
-    float complex* rx,
-    int rx_len,
-    int doppler_freq_min,
-    int doppler_freq_max,
-    int doppler_freq_step,
-    int doppler_freq_size,
-    int t_samp_usec,
-    float complex* pows,
-    int* pows_size,
-    float complex* pows_normalized,
-    int* pows_normalized_size,
-    float complex* max_pow_per_doppler,
-    int max_pow_per_doppler_size,
-    int* max_pow_ind,
-    int max_pow_ind_size
+    float complex* tx,                   // 1 input
+    int tx_len,                          // 2 size
+    float complex* rx,                   // 3 input
+    int rx_len,                          // 4 size
+    int* doppler_frequencies,            // 5 input
+    int doppler_frequencies_len,         // 6 size
+    int range_gate_step,                 // 7 input
+    int t_samp_usec,                     // 8 input
+    float complex* pows,                 // 9 output
+    int* pows_size,                      // 10 size
+    float complex* pows_normalized,      // 11 output
+    int* pows_normalized_size,           // 12 size
+    float complex* max_pow_per_doppler,  // 13 output
+    int max_pow_per_doppler_size,        // 14 size
+    int* max_pow_ind,                    // 15 output
+    int max_pow_ind_size                 // 16 size
 );

@@ -25,7 +25,6 @@ class TargetEstimationCfgParams(CfgParams):
         clutter_length: How many samples to remove due to ground clutter
         min_acceleration: Minimum acceleration to search for (m/s^2)
         max_acceleration: Maximum acceleration to search for (m/s^2)
-        optimization: If optimization should be used.
     """
 
     range_gate_sub_resolution: int = 1
@@ -33,7 +32,6 @@ class TargetEstimationCfgParams(CfgParams):
     clutter_length: int = 0
     min_acceleration: float = -200.0
     max_acceleration: float = 200.0
-    optimization: bool = False
 
 
 @dataclass(frozen=True)
@@ -109,4 +107,4 @@ class MFOutArgs(NamedTuple):
     g_vec: npt.NDArray[np.float32]
     pointing_vec: npt.NDArray[np.float32]
     t: npt.NDArray[np.float32]
-    epoch: float
+    epoch_us: float

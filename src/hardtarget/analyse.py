@@ -39,11 +39,13 @@ def analyse(
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
+    sub_directory: Optional[str] = None,
     comm: global_mpi.CommObject = global_mpi.CommMock(),
     **kwargs: Unpack[ArrayKwargs],
 ) -> AnalysedResult:
     """
     Perform matched filter analysis.
+    Hardtarget analysis supports multiprocessing,
 
     Args:
         data: path to measurement file or data loader
@@ -61,6 +63,9 @@ def analyse(
         progress (optional): If a progress bar should be visualized.
         clobber (optional): If previous analysis should be overwritten.
         output (optional): Output directory for the analysed files, if None no files will be saved.
+                           Path will be output/YYYY-MM-DD/HH-00-00
+        sub_directory(optional): Sub directory, stated if there is a need to store data in a specific subfolder in the output path.
+                                 More specifically output/YYYY-MM-DD/HH-00-00/sub_directory/
         **kwargs (optional): Extra data such as Beam and Beam parameters (needed for interferometry)
 
     """
@@ -101,6 +106,7 @@ def analyse(
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
+        sub_directory=sub_directory,
         clobber=clobber,
     )
 
@@ -121,6 +127,7 @@ def target_estimation(
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
+    sub_directory: Optional[str] = None,
     comm: global_mpi.CommObject = global_mpi.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for Target Estimations"""
@@ -140,6 +147,7 @@ def target_estimation(
         progress=progress,
         clobber=clobber,
         output=output,
+        sub_directory=sub_directory,
         comm=comm,
     )
 
@@ -158,6 +166,7 @@ def optimize(
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
+    sub_directory: Optional[str] = None,
     comm: global_mpi.CommObject = global_mpi.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for Target Estimation optimization"""
@@ -177,6 +186,7 @@ def optimize(
         progress=progress,
         clobber=clobber,
         output=output,
+        sub_directory=sub_directory,
         comm=comm,
     )
 
@@ -195,6 +205,7 @@ def echo_search(
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
+    sub_directory: Optional[str] = None,
     comm: global_mpi.CommObject = global_mpi.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for echo search"""
@@ -214,6 +225,7 @@ def echo_search(
         progress=progress,
         clobber=clobber,
         output=output,
+        sub_directory=sub_directory,
         comm=comm,
     )
 
@@ -234,6 +246,7 @@ def direction_of_arrival(
     progress: bool = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
+    sub_directory: Optional[str] = None,
     comm: global_mpi.CommObject = global_mpi.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for Direction of Arrival"""
@@ -253,6 +266,7 @@ def direction_of_arrival(
         progress=progress,
         clobber=clobber,
         output=output,
+        sub_directory=sub_directory,
         beam=array_beam,
         parameters=beam_params,
         comm=comm,

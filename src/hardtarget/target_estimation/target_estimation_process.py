@@ -253,11 +253,10 @@ class TargetEstimationProcess(
         a_vec = pro_params.accelerations[all_vars.a_ind[coh_ints, r_inds]]  # type: ignore[attr-defined]
         g_vec = all_vars.vals[coh_ints, r_inds]
 
-        # TODO: Should we save it in usec instead to keep it consistent
-        epoch_seconds = file_idx_sample * exp_params.t_samp_usec * 1e-6
+        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_params.t_samp_usec)
 
         _t_conv = (cfg_params.n_ipp * exp_params.t_ipp_usec) * 1e-6
-        t = (np.arange(num_cohints) + 1) * _t_conv + epoch_seconds
+        t = (np.arange(num_cohints) + 1) * _t_conv + file_idx_sample * exp_params.t_samp_usec * 1e-6
 
         pointing_vec = np.zeros((num_cohints, 2), dtype=np.float32)
         for i in range(num_cohints):
@@ -283,7 +282,7 @@ class TargetEstimationProcess(
             g_vec=g_vec,
             pointing_vec=pointing_vec,
             t=t,
-            epoch=epoch_seconds,
+            epoch_us=epoch_us,
         )
 
     def define_h5_vars(self, output: MFOutArgs) -> dict[str, DataItem]:
@@ -386,9 +385,9 @@ class TargetEstimationProcess(
                 dims=[(str_dims_num_cohints_per_file, "2")],
                 long_name="Radar pointing data (azimuth, elevation)",
             ),
-            f"{output.epoch=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.epoch,
-                long_name="epoch",  # TODO: better description
+            f"{output.epoch_us=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.epoch_us,
+                long_name="Epoch of the first analysed datapoint in microseconds",
                 scale=True,
             ),
         }

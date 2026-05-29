@@ -12,6 +12,7 @@ from hardtarget.types import ExpDef
 from .utils import correlation_matrix
 
 
+@np.errstate(all="raise")
 def landscape_function(
     k: npt.NDArray, eig_vec: npt.NDArray, beam: Array, beam_params: ArrayParams
 ) -> npt.NDArray[np.complex64] | np.complex64:
@@ -23,16 +24,23 @@ def landscape_function(
     Returns:
         Scalar value or (N,) array
     """
-
     if k.ndim > 1:
         res = np.zeros((k.shape[1],), dtype=np.complex64)
         a = beam.channel_signals(k, beam_params)
         for i in range(k.shape[1]):
-            res[i] = (a[:, i].conj().T @ a[:, i]) / (a[:, i].conj().T @ eig_vec @ eig_vec.conj().T @ a[:, i])
+            try:
+                res[i] = (a[:, i].conj().T @ a[:, i]) / (
+                    a[:, i].conj().T @ eig_vec @ eig_vec.conj().T @ a[:, i]
+                )
+            except FloatingPointError:
+                res[i] = 0
         return res
     else:
         a = beam.channel_signals(k, beam_params)
-        return (a.conj().T @ a) / (a.conj().T @ eig_vec @ eig_vec.conj().T @ a)
+        try:
+            return (a.conj().T @ a) / (a.conj().T @ eig_vec @ eig_vec.conj().T @ a)
+        except FloatingPointError:
+            return np.complex64(0)
 
 
 def grid_search_numpy(

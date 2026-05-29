@@ -41,7 +41,7 @@ def time_interval_to_sample_bound(
                 start_us = np.datetime64(start_time, "us").astype("datetime64[us]").astype("int64")
 
             assert start_us >= time_bounds.start, (
-                f"Start time: {start_us * 1e-6} is before measurement start: {time_bounds.start * 1e-6}"
+                f"Start time: {str_from_ts(start_us * 1e-6)} is before measurement start: {str_from_ts(time_bounds.start * 1e-6)}"
             )
             start_sample = int((start_us - time_bounds.start) * 1e-6 * sample_rate)
     else:
@@ -60,7 +60,7 @@ def time_interval_to_sample_bound(
                 end_us = np.datetime64(end_time, "us").astype("datetime64[us]").astype("int64")
 
             assert end_us <= time_bounds.end, (
-                f"End time: {end_us * 1e-6}s is before measurement start: {time_bounds.end * 1e-6}s"
+                f"End time: {str_from_ts(end_us * 1e-6)} s is after measurement end: {str_from_ts(time_bounds.end * 1e-6)}s"
             )
             end_sample = int((end_us - time_bounds.start) * 1e-6 * sample_rate)
     else:

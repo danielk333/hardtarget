@@ -83,7 +83,15 @@ test = [
     "pytest-dependency",
     "mpi-pytest",
 ]
-all = ["mpi4py >= 3.1.1", "matplotlib >= 3.3.4", "yappi >= 1.4.0"]
+all = [
+    "hardtarget[develop]",
+    "hardtarget[documentation]",
+    "hardtarget[mpi]",
+    "hardtarget[type_checker]",
+    "hardtarget[plotting]",
+    "hardtarget[profiling]",
+    "hardtarget[test]",
+]
 
 [tool.setuptools]
 include-package-data = true

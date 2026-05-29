@@ -24,7 +24,7 @@ class TrajectoryFunction(Protocol):
     def __call__(
         self,
         t: npt.NDArray,
-    ) -> npt.NDArray: ...
+    ) -> tuple[npt.NDArray, npt.NDArray]: ...
 
     """Trajectory function
 
@@ -32,7 +32,8 @@ class TrajectoryFunction(Protocol):
         t: timepoints in seconds
 
     Returns:
-        Trajectory as a (3,N timepoints) numpy array
+        Two way range (len(t),) and Trajectory as a (3,len(t)) numpy array
+
     """
 
 
