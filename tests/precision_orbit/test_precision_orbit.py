@@ -5,6 +5,7 @@ position and hardtargets range and velocity estimation from the eiscat uhf (Trom
 The object is noticed in the EISCAT_leo_mpark_2.1u_EI@uhf_20240704_100019_278878.hdf5 at 24-07-04T10:21:16
 """
 
+import argparse
 import datetime as dt
 import tempfile
 from pathlib import Path
@@ -23,6 +24,7 @@ from hardtarget.target_estimation.dpt.types import DPTCfgParams
 from hardtarget.target_estimation.gmf.types import GMFCfgParams
 from hardtarget.target_estimation.types import MFOutArgs
 from hardtarget.types import CfgParams, ExpDef, ProParams
+from hardtarget.utils import global_mpi
 
 from .utils import cdse
 from .utils.dt_standard import str_to_dt
@@ -65,12 +67,15 @@ dpt_cfg = DPTCfgParams(
 )
 def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstimationMethod, CfgParams]):
 
-    COPERNICUS_USR, COPERNICUS_PWD, MEASUREMENT = data_params
+    COPERNICUS_USR, COPERNICUS_PWD, MEASUREMENT, ORBIT = data_params
 
     method_lib, cfg = params
 
-    # Temp dir to store precision orbit data
+    # Temp or given dir to store precision orbit data
     tmp_dir = tempfile.TemporaryDirectory()
+    orb_dir = Path(ORBIT) if ORBIT else Path(tmp_dir.name)
+    # relies on knowing filename from `cdse.download_orbit_data`
+    orb_file = orb_dir / "data.eof"
 
     # Time object is noticed in eiscat data
     start_time = str_to_dt("2024-07-04T10:21:15.500")
@@ -78,14 +83,16 @@ def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstim
 
     # get precision orbit data to interpolate
     data_id = cdse.get_orbit_data_id(start_time, end_time)
-    access_token = cdse.generate_token(COPERNICUS_USR, COPERNICUS_PWD)
-    orbit_data_path = cdse.download_orbit_data(
-        data_id=data_id,
-        access_token=access_token,
-        output_dir=Path(tmp_dir.name) / "orbit_data",
-    )
+    if not orb_file.exists():
+        access_token = cdse.generate_token(COPERNICUS_USR, COPERNICUS_PWD)
+        cdse.download_orbit_data(
+            data_id=data_id,
+            access_token=access_token,
+            output_dir=orb_dir,
+        )
+
     orbit_data = cdse.extract_eof_data_block(
-        orbit_data_path, start_time - dt.timedelta(hours=1), end_time + dt.timedelta(hours=1)
+        orb_file, start_time - dt.timedelta(hours=1), end_time + dt.timedelta(hours=1)
     )
     t, pos = zip(*orbit_data)
 
@@ -111,6 +118,7 @@ def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstim
         relative_time=False,
         progress=True,
         method_lib=method_lib,
+        comm=global_mpi.get_mpi(),
     )
 
     assert result["dir"] is not None
@@ -262,6 +270,7 @@ def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstim
             ls="none",
             label="Positions detected",
         )
+        fig.suptitle(f"{method_lib=} vs SENTINEL-2B high precision orbit data")
 
         plt.show()
 
@@ -303,3 +312,23 @@ def generate_measurements_alt(ecefs, rx_ecef, tx_ecef):
     return r_sim, v_sim
 
     return r_sim, v_sim
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="dev function for algorithms")
+    parser.add_argument("--plot", action="store_true")
+    parser.add_argument("--usr")
+    parser.add_argument("--pwd")
+    parser.add_argument("--orbit-path")
+    parser.add_argument("--radar-path")
+    args = parser.parse_args()
+    test_verify_analysis_orbit_data(
+        args.plot,
+        (
+            args.usr,
+            args.pwd,
+            args.radar_path,
+            args.orbit_path,
+        ),
+        (TargetEstimationMethod.fgmf, gmf_cfg),
+    )
