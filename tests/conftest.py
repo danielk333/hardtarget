@@ -5,6 +5,7 @@ def pytest_addoption(parser):
     parser.addoption("--plot", action="store_true")
     parser.addoption("--usr", action="store", help="CDSE Username")
     parser.addoption("--pwd", action="store", help="CDSE Password")
+    parser.addoption("--impl", action="store", default="numpy", help="analysis implementation")
     parser.addoption(
         "--orbit-path",
         action="store",
@@ -34,6 +35,7 @@ def data_params(request):
     password = request.config.getoption("--pwd")
     measurement = request.config.getoption("--radar-path")
     orbit = request.config.getoption("--orbit-path")
+    impl = request.config.getoption("--impl")
 
     if ((username and password) or orbit) and measurement:
         return (
@@ -41,6 +43,7 @@ def data_params(request):
             password,
             measurement,
             orbit,
+            impl,
         )
     else:
         pytest.skip(reason="Missing CDSE Data or Username/Password or Eiscat measurement path")

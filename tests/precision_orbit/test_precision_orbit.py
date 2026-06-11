@@ -19,7 +19,7 @@ from radardef.types import BeamType, EiscatUHFLocation
 from spacecoords import interpolation, linalg, spherical
 
 from hardtarget import load_analysed_data, target_estimation
-from hardtarget.constants import TargetEstimationMethod
+from hardtarget.constants import TargetEstimationMethod, Impl
 from hardtarget.target_estimation.dpt.types import DPTCfgParams
 from hardtarget.target_estimation.gmf.types import GMFCfgParams
 from hardtarget.target_estimation.types import MFOutArgs
@@ -65,9 +65,13 @@ dpt_cfg = DPTCfgParams(
 @pytest.mark.parametrize(
     "params", [(TargetEstimationMethod.fgmf, gmf_cfg), (TargetEstimationMethod.fdpt, dpt_cfg)]
 )
-def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstimationMethod, CfgParams]):
+def test_verify_analysis_orbit_data(
+    plot,
+    data_params,
+    params: tuple[TargetEstimationMethod, CfgParams],
+):
 
-    COPERNICUS_USR, COPERNICUS_PWD, MEASUREMENT, ORBIT = data_params
+    COPERNICUS_USR, COPERNICUS_PWD, MEASUREMENT, ORBIT, IMPL = data_params
 
     method_lib, cfg = params
 
@@ -76,6 +80,7 @@ def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstim
     orb_dir = Path(ORBIT) if ORBIT else Path(tmp_dir.name)
     # relies on knowing filename from `cdse.download_orbit_data`
     orb_file = orb_dir / "data.eof"
+    output_dir = Path(tmp_dir.name) / "analysed"
 
     # Time object is noticed in eiscat data
     start_time = str_to_dt("2024-07-04T10:21:15.500")
@@ -109,23 +114,28 @@ def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstim
     radar_station = radardef.EiscatUHF(location=EiscatUHFLocation.TROMSO, beam_type=BeamType.CASSEGRAIN)
 
     # Analyse data
+    comm = global_mpi.get_mpi()
     result = target_estimation(
         data=MEASUREMENT,
         config=cfg,
-        output=Path(tmp_dir.name) / "analysed",
+        output=output_dir,
         start_time=start_time,
         end_time=end_time,
         relative_time=False,
         progress=True,
         method_lib=method_lib,
-        comm=global_mpi.get_mpi(),
+        implementation=IMPL,
+        comm=comm,
     )
+    comm.barrier()
+    if comm.rank != 0:
+        return
 
     assert result["dir"] is not None
 
     # Load results
     load_ret: tuple[MFOutArgs, ExpDef, GMFCfgParams, ProParams]
-    load_ret = list(load_analysed_data(result["dir"]))[0]
+    load_ret = list(load_analysed_data(output_dir))[0]
     out, exp, cfg, pro = load_ret
 
     # Get satellite position over the analysed interval
@@ -321,6 +331,7 @@ if __name__ == "__main__":
     parser.add_argument("--pwd")
     parser.add_argument("--orbit-path")
     parser.add_argument("--radar-path")
+    parser.add_argument("--impl", default="numpy")
     args = parser.parse_args()
     test_verify_analysis_orbit_data(
         args.plot,
@@ -329,6 +340,7 @@ if __name__ == "__main__":
             args.pwd,
             args.radar_path,
             args.orbit_path,
+            args.impl,
         ),
         (TargetEstimationMethod.fgmf, gmf_cfg),
     )
