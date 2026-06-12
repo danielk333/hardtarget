@@ -30,6 +30,21 @@ from .utils import cdse
 from .utils.dt_standard import str_to_dt
 
 # Process specific configurations
+# gmf_cfg = GMFCfgParams(
+#     n_ipp=5,
+#     ipp_offset=0,
+#     samp_offset=3,
+#     min_range_gate=4000,
+#     max_range_gate=8000,
+#     min_acceleration=-100,
+#     max_acceleration=100,
+#     range_gate_step=1,
+#     frequency_decimation=1,
+#     range_gate_sub_resolution=10,
+#     num_cohints_per_file=10,
+#     node_gpus=1,
+#     acceleration_steps=20,
+# )
 gmf_cfg = GMFCfgParams(
     n_ipp=1,
     ipp_offset=0,
@@ -39,8 +54,9 @@ gmf_cfg = GMFCfgParams(
     min_acceleration=0,
     max_acceleration=0,
     range_gate_step=1,
+    range_gate_sub_resolution=10,
     frequency_decimation=1,
-    num_cohints_per_file=10,
+    num_cohints_per_file=2,
     node_gpus=1,
     acceleration_steps=1,
 )
@@ -84,7 +100,10 @@ def test_verify_analysis_orbit_data(
 
     # Time object is noticed in eiscat data
     start_time = str_to_dt("2024-07-04T10:21:15.500")
-    end_time = str_to_dt("2024-07-04T10:21:20.020")
+    start_time = str_to_dt("2024-07-04T10:21:17.500")
+    end_time = str_to_dt("2024-07-04T10:21:20.000")
+    # start_time = str_to_dt("2024-07-04T10:21:19.400")
+    # end_time = str_to_dt("2024-07-04T10:21:19.900")
 
     # get precision orbit data to interpolate
     data_id = cdse.get_orbit_data_id(start_time, end_time)
@@ -216,17 +235,23 @@ def test_verify_analysis_orbit_data(
 
         # --- Satellite orbit vs radar position ---
 
-        #  Orbit vs position TODO: radar pointing in wrong direction in plot
-        pointing_cart = spherical.sph_to_cart(
+        #  Orbit vs position
+        pointing_k = spherical.sph_to_cart(
             np.array([out.pointing_vec[0, 0], out.pointing_vec[0, 1], 1]),
             degrees=True,
-        ).round(decimals=8)
+        )
+        current_param = radar_station.beam_parameters.copy()
+        current_param.pointing = pointing_k
+
+        pointing_cart = pointing_k.copy().round(decimals=8)
         satellite_cart = satellite_enu[:3, :] / np.linalg.norm(satellite_enu[:3, :], axis=0)
         off_axis_angle = linalg.vector_angle(
             satellite_cart,
             pointing_cart,
             degrees=True,
         )
+        gains = radar_station.beam.gain(satellite_cart, current_param)
+        gainsdb = 10.0 * np.log10(gains)
 
         pointing_cart *= 4000e3
         fig = plt.figure(figsize=plt.figaspect(0.5))
@@ -263,14 +288,43 @@ def test_verify_analysis_orbit_data(
 
         # off-axis angle plot
         ax = fig.add_subplot(2, 2, 3)
-        ax.plot(t_analysed, off_axis_angle, color="g", label="Satelite angle from radar pointing")
+        
+        ax2 = ax.twinx()
+        ax2.tick_params(axis='y', labelcolor='g')
+        ax2.plot(t_analysed, off_axis_angle, color="g", label="Satelite angle from radar pointing")
+        ax2.set_ylabel("Off-axis angle [deg]")
+        ax.plot(
+            t_analysed[inds],
+            snrdb[inds] / np.nanmax(snrdb[inds]),
+            marker=".",
+            ls="none",
+            color="r",
+            label="Normalized Estimated SNR",
+        )
+        ax.plot(
+            t_analysed,
+            gainsdb / np.nanmax(gainsdb),
+            marker=".",
+            ls="none",
+            color="b",
+            label="Normalized Gain (from POD)",
+        )
         ax.set_xlabel("Time [s]")
-        ax.set_ylabel("Off-axis angle [deg]")
-        ax.legend()
+        ax.set_ylabel("Gain and SNR [1]")
+        
+        lines, labels = ax.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax.legend(lines + lines2, labels + labels2)
 
         # Gain heatmap vs satellite position
         ax = fig.add_subplot(2, 2, 4)
-        gain_heatmap(radar_station.beam, radar_station.beam_parameters, ax=ax, min_elevation=87.0)
+        gain_heatmap(
+            radar_station.beam,
+            current_param,
+            ax=ax,
+            min_elevation=87.0,
+            cmap=plt.get_cmap("bone"),
+        )
         ax.plot(satellite_cart[0, :], satellite_cart[1, :], label="satellite path over gain")
         ax.plot(
             satellite_cart[0, inds],
@@ -280,6 +334,7 @@ def test_verify_analysis_orbit_data(
             ls="none",
             label="Positions detected",
         )
+
         fig.suptitle(f"{method_lib=} vs SENTINEL-2B high precision orbit data")
 
         plt.show()
