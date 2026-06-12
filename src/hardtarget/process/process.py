@@ -20,7 +20,7 @@ from radardef.types import Pointing
 import hardtarget.process.utils as utils
 from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl, MethodLib
 from hardtarget.data_handling import dump_params_to_file
-from hardtarget.data_simulation.tx_model import tx_signal_model
+from hardtarget.data_simulation.tx_model import tx_signal_model, tx_modulation_model
 from hardtarget.process.configuration import (
     compute_process_params,
     extract_config_from_dict,
@@ -618,6 +618,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             assert self.exp_def.code is not None, (
                 "No code available from the metadata, not possible to simulate tx"
             )
+            # TODO: this should probably be configurable in the future
             tx = tx_signal_model(
                 code=self.exp_def.code,
                 baud_length_usec=self.exp_def.baud_length_usec,
@@ -631,10 +632,20 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             )
         elif self._tx_channel == self._rx_channels:
             tx = ipp.copy()
-            tx = np.broadcast_to(tx.reshape((tx.size, 1)), (tx.size, sub_resolution))
+            tx = tx_modulation_model(
+                tx_signal=tx,
+                sub_resolution=sub_resolution,
+                tx_stencil=self.pro_params.tx_stencil,
+            )
         else:
+            # TODO: is it possible to have the sub-resolutions already calculated in the data but as
+            # different channels? maybe - could be a future modification
             tx = self.data.read(self._tx_channel, start_sample, read_length)
-            tx = np.broadcast_to(tx.reshape((tx.size, 1)), (tx.size, sub_resolution))
+            tx = tx_modulation_model(
+                tx_signal=tx,
+                sub_resolution=sub_resolution,
+                tx_stencil=self.pro_params.tx_stencil,
+            )
 
         tx = tx[self.pro_params.tx_stencil, :]
 

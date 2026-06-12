@@ -6,6 +6,31 @@ import numpy as np
 import numpy.typing as npt
 import scipy.interpolate as interpolate
 
+def tx_modulation_model(
+    tx_signal: npt.NDArray[np.complex128],
+    tx_stencil: npt.NDArray[np.bool],
+    sub_resolution: int = 1,
+    kind: str = "linear",
+) -> npt.NDArray[np.complex128]:
+    modulated_tx = np.empty((tx_signal.size, sub_resolution), dtype=tx_signal.dtype)
+
+    # Create interpolator for signal
+    sample = np.arange(tx_signal.size)
+    fun = interpolate.interp1d(
+        sample[tx_stencil],
+        tx_signal[tx_stencil],
+        kind=kind,
+        bounds_error=False,
+        fill_value=0,
+    )
+
+    # Signal value of tx sub resolutions
+    offsets = np.linspace(0, 1, sub_resolution, endpoint=False)
+    for ind in range(sub_resolution):
+        modulated_tx[tx_stencil, ind] = fun(sample[tx_stencil] - offsets[ind])
+
+    return modulated_tx
+
 
 def tx_signal_model(
     code: npt.NDArray[np.float64],
