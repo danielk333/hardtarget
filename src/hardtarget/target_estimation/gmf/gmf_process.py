@@ -100,11 +100,13 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
 
         # conjugate, so that when matched filtering, it will cancel out phase of transmit waveform.
         # scale transmit waveform to unity power
-        tx_pwr = np.sum(np.abs(tx) ** 2.0)
+        # NOTE: we are doing this per TX signal if there is sub-resolution, it is assumed shape is
+        # (N, sub-resolution)
+        tx_pwr = np.sum(np.abs(tx) ** 2.0, axis=0)
         tx_amp = np.sqrt(tx_pwr)
-        tx = np.conj(tx) / tx_amp
+        tx = np.conj(tx) / tx_amp[None, :]
 
-        if tx_amp > self.cfg_params.tx_amp_limit:
+        if np.any(tx_amp > self.cfg_params.tx_amp_limit):
             kwargs = {}
             if self.pro_params.implementation == Impl.cuda:
                 kwargs["gpu_id"] = 1 % self.cfg_params.node_gpus  # TODO:1 should be job.idx
