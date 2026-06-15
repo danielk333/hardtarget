@@ -28,6 +28,7 @@ class TargetEstimationCfgParams(CfgParams):
     """
 
     range_gate_sub_resolution: int = 1
+    fft_sub_resolution: int = 1
     frequency_decimation: int = 1
     clutter_length: int = 0
     min_acceleration: float = -200.0

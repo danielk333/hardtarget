@@ -57,6 +57,7 @@ gmf_cfg = GMFCfgParams(
     range_gate_step=1,
     range_gate_sub_resolution=10,
     frequency_decimation=1,
+    fft_sub_resolution=10,
     num_cohints_per_file=2,
     node_gpus=1,
     acceleration_steps=1,

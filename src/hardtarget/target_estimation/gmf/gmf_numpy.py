@@ -53,10 +53,18 @@ def fast_gmf_np(
                 ft2 = np.abs(fft.fft(dec_signal)) ** 2
                 mi = np.argmax(ft2)
 
-                if ft2[mi] > vals[index]:
-                    vals[index] = ft2[mi]
+                # TODO: super resolution doppler here
+                nums = np.arange(len(dec_signal))
+                freqs = fft.fftfreq(len(dec_signal))
+                omega = 2 * np.pi * np.linspace(freqs[mi], freqs[mi + 1], cfg_params.fft_sub_resolution)
+                dtft = np.abs(np.exp(-1j * np.outer(omega, nums)) @ dec_signal) ** 2
+
+                dtft_ind = np.argmax(dtft)
+
+                if dtft[dtft_ind] > vals[index]:
+                    vals[index] = dtft[dtft_ind]
                     # index of doppler that gives highest integrated energy at this range gate
-                    v_ind[index] = mi
+                    v_ind[index] = mi * cfg_params.fft_sub_resolution + dtft_ind
                     # index of acceleration that gives highest integrated energy at this range gate
                     a_ind[index] = pro_params.inds_accelerations[ai]
 
