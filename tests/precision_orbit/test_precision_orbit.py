@@ -10,6 +10,7 @@ import datetime as dt
 import tempfile
 from pathlib import Path
 
+import scipy.constants
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -167,6 +168,16 @@ def test_verify_analysis_orbit_data(
     satellite_enu = radar_station.enu(satellite_orbit)
 
     # Calculate range and velocity relative to the radar station
+    r_rel, v_rel = generate_measurements(
+        satellite_orbit,
+        satellite_enu,
+        satellite_enu,
+    )
+
+    # Redo with correct scattering time, TODO: verify this is the correct approach
+    time_correction = 0.5 * r_rel / scipy.constants.c
+    satellite_orbit = interpolated_satellite_pos.get_state(t_analysed + time_correction)
+    satellite_enu = radar_station.enu(satellite_orbit)
     r_rel, v_rel = generate_measurements(
         satellite_orbit,
         satellite_enu,
