@@ -5,10 +5,14 @@ Tx signal models, used to simulate tx signals when not available.
 import numpy as np
 import numpy.typing as npt
 import scipy.interpolate as interpolate
+import scipy.signal as sc_signal
 
 def tx_modulation_model(
     tx_signal: npt.NDArray[np.complex128],
     tx_stencil: npt.NDArray[np.bool],
+    out_sample_rate: int,
+    in_sample_rate: int,
+    frequency_cutoff: float,
     sub_resolution: int = 1,
     kind: str = "linear",
 ) -> npt.NDArray[np.complex128]:
@@ -24,10 +28,18 @@ def tx_modulation_model(
         fill_value=0,
     )
 
+    super_rate = int(in_sample_rate / out_sample_rate)
+    super_sample = np.arange(tx_signal.size * super_rate) / super_rate
+
     # Signal value of tx sub resolutions
     offsets = np.linspace(0, 1, sub_resolution, endpoint=False)
     for ind in range(sub_resolution):
-        modulated_tx[tx_stencil, ind] = fun(sample[tx_stencil] - offsets[ind])
+        x = fun(super_sample - offsets[ind])
+        numtaps = super_rate + 1
+        # TODO: which filter is maybe input variable?
+        fir = sc_signal.firwin(numtaps, frequency_cutoff, fs=in_sample_rate)
+        x_filt = sc_signal.lfilter(fir, 1.0, x)
+        modulated_tx[tx_stencil, ind] = x_filt[::super_rate][tx_stencil]
 
     return modulated_tx
 

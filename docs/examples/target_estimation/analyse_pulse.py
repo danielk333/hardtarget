@@ -7,6 +7,8 @@ from pathlib import Path
 
 from scipy import constants
 import scipy.interpolate as interpolate
+import scipy.signal
+from scipy.fft import fft, fftfreq
 import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import tqdm
@@ -14,6 +16,7 @@ from tqdm import tqdm
 from hardtarget.target_estimation.gmf.types import GMFCfgParams
 from hardtarget import plotting
 from hardtarget.plotting.raw_data_plots import extract_requested_range_gates
+from hardtarget.data_simulation.tx_model import tx_signal_model
 from hardtarget.types import Bounds
 from hardtarget.process.utils import sample_interval_to_closest_ipp
 from radardef.types import BeamType, EiscatUHFLocation
@@ -223,7 +226,10 @@ pos = np.asarray(pos, dtype=np.float64).T
 interpolated_satellite_pos = interpolation.Legendre8(states=pos, t=t)
 
 # Measurement source station
-radar_station = radardef.EiscatUHF(location=EiscatUHFLocation.TROMSO, beam_type=BeamType.CASSEGRAIN)
+radar_station = radardef.EiscatUHF(
+    location=EiscatUHFLocation.TROMSO,
+    beam_type=BeamType.CASSEGRAIN,
+)
 
 reader = radar_station.load_data(args.data_file)
 assert reader is not None
@@ -310,14 +316,23 @@ r_rel, v_rel = generate_measurements(
     satellite_enu,
     satellite_enu,
 )
+time_correction = 0.5 * r_rel / scipy.constants.c
+satellite_orbit = interpolated_satellite_pos.get_state(t_analysed + time_correction)
+satellite_enu = radar_station.enu(satellite_orbit)
+r_rel, v_rel = generate_measurements(
+    satellite_orbit,
+    satellite_enu,
+    satellite_enu,
+)
 
 ipp_index = 13
+# ipp_index = 1
 
 print(r_rel[ipp_index], v_rel[ipp_index])
 r_true, v_true = r_rel[ipp_index], v_rel[ipp_index]
 
 signal = data_ipp_vec_full[:, ipp_index]
-exp_params = reader.experiment
+exp_params = reader.experiment.copy(radar_frequency = 921.0)
 
 
 def usec_to_samp(usec: int | float) -> int:
@@ -345,19 +360,22 @@ tx = signal[tx_start_samp:tx_end_samp]
 # for some reason these are 1 off??
 print(il0_rg0, il0_rg1, il0_min_range_gate, il0_max_range_gate)
 
-doppler = v_true * radar_station.frequency / constants.c
+doppler = v_true * (exp_params.radar_frequency * 1e6) / constants.c
 ture_dop_phasor = np.exp(-2j * np.pi * doppler * rx_inds / exp_params.sample_rate)
 sub_resolution = 10
 
-base_range_gates = np.arange(cfg.min_range_gate, cfg.max_range_gate - len(tx), 1) + 1
+base_range_gates = np.arange(cfg.min_range_gate, cfg.max_range_gate - len(tx), 1)
 base_r_tests = base_range_gates * constants.c / exp_params.sample_rate
 
-range_gates = np.arange(cfg.min_range_gate, cfg.max_range_gate - len(tx), 1.0 / sub_resolution) + 1
+range_gates = np.arange(cfg.min_range_gate, cfg.max_range_gate - len(tx), 1.0 / sub_resolution)
 r_tests = range_gates * constants.c / exp_params.sample_rate
 
 dop_tests = np.linspace(0.8, 1.2, 100) * doppler
-vel_tests = dop_tests * constants.c / radar_station.frequency
+vel_tests = dop_tests * constants.c / (exp_params.radar_frequency * 1e6)
 sample = np.arange(tx.size)
+orig_sample_rate = 100e6
+super_rate = int(orig_sample_rate / exp_params.sample_rate)
+super_sample = np.arange(tx.size * super_rate) / super_rate
 modulated_tx = np.empty((tx.size, sub_resolution), dtype=tx.dtype)
 fun = interpolate.interp1d(
     sample,
@@ -367,7 +385,18 @@ fun = interpolate.interp1d(
 )
 offsets = np.linspace(0, 1, sub_resolution, endpoint=False)
 for ind in range(sub_resolution):
-    modulated_tx[:, ind] = fun(sample - offsets[ind])
+    x = fun(super_sample - offsets[ind])
+    cutoff = 2e6
+    numtaps = super_rate + 1
+    fir = scipy.signal.firwin(numtaps, cutoff, fs=orig_sample_rate)
+    x_filt = scipy.signal.lfilter(fir, 1.0, x)
+    modulated_tx[:, ind] = x_filt[::super_rate]
+
+# fig, ax = plt.subplots()
+# for ind in range(sub_resolution):
+#     ax.plot(np.real(modulated_tx[:, ind]), label=f"{ind}")
+# ax.legend()
+# plt.show()
 
 samp_r_true = exp_params.sample_rate * r_true / constants.c + tx_start_samp
 
@@ -389,35 +418,68 @@ pbar.close()
 row, col = np.unravel_index(np.argmax(corrs), corrs.shape)
 ri_sol = int(col // sub_resolution)
 
+rg_true = r_true / constants.c * exp_params.sample_rate
+
 fig, axes = plt.subplots(2, 1)
 axes[0].plot(range_gates, corrs[row, :], "-x")
-for ri in [ri_sol - 1, ri_sol, ri_sol + 1]:
+rs = []
+cs = []
+for ri in np.arange(ri_sol - 1, ri_sol + 1):
     z = rx[ri : (ri + len(tx))]
     for rii in range(sub_resolution):
         dop_phasor = np.exp(-2j * np.pi * dop_tests[row] * np.arange(len(tx)) / exp_params.sample_rate)
-        r = range_gates[ri * sub_resolution + rii]
-        axes[1].plot(z * dop_phasor * np.conj(modulated_tx[:, rii]), label=f"{r=}")
-axes[1].legend()
+        rs.append(range_gates[ri * sub_resolution + rii])
+        cs.append(np.sum(np.abs(z * dop_phasor * np.conj(modulated_tx[:, rii]))))
+axes[1].plot(rs, cs)
+axes[0].axvline(rg_true, c="r")
+axes[1].axvline(rg_true, c="r")
 
 ri = int(col // sub_resolution)
 rii = int(col - ri * sub_resolution)
 z = rx[ri : (ri + len(tx))]
 dop_phasor = np.exp(-2j * np.pi * dop_tests[row] * np.arange(len(tx)) / exp_params.sample_rate)
+tx_sel = modulated_tx[:, rii]
 
-fig, axes = plt.subplots(3, 1)
-axes[0].plot(np.real(tx / np.max(np.abs(tx))), ls="--", c="b")
-axes[0].plot(np.imag(tx / np.max(np.abs(tx))), ls="--", c="r")
+
+z_comp = z * dop_phasor
+decode = z * dop_phasor * np.conj(modulated_tx[:, rii])
+z_dop = z * np.conj(modulated_tx[:, rii])
+pad_num = 10_000
+
+freqs = np.fft.fftshift(fftfreq(z.size + pad_num * 2, 1.0 / exp_params.sample_rate))
+powspec_z = np.abs(np.fft.fftshift(fft(np.pad(z, (pad_num, pad_num), "constant"))))
+powspec_cz = np.abs(np.fft.fftshift(fft(np.pad(z_comp, (pad_num, pad_num), "constant"))))
+powspec_zp = np.abs(np.fft.fftshift(fft(np.pad(z_dop, (pad_num, pad_num), "constant"))))
+powspec_dz = np.abs(np.fft.fftshift(fft(np.pad(decode, (pad_num, pad_num), "constant"))))
+
+
+# fig, axes = plt.subplots(3, 1)
+# axes[0].plot(freqs, np.log10(powspec_z))
+# axes[1].plot(freqs, np.log10(powspec_cz))
+# axes[2].plot(freqs, np.log10(powspec_dz))
+
+fig, axes = plt.subplots(4, 1, sharex=True)
+axes[0].plot(freqs, powspec_z)
+axes[1].plot(freqs, powspec_cz)
+axes[2].plot(freqs, powspec_zp)
+axes[2].axvline(doppler, c="r")
+axes[3].plot(freqs, powspec_dz)
+axes[3].set_xlim(-1.5 * doppler, 1.5 * doppler)
+
+
+fig, axes = plt.subplots(4, 1)
+axes[0].plot(np.real(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="b")
+axes[0].plot(np.imag(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="r")
 axes[0].plot(np.real(z / np.max(np.abs(z))), c="b")
 axes[0].plot(np.imag(z / np.max(np.abs(z))), c="r")
-axes[1].plot(np.real(tx / np.max(np.abs(tx))), ls="--", c="b")
-axes[1].plot(np.imag(tx / np.max(np.abs(tx))), ls="--", c="r")
-z_comp = z * dop_phasor
+axes[1].plot(np.real(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="b")
+axes[1].plot(np.imag(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="r")
 axes[1].plot(np.real(z_comp / np.max(np.abs(z_comp))), c="b")
 axes[1].plot(np.imag(z_comp / np.max(np.abs(z_comp))), c="r")
-
-decode = z * dop_phasor * np.conj(modulated_tx[:, rii])
-axes[2].plot(np.real(decode / np.max(np.abs(decode))), c="b")
-axes[2].plot(np.imag(decode / np.max(np.abs(decode))), c="r")
+axes[2].plot(np.real(z_dop / np.max(np.abs(z_dop))), c="b")
+axes[2].plot(np.imag(z_dop / np.max(np.abs(z_dop))), c="r")
+axes[3].plot(np.real(decode / np.max(np.abs(decode))), c="b")
+axes[3].plot(np.imag(decode / np.max(np.abs(decode))), c="r")
 
 
 r_est = rm[row, col]

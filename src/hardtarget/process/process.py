@@ -613,6 +613,9 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             else:
                 rx = ipp[self.pro_params.rx_stencil]
 
+        # TODO: this should be found out from documentation
+        orig_sample_rate = 100e6
+        cutoff = 2e6
         # Extracting tx data
         if not self._tx_channel:
             assert self.exp_def.code is not None, (
@@ -634,8 +637,11 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             tx = ipp.copy()
             tx = tx_modulation_model(
                 tx_signal=tx,
-                sub_resolution=sub_resolution,
                 tx_stencil=self.pro_params.tx_stencil,
+                out_sample_rate=self.exp_params.sample_rate,
+                in_sample_rate=orig_sample_rate,
+                frequency_cutoff=cutoff,
+                sub_resolution=sub_resolution,
             )
         else:
             # TODO: is it possible to have the sub-resolutions already calculated in the data but as
@@ -643,8 +649,11 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             tx = self.data.read(self._tx_channel, start_sample, read_length)
             tx = tx_modulation_model(
                 tx_signal=tx,
-                sub_resolution=sub_resolution,
                 tx_stencil=self.pro_params.tx_stencil,
+                out_sample_rate=self.exp_params.sample_rate,
+                in_sample_rate=orig_sample_rate,
+                frequency_cutoff=cutoff,
+                sub_resolution=sub_resolution,
             )
 
         tx = tx[self.pro_params.tx_stencil, :]

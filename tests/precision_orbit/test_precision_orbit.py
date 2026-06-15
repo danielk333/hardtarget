@@ -50,8 +50,8 @@ gmf_cfg = GMFCfgParams(
     n_ipp=1,
     ipp_offset=0,
     samp_offset=3,
-    min_range_gate=4000,
-    max_range_gate=8000,
+    min_range_gate=5500,
+    max_range_gate=7700,
     min_acceleration=0,
     max_acceleration=0,
     range_gate_step=1,
@@ -131,7 +131,13 @@ def test_verify_analysis_orbit_data(
     interpolated_satellite_pos = interpolation.Legendre8(states=pos, t=t)
 
     # Measurement source station
-    radar_station = radardef.EiscatUHF(location=EiscatUHFLocation.TROMSO, beam_type=BeamType.CASSEGRAIN)
+    radar_station = radardef.EiscatUHF(
+        location=EiscatUHFLocation.TROMSO,
+        beam_type=BeamType.CASSEGRAIN,
+    )
+    reader = radar_station.load_data(MEASUREMENT)
+    assert reader is not None
+    exp_params = reader.experiment.copy(radar_frequency=921.0)
 
     # Analyse data
     comm = global_mpi.get_mpi()
@@ -146,6 +152,7 @@ def test_verify_analysis_orbit_data(
         method_lib=method_lib,
         implementation=IMPL,
         comm=comm,
+        exp_params=exp_params,
     )
     comm.barrier()
     if comm.rank != 0:
@@ -299,9 +306,9 @@ def test_verify_analysis_orbit_data(
 
         # off-axis angle plot
         ax = fig.add_subplot(2, 2, 3)
-        
+
         ax2 = ax.twinx()
-        ax2.tick_params(axis='y', labelcolor='g')
+        ax2.tick_params(axis="y", labelcolor="g")
         ax2.plot(t_analysed, off_axis_angle, color="g", label="Satelite angle from radar pointing")
         ax2.set_ylabel("Off-axis angle [deg]")
         ax.plot(
@@ -322,7 +329,7 @@ def test_verify_analysis_orbit_data(
         )
         ax.set_xlabel("Time [s]")
         ax.set_ylabel("Gain and SNR [1]")
-        
+
         lines, labels = ax.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
         ax.legend(lines + lines2, labels + labels2)
