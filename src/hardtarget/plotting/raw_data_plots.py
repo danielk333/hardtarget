@@ -154,6 +154,7 @@ def rti(
 
     data_ipp_vec = data_ipp_vec[il0_rg0:il0_rg1, :]
     samp_vec = samp_vec[il0_rg0:il0_rg1]
+    rt_vec = rt_vec[il0_rg0:il0_rg1]
 
     # Remove tx-signal (if it exists) and null calibration signal
     if not keep_tx:
