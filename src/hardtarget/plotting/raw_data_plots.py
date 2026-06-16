@@ -1,5 +1,6 @@
 """Plotting tools for raw data"""
 
+import warnings
 import logging
 from typing import Optional
 
@@ -22,14 +23,14 @@ logger = logging.getLogger(__name__)
 def rti(
     ax: Axes,
     data_loader: DataLoader,
-    start_time: Optional[np.datetime64 | int | str] = None,
-    end_time: Optional[np.datetime64 | int | str] = None,
+    start_time: Optional[np.datetime64 | float | int | str] = None,
+    end_time: Optional[np.datetime64 | float | int | str] = None,
     relative_time: bool = False,
     keep_tx: bool = False,
     axis_units: bool = False,
     log: bool = False,
-    start_range_gate: Optional[int] = None,
-    end_range_gate: Optional[int] = None,
+    start_range_gate: Optional[int | float] = None,
+    end_range_gate: Optional[int | float] = None,
     range_gate_unit: str = "sample",
     monostatic: bool = False,
     colorbar: bool = True,
@@ -69,6 +70,8 @@ def rti(
             start_time = int(ts_from_str(start_time) * 1e6)
         except ValueError:
             start_time = int(start_time)
+    elif isinstance(start_time, float):
+        start_time = int(start_time * 1e6)
 
     if isinstance(end_time, str):
         try:
@@ -76,6 +79,8 @@ def rti(
             end_time = int(ts_from_str(end_time) * 1e6)
         except ValueError:
             end_time = int(end_time)
+    elif isinstance(end_time, float):
+        end_time = int(end_time * 1e6)
 
     # Extract bounds
     if start_time or end_time:
@@ -95,6 +100,11 @@ def rti(
 
     # Extract data within bounds
     n_samp = samp_bounds.end - samp_bounds.start
+    if n_samp == 0:
+        raise ValueError(
+            f"Number of samples cannot be 0 for RTI plot ({samp_bounds.start=} {samp_bounds.end=})"
+        )
+
     data_vec = data_loader.read(
         channel=data_loader.exp_def.rx_channels, start_sample=samp_bounds.start, vector_length=n_samp
     )
@@ -121,9 +131,9 @@ def rti(
         else 0
     )
 
-    range_T = t_tx_start_samp / data_loader.exp_def.sample_rate
     samp_vec = np.arange(data_loader.exp_def.ipp_samps)
-    rt_vec = np.arange(t_rx_end_samp - t_rx_start_samp) * data_loader.exp_def.t_samp_usec - range_T
+    rg_vec = np.arange(t_rx_start_samp, t_rx_end_samp, 1) - t_tx_start_samp
+    rt_vec = rg_vec / data_loader.exp_def.sample_rate
 
     if monostatic:
         rt_vec *= 0.5
@@ -163,7 +173,8 @@ def rti(
         data_ipp_vec[t_cal_on_samp:t_cal_off_samp, :] = 0
 
     # Calculate signal power
-    powsum = np.log10(np.abs(data_ipp_vec) ** 2) if log else np.abs(data_ipp_vec) ** 2
+    with warnings.catch_warnings(action="ignore", category=RuntimeWarning):
+        powsum = np.log10(np.abs(data_ipp_vec) ** 2) if log else np.abs(data_ipp_vec) ** 2
 
     # Plot data
     if not axis_units:
@@ -365,7 +376,10 @@ def fti(
 
 
 def extract_requested_range_gates(
-    start_range_gate: int | None, end_range_gate: int | None, range_gate_unit: str, exp_def: ExpDef
+    start_range_gate: int | float | None,
+    end_range_gate: int | float | None,
+    range_gate_unit: str,
+    exp_def: ExpDef,
 ) -> tuple[int, int]:
     if start_range_gate is None:
         il0_rg0 = exp_def.t_rx_start_usec / exp_def.t_samp_usec

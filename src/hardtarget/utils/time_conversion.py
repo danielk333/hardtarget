@@ -11,8 +11,8 @@ from hardtarget.types import Bounds
 def time_interval_to_sample_bound(
     time_bounds: Bounds,
     sample_rate: float,
-    start_time: Optional[np.datetime64 | int | dt.datetime] = None,
-    end_time: Optional[np.datetime64 | int | dt.datetime] = None,
+    start_time: Optional[np.datetime64 | float | dt.datetime] = None,
+    end_time: Optional[np.datetime64 | float | dt.datetime] = None,
     relative_time: bool = False,
 ) -> Bounds:
     """
