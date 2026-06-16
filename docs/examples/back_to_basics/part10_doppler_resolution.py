@@ -16,7 +16,11 @@ sub_resolution = 1000
 boxes = signal_len // cycle_size
 doppler = 1.046e3
 
-def sim_signal(noise: bool=False) -> None:
+np.random.seed(233442)
+
+
+def sim_signal(noise: bool = False) -> None:
+
     signal = np.zeros((signal_len,), dtype=np.complex128)
     stensil = np.full((signal_len,), True, dtype=bool)
     t = np.arange(signal_len) / sample_rate
@@ -89,6 +93,7 @@ def sim_signal(noise: bool=False) -> None:
     axes[1, 1].set_xlim([-df_w, df_w])
     #
     fig.set_size_inches(15, 10)
+
 
 sim_signal(noise=False)
 sim_signal(noise=True)
