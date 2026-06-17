@@ -1,4 +1,4 @@
-# #Back to basics - Part 10: Doppler resolution
+# #Back to basics - Part 11: Doppler resolution
 # ---
 # The FFT bin is not the end-all-be-all of resolution, and the Nyquist sampling theorem gives the upper
 # limit on frequency, but does not dictate the accuracy of frequencies lower than this.
@@ -44,6 +44,7 @@ def sim_signal(noise: bool = False) -> None:
     peak_i = np.argmax(boxcar_stenciled_spec)
     width = 2
 
+    # DTFT method
     nums = np.arange(len(boxcar_stenciled_signal))
     fvec_sub = np.linspace(fvec[peak_i - width], fvec[peak_i + width], sub_resolution)
     dt = 1.0 / sample_rate
