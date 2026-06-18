@@ -11,6 +11,9 @@ except ImportError:
     )
 
 
+# TODO: i think this should be called ReceiverChainModel instead since that is what it is, usually
+# its several FIR filters and decimations chained together and we might model other things like
+# analouge effects later
 class FIRFilter(StrEnum):
     """FIR Filter type"""
 
