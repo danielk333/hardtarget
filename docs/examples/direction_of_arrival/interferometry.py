@@ -37,7 +37,7 @@ raw_data = utils.download_test_data(Path(tmp_dir.name) / "raw")
 
 data = utils.convert_test_data(raw_data, converted_path)[0]
 
-reader = RadarDef().load_data(data)
+reader = RadarDef().load_data(data, cache=False)
 assert reader is not None
 mu_station = Mu()
 
@@ -47,8 +47,8 @@ mu_station = Mu()
 # In this case we choose to visualize the 500 first ipps of the measurement
 
 output_path = Path(tmp_dir.name) / "analysed"
-start_time = int(reader.experiment.t_ipp_usec * 50)
-end_time = start_time + int(reader.experiment.t_ipp_usec * 120)
+start_time = int(reader.exp_def.t_ipp_usec * 50)
+end_time = start_time + int(reader.exp_def.t_ipp_usec * 120)
 cfg = DOACfgParams(
     n_ipp=1,
     ipp_offset=0,
@@ -58,6 +58,7 @@ cfg = DOACfgParams(
     num_cohints_per_file=500,
     elevation_limit=0,
     resolution=150,
+    cache=False,
 )
 
 # Run analysis
@@ -76,7 +77,7 @@ direction_of_arrival(
 
 data_generator = load_analysed_data(output_path)
 output: tuple[DOAVars, ExpDef, DOACfgParams, DOAProParams] = list(data_generator)[0]
-out_data, exp_params, cfg_params, pro_params = output
+out_data, exp_def, cfg_params, pro_params = output
 
 # ## Plot results
 # ---

@@ -33,7 +33,7 @@ data = utils.convert_test_data(raw_data, converted_path)[0]
 
 # Read data
 
-reader = RadarDef().load_data(data)
+reader = RadarDef().load_data(data, cache=False)
 assert reader is not None
 
 # ## Plot
@@ -41,8 +41,8 @@ assert reader is not None
 # So what is seen here is the power for each rx sample for each ipp on the logarithmic scale, for a specific
 # set of ipps
 
-start_time = int(reader.experiment.t_ipp_usec * 40)
-end_time = start_time + int(reader.experiment.t_ipp_usec * 150)
+start_time = int(reader.exp_def.t_ipp_usec * 40)
+end_time = start_time + int(reader.exp_def.t_ipp_usec * 150)
 fig, ax = plt.subplots()
 ax, handles = plotting.rti(
     ax,

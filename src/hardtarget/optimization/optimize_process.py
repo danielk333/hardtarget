@@ -2,11 +2,9 @@
 
 from dataclasses import asdict
 from pathlib import Path
-from typing import Optional
 
 import h5py
 import numpy as np
-from radardef.components import DataLoader
 
 from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl, OptimizationMethod
 from hardtarget.optimization import get_optimize_lib
@@ -18,11 +16,10 @@ from hardtarget.optimization.types import (
     OptStart,
 )
 from hardtarget.process import Process
-from hardtarget.process.configuration import extract_config_section, get_ilx_windows
+from hardtarget.process.configuration import get_ilx_windows
 from hardtarget.target_estimation.gmf import GMFCfgParams
 from hardtarget.target_estimation.types import MFOutArgs
 from hardtarget.types import (
-    CfgParams,
     DataItem,
     ExpDef,
     MethodLib,
@@ -36,34 +33,14 @@ class OptimizeProcess(
     Process[OptimizeCfgParams, OptimizeProParams, MFOptimizeVariables, MFOptimizeOutArgs, OptimizeLib]
 ):
     method = AnalysisMethod.optimize
+    config_section = ConfigSubSection.OPTIMIZATION
 
     def get_analysis_lib(
         self, lib: MethodLib | None, impl: Impl | None
     ) -> tuple[OptimizeLib, OptimizationMethod, Impl]:
         return get_optimize_lib(lib, impl)
 
-    def __init__(
-        self,
-        config: str | Path | OptimizeCfgParams,
-        data: DataLoader,
-        method_lib: Optional[MethodLib] = None,
-        impl: Optional[Impl] = None,
-        rx_channel: Optional[str | int] = None,
-        excluded_channels: Optional[list[str] | list[int]] = None,
-        output_dir: Optional[str | Path] = None,
-        progress: bool = False,
-    ) -> None:
-        super().__init__(
-            config,
-            data,
-            method_lib,
-            impl,
-            rx_channel,
-            excluded_channels,
-            output_dir,
-            progress,
-        )
-
+    def __post_init__(self) -> None:
         estimated_data = Path(self.cfg_params.path).resolve()
         # If output directory is the same as source, add data
         if str(estimated_data.parent) == str(self.output_dir):
@@ -92,7 +69,7 @@ class OptimizeProcess(
                         self.data.epoch_bounds[0]
                         - int(hf["OutArgs"][f"{MFOutArgs.epoch_us=}".split("=")[0].split(".")[1]][()])
                     )
-                    / self.exp_params.t_samp_usec
+                    / self.exp_def.t_samp_usec
                 )
             except KeyError:
                 raise ValueError("Optimization is only compatible with a previous gmf analysis")
@@ -109,7 +86,7 @@ class OptimizeProcess(
         """
 
         relative_sample_index = start_sample - self.mf_sample_start
-        samples_per_cohint = self.exp_params.ipp_samps * self.cfg_params.n_ipp
+        samples_per_cohint = self.exp_def.ipp_samps * self.cfg_params.n_ipp
         samples_per_file = samples_per_cohint * self.cfg_params.num_cohints_per_file
         file_id = relative_sample_index // samples_per_file
         cohind = (start_sample - (file_id * samples_per_file)) // samples_per_cohint
@@ -126,43 +103,21 @@ class OptimizeProcess(
 
         return opt_start
 
-    def get_conf_params(self, cfg_path: Path, cfg_params: CfgParams) -> OptimizeCfgParams:
-        """
-        Extract Optimize configuration parameters
-
-        Args:
-            cfg_path: Path to configuration file.
-            cfg_params: already loaded configuraion parameters that can be extended
-
-        Returns:
-            Process specific Optimize Configuration parameters
-        """
-
-        d = extract_config_section(
-            cfg_path,
-            ConfigSubSection.OPTIMIZATION,
-            OptimizeCfgParams,
-            cfg_params,
-            self._logger,
-        )
-
-        return OptimizeCfgParams(**d)
-
     def get_process_params(
-        self, exp_params: ExpDef, cfg_params: OptimizeCfgParams, pro_params: ProParams
+        self, exp_def: ExpDef, cfg_params: OptimizeCfgParams, pro_params: ProParams
     ) -> OptimizeProParams:
         """
                 Calculate Optimize specific process parameters
 
         Args:
-            exp_params: Experiment parameters from measurement file
+            exp_def: Experiment parameters from measurement file
             cfg_params: Process specific configuration paramters
             pro_params: General process parameters
         Returns:
             Process specific Optimize Process parameters
         """
 
-        _, il0_rx_window_indices, _ = get_ilx_windows(exp_params, cfg_params, pro_params)
+        _, il0_rx_window_indices, _ = get_ilx_windows(exp_def, cfg_params, pro_params)
 
         return OptimizeProParams(**asdict(pro_params), il0_rx_window_indices=il0_rx_window_indices)
 
@@ -202,7 +157,7 @@ class OptimizeProcess(
             r_vec_opt, v_vec_opt, a_vec_opt, peak_vals = self.lib(
                 tx[:, 0],  # TODO: How to handle sub resolution
                 ipp,
-                self.exp_params,
+                self.exp_def,
                 self.cfg_params,
                 self.pro_params,
                 opt_start.r_vec,
@@ -236,7 +191,7 @@ class OptimizeProcess(
         self,
         all_vars: MFOptimizeVariables,
         file_idx_sample: int,
-        exp_params: ExpDef,
+        exp_def: ExpDef,
         cfg_params: OptimizeCfgParams,
         pro_params: OptimizeProParams,
     ) -> MFOptimizeOutArgs:
@@ -246,7 +201,7 @@ class OptimizeProcess(
         Args:
             all_vars: All cohints analysed data stacked together
             file_idx_sample: File id, microseconds since epoch.
-            exp_params: Experiment parameters
+            exp_def: Experiment parameters
             cfg_params: Configuration parameters
 
         Returns:

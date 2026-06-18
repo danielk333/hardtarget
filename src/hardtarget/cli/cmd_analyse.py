@@ -6,6 +6,7 @@ import argparse
 import logging
 
 from radardef import RadarDef
+from radardef.tools.mpi_tools import get_mpi
 
 from hardtarget.analyse import analyse
 from hardtarget.constants import (
@@ -18,7 +19,6 @@ from hardtarget.constants import (
     TargetEstimationMethod,
 )
 from hardtarget.types import Array, ArrayKwargs, ArrayParams
-from hardtarget.utils.global_mpi import get_mpi
 from hardtarget.utils.profiling import get_logging_level
 
 from .commands import add_command

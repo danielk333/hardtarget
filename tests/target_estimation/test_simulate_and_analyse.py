@@ -44,9 +44,9 @@ class TestTargetEstimation:
 
         mf_impl = mf_impl.name
 
-        frequency_decimation = 10
-        n_ipp = 10
-        tau_ipp = 5
+        frequency_decimation = 5
+        n_ipp = 2
+        tau_ipp = 1
 
         config_str = f"""
         [processing]
@@ -57,6 +57,7 @@ class TestTargetEstimation:
             max_range_gate=6750
             range_gate_step=1
             node_gpus=1
+            cache=False
         [target_estimation]
             min_acceleration=-300.0
             max_acceleration=300.0
@@ -68,7 +69,7 @@ class TestTargetEstimation:
         """
 
         t_start = 0
-        t_end = 20000 * 750  # ipp_us = 20000
+        t_end = 20000 * 100  # ipp_us = 20000
         coh_int_len = 20000 * n_ipp
         t_abs_us = np.arange(0, t_end + coh_int_len, coh_int_len)
         t_abs = t_abs_us * 1e-6
@@ -98,7 +99,7 @@ class TestTargetEstimation:
             else:
                 return np.nan
 
-        exp_params = ExpDef(
+        exp_def = ExpDef(
             name="leo_bpark_2.0",
             radar_frequency=929.6,
             t_ipp_usec=20000,
@@ -118,20 +119,18 @@ class TestTargetEstimation:
 
         bounds_params = BoundParams(
             ts_start_usec=1445511612800000,
-            ts_end_usec=1445551228800000,
+            ts_end_usec=1445511613800000,
         )
 
-        sample_rate = 1 / (exp_params.t_samp_usec * 1e-6)
-        dec_samp = (exp_params.t_ipp_usec * 1e-6 * sample_rate) / frequency_decimation
+        sample_rate = 1 / (exp_def.t_samp_usec * 1e-6)
+        dec_samp = (exp_def.t_ipp_usec * 1e-6 * sample_rate) / frequency_decimation
 
         range_gate = constants.c / sample_rate
-        doppler_gate = (
-            2 * exp_params.wavelength * frequency_decimation / ((exp_params.t_ipp_usec * 1e-6) * n_ipp)
-        )
+        doppler_gate = 2 * exp_def.wavelength * frequency_decimation / ((exp_def.t_ipp_usec * 1e-6) * n_ipp)
 
         step = 2 * dec_samp * tau_ipp * frequency_decimation / sample_rate
         max_accels_len = (n_ipp - tau_ipp) * dec_samp
-        accel_gate = exp_params.wavelength * 2 * sample_rate / (max_accels_len * frequency_decimation * step)
+        accel_gate = exp_def.wavelength * 2 * sample_rate / (max_accels_len * frequency_decimation * step)
         print(f"{range_gate=} meters/sample, {doppler_gate=}, {accel_gate=}")
 
         with (
@@ -139,6 +138,8 @@ class TestTargetEstimation:
             tempfile.TemporaryDirectory() as tmp_analysis_path,
             tempfile.NamedTemporaryFile(mode="w+") as tmp_config,
         ):
+            path = Path("test_drf")
+
             # hacky way to create a temp config
             tmp_config.write(config_str)
             tmp_config.seek(0)
@@ -150,7 +151,7 @@ class TestTargetEstimation:
                 Path(tmp_sim_path),
                 range_function,
                 simulation_params,
-                exp_params,
+                exp_def,
                 bounds_params,
                 snr_function=None,
                 dtype=np.complex64,
@@ -172,7 +173,7 @@ class TestTargetEstimation:
             )
 
             data_generator = hardtarget.load_analysed_data(tmp_analysis_path)
-            for out_args, exp_params, cfg_params, pro_params in data_generator:
+            for out_args, exp_def, cfg_params, pro_params in data_generator:
                 dr = out_args.r_vec - sim_r[:-1]
                 dv = out_args.v_vec - sim_v[:-1]
                 da = out_args.a_vec - sim_a[:-1]
@@ -202,25 +203,25 @@ class TestTargetEstimation:
                 import matplotlib.pyplot as plt
 
                 data_generator = hardtarget.load_analysed_data(tmp_analysis_path)
-                for _out_args, _exp_params, _cfg_params, _pro_params in data_generator:
+                for _out_args, _exp_def, _cfg_params, _pro_params in data_generator:
                     t = _out_args.t - np.min(_out_args.t)
 
                     fig, axes = plt.subplots(2, 2)
                     hardtarget.plotting.target_estimation_plots.plot_peaks(
                         axes,
                         _out_args,
-                        _exp_params,
+                        _exp_def,
                         _cfg_params,
                         _pro_params,
                         snr_dB_limit=15.0,
                     )
                     fig, axes = plt.subplots(2, 3)
                     hardtarget.plotting.target_estimation_plots.plot_detections(
-                        axes, _out_args, _exp_params, _cfg_params, _pro_params
+                        axes, _out_args, _exp_def, _cfg_params, _pro_params
                     )
                     fig, axes = plt.subplots(3, 1)
                     hardtarget.plotting.target_estimation_plots.plot_map(
-                        axes, _out_args, _exp_params, _cfg_params, _pro_params
+                        axes, _out_args, _exp_def, _cfg_params, _pro_params
                     )
 
                     fig, axes = plt.subplots(2, 2)

@@ -1,57 +1,32 @@
 """General Matched Filter, or GMF Process"""
 
 from dataclasses import asdict
-from pathlib import Path
 
 import numpy as np
 from radardef.types import ExpDef
 
 from hardtarget.constants import ConfigSubSection, Impl, TargetEstimationMethod
-from hardtarget.process.configuration import extract_config_section
 from hardtarget.target_estimation.gmf import get_gmf_lib
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, GMFProParams
 from hardtarget.target_estimation.target_estimation_process import TargetEstimationProcess
 from hardtarget.target_estimation.types import (
     MFVariables,
-    TargetEstimationCfgParams,
     TargetEstimationProParams,
 )
 from hardtarget.types import AnalysisLib, MethodLib
 
 
 class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
+    config_sub_section = ConfigSubSection.GMF
+
     def get_analysis_lib(
         self, lib: MethodLib | None, impl: Impl | None
     ) -> tuple[AnalysisLib, TargetEstimationMethod, Impl]:
         return get_gmf_lib(lib, impl)
 
-    def get_lib_specific_conf_params(
-        self, cfg_path: Path, cfg_params: TargetEstimationCfgParams
-    ) -> GMFCfgParams:
-        """
-        Extract GMF configuration parameters
-
-        Args:
-            cfg_path: Path to configuration file.
-            cfg_params: already loaded configuraion parameters that can be extended
-
-        Returns:
-            Process specific GMF Configuration parameters
-        """
-
-        d = extract_config_section(
-            cfg_path,
-            ConfigSubSection.GMF,
-            GMFCfgParams,
-            cfg_params,
-            self._logger,
-        )
-
-        return GMFCfgParams(**d)
-
     def get_lib_specific_process_params(
         self,
-        exp_params: ExpDef,
+        exp_def: ExpDef,
         cfg_params: GMFCfgParams,
         pro_params: TargetEstimationProParams,
     ) -> GMFProParams:
@@ -59,7 +34,7 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
         Calculate GMF specific process parameters
 
         Args:
-            exp_params: Experiment parameters from measurement file
+            exp_def: Experiment parameters from measurement file
             cfg_params: Process specific configuration paramters
             pro_params: General process parameters
 
@@ -68,7 +43,7 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
         """
 
         # Sample times in the decimated il0d vector
-        _rx_win_t = np.arange(pro_params.read_length) / exp_params.sample_rate
+        _rx_win_t = np.arange(pro_params.read_length) / exp_def.sample_rate
         _il0_rx_stencil_indices = np.argwhere(pro_params.rx_stencil).flatten()
         _rx_win_t = _rx_win_t[_il0_rx_stencil_indices]
         _rx_win_t = _rx_win_t[pro_params.il1_rx_window_indices]
@@ -87,10 +62,10 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
 
         # precalculate phasors corresponding to different accelerations
         acceleration_phasors = np.exp(
-            -1j * np.pi * accelerations[:, None] * times2[None, :] / exp_params.wavelength
+            -1j * np.pi * np.outer(accelerations, times2) / exp_def.wavelength
         ).astype(np.complex64)
 
-        fgmf_acceleration_phasors = acceleration_phasors[_accel_inds, :].copy()
+        fgmf_acceleration_phasors = acceleration_phasors[_accel_inds, :]
 
         return GMFProParams(
             **asdict(pro_params),

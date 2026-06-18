@@ -12,7 +12,7 @@ from hardtarget.data_simulation.utils import TrajectoryFunction
 
 def plot_true_vs_estimated_trajectory(
     ax: Axes,
-    exp_params: ExpDef,
+    exp_def: ExpDef,
     trajectory_func: TrajectoryFunction,
     doa_peaks: npt.NDArray,
     doa_azimuth: npt.NDArray,
@@ -31,7 +31,7 @@ def plot_true_vs_estimated_trajectory(
 
     Args:
         ax: Axis with projection 3D
-        exp_params: Experiment definition,
+        exp_def: Experiment definition,
         trajectory_func: TrajectoryFunction to visualise objects trajectory
         doa_peaks: Peak values per coherent integrations during DOA analysis
         doa_azimuth: Azimuth vector for each coherent integration from DOA analysis
@@ -47,12 +47,12 @@ def plot_true_vs_estimated_trajectory(
     """
     ax.set_title("Real vs Estimated trajectory")
     measurement_length_us = (measurement_end - measurement_start).total_seconds() * 1e6
-    t_us = np.arange(measurement_length_us, step=exp_params.t_samp_usec)
+    t_us = np.arange(measurement_length_us, step=exp_def.t_samp_usec)
     two_way_range, k_vec = trajectory_func(t_us * 1e-6)
 
     full_trajectory = k_vec * two_way_range
 
-    t_target_us = np.arange(target_start_us, stop=target_end_us, step=exp_params.t_samp_usec)
+    t_target_us = np.arange(target_start_us, stop=target_end_us, step=exp_def.t_samp_usec)
     two_way_range, k_vec = trajectory_func(t_target_us * 1e-6)
 
     noticable_trajectory = k_vec * two_way_range

@@ -12,10 +12,7 @@ from scipy.signal import savgol_filter  # type: ignore[attr-defined]
 
 from hardtarget.constants import AnalysisMethod, ConfigSubSection
 from hardtarget.process import Process
-from hardtarget.process.configuration import (
-    extract_config_section,
-    get_ilx_windows,
-)
+from hardtarget.process.configuration import extract_config_section, get_ilx_windows
 from hardtarget.target_estimation.types import (
     ExtendedTargetEstimationProParams,
     MFOutArgs,
@@ -25,7 +22,6 @@ from hardtarget.target_estimation.types import (
 )
 from hardtarget.types import (
     AnalysisLib,
-    CfgParams,
     DataItem,
     ExpDef,
     ProParams,
@@ -53,6 +49,8 @@ class TargetEstimationProcess(
     Generic[TeLibCfg, TeLibPro],
 ):
     method = AnalysisMethod.target_estimation
+    config_section = ConfigSubSection.TARGET_ESTIMATION
+    config_sub_section: ConfigSubSection
 
     def __post_init__(self) -> None:
         """Extract configuration parameters for the specfic child class"""
@@ -62,39 +60,30 @@ class TargetEstimationProcess(
         elif not isinstance(self.raw_config, dict):
             self.cfg_params = self.get_lib_specific_conf_params(Path(self.raw_config), self.cfg_params)
         self.pro_params: TeLibPro = self.get_lib_specific_process_params(
-            self.exp_params, self.cfg_params, self.pro_params
+            self.exp_def, self.cfg_params, self.pro_params
         )
 
-    def get_conf_params(self, cfg_path: Path, cfg_params: CfgParams) -> TargetEstimationCfgParams:
-        """
-        Extract Target Estimation parameters
-
-        Args:
-            cfg_path: Path to configuration file.
-            cfg_params: already loaded configuraion parameters that can be extended
-
-        Returns:
-            Process specific Optimize Configuration parameters
-        """
-
-        d = extract_config_section(
-            cfg_path, ConfigSubSection.TARGET_ESTIMATION, TargetEstimationCfgParams, cfg_params
-        )
-
-        return TargetEstimationCfgParams(**d)
-
-    @abstractmethod
     def get_lib_specific_conf_params(self, cfg_path: Path, cfg_params: TargetEstimationCfgParams) -> TeLibCfg:
-        pass
+
+        cfg_type, _, _ = self.get_types()
+        d = extract_config_section(
+            cfg_path,
+            self.config_sub_section,
+            cfg_type,
+            cfg_params,
+            self._logger,
+        )
+
+        return cfg_type(**d)  # type: ignore[return-value]
 
     def get_process_params(
-        self, exp_params: ExpDef, cfg_params: TargetEstimationCfgParams, pro_params: ProParams
+        self, exp_def: ExpDef, cfg_params: TargetEstimationCfgParams, pro_params: ProParams
     ) -> TargetEstimationProParams:
         """
         Calculate Optimize specific process parameters
 
         Args:
-            exp_params: Experiment parameters from measurement file
+            exp_def: Experiment parameters from measurement file
             cfg_params: Process specific configuration paramters
             pro_params: General process parameters
 
@@ -103,12 +92,12 @@ class TargetEstimationProcess(
         """
 
         def usec_to_samp(usec: int | float) -> int:
-            return int(usec / exp_params.t_samp_usec)
+            return int(usec / exp_def.t_samp_usec)
 
-        rx_start_samp = usec_to_samp(exp_params.t_rx_start_usec)
-        rx_end_samp = usec_to_samp(exp_params.t_rx_end_usec)
-        tx_start_samp = usec_to_samp(exp_params.t_tx_start_usec)
-        tx_end_samp = usec_to_samp(exp_params.t_tx_end_usec)
+        rx_start_samp = usec_to_samp(exp_def.t_rx_start_usec)
+        rx_end_samp = usec_to_samp(exp_def.t_rx_end_usec)
+        tx_start_samp = usec_to_samp(exp_def.t_tx_start_usec)
+        tx_end_samp = usec_to_samp(exp_def.t_tx_end_usec)
 
         decimated_read_length = np.ceil(pro_params.read_length / cfg_params.frequency_decimation).astype(
             np.int64
@@ -121,14 +110,14 @@ class TargetEstimationProcess(
             dtype=np.float64,
         )
 
-        ranges = range_gate_to_range(full_res_rgs + 1, exp_params.sample_rate).astype(np.float64)  # m
+        ranges = range_gate_to_range(full_res_rgs + 1, exp_def.sample_rate).astype(np.float64)  # m
 
         assert np.all(pro_params.range_gates >= 0), "Computed range gates not compatible with stencils"
 
         _tx_pulse_samps = tx_end_samp - tx_start_samp
 
         il0_rgs, il0_rx_window_indices, il1_rx_window_indices = get_ilx_windows(
-            exp_params, cfg_params, pro_params
+            exp_def, cfg_params, pro_params
         )
 
         assert il0_rgs.max() <= rx_end_samp - _tx_pulse_samps, (
@@ -159,10 +148,10 @@ class TargetEstimationProcess(
             f"{len(ranges)} % {cfg_params.frequency_decimation} = "
             f"{len(ranges) % cfg_params.frequency_decimation}"
         )
-        assert exp_params.ipp_samps % cfg_params.frequency_decimation == 0, (
+        assert exp_def.ipp_samps % cfg_params.frequency_decimation == 0, (
             "ipp-samples length not compatible with decimation: "
-            f"{exp_params.ipp_samps} % {cfg_params.frequency_decimation} = "
-            f"{exp_params.ipp_samps % cfg_params.frequency_decimation}"
+            f"{exp_def.ipp_samps} % {cfg_params.frequency_decimation} = "
+            f"{exp_def.ipp_samps % cfg_params.frequency_decimation}"
         )
         assert _coh_int_samps % cfg_params.frequency_decimation == 0, (
             "range-gate interval not compatible with decimation: "
@@ -179,10 +168,10 @@ class TargetEstimationProcess(
         # frequency vector
         _fft_frequencies = fft.fftfreq(
             decimated_read_length,
-            d=cfg_params.frequency_decimation / exp_params.sample_rate,
+            d=cfg_params.frequency_decimation / exp_def.sample_rate,
         )  # Hz
 
-        range_rates = (exp_params.wavelength * _fft_frequencies).astype(np.float64)
+        range_rates = (exp_def.wavelength * _fft_frequencies).astype(np.float64)
 
         return TargetEstimationProParams(
             **asdict(pro_params),
@@ -198,7 +187,7 @@ class TargetEstimationProcess(
     @abstractmethod
     def get_lib_specific_process_params(
         self,
-        exp_params: ExpDef,
+        exp_def: ExpDef,
         cfg_params: TeLibCfg,
         pro_params: TargetEstimationProParams,
     ) -> TeLibPro:
@@ -219,7 +208,7 @@ class TargetEstimationProcess(
         self,
         all_vars: MFVariables,
         file_idx_sample: int,
-        exp_params: ExpDef,
+        exp_def: ExpDef,
         cfg_params: TargetEstimationCfgParams,
         pro_params: TargetEstimationProParams,
     ) -> MFOutArgs:
@@ -229,7 +218,7 @@ class TargetEstimationProcess(
         Args:
             all_vars: All cohints analysed data stacked together
             file_idx_sample: File id, sample relative to file start.
-            exp_params: Experiment parameters
+            exp_def: Experiment parameters
             cfg_params: Configuration parameters
 
         Returns:
@@ -253,14 +242,14 @@ class TargetEstimationProcess(
         a_vec = pro_params.accelerations[all_vars.a_ind[coh_ints, r_inds]]  # type: ignore[attr-defined]
         g_vec = all_vars.vals[coh_ints, r_inds]
 
-        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_params.t_samp_usec)
+        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_def.t_samp_usec)
 
-        _t_conv = (cfg_params.n_ipp * exp_params.t_ipp_usec) * 1e-6
-        t = (np.arange(num_cohints) + 1) * _t_conv + file_idx_sample * exp_params.t_samp_usec * 1e-6
+        _t_conv = (cfg_params.n_ipp * exp_def.t_ipp_usec) * 1e-6
+        t = (np.arange(num_cohints) + 1) * _t_conv + file_idx_sample * exp_def.t_samp_usec * 1e-6
 
         pointing_vec = np.zeros((num_cohints, 2), dtype=np.float32)
         for i in range(num_cohints):
-            pointing = self.get_pointing(file_idx_sample + i * (cfg_params.n_ipp * exp_params.ipp_samps))
+            pointing = self.get_pointing(file_idx_sample + i * (cfg_params.n_ipp * exp_def.ipp_samps))
             pointing_vec[i, 0] = pointing.azimuth
             pointing_vec[i, 1] = pointing.elevation
 

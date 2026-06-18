@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Optional, Pattern
 
-from hardtarget.utils import global_mpi
+from radardef.tools import mpi_tools
 
 try:
     import yappi
@@ -18,7 +18,7 @@ except ImportError:
     YAPPI_AVAILABLE = False
 
 # if code is run by mpi, mpi is already imported)
-comm = global_mpi.get_mpi()
+comm = mpi_tools.get_mpi()
 
 
 PACKAGE_NAME = "hardtarget"

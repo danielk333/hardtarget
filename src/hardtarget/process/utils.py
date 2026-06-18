@@ -50,7 +50,7 @@ def compute_total_tasks(ipp_samps: int, n_ipp: int, num_cohints_per_file: int, b
 
 def calculate_tasks(
     comm_rank: int, comm_size: int, n_ipp: int, num_cohints_per_file: int, ipp_samps: int, bounds: Bounds
-) -> tuple[list[int], int]:
+) -> tuple[list[int], int, int]:
     """
     Calculate the current jobs tasks and coherent integrations.
 
@@ -77,7 +77,7 @@ def calculate_tasks(
 
     if len(job_tasks) == 0:
         # Most likely more processes than tasks available
-        return job_tasks, 0
+        return job_tasks, 0, 0
 
     job_cohints = (len(job_tasks) - 2) * num_cohints_per_file
 
@@ -93,7 +93,9 @@ def calculate_tasks(
         num_cohints = num_cohints_per_file - int((bounds.start - file_idx_sample) // (ipp_samps * n_ipp))
     job_cohints += num_cohints
 
-    return job_tasks, job_cohints
+    total_cohints = int((bounds.end - bounds.start) / (n_ipp * ipp_samps))
+
+    return job_tasks, job_cohints, total_cohints
 
 
 def get_filepath(

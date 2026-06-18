@@ -13,7 +13,7 @@ from hardtarget.utils.time_conversion import ipp_time_to_sample
 def optimize_gmf_np(
     tx: npt.NDArray[np.complexfloating],
     ipp: npt.NDArray,
-    exp_params: ExpDef,
+    exp_def: ExpDef,
     cfg_params: OptimizeCfgParams,
     pro_params: OptimizeProParams,
     r_vec: float,
@@ -27,7 +27,7 @@ def optimize_gmf_np(
     Args:
         tx: Transmitted signal
         ipp: The entire sample vector
-        exp_params: Experiment parameters
+        exp_def: Experiment parameters
         cfg_params: Configuration parameters
         pro_params: Process parameters
         r_vec: The estimated range value from the previous coherent integration in the matched filter analysis.
@@ -72,9 +72,9 @@ def optimize_gmf_np(
         args=(
             r_vec,
             sample_inds,
-            exp_params.wavelength,
-            exp_params.sample_rate,
-            ipp_time_to_sample(exp_params.t_tx_start_usec, exp_params.sample_rate),
+            exp_def.wavelength,
+            exp_def.sample_rate,
+            ipp_time_to_sample(exp_def.t_tx_start_usec, exp_def.sample_rate),
             tx,  # TODO: how to handle sub_resolution
             ipp,
         ),
@@ -88,7 +88,7 @@ def optimize_gmf_np(
 def optimize_grid_gmf_np(
     tx: npt.NDArray[np.complexfloating],
     ipp: npt.NDArray,
-    exp_params: ExpDef,
+    exp_def: ExpDef,
     cfg_params: OptimizeCfgParams,
     pro_params: OptimizeProParams,
     r_vec: float,
@@ -102,7 +102,7 @@ def optimize_grid_gmf_np(
     Args:
         tx: Transmitted signal
         ipp: The entire sample vector
-        exp_params: Experiment parameters
+        exp_def: Experiment parameters
         cfg_params: Configuration parameters
         pro_params: Process parameters
         r_vec: The estimated range value from the previous coherent integration in the matched filter analysis.
@@ -115,15 +115,15 @@ def optimize_grid_gmf_np(
     """
     sample_inds = pro_params.il0_rx_window_indices
 
-    sample_rate = exp_params.sample_rate
-    wavelength = exp_params.wavelength
+    sample_rate = exp_def.sample_rate
+    wavelength = exp_def.wavelength
     min_rg = cfg_params.min_range_gate
     accel_res = pro_params.acceleration_step
 
     delta_a = 2 * accel_res
     res_a = 20
 
-    max_time = exp_params.t_ipp_usec * 1e-6 * cfg_params.n_ipp
+    max_time = exp_def.t_ipp_usec * 1e-6 * cfg_params.n_ipp
     max_velocity_change = 0.5 * (a_vec + np.sign(a_vec) * delta_a * 0.5) * max_time**2
 
     delta_v = 2 * max_velocity_change

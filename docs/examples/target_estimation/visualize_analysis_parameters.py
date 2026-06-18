@@ -36,9 +36,9 @@ data_path = utils.convert_test_data(raw_data, converted_path)[0]
 
 # Create a process which will extract the configuration and process parameters
 
-data = RadarDef().load_data(data_path)
+data = RadarDef().load_data(data_path, cache=False)
 process = hardtarget.GMFProcess(config=config, data=data)
-exp = process.exp_params
+exp = process.exp_def
 cfg = process.cfg_params
 pro = process.pro_params
 

@@ -1,8 +1,6 @@
 """Event search process"""
 
-import logging
 from dataclasses import asdict
-from pathlib import Path
 
 import numpy as np
 
@@ -15,48 +13,28 @@ from hardtarget.echo_search.types import (
     EchoSearchVars,
 )
 from hardtarget.process import Process
-from hardtarget.process.configuration import extract_config_section
-from hardtarget.types import CfgParams, DataItem, EventSearchLib, ExpDef, MethodLib, ProParams
+from hardtarget.types import DataItem, EventSearchLib, ExpDef, MethodLib, ProParams
 
 
 class EchoSearchProcess(
     Process[EchoSearchCfgParams, EchoSearchProParams, EchoSearchVars, EchoSearchOutArgs, EventSearchLib]
 ):
     method = AnalysisMethod.echo_search
-
-    logger = logging.getLogger(__name__)
+    config_section = ConfigSubSection.ECHO_SEARCH
 
     def get_analysis_lib(
         self, lib: MethodLib | None, impl: Impl | None
     ) -> tuple[EventSearchLib, EchoSearchMethod, Impl]:
         return get_echo_search_lib(lib, impl)
 
-    def get_conf_params(self, cfg_path: Path, cfg_params: CfgParams) -> EchoSearchCfgParams:
-        """
-        Extract Optimize configuration parameters
-
-        Args:
-            cfg_path: Path to configuration file.
-            cfg_params: already loaded configuraion parameters that can be extended
-
-        Returns:
-            Process specific Optimize Configuration parameters
-        """
-
-        d = extract_config_section(cfg_path, ConfigSubSection.ECHO_SEARCH, EchoSearchCfgParams, cfg_params)
-
-        # TODO: if n_ipp is above 1 send a warning to the user and then continue, not sure if works with many
-
-        return EchoSearchCfgParams(**d)
-
     def get_process_params(
-        self, exp_params: ExpDef, cfg_params: EchoSearchCfgParams, pro_params: ProParams
+        self, exp_def: ExpDef, cfg_params: EchoSearchCfgParams, pro_params: ProParams
     ) -> EchoSearchProParams:
         """
         Calculate Optimize specific process parameters
 
         Args:
-            exp_params: Experiment parameters from measurement file
+            exp_def: Experiment parameters from measurement file
             cfg_params: Process specific configuration paramters
             pro_params: General process parameters
 
@@ -89,7 +67,7 @@ class EchoSearchProcess(
         return self.lib(
             tx,
             rx,
-            self.exp_params,
+            self.exp_def,
             self.cfg_params,
             self.pro_params,
         )
@@ -111,7 +89,7 @@ class EchoSearchProcess(
         self,
         all_vars: EchoSearchVars,
         file_idx_sample: int,
-        exp_params: ExpDef,
+        exp_def: ExpDef,
         cfg_params: EchoSearchCfgParams,
         pro_params: EchoSearchProParams,
     ) -> EchoSearchOutArgs:
@@ -121,14 +99,14 @@ class EchoSearchProcess(
          Args:
              all_vars: All cohints analysed data stacked together
              file_idx_sample: File id, sample relative to file start.
-             exp_params: Experiment parameters
+             exp_def: Experiment parameters
              cfg_params: Configuration parameters
 
          Returns:
              Output data
         """
 
-        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_params.t_samp_usec)
+        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_def.t_samp_usec)
 
         return EchoSearchOutArgs(
             max_corr=all_vars.max_corr

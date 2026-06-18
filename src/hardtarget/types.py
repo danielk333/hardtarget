@@ -60,6 +60,7 @@ class CfgParams:
     num_cohints_per_file: int = 100
     tx_amp_limit: float = 1.0
     node_gpus: int = 1
+    cache: bool = True
 
 
 @dataclass(frozen=True)

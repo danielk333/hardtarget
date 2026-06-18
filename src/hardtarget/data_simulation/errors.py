@@ -32,7 +32,7 @@ def linearized_mle_covariance(
     da: float = 1.0,
 ) -> npt.NDArray[np.floating]:
     """ """
-    experiment_params = ExpDef(
+    exp_def = ExpDef(
         name="leo_bpark",
         radar_frequency=929.6,
         t_ipp_usec=20000,
@@ -53,9 +53,9 @@ def linearized_mle_covariance(
     simulation_params = DRFSimParams(
         epoch="2021-04-12T12:15:40",
         start_time_us=0,
-        end_time_us=int(n_ipp * experiment_params.t_ipp_usec),
+        end_time_us=int(n_ipp * exp_def.t_ipp_usec),
         target_start_time_us=0,
-        target_end_time_us=int(n_ipp * experiment_params.t_ipp_usec),
+        target_end_time_us=int(n_ipp * exp_def.t_ipp_usec),
         noise_sigma=0,
         tx_amp=1,
     )
@@ -77,7 +77,7 @@ def linearized_mle_covariance(
         range_function=range_function,
         sim_params=simulation_params,
         bounds_params=BoundParams(),
-        experiment_params=experiment_params,
+        exp_def=exp_def,
         snr_function=None,
         include_tx_signal=False,
         dtype=np.complex64,
@@ -87,7 +87,7 @@ def linearized_mle_covariance(
         range_function=range_function_dr,
         sim_params=simulation_params,
         bounds_params=BoundParams(),
-        experiment_params=experiment_params,
+        exp_def=exp_def,
         snr_function=None,
         include_tx_signal=False,
         dtype=np.complex64,
@@ -97,7 +97,7 @@ def linearized_mle_covariance(
         range_function=range_function_dv,
         sim_params=simulation_params,
         bounds_params=BoundParams(),
-        experiment_params=experiment_params,
+        exp_def=exp_def,
         snr_function=None,
         include_tx_signal=False,
         dtype=np.complex64,
@@ -107,7 +107,7 @@ def linearized_mle_covariance(
         range_function=range_function_da,
         sim_params=simulation_params,
         bounds_params=BoundParams(),
-        experiment_params=experiment_params,
+        exp_def=exp_def,
         snr_function=None,
         include_tx_signal=False,
         dtype=np.complex64,
@@ -122,11 +122,9 @@ def linearized_mle_covariance(
     A[:, 1] = z_diff_v
     A[:, 2] = z_diff_a
 
-    tx_pulse_length = int(
-        (experiment_params.t_tx_end_usec - experiment_params.t_tx_start_usec) / experiment_params.t_samp_usec
-    )
+    tx_pulse_length = int((exp_def.t_tx_end_usec - exp_def.t_tx_start_usec) / exp_def.t_samp_usec)
 
-    tx_pulse_samps = np.round(tx_pulse_length * 1e-6 * experiment_params.sample_rate).astype(np.int64)
+    tx_pulse_samps = np.round(tx_pulse_length * 1e-6 * exp_def.sample_rate).astype(np.int64)
     coh_samples = tx_pulse_samps * n_ipp
     z_sigma_inv = snr / (2 * coh_samples)
     S = np.linalg.inv(np.real(np.transpose(np.conj(A)) @ A * z_sigma_inv))
@@ -156,7 +154,7 @@ def monte_carlo_sample_errors(
     rx_end = int(t_ipp_s * 1e6)
     tx_pulse_length = int(tx_pulse_length * 1e6) - 1  # should be (end-start) - t_samp_usec
     t_samp_usec = int((1 / sample_rate) * 1e6)
-    experiment_params = ExpDef(
+    exp_def = ExpDef(
         name="simulation",
         radar_frequency=radar_frequency * 1e-6,
         t_ipp_usec=int(t_ipp_s * 1e6),
@@ -176,8 +174,8 @@ def monte_carlo_sample_errors(
 
     bounds_params = BoundParams()
 
-    rg0 = np.round((range0 / constants.c) * experiment_params.sample_rate).astype(np.int64)
-    rg1 = rg0 + len(experiment_params.code[0])
+    rg0 = np.round((range0 / constants.c) * exp_def.sample_rate).astype(np.int64)
+    rg1 = rg0 + len(exp_def.code[0])
     rg_padding = 100
 
     if not isinstance(output_path, Path):
@@ -221,7 +219,7 @@ def monte_carlo_sample_errors(
         snr = np.array([snr])
     snr_len = len(snr)
 
-    coh_int_time = n_ipp * experiment_params.t_ipp_usec
+    coh_int_time = n_ipp * exp_def.t_ipp_usec
     step_size = coh_int_time * samples
     sim_len = step_size * snr_len
 
@@ -244,7 +242,7 @@ def monte_carlo_sample_errors(
             output_path=drf_path,
             range_function=range_function,
             sim_params=simulation_params,
-            experiment_params=experiment_params,
+            exp_def=exp_def,
             bounds_params=bounds_params,
             snr_function=lambda t: snr[np.floor(t / step_size).astype(np.int64)] / coh_samples,
             dtype=np.complex64,
@@ -259,7 +257,7 @@ def monte_carlo_sample_errors(
     target_estimation(
         data=drf_path,
         config=config_path,
-        exp_params=experiment_params,
+        exp_def=exp_def,
         method_lib=mf_method,
         implementation=mf_implementation,
         clobber=clobber,
@@ -276,7 +274,7 @@ def monte_carlo_sample_errors(
     }
     data_generator: Any = load_analysed_data(analysed_path)
     index = 0
-    for out_data, exp_params, cfg_params, pro_params in data_generator:
+    for out_data, exp_def, cfg_params, pro_params in data_generator:
         data_len = len(out_data.r_vec)
         print(f"loading {data_len} results")
         dr = out_data.r_vec - range0

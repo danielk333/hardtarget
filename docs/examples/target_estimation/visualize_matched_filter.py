@@ -58,7 +58,7 @@ bounds_params = BoundParams(
 tmp_sim_path = tempfile.TemporaryDirectory(suffix="_drf")
 range0, vel0, acel0, t_rel, t_abs, SNR, echo_len, _ = utils.sim_data(
     output_path=Path(tmp_sim_path.name),
-    exp_params=exp,
+    exp_def=exp,
     bounds_params=bounds_params,
     config=config,
     zero_noise=True,
@@ -67,9 +67,9 @@ range0, vel0, acel0, t_rel, t_abs, SNR, echo_len, _ = utils.sim_data(
 # ## Setup process and access the data
 # ---
 # Create a process to get the correct process parameters
-data = RadarDef().load_data(tmp_sim_path.name, experiment=exp)
+data = RadarDef().load_data(tmp_sim_path.name, exp_def=exp)
 analyse_process = hardtarget.process.GMFProcess(config, data)
-exp_params = analyse_process.exp_params
+exp_def = analyse_process.exp_def
 pro_params = analyse_process.pro_params
 cfg_params = analyse_process.cfg_params
 
@@ -94,7 +94,7 @@ print("Acceleration: ", pro_params.accelerations[acc_ind] * 1e-3, " km/s^2")
 n_ipp = cfg_params.n_ipp
 start_sample = np.round(look_time * exp.sample_rate).astype(np.int64)
 start_sample = (start_sample // exp.ipp_samps) * exp.ipp_samps
-start_sample += data.bounds(exp_params.rx_channels[0])[0]
+start_sample += data.bounds(exp_def.rx_channels[0])[0]
 delta_samples = exp.ipp_samps * n_ipp
 print(f"read amount of samples: {delta_samples}, size tx_stencil = {pro_params.tx_stencil.shape}")
 

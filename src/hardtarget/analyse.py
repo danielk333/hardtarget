@@ -7,6 +7,7 @@ import numpy as np
 from pyant.models.array import Array, ArrayParams
 from radardef import RadarDef
 from radardef.components import DataLoader
+from radardef.tools import mpi_tools
 from radardef.types.types import ExpDef
 
 from hardtarget.constants import (
@@ -16,7 +17,6 @@ from hardtarget.constants import (
 )
 from hardtarget.process import get_analysis_process
 from hardtarget.types import AnalysedResult, ArrayKwargs, GenericCfg
-from hardtarget.utils import global_mpi
 
 if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
     from typing_extensions import Unpack
@@ -35,12 +35,12 @@ def analyse(
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
-    exp_params: Optional[ExpDef] = None,
-    progress: bool = False,
+    exp_def: Optional[ExpDef] = None,
+    progress: bool | mpi_tools.CommBar = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
     sub_directory: Optional[str] = None,
-    comm: global_mpi.CommObject = global_mpi.CommMock(),
+    comm: mpi_tools.CommObject = mpi_tools.CommMock(),
     **kwargs: Unpack[ArrayKwargs],
 ) -> AnalysedResult:
     """
@@ -59,7 +59,7 @@ def analyse(
         start_time (optional): Start time of analysis
         end_time (optional): End time of analysis
         relative_time (optional): If to use relative time
-        exp_params (optional): If working with custom experiments it is needed to be able to load the data.
+        exp_def (optional): If working with custom experiments it is needed to be able to load the data.
         progress (optional): If a progress bar should be visualized.
         clobber (optional): If previous analysis should be overwritten.
         output (optional): Output directory for the analysed files, if None no files will be saved.
@@ -73,7 +73,7 @@ def analyse(
     if comm.rank == 0:
         # Access data
         if isinstance(data, str) or isinstance(data, Path):
-            data_loader = RadarDef().load_data(Path(data), experiment=exp_params)
+            data_loader = RadarDef().load_data(Path(data), exp_def=exp_def)
             if data_loader is None:
                 raise ValueError(f"Not possible to load data file from: {data}")
         else:
@@ -91,7 +91,6 @@ def analyse(
             rx_channel=rx_channel,
             excluded_channels=excluded_channels,
             output_dir=output,
-            progress=progress,
             **kwargs,
         )
     else:
@@ -108,7 +107,19 @@ def analyse(
         relative_time=relative_time,
         sub_directory=sub_directory,
         clobber=clobber,
+        progress=progress,
     )
+
+    if comm.size > 1:
+        all_results = comm.gather(results, root=0)
+
+        if comm.rank == 0:
+            results = merge_results_from_all_ranks(all_results)  # type: ignore[arg-type]
+        else:
+            results = None
+
+        results = comm.bcast(results, root=0)
+        comm.barrier()
 
     return results
 
@@ -123,12 +134,12 @@ def target_estimation(
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
-    exp_params: Optional[ExpDef] = None,
-    progress: bool = False,
+    exp_def: Optional[ExpDef] = None,
+    progress: bool | mpi_tools.CommBar = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
     sub_directory: Optional[str] = None,
-    comm: global_mpi.CommObject = global_mpi.CommMock(),
+    comm: mpi_tools.CommObject = mpi_tools.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for Target Estimations"""
 
@@ -143,7 +154,7 @@ def target_estimation(
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
-        exp_params=exp_params,
+        exp_def=exp_def,
         progress=progress,
         clobber=clobber,
         output=output,
@@ -162,12 +173,12 @@ def optimize(
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
-    exp_params: Optional[ExpDef] = None,
-    progress: bool = False,
+    exp_def: Optional[ExpDef] = None,
+    progress: bool | mpi_tools.CommBar = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
     sub_directory: Optional[str] = None,
-    comm: global_mpi.CommObject = global_mpi.CommMock(),
+    comm: mpi_tools.CommObject = mpi_tools.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for Target Estimation optimization"""
 
@@ -182,7 +193,7 @@ def optimize(
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
-        exp_params=exp_params,
+        exp_def=exp_def,
         progress=progress,
         clobber=clobber,
         output=output,
@@ -201,12 +212,12 @@ def echo_search(
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
-    exp_params: Optional[ExpDef] = None,
-    progress: bool = False,
+    exp_def: Optional[ExpDef] = None,
+    progress: bool | mpi_tools.CommBar = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
     sub_directory: Optional[str] = None,
-    comm: global_mpi.CommObject = global_mpi.CommMock(),
+    comm: mpi_tools.CommObject = mpi_tools.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for echo search"""
 
@@ -221,7 +232,7 @@ def echo_search(
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
-        exp_params=exp_params,
+        exp_def=exp_def,
         progress=progress,
         clobber=clobber,
         output=output,
@@ -242,12 +253,12 @@ def direction_of_arrival(
     start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
     relative_time: bool = False,
-    exp_params: Optional[ExpDef] = None,
-    progress: bool = False,
+    exp_def: Optional[ExpDef] = None,
+    progress: bool | mpi_tools.CommBar = False,
     clobber: bool = True,
     output: Optional[str | Path] = None,
     sub_directory: Optional[str] = None,
-    comm: global_mpi.CommObject = global_mpi.CommMock(),
+    comm: mpi_tools.CommObject = mpi_tools.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for Direction of Arrival"""
 
@@ -262,7 +273,7 @@ def direction_of_arrival(
         start_time=start_time,
         end_time=end_time,
         relative_time=relative_time,
-        exp_params=exp_params,
+        exp_def=exp_def,
         progress=progress,
         clobber=clobber,
         output=output,
@@ -271,3 +282,32 @@ def direction_of_arrival(
         parameters=beam_params,
         comm=comm,
     )
+
+
+def merge_results_from_all_ranks(results: list[AnalysedResult]) -> AnalysedResult:
+
+    result: AnalysedResult = {"dir": results[0]["dir"], "files": [], "data": {}}
+
+    for res in results:
+        for key, value in res.items():
+            if key == "files":
+                if isinstance(value, list):
+                    if key not in result:
+                        result["files"] = value
+                    else:
+                        result["files"].extend(value)
+            elif key == "data":
+                if isinstance(value, dict):
+                    if key not in result:
+                        result["data"] = value
+                    else:
+                        result["data"].update(value)
+            elif key == "dir":
+                if isinstance(value, Path) or isinstance(value, str) or value is None:
+                    if key not in result:
+                        result["dir"] = value
+                    else:
+                        if value != result["dir"]:
+                            raise Exception("Output data stored in different directories")
+
+    return result

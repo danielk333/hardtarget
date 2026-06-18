@@ -53,7 +53,7 @@ def default_trajectory_function(t: npt.NDArray) -> tuple[npt.NDArray, npt.NDArra
 
 def simulate_h5(
     output_dir: Path,
-    exp_params: ExpDef,
+    exp_def: ExpDef,
     start_time: dt.datetime | int,
     end_time: dt.datetime | int,
     target_start_time: Optional[dt.datetime | int] = None,
@@ -70,7 +70,7 @@ def simulate_h5(
 
     Args:
         output_dir: Output directory.
-        exp_params: Experiment definition.
+        exp_def: Experiment definition.
         start_time: Start time of measurement, either in datetime or usec.
         end_time: End time of measurement, either in datetime or usec.
         target_start_time (optional): Start time of object in the measurement, either in datetime or usec.
@@ -105,38 +105,38 @@ def simulate_h5(
     else:
         raise ValueError("Measurement start and end time should be in the same format")
 
-    n_ipps = int((end_time_us - start_time_us) // exp_params.t_ipp_usec)
+    n_ipps = int((end_time_us - start_time_us) // exp_def.t_ipp_usec)
     if target_relative_time:
-        target_start_ipp = target_start_us // exp_params.t_ipp_usec
-        target_end_ipp = target_end_us // exp_params.t_ipp_usec
+        target_start_ipp = target_start_us // exp_def.t_ipp_usec
+        target_end_ipp = target_end_us // exp_def.t_ipp_usec
     else:
-        target_start_ipp = (target_start_us - start_time_us) // exp_params.t_ipp_usec
-        target_end_ipp = (target_end_us - start_time_us) // exp_params.t_ipp_usec
+        target_start_ipp = (target_start_us - start_time_us) // exp_def.t_ipp_usec
+        target_end_ipp = (target_end_us - start_time_us) // exp_def.t_ipp_usec
 
     # Create output dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Calculate rx and tx sections
-    rx_start_samp = int(exp_params.t_rx_start_usec / exp_params.t_samp_usec)
-    rx_end_samp = int(exp_params.t_rx_end_usec / exp_params.t_samp_usec)
+    rx_start_samp = int(exp_def.t_rx_start_usec / exp_def.t_samp_usec)
+    rx_end_samp = int(exp_def.t_rx_end_usec / exp_def.t_samp_usec)
     rx_samps = rx_end_samp - rx_start_samp
-    tx_start_samp = int(exp_params.t_tx_start_usec / exp_params.t_samp_usec)
-    tx_end_samp = int(exp_params.t_tx_end_usec / exp_params.t_samp_usec)
+    tx_start_samp = int(exp_def.t_tx_start_usec / exp_def.t_samp_usec)
+    tx_end_samp = int(exp_def.t_tx_end_usec / exp_def.t_samp_usec)
 
     # Generate stream of data
-    ipp_data = np.zeros((len(exp_params.rx_channels), n_ipps, rx_samps), dtype=np.complex64)
+    ipp_data = np.zeros((len(exp_def.rx_channels), n_ipps, rx_samps), dtype=np.complex64)
     for i in range(n_ipps):
         # Generate tx wave
         tx_wave = waveform_generator(
             n_tx_samps=tx_end_samp - tx_start_samp,
-            sample_rate=exp_params.sample_rate,
-            baud_length_sec=exp_params.baud_length_usec * 1e-6,
-            code=exp_params.code,
+            sample_rate=exp_def.sample_rate,
+            baud_length_sec=exp_def.baud_length_usec * 1e-6,
+            code=exp_def.code,
             dtype=np.complex64,
         )
 
         ipp_data[:, i, :] = generate_rx_vectors(
-            exp=exp_params,
+            exp=exp_def,
             ipp_n=i,
             is_object_present=(i >= target_start_ipp and i <= target_end_ipp),
             tx_wave=tx_wave,
@@ -155,19 +155,19 @@ def simulate_h5(
             )
 
     # Split data to files
-    n_samps = n_ipps * exp_params.ipp_samps
-    n_files = -(n_samps // -exp_params.samples_per_file)
-    ipps_per_file = exp_params.samples_per_file // exp_params.ipp_samps
+    n_samps = n_ipps * exp_def.ipp_samps
+    n_files = -(n_samps // -exp_def.samples_per_file)
+    ipps_per_file = exp_def.samples_per_file // exp_def.ipp_samps
     for i in range(n_files):
         # Extract data for relevant ipps
         data = ipp_data[:, i * ipps_per_file : (i + 1) * ipps_per_file]
 
         # Calculate file start and end
         file_start_time = start_time + dt.timedelta(
-            microseconds=i * exp_params.samples_per_file * exp_params.t_samp_usec
+            microseconds=i * exp_def.samples_per_file * exp_def.t_samp_usec
         )
         file_end_time = file_start_time + dt.timedelta(
-            microseconds=(data.shape[1] * exp_params.ipp_samps * exp_params.t_samp_usec)
+            microseconds=(data.shape[1] * exp_def.ipp_samps * exp_def.t_samp_usec)
         )
         # Declare file name and location
         output_file = output_dir / (
@@ -185,7 +185,7 @@ def simulate_h5(
 
             # Create dataset
             h5file.create_dataset("data", data=data)
-            h5file.create_dataset("rx_channels", data=exp_params.rx_channels)
+            h5file.create_dataset("rx_channels", data=exp_def.rx_channels)
 
     return output_dir
 

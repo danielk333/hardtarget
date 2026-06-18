@@ -19,7 +19,7 @@ except NameError:
 
 def sim_data(
     output_path: Path,
-    exp_params: Optional[ExpDef] = None,
+    exp_def: Optional[ExpDef] = None,
     bounds_params: Optional[BoundParams] = None,
     config: Optional[Path] = None,
     range0: float = 2000e3,
@@ -31,8 +31,8 @@ def sim_data(
     SNRdB = 40.0
     samples = 200
 
-    if exp_params is None:
-        exp_params = ExpDef(
+    if exp_def is None:
+        exp_def = ExpDef(
             name="test",
             radar_frequency=929.6,
             t_ipp_usec=20000,
@@ -64,16 +64,14 @@ def sim_data(
 
     # Load user configuration and calculate start and end time
     cfg_params = load_config_params(config)
-    coh_samples = (
-        (exp_params.t_tx_end_usec - exp_params.t_tx_start_usec) / exp_params.t_samp_usec
-    ) * cfg_params.n_ipp
+    coh_samples = ((exp_def.t_tx_end_usec - exp_def.t_tx_start_usec) / exp_def.t_samp_usec) * cfg_params.n_ipp
     SNR = 10 ** (SNRdB / 10.0)
     if zero_noise:
         noise_sigma = 0
     else:
         noise_sigma = np.sqrt(coh_samples / (2 * SNR))
     t_start = 0
-    coh_int_time = cfg_params.n_ipp * exp_params.t_ipp_usec
+    coh_int_time = cfg_params.n_ipp * exp_def.t_ipp_usec
     echo_len = coh_int_time * samples
     t_abs = np.zeros(samples)
     t_rel = t_abs - t_start
@@ -111,13 +109,13 @@ def sim_data(
         output_path=output_path,
         range_function=range_function,
         sim_params=simulation_params,
-        experiment_params=exp_params,
+        exp_def=exp_def,
         bounds_params=bounds_params,
         dtype=np.complex64,
         clobber=True,
     )
 
-    return range0, vel0, acel0, t_rel, t_abs, SNR, echo_len, exp_params
+    return range0, vel0, acel0, t_rel, t_abs, SNR, echo_len, exp_def
 
 
 def download_test_data(path: Path) -> Path:

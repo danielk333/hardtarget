@@ -37,7 +37,7 @@ raw_data = utils.download_test_data(Path(tmp_dir.name) / "raw")
 data = utils.convert_test_data(raw_data, converted_path)[0]
 
 
-reader = RadarDef().load_data(data)
+reader = RadarDef().load_data(data, cache=False)
 assert reader is not None
 
 # ## Analyse data
@@ -46,8 +46,8 @@ assert reader is not None
 # In this case we choose to visualize the 500 first ipps of the measurement
 
 output_path = Path(tmp_dir.name) / "analysed"
-start_time = int(reader.experiment.t_ipp_usec * 50)
-end_time = start_time + int(reader.experiment.t_ipp_usec * 120)
+start_time = int(reader.exp_def.t_ipp_usec * 50)
+end_time = start_time + int(reader.exp_def.t_ipp_usec * 120)
 
 echo_search(
     data=data,
@@ -63,12 +63,12 @@ echo_search(
 # First load results
 
 data_generator = load_analysed_data(output_path)
-out_data, exp_params, cfg_params, pro_params = list(data_generator)[0]
+out_data, exp_def, cfg_params, pro_params = list(data_generator)[0]
 
 # Then we can visualize it with different plots
 
 fig, ax = plt.subplots(3, 2)
-plotting.plot_echo_search(ax, exp_params, out_data, pro_params, limit=0.7)
+plotting.plot_echo_search(ax, exp_def, out_data, pro_params, limit=0.7)
 #
 # plot raw data power in 2 blocks
 long_plot = ax[1, 0].get_gridspec()

@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory() as tmp_dir:
     simulation_path = Path(tmp_dir) / "sim_data"
     simulate_h5(
         output_dir=simulation_path,
-        exp_params=exp_def,
+        exp_def=exp_def,
         start_time=0,
         end_time=exp_def.t_ipp_usec,
         target_start_time=0,

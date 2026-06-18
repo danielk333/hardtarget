@@ -12,7 +12,7 @@ from hardtarget.types import ExpDef
 def xcorr_numpy(
     tx: npt.NDArray[np.complex64],
     rx: npt.NDArray[np.complex64],
-    exp_params: ExpDef,
+    exp_def: ExpDef,
     cfg_params: EchoSearchCfgParams,
     pro_params: EchoSearchProParams,
 ) -> EchoSearchVars:
@@ -22,7 +22,7 @@ def xcorr_numpy(
     Args:
         tx: Transmitted signal, one dimensional
         rx: Recived signal per channel, shape: (n_channels, n_rx_samps)
-        exp_params: Experiment definition
+        exp_def: Experiment definition
         cfg_params: Configuration parameters
         pro_params: Echo search process specific parameters
 
@@ -53,7 +53,7 @@ def xcorr_numpy(
 
     # Calculate signal model
     doppler_freq_samp = (
-        np.atleast_2d(doppler_freqs).T * 2 * np.pi * np.arange(1, len(tx) + 1) * exp_params.t_samp_usec * 1e-6
+        np.atleast_2d(doppler_freqs).T * 2 * np.pi * np.arange(1, len(tx) + 1) * exp_def.t_samp_usec * 1e-6
     )
     signal_model = tx.flatten() * (np.cos(doppler_freq_samp) + np.sin(doppler_freq_samp) * 1j)
 

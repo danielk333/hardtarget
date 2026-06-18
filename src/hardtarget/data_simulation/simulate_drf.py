@@ -28,7 +28,7 @@ def simulate_drf(
     output_path: pathlib.Path | None,
     range_function: Callable,
     sim_params: DRFSimParams,
-    experiment_params: ExpDef,
+    exp_def: ExpDef,
     bounds_params: BoundParams,
     snr_function: Optional[Callable] = None,
     compression_level: int = 0,
@@ -45,7 +45,7 @@ def simulate_drf(
         output_path: Path to directory to store the simulated measurement.
         range_function: Range function, used to model the range input: time point [seconds] output: range [km]
         sim_params: Simulation parameters, specifics to control the simulation.
-        experiment_params: Experiment parameters used to model the signal.
+        exp_def: Experiment parameters used to model the signal.
         bounds_params: Epoch bounds, start and end of measurement.
         snr_function (optional): Signal to noise ratio function, used to simulate the snr.
         compression_level (optional): Compression level on the raw data.
@@ -58,29 +58,29 @@ def simulate_drf(
 
     # ------- Channel data --------
 
-    sample_rate = experiment_params.sample_rate
+    sample_rate = exp_def.sample_rate
 
-    rx_start_usec = experiment_params.t_rx_start_usec
-    rx_end_usec = experiment_params.t_rx_end_usec
-    tx_start_usec = experiment_params.t_tx_start_usec
-    tx_end_usec = experiment_params.t_tx_end_usec
+    rx_start_usec = exp_def.t_rx_start_usec
+    rx_end_usec = exp_def.t_rx_end_usec
+    tx_start_usec = exp_def.t_tx_start_usec
+    tx_end_usec = exp_def.t_tx_end_usec
 
-    ipp_samp = experiment_params.ipp_samps
-    wavelength = experiment_params.wavelength
-    rx_start_samp = np.round(rx_start_usec / experiment_params.t_samp_usec).astype(np.int64)
-    rx_end_samp = np.round(rx_end_usec / experiment_params.t_samp_usec).astype(np.int64)
+    ipp_samp = exp_def.ipp_samps
+    wavelength = exp_def.wavelength
+    rx_start_samp = np.round(rx_start_usec / exp_def.t_samp_usec).astype(np.int64)
+    rx_end_samp = np.round(rx_end_usec / exp_def.t_samp_usec).astype(np.int64)
     n_rx_samps = rx_end_samp - rx_start_samp
     rx_select = np.full((ipp_samp,), False, dtype=bool)
     rx_select[rx_start_samp:rx_end_samp] = True
 
-    tx_start_samp = np.round(tx_start_usec / experiment_params.t_samp_usec).astype(np.int64)
-    tx_end_samp = np.round(tx_end_usec / experiment_params.t_samp_usec).astype(np.int64)
+    tx_start_samp = np.round(tx_start_usec / exp_def.t_samp_usec).astype(np.int64)
+    tx_end_samp = np.round(tx_end_usec / exp_def.t_samp_usec).astype(np.int64)
     n_tx_samps = tx_end_samp - tx_start_samp
     tx_select = np.full((ipp_samp,), False, dtype=bool)
     tx_select[tx_start_samp:tx_end_samp] = True
 
-    code = experiment_params.code
-    codes = experiment_params.code.shape[0]
+    code = exp_def.code
+    codes = exp_def.code.shape[0]
 
     samp_t0 = sim_params.start_time_us * 1e-6 * sample_rate
     samp_t0 = np.round((samp_t0 // ipp_samp) * ipp_samp).astype(np.int64)
@@ -101,7 +101,7 @@ def simulate_drf(
         output_path = pathlib.Path(output_path)
         output_path.mkdir(exist_ok=True)
 
-        dstdir = output_path / str(experiment_params.rx_channels[0])
+        dstdir = output_path / str(exp_def.rx_channels[0])
         if dstdir.is_dir() and clobber:
             logger.info(f"'{dstdir}' exists and clobber is on: removing dir")
             shutil.rmtree(dstdir)
@@ -139,8 +139,8 @@ def simulate_drf(
 
         tx_wave = waveform_generator(
             n_tx_samps=n_tx_samps,
-            sample_rate=experiment_params.sample_rate,
-            baud_length_sec=experiment_params.baud_length_usec,
+            sample_rate=exp_def.sample_rate,
+            baud_length_sec=exp_def.baud_length_usec,
             code=code[pid % codes],
             dtype=dtype,
         )
@@ -198,7 +198,7 @@ def simulate_drf(
         meta_writer.write(tx_start_samp, pointing_data)
 
         # ------------ Metadata ---------------
-        write_metadata(experiment_params, bounds_params, dstdir)
+        write_metadata(exp_def, bounds_params, dstdir)
 
         if rf_writer:
             rf_writer.close()

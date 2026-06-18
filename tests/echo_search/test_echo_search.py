@@ -21,7 +21,7 @@ from hardtarget.plotting import echo_search_plot, rti
 
 @pytest.mark.parametrize("impl", [Impl.c])  # Impl.numpy
 def test_echo(plot, impl: Impl):
-    exp_params = ExpDef(
+    exp_def = ExpDef(
         name="Mu",
         radar_frequency=46.5,
         t_ipp_usec=3120,
@@ -77,12 +77,12 @@ def test_echo(plot, impl: Impl):
     with tempfile.TemporaryDirectory() as temp_dir:
         output_path = Path(temp_dir) / "sim"
         station = Mu()
-        measurement_length_us = exp_params.t_ipp_usec * 50
-        target_start_time_us = exp_params.t_ipp_usec * 20
-        target_end_time_us = exp_params.t_ipp_usec * 40
+        measurement_length_us = exp_def.t_ipp_usec * 50
+        target_start_time_us = exp_def.t_ipp_usec * 20
+        target_end_time_us = exp_def.t_ipp_usec * 40
         simulate_h5(
             output_dir=output_path,
-            exp_params=exp_params,
+            exp_def=exp_def,
             start_time=dt.datetime.now(),
             end_time=dt.datetime.now() + dt.timedelta(microseconds=measurement_length_us),
             target_start_time=target_start_time_us,
@@ -102,6 +102,7 @@ def test_echo(plot, impl: Impl):
             min_range_gate=81,
             max_range_gate=140,
             num_cohints_per_file=10,
+            cache=False,
             doppler_freq_min=-30000,
             doppler_freq_max=0,
             doppler_freq_step=10,
@@ -116,7 +117,7 @@ def test_echo(plot, impl: Impl):
             clobber=False,
             output=output_analysis,
             progress=False,
-            exp_params=exp_params,
+            exp_def=exp_def,
             implementation=impl,
         )
         output: tuple[EchoSearchOutArgs, ExpDef, EchoSearchCfgParams, EchoSearchProParams] = list(
@@ -153,7 +154,7 @@ def test_echo(plot, impl: Impl):
             echo_search_plot.plot_echo_search(ax, exp, out)
             ax[0, 1].plot(np.arange(out.max_corr.shape[0]), target_range * 1e-3, "-r")
             ax[1, 1].plot(np.arange(out.max_corr.shape[0]), target_range_rate * 1e-3, "-r")
-            rti(ax=ax[2, 0], data_loader=station.load_data(output_path, experiment=exp))
+            rti(ax=ax[2, 0], data_loader=station.load_data(output_path, exp_def=exp))
             ax[2, 1].plot(
                 np.arange(out.max_corr.shape[0]),
                 tx_rx_samps - tx_rx_start_delta,
@@ -172,7 +173,7 @@ def test_echo(plot, impl: Impl):
 
 
 def test_crosscorrelate_tx_model(plot):
-    exp_params = ExpDef(
+    exp_def = ExpDef(
         name="Mu",
         radar_frequency=46.5,
         t_ipp_usec=3120,
@@ -194,12 +195,12 @@ def test_crosscorrelate_tx_model(plot):
 
     tx = (
         tx_signal_model(
-            code=exp_params.code,
-            baud_length_usec=exp_params.baud_length_usec,
-            t_samp_usec=exp_params.t_samp_usec,
+            code=exp_def.code,
+            baud_length_usec=exp_def.baud_length_usec,
+            t_samp_usec=exp_def.t_samp_usec,
             tx_start_samp=0,
-            ipp_samps=len(exp_params.code) * 2,
-            read_length=len(exp_params.code) * 2,
+            ipp_samps=len(exp_def.code) * 2,
+            read_length=len(exp_def.code) * 2,
         )
         .flatten()
         .astype(np.complex64)

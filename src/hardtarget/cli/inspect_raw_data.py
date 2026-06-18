@@ -45,7 +45,7 @@ def main(args: argparse.Namespace) -> None:
         channels = data_loader.channels
         for chnl in channels:
             samp_start, samp_end = data_loader.bounds(chnl)
-            sample_rate = data_loader.experiment.sample_rate
+            sample_rate = data_loader.exp_def.sample_rate
             dt_start = str_from_ts(data_loader.epoch_bounds.ts_start_usec * 1e-6)
             dt_end = str_from_ts(data_loader.epoch_bounds.ts_end_usec * 1e-6)
 
@@ -60,4 +60,4 @@ def main(args: argparse.Namespace) -> None:
                 )
             )
 
-        pprint.pprint({"Channels": d, "Experiment": asdict(data_loader.experiment)})
+        pprint.pprint({"Channels": d, "Experiment": asdict(data_loader.exp_def)})

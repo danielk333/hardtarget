@@ -61,7 +61,7 @@ def main(args: argparse.Namespace) -> None:
             # File is already converted
             filepath = Path(args.path)
 
-        data_loader = radar_def.load_data(filepath)
+        data_loader = radar_def.load_data(filepath, cache=False)
         if data_loader is None:
             raise Exception(f"Not possible to load the given file: {args.path}")
 

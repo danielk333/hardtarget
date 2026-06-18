@@ -73,7 +73,7 @@ target_end_time_us = 750000
 # Simulate data and write to file
 simulate_h5(
     output_dir=data_path,
-    exp_params=experiment,
+    exp_def=experiment,
     start_time=measurement_start,
     end_time=measurement_end,
     target_start_time=target_start_time_us,
@@ -85,7 +85,7 @@ simulate_h5(
     beam_params=station.beam_parameters,
 )
 # Load the raw data so it's available if needed.
-data = station.load_data(data_path, experiment=mu_exp)
+data = station.load_data(data_path, exp_def=mu_exp, cache=False)
 assert data is not None, "Not possible to load data"
 
 # ## Analysis configuration
@@ -129,10 +129,10 @@ echo_search(
 
 # load data
 data_generator = load_analysed_data(output_path)
-out_data, exp_params, cfg_params, pro_params = list(data_generator)[0]
+out_data, exp_def, cfg_params, pro_params = list(data_generator)[0]
 #
 fig, ax = plt.subplots(2, 2)
-plotting.plot_echo_search(ax, exp_params, out_data, limit=0.6)
+plotting.plot_echo_search(ax, exp_def, out_data, limit=0.6)
 _, handles = plotting.rti(
     ax[1, 1],
     data,
@@ -152,7 +152,7 @@ target_estimation(
     data=data,
     config=cfg,
     output=output_path,
-    exp_params=experiment,
+    exp_def=experiment,
 )
 
 # ### Plot target estimation results
@@ -160,7 +160,7 @@ target_estimation(
 
 # load data,
 data_generator = load_analysed_data(output_path)
-out_data, exp_params, cfg_params, pro_params = list(data_generator)[0]
+out_data, exp_def, cfg_params, pro_params = list(data_generator)[0]
 
 # Plot peaks, this visualizes the peaks  of the hardtargets range, velocity
 # and acceleration over time (red is marking the detections). Furthermore the the signal to noise ratio is
@@ -170,7 +170,7 @@ fig, axes = plt.subplots(2, 2)
 plotting.target_estimation_plots.plot_peaks(
     axes,
     out_data,
-    exp_params,
+    exp_def,
     cfg_params,
     pro_params,
     snr_dB_limit=15.0,
@@ -185,7 +185,7 @@ fig, axes = plt.subplots(2, 3)
 plotting.target_estimation_plots.plot_detections(
     axes,
     out_data,
-    exp_params,
+    exp_def,
     cfg_params,
     pro_params,
 )
@@ -204,7 +204,7 @@ axes = [
 plotting.target_estimation_plots.plot_map(
     axes,
     out_data,
-    exp_params,
+    exp_def,
     cfg_params,
     pro_params,
 )
@@ -232,7 +232,7 @@ direction_of_arrival(
 # load data
 data_generator = load_analysed_data(output_path)
 output: tuple[DOAVars, ExpDef, DOACfgParams, DOAProParams] = list(data_generator)[0]
-out_data, exp_params, cfg_params, pro_params = output
+out_data, exp_def, cfg_params, pro_params = output
 # plot
 fig, ax = plt.subplots(2, 2)
 ax = plotting.plot_direction_of_arrival(ax, out_data, pro_params, 10.0)
@@ -248,7 +248,7 @@ fig = plt.figure()
 ax = plt.axes(projection="3d")
 ax = plotting.plot_true_vs_estimated_trajectory(
     ax=ax,
-    exp_params=exp_params,
+    exp_def=exp_def,
     trajectory_func=trajectory_func,
     doa_peaks=out_data.peak,
     doa_azimuth=out_data.azimuth,

@@ -84,18 +84,18 @@ def rti(
             ),
             start_time=start_time,
             end_time=end_time,
-            sample_rate=data_loader.experiment.sample_rate,
+            sample_rate=data_loader.exp_def.sample_rate,
             relative_time=relative_time,
         )
     else:
-        request_bounds = Bounds(*data_loader.bounds(data_loader.experiment.rx_channels[0]))
+        request_bounds = Bounds(*data_loader.bounds(data_loader.exp_def.rx_channels[0]))
 
-    samp_bounds = sample_interval_to_closest_ipp(request_bounds, data_loader.experiment.ipp_samps)
+    samp_bounds = sample_interval_to_closest_ipp(request_bounds, data_loader.exp_def.ipp_samps)
 
     # Extract data within bounds
     n_samp = samp_bounds.end - samp_bounds.start
     data_vec = data_loader.read(
-        channel=data_loader.experiment.rx_channels, start_sample=samp_bounds.start, vector_length=n_samp
+        channel=data_loader.exp_def.rx_channels, start_sample=samp_bounds.start, vector_length=n_samp
     )
 
     if data_vec.ndim > 1:
@@ -103,26 +103,26 @@ def rti(
 
     # Define experiment tx and rx intervals
     def usec_to_sample(t_usec: int) -> int:
-        return int(t_usec / data_loader.experiment.t_samp_usec)
+        return int(t_usec / data_loader.exp_def.t_samp_usec)
 
-    t_rx_start_samp = usec_to_sample(data_loader.experiment.t_rx_start_usec)
-    t_rx_end_samp = usec_to_sample(data_loader.experiment.t_rx_end_usec)
-    t_tx_start_samp = usec_to_sample(data_loader.experiment.t_tx_start_usec)
-    t_tx_end_samp = usec_to_sample(data_loader.experiment.t_tx_end_usec)
+    t_rx_start_samp = usec_to_sample(data_loader.exp_def.t_rx_start_usec)
+    t_rx_end_samp = usec_to_sample(data_loader.exp_def.t_rx_end_usec)
+    t_tx_start_samp = usec_to_sample(data_loader.exp_def.t_tx_start_usec)
+    t_tx_end_samp = usec_to_sample(data_loader.exp_def.t_tx_end_usec)
     t_cal_on_samp = (
-        usec_to_sample(int(data_loader.experiment.t_cal_on_usec))
-        if data_loader.experiment.t_cal_on_usec is not None
+        usec_to_sample(int(data_loader.exp_def.t_cal_on_usec))
+        if data_loader.exp_def.t_cal_on_usec is not None
         else 0
     )
     t_cal_off_samp = (
-        usec_to_sample(int(data_loader.experiment.t_cal_off_usec))
-        if data_loader.experiment.t_cal_off_usec is not None
+        usec_to_sample(int(data_loader.exp_def.t_cal_off_usec))
+        if data_loader.exp_def.t_cal_off_usec is not None
         else 0
     )
 
-    range_T = t_tx_start_samp / data_loader.experiment.sample_rate
-    samp_vec = np.arange(data_loader.experiment.ipp_samps)
-    rt_vec = np.arange(t_rx_end_samp - t_rx_start_samp) * data_loader.experiment.t_samp_usec - range_T
+    range_T = t_tx_start_samp / data_loader.exp_def.sample_rate
+    samp_vec = np.arange(data_loader.exp_def.ipp_samps)
+    rt_vec = np.arange(t_rx_end_samp - t_rx_start_samp) * data_loader.exp_def.t_samp_usec - range_T
 
     if monostatic:
         rt_vec *= 0.5
@@ -131,11 +131,11 @@ def rti(
         if end_range_gate is not None:
             end_range_gate *= 2
 
-    mat_shape = (data_vec.size // data_loader.experiment.ipp_samps, data_loader.experiment.ipp_samps)
+    mat_shape = (data_vec.size // data_loader.exp_def.ipp_samps, data_loader.exp_def.ipp_samps)
     data_ipp_vec = data_vec.reshape(mat_shape).T
 
     il0_rg0, il0_rg1 = extract_requested_range_gates(
-        start_range_gate, end_range_gate, range_gate_unit, data_loader.experiment
+        start_range_gate, end_range_gate, range_gate_unit, data_loader.exp_def
     )
     assert il0_rg0 >= t_rx_start_samp, (
         f"requested start range gate {il0_rg0} before measurement start {t_rx_start_samp}"
@@ -173,7 +173,7 @@ def rti(
         ax.set_ylabel("Level-0 sample")
     else:
         X, Y = np.meshgrid(
-            np.arange(data_ipp_vec.shape[1]) * data_loader.experiment.t_ipp_usec * 1e-6,
+            np.arange(data_ipp_vec.shape[1]) * data_loader.exp_def.t_ipp_usec * 1e-6,
             1e-3 * rt_vec * constants.c,
         )
         ax.set_xlabel("Time [s]")

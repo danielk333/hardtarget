@@ -2,6 +2,7 @@
 
 import datetime as dt
 import logging
+import warnings
 from collections.abc import Generator
 from dataclasses import fields
 from pathlib import Path
@@ -103,7 +104,9 @@ def collect_paths(
         unix_t0 = epoch_unix + start
     else:
         if start_time is None:
-            dt64_t0 = np.datetime64(dt.datetime.fromtimestamp(epoch_unix, dt.timezone.utc))
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=UserWarning)
+                dt64_t0 = np.datetime64(dt.datetime.fromtimestamp(epoch_unix, dt.timezone.utc))
         elif isinstance(start_time, np.datetime64):
             dt64_t0 = start_time  # type: ignore[assignment]
         else:
@@ -119,7 +122,9 @@ def collect_paths(
         unix_t1 = epoch_unix + end
     else:
         if end_time is None:
-            dt64_t1 = np.datetime64(dt.datetime.fromtimestamp(max_unix, dt.timezone.utc))
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=UserWarning)
+                dt64_t1 = np.datetime64(dt.datetime.fromtimestamp(max_unix, dt.timezone.utc))
         elif isinstance(end_time, np.datetime64):
             dt64_t1 = end_time  # type: ignore[assignment]
         else:
@@ -151,7 +156,7 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
     cfg_type, pro_type, out_type = get_process_types_from_file(paths[0])
 
     out_args: dict[str, Any] = {}
-    exp_params: ExpDef | None = None
+    exp_def: ExpDef | None = None
     cfg_params: GenericCfg | None = None
     pro_params: GenericPro | None = None
 
@@ -173,8 +178,8 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
                     **{key: read_key(group, key) for key in group.keys() if key not in excluded_keys}
                 )
 
-            if exp_params is None:
-                exp_params = extract_dataclass(hf, ExpDef)
+            if exp_def is None:
+                exp_def = extract_dataclass(hf, ExpDef)
             if cfg_params is None:
                 group = hf[cfg_type.__name__]
                 cfg_params = cfg_type(**{key: read_key(group, key) for key in group.keys()})
@@ -201,13 +206,13 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
 
         out_args = _append_data(out_args, out_tmp, logger)
 
-    if not exp_params or not cfg_params or not pro_params:
+    if not exp_def or not cfg_params or not pro_params:
         raise FileNotFoundError(
-            f"Exp present: {exp_params is not None}, Cfg present: {cfg_params is not None}, Pro present: {pro_params is not None} "
+            f"Exp present: {exp_def is not None}, Cfg present: {cfg_params is not None}, Pro present: {pro_params is not None} "
         )
     return (
         out_type(**out_args),
-        exp_params,
+        exp_def,
         cfg_params,
         pro_params,
     )

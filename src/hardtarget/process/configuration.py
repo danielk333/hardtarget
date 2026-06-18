@@ -57,10 +57,10 @@ def extract_config_section(
             if key not in default_dict.keys():
                 raise ValueError(f"'{key}' option found in config file is not a valid config parameter")
             # Convert values to specific types
-            if isinstance(default_dict[key], int):
-                default_dict[key] = config.getint(section, key)
-            elif isinstance(default_dict[key], bool):
+            if isinstance(default_dict[key], bool):
                 default_dict[key] = config.getboolean(section, key)
+            elif isinstance(default_dict[key], int):
+                default_dict[key] = config.getint(section, key)
             elif isinstance(default_dict[key], float):
                 default_dict[key] = config.getfloat(section, key)
             else:
@@ -121,7 +121,7 @@ def extract_config_params_from_derived_object(cfg_derived: CfgParams) -> CfgPara
 
 
 def compute_process_params(
-    exp_params: ExpDef,
+    exp_def: ExpDef,
     cfg_params: CfgParams,
     analysis_method: AnalysisMethod,
     method_lib: MethodLib,
@@ -131,7 +131,7 @@ def compute_process_params(
     Computes the processing parameters from the experiment and configuration parameters.
 
     Args:
-        exp_params: Experiment parameters from dataloader
+        exp_def: Experiment parameters from dataloader
         cfg_params: Configuration parameters from user
         analysis_method: Method to use during analysis
         method_lib: Specific library used
@@ -141,19 +141,19 @@ def compute_process_params(
     """
 
     def usec_to_samp(usec: int | float) -> int:
-        return int(usec / exp_params.t_samp_usec)
+        return int(usec / exp_def.t_samp_usec)
 
     # ---- Read length ----
-    read_length = (cfg_params.n_ipp + cfg_params.ipp_offset) * exp_params.ipp_samps
+    read_length = (cfg_params.n_ipp + cfg_params.ipp_offset) * exp_def.ipp_samps
 
     # ---- signal indexing ----
     rx_stencil = np.full((read_length,), False, dtype=bool)
     tx_stencil = np.full((read_length,), False, dtype=bool)
 
     # ---- start and end samples ----
-    rx_end_samp = usec_to_samp(exp_params.t_rx_end_usec)
-    tx_start_samp = usec_to_samp(exp_params.t_tx_start_usec)
-    tx_end_samp = usec_to_samp(exp_params.t_tx_end_usec)
+    rx_end_samp = usec_to_samp(exp_def.t_rx_end_usec)
+    tx_start_samp = usec_to_samp(exp_def.t_tx_start_usec)
+    tx_end_samp = usec_to_samp(exp_def.t_tx_end_usec)
     tx_pulse_samps = tx_end_samp - tx_start_samp
 
     # ---- Range gates ----
@@ -181,12 +181,12 @@ def compute_process_params(
     # --- Signal stencils ----
     for k in range(cfg_params.n_ipp):
         # start of pulse within range-gates, thus include also the entire pulse at the end
-        _rx0 = (k + cfg_params.ipp_offset) * exp_params.ipp_samps + _il0_min_range_gate
-        _rx1 = (k + cfg_params.ipp_offset) * exp_params.ipp_samps + _il0_max_range_gate + tx_pulse_samps
+        _rx0 = (k + cfg_params.ipp_offset) * exp_def.ipp_samps + _il0_min_range_gate
+        _rx1 = (k + cfg_params.ipp_offset) * exp_def.ipp_samps + _il0_max_range_gate + tx_pulse_samps
         rx_stencil[_rx0:_rx1] = True
 
-        _tx0 = k * exp_params.ipp_samps + tx_start_samp
-        _tx1 = k * exp_params.ipp_samps + tx_end_samp
+        _tx0 = k * exp_def.ipp_samps + tx_start_samp
+        _tx1 = k * exp_def.ipp_samps + tx_end_samp
         tx_stencil[_tx0:_tx1] = True
 
     return ProParams(
@@ -202,11 +202,11 @@ def compute_process_params(
 
 
 def get_ilx_windows(
-    exp_params: ExpDef, cfg_params: CfgParams, pro_params: ProParams
+    exp_def: ExpDef, cfg_params: CfgParams, pro_params: ProParams
 ) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
-    rx_end_samp = int(exp_params.t_rx_end_usec / exp_params.t_samp_usec)
-    tx_start_samp = int(exp_params.t_tx_start_usec / exp_params.t_samp_usec)
-    tx_end_samp = int(exp_params.t_tx_end_usec / exp_params.t_samp_usec)
+    rx_end_samp = int(exp_def.t_rx_end_usec / exp_def.t_samp_usec)
+    tx_start_samp = int(exp_def.t_tx_start_usec / exp_def.t_samp_usec)
+    tx_end_samp = int(exp_def.t_tx_end_usec / exp_def.t_samp_usec)
 
     _tx_pulse_samps = tx_end_samp - tx_start_samp
 

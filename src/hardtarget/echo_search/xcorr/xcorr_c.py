@@ -15,7 +15,7 @@ mfclib = load_c_lib()
 def xcorr_c(
     tx: npt.NDArray[np.complex64],
     rx: npt.NDArray[np.complex64],
-    exp_params: ExpDef,
+    exp_def: ExpDef,
     cfg_params: EchoSearchCfgParams,
     pro_params: EchoSearchProParams,
 ) -> EchoSearchVars:
@@ -25,7 +25,7 @@ def xcorr_c(
     Args:
         tx: Transmitted signal, one dimensional
         rx: Recived signal per channel, shape: (n_channels, n_rx_samps)
-        exp_params: Experiment definition
+        exp_def: Experiment definition
         cfg_params: Configuration parameters
         pro_params: Echo search process specific parameters
 
@@ -52,7 +52,7 @@ def xcorr_c(
         pro_params.doppler_frequencies,  # 5
         len(pro_params.doppler_frequencies),  # 6
         cfg_params.range_gate_step,  # 7
-        int(exp_params.t_samp_usec),  # 8
+        int(exp_def.t_samp_usec),  # 8
         correlation,  # 9
         np.array(correlation.shape, dtype=np.int32),  # 10
         corr_normalized,  # 11

@@ -49,6 +49,7 @@ def create_cfg(path: Path) -> Path:
         range_gate_step=1
         num_cohints_per_file=500
         tx_amp_limit = 0.2
+        cache=False
     [target_estimation]
         min_acceleration=0
         max_acceleration=0

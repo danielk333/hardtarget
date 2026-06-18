@@ -21,7 +21,7 @@ temp_dir = tempfile.TemporaryDirectory()
 # ## Defining the experiment definition
 # ---
 
-exp_params = ExpDef(
+exp_def = ExpDef(
     name="Mu",
     radar_frequency=46.5,
     t_ipp_usec=3120,
@@ -75,7 +75,7 @@ target_start_time_us = 350000
 target_end_time_us = 600000
 simulate_h5(
     output_dir=output_path,
-    exp_params=exp_params,
+    exp_def=exp_def,
     start_time=dt.datetime.now(),
     end_time=dt.datetime.now() + dt.timedelta(seconds=1),
     target_start_time=target_start_time_us,
@@ -90,11 +90,11 @@ simulate_h5(
 # ## Visualise the Raw data
 # ---
 
-data_loader = RadarDef().load_data(output_path, experiment=exp_params)
+data_loader = RadarDef().load_data(output_path, exp_def=exp_def, cache=False)
 assert data_loader is not None, "Failed to load data"
 fig, ax = plt.subplots(2)
 data = np.zeros(data_loader.read(1).shape, dtype=np.complex128)
-for c in exp_params.rx_channels:
+for c in exp_def.rx_channels:
     data += data_loader.read(c)
 ax[0].plot(data)
 ax[1], handles = rti(

@@ -14,16 +14,17 @@ from typing import Any, Generic, Optional, Type
 
 import numpy as np
 from radardef.components import DataLoader
+from radardef.tools.mpi_tools import CommBar
 from radardef.types import Pointing
-from tqdm import tqdm
 
 import hardtarget.process.utils as utils
-from hardtarget.constants import AnalysisMethod, Impl, MethodLib
+from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl, MethodLib
 from hardtarget.data_handling import dump_params_to_file
 from hardtarget.data_simulation.tx_model import tx_signal_model
 from hardtarget.process.configuration import (
     compute_process_params,
     extract_config_from_dict,
+    extract_config_section,
     load_config_params,
 )
 from hardtarget.process.utils import calculate_tasks, sample_interval_to_closest_ipp
@@ -120,13 +121,13 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         impl (optional): Implementation to be used during analyse (C/Cuda/Numpy)
         rx_channel (optional): If only a specific rx channel should be analysed, if None all rx channels will be used for analysis.
         excluded_channels (optional): Rx channels to ignore if the data contains multiple channels.
-        progress (optional): Enable progress bar.
         output_dir (optional): Path to output directory, if none data will only be stored in ram
         **kwargs: Extra data such as Beam and Beam parameters (needed for interferometry)
 
     """
 
     method: AnalysisMethod
+    config_section: ConfigSubSection
 
     def __init__(
         self,
@@ -137,7 +138,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         rx_channel: Optional[str | int] = None,
         excluded_channels: Optional[list[str] | list[int]] = None,
         output_dir: Optional[str | Path] = None,
-        progress: bool = False,
         **kwargs: Unpack[ArrayKwargs],
     ) -> None:
         # Local logger
@@ -145,8 +145,8 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
         # Experiment definition and data acquisition
         self.data = data
-        self.exp_params = self.data.experiment
-        self._rx_channels, self._tx_channel = self.extract_channels(self.exp_params, rx_channel)
+        self.exp_def = self.data.exp_def
+        self._rx_channels, self._tx_channel = self.extract_channels(self.exp_def, rx_channel)
         self._excluded_channels = excluded_channels if excluded_channels else []
 
         # Define configuration
@@ -160,23 +160,26 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             cfg_base = load_config_params(Path(config))
             self.cfg_params = self.get_conf_params(Path(config), cfg_base)
 
+        # Check if cache is requested or not
+        if self.cfg_params.cache != self.data.cache_state:
+            self.data.cache_state = self.cfg_params.cache
+
         # Define library to be used during process
         self.lib, lib_name, impl = self.get_analysis_lib(method_lib, impl)
 
         # Derive process parameters
         pro_base = compute_process_params(
-            self.exp_params,
+            self.exp_def,
             self.cfg_params,
             analysis_method=self.method,
             method_lib=lib_name,
             implementation=impl,
         )
-        self.pro_params = self.get_process_params(self.exp_params, self.cfg_params, pro_base)
+        self.pro_params = self.get_process_params(self.exp_def, self.cfg_params, pro_base)
 
         # Other needed parameters
         t_start_usec, t_end_usec = self.data.epoch_bounds
         self.epoch = Bounds(int(t_start_usec), int(t_end_usec))
-        self.progress = progress
         self.output_dir = Path(output_dir).resolve() if output_dir is not None else None
         self.store_mode = "w"
         self.store_params = True
@@ -215,14 +218,31 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         """Get specific library to run analysis"""
         pass
 
-    @abstractmethod
     def get_conf_params(self, cfg_path: Path, cfg_params: CfgParams) -> GenericCfg:
-        """Abstract method, process specific configuration parameters"""
-        pass
+        """
+        Extract process configuration parameters
+
+        Args:
+            cfg_path: Path to configuration file.
+            cfg_params: already loaded configuration parameters that can be extended
+
+        Returns:
+            Process specific Configuration parameters
+        """
+        cfg_type, _, _ = self.get_types()
+        d = extract_config_section(
+            cfg_path,
+            self.config_section,
+            cfg_type,
+            cfg_params,
+            self._logger,
+        )
+
+        return cfg_type(**d)
 
     @abstractmethod
     def get_process_params(
-        self, exp_params: ExpDef, cfg_params: GenericCfg, pro_params: ProParams
+        self, exp_def: ExpDef, cfg_params: GenericCfg, pro_params: ProParams
     ) -> GenericPro:
         """Abstract method, process specific parameters"""
         pass
@@ -251,7 +271,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self,
         all_vars: GenericVars,
         file_idx_sample: int,
-        exp_params: ExpDef,
+        exp_def: ExpDef,
         cfg_params: GenericCfg,
         pro_params: GenericPro,
     ) -> GenericOut:
@@ -261,7 +281,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         Args:
             all_vars: All cohints analysed data stacked together
             file_idx_sample: File id, microseconds since epoch.
-            exp_params: Experiment parameters
+            exp_def: Experiment parameters
             cfg_params: Configuration parameters
 
         Returns:
@@ -284,7 +304,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         pass
 
     def process_task(
-        self, task_idx: int, file_idx_sample: int, bounds: Bounds, progress_bar: Optional[tqdm]
+        self, task_idx: int, file_idx_sample: int, bounds: Bounds, progress_bar: Optional[CommBar]
     ) -> GenericOut:
         """
         Process one task, extract amount of samples to process, analyse the samples for each coherent
@@ -299,11 +319,11 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             Out data suitable for the specific process
         """
 
-        ipp = self.exp_params.t_ipp_usec
-        sample_rate = self.exp_params.sample_rate
+        ipp = self.exp_def.t_ipp_usec
+        sample_rate = self.exp_def.sample_rate
         n_ipp = self.cfg_params.n_ipp
         num_cohints_per_file = self.cfg_params.num_cohints_per_file
-        ipp_samp = self.exp_params.ipp_samps
+        ipp_samp = self.exp_def.ipp_samps
 
         ts0 = time.time()
 
@@ -338,9 +358,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self._logger.debug(msg.format(**info))
 
         # --- Generate output ---
-        return self.generate_output(
-            all_vars, file_idx_sample, self.exp_params, self.cfg_params, self.pro_params
-        )
+        return self.generate_output(all_vars, file_idx_sample, self.exp_def, self.cfg_params, self.pro_params)
 
     def save_task_data(
         self,
@@ -369,7 +387,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
             dump_params_to_file(
                 data.items(),
-                self.exp_params,
+                self.exp_def,
                 self.cfg_params,
                 self.pro_params,
                 filepath,
@@ -383,7 +401,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             results["files"].append(filepath.name)
         else:
             # Write data to dict at file_idx_sample
-            results["data"][file_idx_sample] = (out_data, self.exp_params, self.cfg_params, self.pro_params)
+            results["data"][file_idx_sample] = (out_data, self.exp_def, self.cfg_params, self.pro_params)
 
         return results
 
@@ -396,6 +414,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         relative_time: bool = False,
         sub_directory: Optional[str] = None,
         clobber: bool = True,
+        progress: bool | CommBar = False,
     ) -> AnalysedResult:
         """
         Run gathers all components of the process and runs the analysis.
@@ -434,15 +453,15 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 start_time=start_time,
                 end_time=end_time,
                 time_bounds=self.epoch,
-                sample_rate=self.exp_params.sample_rate,
+                sample_rate=self.exp_def.sample_rate,
                 relative_time=relative_time,
             )
         else:
-            sample_bounds = Bounds(*self.data.bounds(self.exp_params.rx_channels[0]))
+            sample_bounds = Bounds(*self.data.bounds(self.exp_def.rx_channels[0]))
 
         # round off to closest ipp, starting in the middle of a ipp will cause issues to the analysis
         sample_bounds = sample_interval_to_closest_ipp(
-            sample_bounds=sample_bounds, ipp_samps=self.exp_params.ipp_samps
+            sample_bounds=sample_bounds, ipp_samps=self.exp_def.ipp_samps
         )
 
         # add potential sample offset
@@ -450,23 +469,25 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             sample_bounds.start + self.cfg_params.samp_offset, sample_bounds.end + self.cfg_params.samp_offset
         )
 
-        job_tasks, job_cohints = calculate_tasks(
+        job_tasks, job_cohints, total_cohints = calculate_tasks(
             comm_rank,
             comm_size,
             self.cfg_params.n_ipp,
             self.cfg_params.num_cohints_per_file,
-            self.exp_params.ipp_samps,
+            self.exp_def.ipp_samps,
             sample_bounds,
         )
 
-        progress_desc = "Coherent integrations"
-        total = job_cohints
-        extend_str_len = len(str(len(job_tasks)))
-        total_num = str(len(job_tasks)).ljust(extend_str_len, " ")
-        if self.progress:
-            curr_num = "1".ljust(extend_str_len, " ")
-            subprog_str = f"[file {curr_num}/{total_num}]"
-            progress_bar = tqdm(desc=f"{progress_desc} {subprog_str}", total=total, position=comm_rank)
+        if progress:
+            description = f"{self.method.replace('_', ' ').title()}"
+            parent_progress = progress if isinstance(progress, CommBar) else None
+            progress_bar = CommBar(
+                desc=description,
+                tot=total_cohints,
+                parent_progress=parent_progress,
+                transient=bool(parent_progress),
+            )
+
         else:
             progress_bar = None
 
@@ -474,17 +495,10 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
         results: AnalysedResult = {"dir": self.output_dir, "files": [], "data": {}}
         for idx, task_idx in enumerate(job_tasks):
-            if progress_bar is not None:
-                curr_num = f"{idx + 1}".ljust(extend_str_len, " ")
-                subprog_str = f"[file {curr_num}/{total_num}]"
-                progress_bar.set_description(
-                    f"{progress_desc} {subprog_str}",
-                )
-
             # Calculate start sample of task
             file_idx_sample = (
                 task_idx
-                * self.exp_params.ipp_samps
+                * self.exp_def.ipp_samps
                 * self.cfg_params.n_ipp
                 * self.cfg_params.num_cohints_per_file
                 + sample_bounds.start
@@ -540,7 +554,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
     def extract_channels(
         self,
-        exp_params: ExpDef,
+        exp_def: ExpDef,
         rx_channel: Optional[int | str] = None,
         excluded_channels: list[int] | list[str] = [],
     ) -> tuple[int | str | list[int] | list[str], int | str | None]:
@@ -549,19 +563,19 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         """
 
         if rx_channel:
-            if rx_channel not in exp_params.rx_channels:
+            if rx_channel not in exp_def.rx_channels:
                 raise ValueError(f"rx_channel: {rx_channel} is not a valid channel in the measurement file")
-            return rx_channel, exp_params.tx_channel
-        elif len(exp_params.rx_channels) == 1:
+            return rx_channel, exp_def.tx_channel
+        elif len(exp_def.rx_channels) == 1:
             # Only one available rx_channel during the experiment, thus we can declare it here
-            return exp_params.rx_channels[0], exp_params.tx_channel
+            return exp_def.rx_channels[0], exp_def.tx_channel
         elif not rx_channel:
-            _rx_channel = exp_params.rx_channels
+            _rx_channel = exp_def.rx_channels
             for chnl in _rx_channel:
                 if chnl in excluded_channels:
                     _rx_channel.remove(chnl)  # type: ignore[arg-type]
 
-            return _rx_channel, exp_params.tx_channel
+            return _rx_channel, exp_def.tx_channel
 
     def get_data(
         self,
@@ -601,17 +615,17 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
         # Extracting tx data
         if not self._tx_channel:
-            assert self.exp_params.code is not None, (
+            assert self.exp_def.code is not None, (
                 "No code available from the metadata, not possible to simulate tx"
             )
             tx = tx_signal_model(
-                code=self.exp_params.code,
-                baud_length_usec=self.exp_params.baud_length_usec,
-                t_samp_usec=self.exp_params.t_samp_usec,
-                tx_start_samp=int(self.exp_params.t_tx_start_usec / self.exp_params.t_samp_usec),
-                start_samp=(start_sample % self.exp_params.ipp_samps) - self.cfg_params.samp_offset,
+                code=self.exp_def.code,
+                baud_length_usec=self.exp_def.baud_length_usec,
+                t_samp_usec=self.exp_def.t_samp_usec,
+                tx_start_samp=int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec),
+                start_samp=(start_sample % self.exp_def.ipp_samps) - self.cfg_params.samp_offset,
                 read_length=read_length,
-                ipp_samps=self.exp_params.ipp_samps,
+                ipp_samps=self.exp_def.ipp_samps,
                 sub_resolution=sub_resolution,
                 kind="linear",
             )

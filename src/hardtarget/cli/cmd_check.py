@@ -70,15 +70,11 @@ def range_gates_main(args: argparse.Namespace) -> None:
             logger.warning(f"Not possible to read data from path: {args.path}")
             return
 
-    sample_rate = 1 / (data_loader.experiment.t_samp_usec * 1e-6)
-    rx_start = (
-        data_loader.experiment.t_rx_start_usec if data_loader.experiment.t_rx_start_usec is not None else 0
-    )
-    rx_end = data_loader.experiment.t_rx_end_usec if data_loader.experiment.t_rx_end_usec is not None else 0
-    tx_start = (
-        data_loader.experiment.t_tx_start_usec if data_loader.experiment.t_tx_start_usec is not None else 0
-    )
-    tx_end = data_loader.experiment.t_tx_end_usec if data_loader.experiment.t_tx_end_usec is not None else 0
+    sample_rate = 1 / (data_loader.exp_def.t_samp_usec * 1e-6)
+    rx_start = data_loader.exp_def.t_rx_start_usec if data_loader.exp_def.t_rx_start_usec is not None else 0
+    rx_end = data_loader.exp_def.t_rx_end_usec if data_loader.exp_def.t_rx_end_usec is not None else 0
+    tx_start = data_loader.exp_def.t_tx_start_usec if data_loader.exp_def.t_tx_start_usec is not None else 0
+    tx_end = data_loader.exp_def.t_tx_end_usec if data_loader.exp_def.t_tx_end_usec is not None else 0
 
     T_rx_start_samp = np.round(rx_start * 1e-6 * sample_rate).astype(np.int64)
     T_rx_end_samp = np.round(rx_end * 1e-6 * sample_rate).astype(np.int64)

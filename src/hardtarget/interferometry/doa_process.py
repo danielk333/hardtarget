@@ -2,7 +2,6 @@
 
 import sys
 from dataclasses import asdict
-from pathlib import Path
 
 import numpy as np
 from pyant.models.array import Array
@@ -11,9 +10,7 @@ from hardtarget.constants import AnalysisMethod, ConfigSubSection, DOAMethod, Im
 from hardtarget.interferometry import get_doa_lib
 from hardtarget.interferometry.types import DOACfgParams, DOAOutArgs, DOAProParams, DOAVars
 from hardtarget.process import Process
-from hardtarget.process.configuration import extract_config_section
 from hardtarget.types import (
-    CfgParams,
     DataItem,
     ExpDef,
     InterferometryLib,
@@ -29,6 +26,7 @@ else:
 
 class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, InterferometryLib]):
     method = AnalysisMethod.direction_of_arrival
+    config_section = ConfigSubSection.INTERFEROMETRY
 
     def __post_init__(self) -> None:
         """Extract beam and beam parameters"""
@@ -47,36 +45,14 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
     ) -> tuple[InterferometryLib, DOAMethod, Impl]:
         return get_doa_lib(lib, impl)
 
-    def get_conf_params(self, cfg_path: Path, cfg_params: CfgParams) -> DOACfgParams:
-        """
-        Extract interferometry configuration parameters
-
-        Args:
-            cfg_path: Path to configuration file.
-            cfg_params: already loaded configuraion parameters that can be extended
-
-        Returns:
-            Process specific interferometry Configuration parameters
-        """
-
-        d = extract_config_section(
-            cfg_path,
-            ConfigSubSection.INTERFEROMETRY,
-            DOACfgParams,
-            cfg_params,
-            self._logger,
-        )
-
-        return DOACfgParams(**d)
-
     def get_process_params(
-        self, exp_params: ExpDef, cfg_params: DOACfgParams, pro_params: ProParams
+        self, exp_def: ExpDef, cfg_params: DOACfgParams, pro_params: ProParams
     ) -> DOAProParams:
         """
         Calculate interferometry specific process parameters
 
         Args:
-            exp_params: Experiment parameters from measurement file
+            exp_def: Experiment parameters from measurement file
             cfg_params: Process specific configuration paramters
             pro_params: General process parameters
 
@@ -112,9 +88,7 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
             start_sample=start_sample, read_length=self.pro_params.read_length, sum_rx_channels=False
         )
 
-        return self.lib(
-            rx, self.exp_params, self.cfg_params, self.pro_params, self.beam, self.beam_parameters
-        )
+        return self.lib(rx, self.exp_def, self.cfg_params, self.pro_params, self.beam, self.beam_parameters)
 
     def stack_vars(self, vars_list: list[DOAVars]) -> DOAVars:
         """Stack the results from the analysis"""
@@ -130,7 +104,7 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
         self,
         all_vars: DOAVars,
         file_idx_sample: int,
-        exp_params: ExpDef,
+        exp_def: ExpDef,
         cfg_params: DOACfgParams,
         pro_params: DOAProParams,
     ) -> DOAOutArgs:
@@ -140,13 +114,13 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
         Args:
             all_vars: All cohints analysed data stacked together
             file_idx_sample: File id, microseconds since epoch.
-            exp_params: Experiment parameters
+            exp_def: Experiment parameters
             cfg_params: Configuration parameters
 
         Returns:
             Output data
         """
-        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_params.t_samp_usec)
+        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_def.t_samp_usec)
 
         return DOAOutArgs(
             k_vec=all_vars.k_vec,

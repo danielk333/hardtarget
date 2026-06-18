@@ -64,7 +64,7 @@ data_generator = load_analysed_data(output_path)
 
 # Then we can visualize it with different plots
 
-out_data, exp_params, cfg_params, pro_params = list(data_generator)[0]
+out_data, exp_def, cfg_params, pro_params = list(data_generator)[0]
 
 # Plot peaks, this visualizes the peaks  of the hardtargets range, velocity
 # and acceleration over time (red is marking the detections). Furthermore the the signal to noise ratio is
@@ -74,7 +74,7 @@ fig, axes = plt.subplots(2, 2)
 target_estimation_plots.plot_peaks(
     axes,
     out_data,
-    exp_params,
+    exp_def,
     cfg_params,
     pro_params,
     snr_dB_limit=15.0,
@@ -98,6 +98,7 @@ config_str = f"""
             num_cohints_per_file=500
             tx_amp_limit = 0.2
             node_gpus=1
+            cache=False
         [target_estimation]
             min_acceleration=0
             max_acceleration=0
@@ -130,7 +131,7 @@ analyse(
 )
 
 optimized_data = load_analysed_data(optimization_path)
-out_data_opt, exp_params_opt, cfg_params_opt, pro_params_opt = list(optimized_data)[0]
+out_data_opt, exp_def_opt, cfg_params_opt, pro_params_opt = list(optimized_data)[0]
 
 # ## Optimization plot
 # ---
@@ -139,14 +140,14 @@ fig, axes = plt.subplots(2, 2)
 target_estimation_plots.plot_peaks(
     axes,
     out_data,
-    exp_params,
+    exp_def,
     cfg_params,
     pro_params,
 )
 optimization_plots.plot_optimization_peaks(
     axes,
     out_data_opt,
-    exp_params_opt,
+    exp_def_opt,
     cfg_params_opt,
     pro_params_opt,
     snr_dB_limit=15.0,

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def dump_params_to_file(
     data_items: Iterable[tuple[str, DataItem]],
-    exp_params: ExpDef,
+    exp_def: ExpDef,
     cfg_params: CfgParams,
     pro_params: ProParams,
     outfile: Path,
@@ -56,7 +56,7 @@ def dump_params_to_file(
     Args:
         data_items: Iterable of data items to be stored in the OutArgs section. This section contains more
                     detailed information for each parameter.
-        exp_params: Experiment parameters
+        exp_def: Experiment parameters
         cfg_params: Configuration parameters related to the specific process, bound to CfgParams
         pro_params: Process parameters related to the specific process, bound to ProParams
         outfile: Path to file
@@ -130,6 +130,6 @@ def dump_params_to_file(
                             val = val.value
                         grp.create_dataset(key, data=val)
 
-            dump_params(file, exp_params)
+            dump_params(file, exp_def)
             dump_params(file, cfg_params)
             dump_params(file, pro_params)

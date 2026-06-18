@@ -55,7 +55,7 @@ data_generator = load_analysed_data(output_path)
 
 # Then we can plot visualize it with different plots
 
-out_data, exp_params, cfg_params, pro_params = list(data_generator)[0]
+out_data, exp_def, cfg_params, pro_params = list(data_generator)[0]
 
 # Plot peaks, this visualizes the peaks  of the hardtargets range, velocity
 # and acceleration over time (red is marking the detections). Furthermore the the signal to noise ratio is
@@ -65,7 +65,7 @@ fig, axes = plt.subplots(2, 2)
 target_estimation_plots.plot_peaks(
     axes,
     out_data,
-    exp_params,
+    exp_def,
     cfg_params,
     pro_params,
     snr_dB_limit=15.0,
@@ -80,7 +80,7 @@ fig, axes = plt.subplots(2, 3)
 target_estimation_plots.plot_detections(
     axes,
     out_data,
-    exp_params,
+    exp_def,
     cfg_params,
     pro_params,
 )
@@ -99,7 +99,7 @@ axes = [
 target_estimation_plots.plot_map(
     axes,
     out_data,
-    exp_params,
+    exp_def,
     cfg_params,
     pro_params,
 )
