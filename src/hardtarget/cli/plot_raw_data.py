@@ -20,6 +20,7 @@ def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("-s", "--start_time", default=None, type=str)
     parser.add_argument("-e", "--end_time", default=None, type=str)
     parser.add_argument("--relative_time", action="store_true")
+    parser.add_argument("--frequency", action="store_true")
     parser.add_argument("--axis_units", action="store_true")
     parser.add_argument("--log", action="store_true")
     parser.add_argument("--keep-tx", action="store_true")
@@ -72,7 +73,13 @@ def main(args: argparse.Namespace) -> None:
 
         if data_loader is not None:
             fig, ax = plt.subplots()
-            ax, handles = plotting.rti(
+
+            if args.frequency:
+                plot_func = plotting.fti
+            else:
+                plot_func = plotting.rti
+
+            ax, handles = plot_func(
                 ax,
                 data_loader=data_loader,
                 start_time=int(args.start_time) if args.relative_time else args.start_time,

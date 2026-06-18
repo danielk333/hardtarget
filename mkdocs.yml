@@ -88,7 +88,6 @@ markdown_extensions:
 
 extra_javascript:
   - javascripts/config.js
-  - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 nav:
@@ -126,6 +125,7 @@ nav:
           - Visualization of analysis parameters: examples/target_estimation/visualize_analysis_parameters.py
           - Visualization of matched filter: examples/target_estimation/visualize_matched_filter.py
           - Visualization of raw data: examples/target_estimation/plot_raw_data.py
+          - Visualization of raw data (frequency): examples/target_estimation/plot_raw_frequency_content.py
       - Optimization:
           - Optimizing Target Estimation: examples/optimization/optimization.py
       - Echo Search:

@@ -236,6 +236,18 @@ def test_plot_raw_data(monkeypatch, get_data):
     plot_raw_data.main(args)
 
 
+def test_plot_raw_data_freq(monkeypatch, get_data):
+    # mock away plt.show
+    monkeypatch.setattr(plt, "show", lambda: None)
+
+    # get data storage
+    data_dir, _ = get_data
+
+    parser = plot_raw_data.parser_build(argparse.ArgumentParser())
+    args = parser.parse_args([str(data_dir), "--relative_time", "-s", "0", "-e", "10000", "--frequency"])
+    plot_raw_data.main(args)
+
+
 def test_inspect_raw(get_data):
     # get data storage
     data_dir, _ = get_data

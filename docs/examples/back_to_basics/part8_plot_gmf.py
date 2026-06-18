@@ -1,7 +1,6 @@
 # #Back to basics - Part 8: GMF plots
 # ---
-
-# TODO: more text
+# Visualization of the gmf functions and the effect of its parameters
 
 import matplotlib.pyplot as plt
 import numpy as np
