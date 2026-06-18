@@ -420,6 +420,7 @@ tx_phase_smooth = moving_average(
 )
 tx_phase_mod = np.exp(-1j * tx_phase_smooth)
 modulated_tx = modulated_tx_sim * tx_phase_mod[:, None]
+# modulated_tx = modulated_tx_sim
 
 fig, ax = plt.subplots()
 ax.plot(tx_phase_direct)
@@ -450,23 +451,24 @@ for ri, r in enumerate(base_r_tests):
         spec = fftshift(fft(decoded, n=fft_len))
         mi = np.argmax(np.abs(spec))
 
-        try:
-            f_est, phi_est = dft_taylor(
-                spectrum=spec,
-                signal_len=len(decoded),
-                sample_rate=exp_params.sample_rate,
-            )
-        except RuntimeError:
-            f_est, phi_est = np.nan, np.nan
-        if np.isnan(f_est):
-            f_est = dtft_solve(
-                dec_signal=decoded,
-                sample_rate=exp_params.sample_rate,
-                freq_bracket=(
-                    fvec[mi] - d_freq,
-                    fvec[mi] + d_freq,
-                ),
-            )
+        # try:
+        #     f_est, phi_est = dft_taylor(
+        #         spectrum=spec,
+        #         signal_len=len(decoded),
+        #         sample_rate=exp_params.sample_rate,
+        #     )
+        # except RuntimeError:
+        #     f_est, phi_est = np.nan, np.nan
+        # if np.isnan(f_est):
+        # NOTE: apparently this is just better! although its a bit slower
+        f_est, phi_est = dtft_solve(
+            decoded_signal=decoded,
+            sample_rate=exp_params.sample_rate,
+            freq_bracket=(
+                fvec[mi] - d_freq,
+                fvec[mi] + d_freq,
+            ),
+        )
 
         dop_phasor = np.exp(-2j * np.pi * f_est * np.arange(len(tx)) / exp_params.sample_rate)
         full_decoded = decoded * dop_phasor

@@ -38,7 +38,7 @@ t = np.arange(n0) / sample_rate
 noise_sigmas = 10 ** np.linspace(-3, 1, 20)
 monte_carlo_samples = 500
 
-errs = np.zeros((3, len(noise_sigmas), monte_carlo_samples))
+errs = np.zeros((4, len(noise_sigmas), monte_carlo_samples))
 for ind, sigma in tqdm(enumerate(noise_sigmas), total=len(noise_sigmas)):
     for mci in range(monte_carlo_samples):
         xi = 1j * np.random.randn(n0) + np.random.randn(n0)
@@ -50,8 +50,8 @@ for ind, sigma in tqdm(enumerate(noise_sigmas), total=len(noise_sigmas)):
         spec_max = np.argmax(np.abs(spec))
         d_freq = freqs[spec_max] - freqs[spec_max - 1]
 
-        f_est_dtft = dtft_solve(
-            dec_signal=signal,
+        f_est_dtft, phi_est_dtft = dtft_solve(
+            decoded_signal=signal,
             sample_rate=sample_rate,
             freq_bracket=(
                 freqs[spec_max] - d_freq,
@@ -70,25 +70,34 @@ for ind, sigma in tqdm(enumerate(noise_sigmas), total=len(noise_sigmas)):
         errs[0, ind, mci] = f_est - f0
         errs[1, ind, mci] = phi_est - phi0
         errs[2, ind, mci] = f_est_dtft - f0
+        errs[3, ind, mci] = phi_est_dtft - phi0
 
 
 fig, axes = plt.subplots(2, 1)
 
-mu_f_dtft_err = np.nanmean(np.abs(errs[2, :, :]), axis=1)
-std_f_dtft_err = np.nanstd(np.abs(errs[2, :, :]), axis=1)
 mu_f_err = np.nanmean(np.abs(errs[0, :, :]), axis=1)
 std_f_err = np.nanstd(np.abs(errs[0, :, :]), axis=1)
+mu_f_dtft_err = np.nanmean(np.abs(errs[2, :, :]), axis=1)
+std_f_dtft_err = np.nanstd(np.abs(errs[2, :, :]), axis=1)
 mu_phi_err = np.nanmean(np.abs(errs[1, :, :]), axis=1)
 std_phi_err = np.nanstd(np.abs(errs[1, :, :]), axis=1)
+mu_phi_dtft_err = np.nanmean(np.abs(errs[3, :, :]), axis=1)
+std_phi_dtft_err = np.nanstd(np.abs(errs[3, :, :]), axis=1)
 
-axes[0].loglog(noise_sigmas, mu_f_err, c="k")
-axes[0].loglog(noise_sigmas, mu_f_err + std_f_err * 3, ls="--", alpha=0.5, c="k")
-axes[0].loglog(noise_sigmas, mu_f_dtft_err, c="b")
-axes[0].loglog(noise_sigmas, mu_f_dtft_err + std_f_err * 3, ls="--", alpha=0.5, c="b")
+breakpoint()
+
+axes[0].loglog(noise_sigmas, mu_f_err, c="k", label="Taylor expanded FT equation")
+axes[0].loglog(noise_sigmas, mu_f_err + std_f_err * 3, ls="--", alpha=0.5, c="k", label="+3 sigma")
+axes[0].loglog(noise_sigmas, mu_f_dtft_err, c="b", label="DTFT (Bayesian) maximiziation")
+axes[0].loglog(noise_sigmas, mu_f_dtft_err + std_f_err * 3, ls="--", alpha=0.5, c="b", label="+3 sigma")
 axes[0].set_ylabel("Frequency error [Hz]")
-axes[1].loglog(noise_sigmas, mu_phi_err)
+axes[0].legend()
+axes[1].loglog(noise_sigmas, mu_phi_err, c="k")
 axes[1].loglog(noise_sigmas, mu_phi_err + std_phi_err * 3, ls="--", alpha=0.5, c="k")
+axes[1].loglog(noise_sigmas, mu_phi_dtft_err, c="b")
+axes[1].loglog(noise_sigmas, mu_phi_dtft_err + std_phi_dtft_err * 3, ls="--", alpha=0.5, c="b")
 axes[1].set_xlabel("Noise standard deviation [1]")
 axes[1].set_ylabel("Phase error [rad]")
+fig.suptitle(f"Frequency and phase determination performance | {monte_carlo_samples} Monte-Carlo samples")
 
 plt.show()

@@ -1,5 +1,6 @@
 """The Numpy Implementations of the General Matched Filter, or GMF"""
 
+from typing import Any
 import numpy as np
 import numpy.typing as npt
 import scipy.fft as fft
@@ -25,8 +26,38 @@ def dtft_sub_resolution(
     return dtft
 
 
+def dtft_solve_with_acceleration(
+    decoded_signal: npt.NDArray[np.complexfloating],
+    sample_rate: float | int,
+    start_freq: float,
+    start_accel: float,
+    accel_limits: tuple[float, float] = (None, None),
+    freq_limits: tuple[float, float] = (None, None),
+    method: str = "Nelder-Mead",
+    minimize_kwargs: dict[str, Any] | None = {},
+) -> float:
+    """TODO docstring, this is a bit novel - maybe it works?"""
+    t = np.arange(len(decoded_signal)) / sample_rate
+    t2 = t**2
+
+    def fun(x):
+        dtft_fractors = np.exp(-1j * 2 * np.pi * x[0] * t)
+        accel_factors = np.exp(-1j * np.pi * x[1] * t2).astype(np.complex64)
+        return -(np.abs(np.mean(dtft_fractors * decoded_signal * accel_factors)) ** 2)
+
+    res = optimize.minimize(
+        fun, [start_freq, start_accel], bounds=[freq_limits, accel_limits], method=method, **minimize_kwargs
+    )
+
+    # TODO: phase can be computed like this, double check it works and also add it as return value
+    dtft_fractors = np.exp(-1j * 2 * np.pi * res.x[0] * t)
+    accel_factors = np.exp(-1j * np.pi * res.x[1] * t2).astype(np.complex64)
+    phi = np.angle(np.mean(dtft_fractors * decoded_signal * accel_factors))
+    return res.x
+
+
 def dtft_solve(
-    dec_signal: npt.NDArray[np.complexfloating],
+    decoded_signal: npt.NDArray[np.complexfloating],
     sample_rate: float | int,
     freq_bracket: tuple[float, float],
 ) -> float:
@@ -38,14 +69,17 @@ def dtft_solve(
         in: Proc. 6th European Conference on Space Debris, ESA, Darmstadt, Germany.
 
     """
-    t = np.arange(len(dec_signal)) / sample_rate
+    t = np.arange(len(decoded_signal)) / sample_rate
 
     def fun(x):
         dtft_fractors = np.exp(-1j * 2 * np.pi * x * t)
-        return -(np.abs(np.mean(dtft_fractors * dec_signal)) ** 2)
+        return -(np.abs(np.mean(dtft_fractors * decoded_signal)) ** 2)
 
     res = optimize.minimize_scalar(fun, bracket=freq_bracket, method="brent")
-    return res.x
+
+    dtft_fractors = np.exp(-1j * 2 * np.pi * res.x * t)
+    phi = np.angle(np.mean(dtft_fractors * decoded_signal))
+    return res.x, phi
 
 
 def _dft_ratio_derivatives_at_zero(d: float) -> tuple[float, float, float, float]:
@@ -218,10 +252,9 @@ def fast_gmf_np(
                 ft2 = np.abs(fft.fftshift(fft.fft(dec_signal))) ** 2
                 mi = np.argmax(ft2)
 
-                # TODO: this is a bit ugly - optimize later maybe?
+                # TODO: we should maybe not return index of doppler frequencies and instead just
+                # return the best doppler, that would allow us to do any type of doppler fixing
                 if cfg_params.range_rate_sub_resolution > 1:
-                    # TODO: replace this with the frequency estimation - i think i know how we
-                    # should re-structure things to better allow this kind of analysis
                     fvec = fft.fftshift(fft.fftfreq(len(dec_signal)))
                     fmin = fvec[mi - 1] if mi >= 1 else fvec[0]
                     fmax = fvec[mi + 1] if mi < len(fvec) - 1 else fvec[-1]
