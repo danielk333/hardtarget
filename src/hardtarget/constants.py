@@ -11,6 +11,13 @@ except ImportError:
     )
 
 
+class FIRFilter(StrEnum):
+    """FIR Filter type"""
+
+    b414d15_gaus = "b414d15_gaus"
+    unknown = "unknown"
+
+
 class AnalysisMethod(StrEnum):
     """Analysis method type"""
 

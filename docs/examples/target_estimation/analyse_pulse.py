@@ -8,7 +8,8 @@ from pathlib import Path
 from scipy import constants
 import scipy.interpolate as interpolate
 import scipy.signal
-from scipy.fft import fft, fftfreq
+from scipy import optimize
+from scipy.fft import fft, fftfreq, fftshift
 import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import tqdm
@@ -16,11 +17,12 @@ from tqdm import tqdm
 from hardtarget.target_estimation.gmf.types import GMFCfgParams
 from hardtarget import plotting
 from hardtarget.plotting.raw_data_plots import extract_requested_range_gates
-from hardtarget.data_simulation.tx_model import tx_signal_model
+from hardtarget.data_simulation.tx_model import tx_signal_model, tx_modulation_model, match_pulse_code
 from hardtarget.types import Bounds
 from hardtarget.process.utils import sample_interval_to_closest_ipp
 from radardef.types import BeamType, EiscatUHFLocation
 from hardtarget.utils.time_conversion import time_interval_to_sample_bound, ts_from_str
+from hardtarget.target_estimation.gmf.gmf_numpy import dft_taylor, dtft_solve
 import radardef
 import datetime as dt
 import requests
@@ -252,6 +254,8 @@ request_bounds = time_interval_to_sample_bound(
 
 samp_bounds = sample_interval_to_closest_ipp(request_bounds, reader.experiment.ipp_samps)
 
+start_ipp_num = request_bounds.start // reader.experiment.ipp_samps
+
 # extract data within bounds
 n_samp = samp_bounds.end - samp_bounds.start
 data_vec = reader.read(
@@ -259,10 +263,6 @@ data_vec = reader.read(
     start_sample=samp_bounds.start + cfg.samp_offset,
     vector_length=n_samp,
 )
-
-# from juha:
-# center freq wrong?
-# rx not locked
 
 if data_vec.ndim > 1:
     data_vec = np.sum(data_vec, axis=0)
@@ -332,7 +332,7 @@ print(r_rel[ipp_index], v_rel[ipp_index])
 r_true, v_true = r_rel[ipp_index], v_rel[ipp_index]
 
 signal = data_ipp_vec_full[:, ipp_index]
-exp_params = reader.experiment.copy(radar_frequency = 921.0)
+exp_params = reader.experiment.copy(radar_frequency=927.200)
 
 
 def usec_to_samp(usec: int | float) -> int:
@@ -363,109 +363,176 @@ print(il0_rg0, il0_rg1, il0_min_range_gate, il0_max_range_gate)
 doppler = v_true * (exp_params.radar_frequency * 1e6) / constants.c
 ture_dop_phasor = np.exp(-2j * np.pi * doppler * rx_inds / exp_params.sample_rate)
 sub_resolution = 10
+sub_resolution_doppler = 50
 
-base_range_gates = np.arange(cfg.min_range_gate, cfg.max_range_gate - len(tx), 1)
+base_range_gates = np.arange(cfg.min_range_gate, cfg.max_range_gate - len(tx), 1) + 1
 base_r_tests = base_range_gates * constants.c / exp_params.sample_rate
 
-range_gates = np.arange(cfg.min_range_gate, cfg.max_range_gate - len(tx), 1.0 / sub_resolution)
+range_gates = np.arange(cfg.min_range_gate, cfg.max_range_gate - len(tx), 1.0 / sub_resolution) + 1
 r_tests = range_gates * constants.c / exp_params.sample_rate
 
-dop_tests = np.linspace(0.8, 1.2, 100) * doppler
-vel_tests = dop_tests * constants.c / (exp_params.radar_frequency * 1e6)
 sample = np.arange(tx.size)
-orig_sample_rate = 100e6
-super_rate = int(orig_sample_rate / exp_params.sample_rate)
-super_sample = np.arange(tx.size * super_rate) / super_rate
-modulated_tx = np.empty((tx.size, sub_resolution), dtype=tx.dtype)
-fun = interpolate.interp1d(
-    sample,
-    tx,
-    bounds_error=False,
-    fill_value=0,
+
+
+# determine pulse code here
+
+matches = match_pulse_code(
+    tx_signal=tx,
+    codes=exp_params.code,
+    baud_length_usec=exp_params.baud_length_usec,
+    t_samp_usec=exp_params.t_samp_usec,
+    ipp_t_usec=exp_params.ipp_samps * exp_params.t_samp_usec,
 )
-offsets = np.linspace(0, 1, sub_resolution, endpoint=False)
-for ind in range(sub_resolution):
-    x = fun(super_sample - offsets[ind])
-    cutoff = 2e6
-    numtaps = super_rate + 1
-    fir = scipy.signal.firwin(numtaps, cutoff, fs=orig_sample_rate)
-    x_filt = scipy.signal.lfilter(fir, 1.0, x)
-    modulated_tx[:, ind] = x_filt[::super_rate]
+start_code_num = np.argmax(matches)
 
 # fig, ax = plt.subplots()
-# for ind in range(sub_resolution):
-#     ax.plot(np.real(modulated_tx[:, ind]), label=f"{ind}")
-# ax.legend()
+# ax.plot(matches)
 # plt.show()
 
-samp_r_true = exp_params.sample_rate * r_true / constants.c + tx_start_samp
+print("guessed code id: ", start_ipp_num % reader.experiment.code.shape[0])
+print("estimated code id: ", start_code_num)
 
-rm, vm = np.meshgrid(r_tests, vel_tests)
-corrs = np.zeros_like(rm)
+# TODO: this now works with both! implement that we can choose which to do, modulated or simulated
+modulated_tx_sim = tx_signal_model(
+    code=exp_params.code[start_code_num, :],
+    baud_length_usec=exp_params.baud_length_usec,
+    t_samp_usec=exp_params.t_samp_usec,
+    tx_start_samp=0,
+    ipp_samps=exp_params.ipp_samps,
+    read_length=len(tx),
+    sub_resolution=sub_resolution,
+    bandwidth=1e6,
+)
+
+# TODO: we can probably use the tx signal to measure phase drift and apply that to the analytic
+# model? something like this
+
+
+def moving_average(x, w):
+    x_padded = np.pad(x, (w // 2, w - 1 - w // 2), mode="edge")
+    return np.convolve(x_padded, np.ones(w), "valid") / w
+
+
+tx_phase_direct = np.unwrap(2 * np.angle(tx)) / 2
+tx_phase_smooth = moving_average(
+    tx_phase_direct,
+    5 * int(exp_params.baud_length_usec * 1e-6 * exp_params.sample_rate),
+)
+tx_phase_mod = np.exp(-1j * tx_phase_smooth)
+modulated_tx = modulated_tx_sim * tx_phase_mod[:, None]
+
+fig, ax = plt.subplots()
+ax.plot(tx_phase_direct)
+ax.plot(tx_phase_smooth, ls="--")
+
+modulated_tx_meas = tx_modulation_model(
+    tx_signal=tx,
+    tx_stencil=np.full(tx.shape, True, dtype=np.bool),
+    sub_resolution=sub_resolution,
+)
+# modulated_tx = modulated_tx_meas
+
+samp_r_true = exp_params.sample_rate * r_true / constants.c + tx_start_samp
+fft_len = 2 ** (int(np.log2(len(tx))) + 2)
+fvec = fftshift(fftfreq(fft_len, d=1.0 / exp_params.sample_rate))
+d_freq = fvec[1] - fvec[0]
+
+samp_inds = np.arange(len(rx))
+corrs = np.zeros_like(r_tests)
+dopps = np.zeros_like(r_tests)
 pbar = tqdm(total=corrs.size)
 for ri, r in enumerate(base_r_tests):
     z = rx[ri : (ri + len(tx))]
     for rii in range(sub_resolution):
-        for vi, dop in enumerate(dop_tests):
-            dop_phasor = np.exp(-2j * np.pi * dop * np.arange(len(tx)) / exp_params.sample_rate)
+        ind = ri * sub_resolution + rii
+        decoded = z * np.conj(modulated_tx[:, rii])
 
-            corrs[vi, ri * sub_resolution + rii] = np.abs(
-                np.sum(z * dop_phasor * np.conj(modulated_tx[:, rii]))
+        spec = fftshift(fft(decoded, n=fft_len))
+        mi = np.argmax(np.abs(spec))
+
+        try:
+            f_est, phi_est = dft_taylor(
+                spectrum=spec,
+                signal_len=len(decoded),
+                sample_rate=exp_params.sample_rate,
             )
-            pbar.update(1)
+        except RuntimeError:
+            f_est, phi_est = np.nan, np.nan
+        if np.isnan(f_est):
+            f_est = dtft_solve(
+                dec_signal=decoded,
+                sample_rate=exp_params.sample_rate,
+                freq_bracket=(
+                    fvec[mi] - d_freq,
+                    fvec[mi] + d_freq,
+                ),
+            )
+
+        dop_phasor = np.exp(-2j * np.pi * f_est * np.arange(len(tx)) / exp_params.sample_rate)
+        full_decoded = decoded * dop_phasor
+
+        corrs[ind] = np.abs(np.sum(full_decoded))
+        # corrs[ind] = np.abs(spec[mi])
+        dopps[ind] = f_est
+
+        pbar.update(1)
+        # if np.abs(r_tests[ind] - r_true) < 300.0:
+        #     fig, axes = plt.subplots(3, 1)
+        #     axes[0].plot(np.real(decoded))
+        #     axes[0].plot(np.imag(decoded))
+        #     axes[1].plot(samp_inds, np.real(rx))
+        #     axes[1].plot(samp_inds, np.imag(rx))
+        #     axes[1].axvline(ri, c="g", ls="--")
+        #     axes[1].axvline(ri + len(tx), c="g", ls="--")
+        #     axes[2].plot(r_tests, corrs)
+        #     axes[2].plot(r_tests[ind], corrs[ind], "or")
+        #     plt.show()
 pbar.close()
 
-row, col = np.unravel_index(np.argmax(corrs), corrs.shape)
-ri_sol = int(col // sub_resolution)
+ri_max = np.argmax(corrs)
+ri = int(ri_max // sub_resolution)
 
 rg_true = r_true / constants.c * exp_params.sample_rate
 
-fig, axes = plt.subplots(2, 1)
-axes[0].plot(range_gates, corrs[row, :], "-x")
-rs = []
-cs = []
-for ri in np.arange(ri_sol - 1, ri_sol + 1):
-    z = rx[ri : (ri + len(tx))]
-    for rii in range(sub_resolution):
-        dop_phasor = np.exp(-2j * np.pi * dop_tests[row] * np.arange(len(tx)) / exp_params.sample_rate)
-        rs.append(range_gates[ri * sub_resolution + rii])
-        cs.append(np.sum(np.abs(z * dop_phasor * np.conj(modulated_tx[:, rii]))))
-axes[1].plot(rs, cs)
-axes[0].axvline(rg_true, c="r")
-axes[1].axvline(rg_true, c="r")
-
-ri = int(col // sub_resolution)
-rii = int(col - ri * sub_resolution)
+rii = int(ri_max - ri * sub_resolution)
 z = rx[ri : (ri + len(tx))]
-dop_phasor = np.exp(-2j * np.pi * dop_tests[row] * np.arange(len(tx)) / exp_params.sample_rate)
-tx_sel = modulated_tx[:, rii]
+z_dop = z * np.conj(modulated_tx[:, rii])
 
+z = rx[ri : (ri + len(tx))]
+dop_phasor = np.exp(-2j * np.pi * dopps[ri_max] * np.arange(len(tx)) / exp_params.sample_rate)
+tx_sel = modulated_tx[:, rii]
 
 z_comp = z * dop_phasor
 decode = z * dop_phasor * np.conj(modulated_tx[:, rii])
 z_dop = z * np.conj(modulated_tx[:, rii])
-pad_num = 10_000
 
-freqs = np.fft.fftshift(fftfreq(z.size + pad_num * 2, 1.0 / exp_params.sample_rate))
-powspec_z = np.abs(np.fft.fftshift(fft(np.pad(z, (pad_num, pad_num), "constant"))))
-powspec_cz = np.abs(np.fft.fftshift(fft(np.pad(z_comp, (pad_num, pad_num), "constant"))))
-powspec_zp = np.abs(np.fft.fftshift(fft(np.pad(z_dop, (pad_num, pad_num), "constant"))))
-powspec_dz = np.abs(np.fft.fftshift(fft(np.pad(decode, (pad_num, pad_num), "constant"))))
+r_est = r_tests[ri_max]
+v_est = dopps[ri_max] / (exp_params.radar_frequency * 1e6) * constants.c
 
+spec = fftshift(fft(z_dop, n=fft_len))
+fvec = fftshift(fftfreq(fft_len, d=1 / exp_params.sample_rate))
 
-# fig, axes = plt.subplots(3, 1)
-# axes[0].plot(freqs, np.log10(powspec_z))
-# axes[1].plot(freqs, np.log10(powspec_cz))
-# axes[2].plot(freqs, np.log10(powspec_dz))
+print(f"{r_est - r_true=} m")
+print(f"{v_est - v_true=} m/s")
 
-fig, axes = plt.subplots(4, 1, sharex=True)
-axes[0].plot(freqs, powspec_z)
-axes[1].plot(freqs, powspec_cz)
-axes[2].plot(freqs, powspec_zp)
-axes[2].axvline(doppler, c="r")
-axes[3].plot(freqs, powspec_dz)
-axes[3].set_xlim(-1.5 * doppler, 1.5 * doppler)
+fig, axes = plt.subplots(3, 1)
+axes[0].plot(range_gates, corrs, "-")
+axes[0].plot(range_gates[ri_max], corrs[ri_max], "or")
+axes[0].axvline(rg_true, c="r")
+axes[1].plot(range_gates, corrs, "-x")
+axes[1].plot(range_gates[ri_max], corrs[ri_max], "or")
+axes[1].axvline(rg_true, c="r")
+axes[1].set_xlim(rg_true - 10, rg_true + 10)
+axes[2].plot(fvec, np.abs(spec))
+# axes[2].set_xlim()
 
+fig, axes = plt.subplots(2, 1)
+for ind in range(sub_resolution):
+    axes[0].plot(np.real(modulated_tx[:, ind]), label=f"{ind}")
+    axes[0].plot(np.imag(modulated_tx[:, ind]))
+    axes[1].plot(np.real(modulated_tx_meas[:, ind]))
+    axes[1].plot(np.imag(modulated_tx_meas[:, ind]))
+axes[0].legend()
 
 fig, axes = plt.subplots(4, 1)
 axes[0].plot(np.real(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="b")
@@ -482,22 +549,6 @@ axes[3].plot(np.real(decode / np.max(np.abs(decode))), c="b")
 axes[3].plot(np.imag(decode / np.max(np.abs(decode))), c="r")
 
 
-r_est = rm[row, col]
-v_est = vm[row, col]
-
-print(f"{r_est - r_true=} m")
-print(f"{v_est - v_true=} m/s")
-
-fig, ax = plt.subplots()
-ax.pcolormesh(rm * 1e-3, vm * 1e-3, corrs, cmap="bwr")
-ax.plot(r_true * 1e-3, v_true * 1e-3, "xg")
-ax.plot(r_est * 1e-3, v_est * 1e-3, "ok")
-
-fig, ax = plt.subplots()
-ax.pcolormesh(rm * 1e-3, vm * 1e-3, np.log10(corrs), cmap="bone")
-ax.plot(r_true * 1e-3, v_true * 1e-3, "xg")
-ax.plot(r_est * 1e-3, v_est * 1e-3, "ok")
-
 fig, ax = plt.subplots()
 ax, handles = plotting.rti(
     ax,
@@ -513,13 +564,9 @@ ax, handles = plotting.rti(
 # plt.show()
 
 
-fig, axes = plt.subplots(2, 2, sharex="all")
-axes[0, 0].plot(np.real(rx * ture_dop_phasor))
-axes[0, 0].plot(np.imag(rx * ture_dop_phasor))
-axes[1, 0].plot(np.real(tx))
-axes[1, 0].plot(np.imag(tx))
-axes[0, 1].plot(np.angle(rx * ture_dop_phasor))
-axes[1, 1].plot(np.angle(tx))
+fig, ax = plt.subplots()
+ax.plot(np.real(tx))
+ax.plot(np.imag(tx))
 
 
 fig, axes = plt.subplots(2, 1)
