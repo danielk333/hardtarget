@@ -75,6 +75,9 @@ class DPTProcess(TargetEstimationProcess[DPTCfgParams, DPTProParams]):
         inds_accelerations = np.argwhere(_accel_inds).flatten().astype(np.int32)
 
         # precalculate phasors corresponding to different accelerations
+        # TODO: this size problem can be fixed by only computing the ones inside _accel_inds
+        # this might even be removed since its easy to compute just one for the amplitude and phase
+        # computation, we are not looping trough them like with gmf
         acceleration_phasors = np.exp(
             -1j * np.pi * np.outer(accelerations, times2) / exp_def.wavelength
         ).astype(np.complex64)

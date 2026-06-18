@@ -28,7 +28,8 @@ class TargetEstimationCfgParams(CfgParams):
     """
 
     range_gate_sub_resolution: int = 1
-    fft_sub_resolution: int = 1
+    refine_doppler: bool = True
+    refine_acceleration: bool = False
     frequency_decimation: int = 1
     clutter_length: int = 0
     min_acceleration: float = -200.0
@@ -60,8 +61,14 @@ class TargetEstimationProParams(ProParams):
         default_factory=lambda: np.empty(2, dtype=np.int32)
     )
     range_rates: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty(2, dtype=np.float64))
+    fft_frequencies: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty(2, dtype=np.float64))
+    # TODO: i shimmied this in here for now, it should probably be propagated down some other way?
+    sample_rate: float = 0
 
 
+# TODO: the name "Extended" should probably be changed as extended targets are a common phrase in
+# the radar community and it means a target that is much larger than the range-gates used which is
+# probably not what this means
 @dataclass(frozen=True)
 class ExtendedTargetEstimationProParams(TargetEstimationProParams):
     """
@@ -82,9 +89,10 @@ class MFVariables(NamedTuple):
     """Container for compacting the variables set by the GMF Grid function."""
 
     vals: npt.NDArray[np.float32]  # match function values reduced over the requested axis
-    dc: npt.NDArray[np.float32]  # 0-frequency gmf output as a function of range
-    v_ind: npt.NDArray[np.int32]  # best fitting range-rate
-    a_ind: npt.NDArray[np.int32]  # best fitting range-rate change
+    dc: npt.ndarray[np.float32]  # 0-frequency gmf output as a function of range
+    v: npt.NDArray[np.float32]  # best fitting range-rate
+    a: npt.NDArray[np.float32]  # best fitting range-rate change
+    phi: npt.ndarray[np.float32]  # best fitting phase
     tx_pwr: npt.NDArray[np.floating]  # tx power
 
 
@@ -98,10 +106,10 @@ class MFOutArgs(NamedTuple):
     sample_numbers: npt.NDArray[np.int32]
     vals: npt.NDArray[np.float32]
     dc: npt.NDArray[np.float32]
-    v_ind: npt.NDArray[np.int32]
-    a_ind: npt.NDArray[np.int32]
     tx_pwr: npt.NDArray[np.floating]
     snr: npt.NDArray[np.floating]
+    v: npt.NDArray[np.float64]
+    a: npt.NDArray[np.float64]
     r_vec: npt.NDArray[np.float64]
     v_vec: npt.NDArray[np.float64]
     a_vec: npt.NDArray[np.float64]

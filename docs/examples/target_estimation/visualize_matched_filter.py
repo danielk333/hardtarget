@@ -143,6 +143,7 @@ c_spec = fft.fft(c_dec_signal_vec)
 
 # FFT frequencay can be extracted from the range_rates
 
+# TODO: is it 2* or not? doppler definition
 fft_freq = pro_params.range_rates / exp.wavelength
 print("FFT len: ", len(fft_freq))
 

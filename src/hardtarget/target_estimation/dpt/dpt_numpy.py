@@ -60,4 +60,12 @@ def fast_dpt_np(
             v_ind[index] = spec_peak
             a_ind[index] = dspec_peak
 
-    return MFVariables(vals=vals, dc=dc, v_ind=v_ind, a_ind=a_ind, tx_pwr=tx_pwr)
+    # TODO: add phase here and fix return values to not be inds, use dtft opt to get v and phase
+    return MFVariables(
+        vals=vals,
+        dc=dc,
+        v=v_ind,
+        a=a_ind,
+        phi=np.zeros_like(vals),
+        tx_pwr=tx_pwr,
+    )

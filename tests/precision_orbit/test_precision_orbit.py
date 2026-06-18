@@ -51,16 +51,17 @@ gmf_cfg = GMFCfgParams(
     ipp_offset=0,
     samp_offset=3,
     min_range_gate=5500,
-    max_range_gate=7700,
+    max_range_gate=6000,
     min_acceleration=0,
     max_acceleration=0,
     range_gate_step=1,
     range_gate_sub_resolution=10,
     frequency_decimation=1,
-    fft_sub_resolution=10,
     num_cohints_per_file=2,
     node_gpus=1,
     acceleration_steps=1,
+    refine_doppler=True,
+    refine_acceleration=False,
 )
 
 dpt_cfg = DPTCfgParams(
@@ -102,7 +103,7 @@ def test_verify_analysis_orbit_data(
 
     # Time object is noticed in eiscat data
     start_time = str_to_dt("2024-07-04T10:21:15.500")
-    start_time = str_to_dt("2024-07-04T10:21:17.500")
+    # start_time = str_to_dt("2024-07-04T10:21:19.500")
     end_time = str_to_dt("2024-07-04T10:21:20.000")
     # start_time = str_to_dt("2024-07-04T10:21:19.400")
     # end_time = str_to_dt("2024-07-04T10:21:19.900")
@@ -138,7 +139,13 @@ def test_verify_analysis_orbit_data(
     )
     reader = radar_station.load_data(MEASUREMENT)
     assert reader is not None
-    exp_params = reader.experiment.copy(radar_frequency=921.0)
+    # TODO: this frequency is apparently present in the tlan file, probably needs to be hardcoded
+    # for each experiment like we did for the tx_start, the way to do it is to go to the tland file,
+    # find this row `AT     40.0  BEAMON,F4,PHA180` and translate F4 to the table at
+    # https://old.eiscat.se/scientist/user-documentation/receiver-documentation/#uhf-receiver
+    # which is here 927.200 MHz
+    # - apparently there is meta data in the matlab data file that documents frequency!
+    exp_params = reader.experiment.copy(radar_frequency=927.200)
 
     # Analyse data
     comm = global_mpi.get_mpi()

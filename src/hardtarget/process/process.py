@@ -20,7 +20,7 @@ from radardef.types import Pointing
 import hardtarget.process.utils as utils
 from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl, MethodLib
 from hardtarget.data_handling import dump_params_to_file
-from hardtarget.data_simulation.tx_model import tx_signal_model, tx_modulation_model
+from hardtarget.data_simulation.tx_model import tx_modulation_model, tx_signal_model
 from hardtarget.process.configuration import (
     compute_process_params,
     extract_config_from_dict,
@@ -613,9 +613,19 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             else:
                 rx = ipp[self.pro_params.rx_stencil]
 
-        # TODO: this should be found out from documentation
-        orig_sample_rate = 100e6
-        cutoff = 2e6
+        # TODO: im getting conflicting info on the files, in 1997 wannberg it says
+        # "the numerical local oscillator (NCO) in the HSP 45116 downconverter is set
+        # to the corresponding IF center frequency", in the leo-u NCO it says
+        # "NCO 0 8.8  % for RF at 927.2", while in the table on
+        # https://old.eiscat.se/scientist/user-documentation/receiver-documentation/#uhf-receiver
+        # it says "F4 	927.200 	12.800", so which is it?! we should add a note about this as we
+        # clean up
+        # TODO: this should be put as an experiment variable!
+        # TODO: the experiment file also contains a .fir file, for LEO 2024 its `b414d15_gaus.fir`
+        # this should be translated into which filter we apply with what coefficients, i did some
+        # guesswork now and hardcoded it here for now
+        fir_filter = "b414d15_gaus"
+
         # Extracting tx data
         if not self._tx_channel:
             assert self.exp_def.code is not None, (
@@ -627,20 +637,21 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 baud_length_usec=self.exp_def.baud_length_usec,
                 t_samp_usec=self.exp_def.t_samp_usec,
                 tx_start_samp=int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec),
-                start_samp=(start_sample % self.exp_def.ipp_samps) - self.cfg_params.samp_offset,
-                read_length=read_length,
                 ipp_samps=self.exp_def.ipp_samps,
+                read_length=read_length,
+                bandwidth=1e6,  # TODO: this needs to be part of the config somewhere - its kinda a
+                # fundamental limits of the radar system but could in principle be configurable per
+                # experiment
+                start_samp=(start_sample % self.exp_def.ipp_samps) - self.cfg_params.samp_offset,
                 sub_resolution=sub_resolution,
-                kind="linear",
+                fir_filter=fir_filter,  # TODO: again, probably should change name of this variable
             )
         elif self._tx_channel == self._rx_channels:
             tx = ipp.copy()
             tx = tx_modulation_model(
                 tx_signal=tx,
                 tx_stencil=self.pro_params.tx_stencil,
-                out_sample_rate=self.exp_params.sample_rate,
-                in_sample_rate=orig_sample_rate,
-                frequency_cutoff=cutoff,
+                fir_filter=fir_filter,
                 sub_resolution=sub_resolution,
             )
         else:
@@ -650,9 +661,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             tx = tx_modulation_model(
                 tx_signal=tx,
                 tx_stencil=self.pro_params.tx_stencil,
-                out_sample_rate=self.exp_params.sample_rate,
-                in_sample_rate=orig_sample_rate,
-                frequency_cutoff=cutoff,
+                fir_filter=fir_filter,
                 sub_resolution=sub_resolution,
             )
 

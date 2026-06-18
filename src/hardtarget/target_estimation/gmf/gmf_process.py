@@ -111,12 +111,18 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
             if self.pro_params.implementation == Impl.cuda:
                 kwargs["gpu_id"] = 1 % self.cfg_params.node_gpus  # TODO:1 should be job.idx
 
-            return self.lib(tx, rx, np.array(tx_pwr), self.cfg_params, self.pro_params, **kwargs)
+            mfvars = self.lib(tx, rx, np.array(tx_pwr), self.cfg_params, self.pro_params, **kwargs)
+            # TODO: for now since we expect physical units at this level do the conversion here
+            mfvars.v[:] = mfvars.v * self.exp_params.wavelength
+            return mfvars
         else:
+            # TODO: i think i have acceidentally used float64 some places and float32 others, maybe
+            # need to double check those
             return MFVariables(
                 vals=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
                 dc=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
-                v_ind=np.zeros((len(self.pro_params.ranges),), dtype=np.int32),
-                a_ind=np.zeros((len(self.pro_params.ranges),), dtype=np.int32),
+                v=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
+                a=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
+                phi=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
                 tx_pwr=np.array(tx_pwr),
             )

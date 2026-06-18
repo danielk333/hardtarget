@@ -166,12 +166,14 @@ class TargetEstimationProcess(
         # ---- Velocity related parameters ----
 
         # frequency vector
-        _fft_frequencies = fft.fftfreq(
-            decimated_read_length,
-            d=cfg_params.frequency_decimation / exp_def.sample_rate,
+        fft_frequencies = fft.fftshift(
+            fft.fftfreq(
+                decimated_read_length,
+                d=cfg_params.frequency_decimation / exp_def.sample_rate,
+            )
         )  # Hz
 
-        range_rates = (exp_def.wavelength * _fft_frequencies).astype(np.float64)
+        range_rates = (exp_def.wavelength * fft_frequencies).astype(np.float64)
 
         return TargetEstimationProParams(
             **asdict(pro_params),
@@ -182,6 +184,8 @@ class TargetEstimationProcess(
             il0_rx_window_indices=il0_rx_window_indices,
             il0_dec_rx_window_indices=il0_dec_rx_window_indices,
             range_rates=range_rates,
+            fft_frequencies=fft_frequencies,
+            sample_rate=exp_def.sample_rate,
         )
 
     @abstractmethod
@@ -199,8 +203,9 @@ class TargetEstimationProcess(
         return MFVariables(
             vals=np.stack([x.vals for x in vars_list], axis=0),
             dc=np.stack([x.dc for x in vars_list], axis=0),
-            v_ind=np.stack([x.v_ind for x in vars_list], axis=0),
-            a_ind=np.stack([x.a_ind for x in vars_list], axis=0),
+            v=np.stack([x.v for x in vars_list], axis=0),
+            a=np.stack([x.a for x in vars_list], axis=0),
+            phi=np.stack([x.phi for x in vars_list], axis=0),
             tx_pwr=np.stack([x.tx_pwr for x in vars_list], axis=0),
         )
 
@@ -238,8 +243,8 @@ class TargetEstimationProcess(
         # finding peaks
         r_inds = np.argmax(snr, axis=1)
         r_vec = pro_params.ranges[r_inds]
-        v_vec = pro_params.range_rates[all_vars.v_ind[coh_ints, r_inds]]
-        a_vec = pro_params.accelerations[all_vars.a_ind[coh_ints, r_inds]]  # type: ignore[attr-defined]
+        v_vec = all_vars.v[coh_ints, r_inds]
+        a_vec = all_vars.a[coh_ints, r_inds]
         g_vec = all_vars.vals[coh_ints, r_inds]
 
         epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_def.t_samp_usec)
@@ -261,10 +266,10 @@ class TargetEstimationProcess(
             sample_numbers=sample_numbers,
             vals=all_vars.vals,
             dc=all_vars.dc,
-            v_ind=all_vars.v_ind,
-            a_ind=all_vars.a_ind,
             tx_pwr=all_vars.tx_pwr,
             snr=snr,
+            v=all_vars.v,
+            a=all_vars.a,
             r_vec=r_vec,
             v_vec=v_vec,
             a_vec=a_vec,
@@ -288,6 +293,7 @@ class TargetEstimationProcess(
         str_dims_num_cohints_per_file = f"{output.num_cohints_per_file=}".split("=")[0].split(".")[1]
         str_t = f"{output.t=}".split("=")[0].split(".")[1]
         str_ranges = f"{output.ranges=}".split("=")[0].split(".")[1]
+        # TODO: add phase to output
         return {
             str_dims_num_cohints_per_file: DataItem(
                 data=output.num_cohints_per_file,
@@ -329,14 +335,15 @@ class TargetEstimationProcess(
                 dims=[(str_dims_num_cohints_per_file, str_t), (str_ranges, "r")],
                 long_name="Range dependant noise floor (0-frequency gmf output)",
             ),
-            f"{output.v_ind=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.v_ind,
+            f"{output.v=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.v,
                 dims=[(str_dims_num_cohints_per_file, str_t), (str_ranges, "r")],
-                long_name="If range_rate is reduced, contains the best range rate index "
-                "for each left over axis",
+                # TODO: update the long names descriptions, we no longer allow output
+                # with no reduction
+                long_name="If range_rate is reduced, contains the best range rate for each left over axis",
             ),
-            f"{output.a_ind=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.a_ind,
+            f"{output.a=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.a,
                 dims=[(str_dims_num_cohints_per_file, str_t), (str_ranges, "r")],
                 long_name="If acceleration is reduced, contains the best acceleration "
                 "index for each left over axis",

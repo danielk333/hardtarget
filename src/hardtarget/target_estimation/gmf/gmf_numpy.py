@@ -146,7 +146,7 @@ def dft_taylor(
     """
     #todo docstring, appendix A of [^1]
 
-    assumes spectrum if shifted
+    assumes spectrum is shifted
 
     [^1]: Nygrén, T., Markkanen, J., Aikio, A., Voiculescu, M., 2012.
         High-precision measurement of satellite velocity using the EISCAT radar.
@@ -184,8 +184,6 @@ def dft_taylor(
     in_bin = real_roots[np.abs(real_roots) <= abs(d) / 2.0 * (1.0 + 1e-9)]
 
     if in_bin.size != 1:
-        # TODO: figure out if this function should even raise errors or if should just return nan in
-        # these cases?
         raise RuntimeError(
             "Expected exactly one real root in [-d/2, d/2]"
             f"([{-d / 2},{d / 2}]), got {in_bin.size}. roots={roots}"
@@ -228,14 +226,14 @@ def fast_gmf_np(
     n_acc = pro_params.fgmf_acceleration_phasors.shape[0]
 
     size = (len(pro_params.ranges),)
-    dc, vals, v_ind, a_ind = default_mf_vars_items(size)
+    dc, vals, v, a, phi = default_mf_vars_items(size)
 
     for ri, rg in enumerate(pro_params.rel_rgs):
         for sub_res in range(cfg_params.range_gate_sub_resolution):
             drg = int(rg // cfg_params.frequency_decimation)
             zr = rx[pro_params.il1_rx_window_indices + rg]
             # TODO: the rx-tx block size should probably have a padding option? like +-1 for the
-            # super resolution stuff, currently not done
+            # super resolution stuff, currently not done, needs more investigation if needed
 
             # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter), decimate
             echo = np.sum((zr * tx[:, sub_res]).reshape(-1, cfg_params.frequency_decimation), axis=-1)
@@ -243,37 +241,82 @@ def fast_gmf_np(
             # zero-frequency (DC) is used to get range-dependent noise floor
             index = sub_res + ri * cfg_params.range_gate_sub_resolution
             dc[index] = np.abs(np.sum(echo)) ** 2
+            a_index = -1
+            v_index = -1
 
             for ai in range(n_acc):
                 dec_signal[pro_params.il0_dec_rx_window_indices + drg] = (
                     pro_params.fgmf_acceleration_phasors[ai] * echo
                 )
-                # TODO: implement FFT shift in the C and CUDA versions since we need it now?
-                ft2 = np.abs(fft.fftshift(fft.fft(dec_signal))) ** 2
+                # TODO: implement FFT shift in the C and CUDA versions since we need it now? or do
+                # we?
+                ft = fft.fftshift(fft.fft(dec_signal))
+                ft2 = np.abs(ft) ** 2
                 mi = np.argmax(ft2)
+                pwr, f_est, phi_est = ft2[mi], pro_params.fft_frequencies[mi], np.angle(ft[mi])
 
-                # TODO: we should maybe not return index of doppler frequencies and instead just
-                # return the best doppler, that would allow us to do any type of doppler fixing
-                if cfg_params.range_rate_sub_resolution > 1:
-                    fvec = fft.fftshift(fft.fftfreq(len(dec_signal)))
-                    fmin = fvec[mi - 1] if mi >= 1 else fvec[0]
-                    fmax = fvec[mi + 1] if mi < len(fvec) - 1 else fvec[-1]
-                    dtft = dtft_sub_resolution(dec_signal, fmin, fmax, cfg_params.range_rate_sub_resolution)
-                    dtft_ind = np.argmax(dtft)
-                    ftmax = dtft[dtft_ind]
-                    ftind = mi * cfg_params.range_rate_sub_resolution + dtft_ind
-                else:
-                    ftmax = ft2[mi]
-                    ftind = mi
+                if pwr > vals[index]:
+                    vals[index] = pwr
+                    # TODO: the convention should be that these are signal specific numbers, i.e.
+                    # doppler frequency and cycle acceleration (i.e. cycle/s and cycle/s^2), not
+                    # physical units like m/s och m/s^2
 
-                if ftmax > vals[index]:
-                    vals[index] = ftmax
-                    # index of doppler that gives highest integrated energy at this range gate
-                    v_ind[index] = ftind
-                    # index of acceleration that gives highest integrated energy at this range gate
-                    a_ind[index] = pro_params.inds_accelerations[ai]
+                    # doppler that gives highest integrated energy at this range gate
+                    v[index] = f_est
+                    v_index = mi
+                    # acceleration that gives highest integrated energy at this range gate
+                    a[index] = pro_params.accelerations[ai]
+                    a_index = ai
+                    # phase at the best acceleration and range rate
+                    phi[index] = phi_est
 
-    return MFVariables(vals=vals, dc=dc, v_ind=v_ind, a_ind=a_ind, tx_pwr=tx_pwr)
+            dec_signal[pro_params.il0_dec_rx_window_indices + drg] = (
+                pro_params.fgmf_acceleration_phasors[a_index] * echo
+            )
+            v_index_p = v_index
+            if v_index < len(pro_params.fft_frequencies) - 1:
+                v_index_p += 1
+            v_index_m = v_index
+            if v_index > 0:
+                v_index_m = v_index - 1
+            if cfg_params.refine_acceleration:
+                pwr, f_est, a_est, phi_est = dtft_solve_with_acceleration(
+                    decoded_signal=dec_signal,
+                    sample_rate=pro_params.sample_rate,
+                    start_freq=pro_params.fft_frequencies[v_index],
+                    # TODO: i think this accel is the wrong variable and the wrong units, verify
+                    start_accel=pro_params.accelerations[a_index],
+                    freq_limits=(
+                        pro_params.fft_frequencies[v_index_m],
+                        pro_params.fft_frequencies[v_index_p],
+                    ),
+                    accel_limits=(
+                        pro_params.accelerations[a_index - 1],
+                        pro_params.accelerations[a_index + 1],
+                    ),
+                )
+                v[index] = f_est
+                a[index] = a_est
+                phi[index] = phi_est
+            elif cfg_params.refine_doppler:
+                pwr, f_est, phi_est = dtft_solve(
+                    decoded_signal=dec_signal,
+                    sample_rate=pro_params.sample_rate,
+                    freq_bracket=(
+                        pro_params.fft_frequencies[v_index_m],
+                        pro_params.fft_frequencies[v_index_p],
+                    ),
+                )
+                v[index] = f_est
+                phi[index] = phi_est
+    return MFVariables(
+        vals=vals,
+        dc=dc,
+        v=v,
+        a=a,
+        tx_pwr=tx_pwr,
+        phi=phi,
+    )
 
 
 def fast_gmf_no_reduce_np(
