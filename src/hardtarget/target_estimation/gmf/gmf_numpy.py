@@ -14,11 +14,11 @@ def dtft_sub_resolution(
     dec_signal: npt.NDArray[np.complexfloating],
     fmin: float,
     fmax: float,
-    cfg_params: GMFCfgParams,
+    resolution: int,
 ) -> npt.NDArray[np.complexfloating]:
 
     nums = np.arange(len(dec_signal))
-    fvec_sub = np.linspace(fmin, fmax, cfg_params.range_rate_sub_resolution)
+    fvec_sub = np.linspace(fmin, fmax, resolution)
 
     dtft_fractors = np.exp(-1j * 2 * np.pi * fvec_sub[:, None] * nums[None, :])
     dtft = np.abs(np.sum(dtft_fractors * dec_signal[None, :], axis=1)) ** 2
@@ -27,16 +27,24 @@ def dtft_sub_resolution(
 
 def dtft_solve(
     dec_signal: npt.NDArray[np.complexfloating],
-    freq_est: float,
+    sample_rate: float | int,
+    freq_bracket: tuple[float, float],
 ) -> float:
-    nums = np.arange(len(dec_signal))
+    """TODO docstring, using the brent method
+    NOTE: this is also the baysian MAP - see [^1]
+
+    [^1]: Markkanen, J., Nygren, T., Markkanen, M., 2013.
+        New Hight Accuracy Determination of Range and Range Rate of Satellites from EISCAT Radar Data Taken During 2010 SSA CO-VI Campaign,
+        in: Proc. 6th European Conference on Space Debris, ESA, Darmstadt, Germany.
+
+    """
+    t = np.arange(len(dec_signal)) / sample_rate
 
     def fun(x):
-        dtft_fractors = np.exp(-1j * 2 * np.pi * x * nums)
-        return -(np.abs(np.sum(dtft_fractors * dec_signal)) ** 2)
+        dtft_fractors = np.exp(-1j * 2 * np.pi * x * t)
+        return -(np.abs(np.mean(dtft_fractors * dec_signal)) ** 2)
 
-    res = optimize.minimize(fun, freq_est)
-
+    res = optimize.minimize_scalar(fun, bracket=freq_bracket, method="brent")
     return res.x
 
 
@@ -142,7 +150,7 @@ def dft_taylor(
     in_bin = real_roots[np.abs(real_roots) <= abs(d) / 2.0 * (1.0 + 1e-9)]
 
     if in_bin.size != 1:
-        #TODO: figure out if this function should even raise errors or if should just return nan in
+        # TODO: figure out if this function should even raise errors or if should just return nan in
         # these cases?
         raise RuntimeError(
             "Expected exactly one real root in [-d/2, d/2]"
@@ -192,6 +200,9 @@ def fast_gmf_np(
         for sub_res in range(cfg_params.range_gate_sub_resolution):
             drg = int(rg // cfg_params.frequency_decimation)
             zr = rx[pro_params.il1_rx_window_indices + rg]
+            # TODO: the rx-tx block size should probably have a padding option? like +-1 for the
+            # super resolution stuff, currently not done
+
             # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter), decimate
             echo = np.sum((zr * tx[:, sub_res]).reshape(-1, cfg_params.frequency_decimation), axis=-1)
             dec_signal = np.zeros((pro_params.decimated_read_length,), dtype=np.complex64)
@@ -214,7 +225,7 @@ def fast_gmf_np(
                     fvec = fft.fftshift(fft.fftfreq(len(dec_signal)))
                     fmin = fvec[mi - 1] if mi >= 1 else fvec[0]
                     fmax = fvec[mi + 1] if mi < len(fvec) - 1 else fvec[-1]
-                    dtft = dtft_sub_resolution(dec_signal, fmin, fmax, cfg_params)
+                    dtft = dtft_sub_resolution(dec_signal, fmin, fmax, cfg_params.range_rate_sub_resolution)
                     dtft_ind = np.argmax(dtft)
                     ftmax = dtft[dtft_ind]
                     ftind = mi * cfg_params.range_rate_sub_resolution + dtft_ind
