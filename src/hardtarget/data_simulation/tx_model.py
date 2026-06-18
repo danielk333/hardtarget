@@ -49,6 +49,60 @@ def apply_b414d15_gaus(x: np.ndarray) -> np.ndarray:
     return y
 
 
+def cic_decimate(x, decimation: int, combs: int, delay: int = 1):
+    """
+    CIC decimator: N integrators at input rate that is decimated,
+    then N comb stages at output rate with a delay.
+    """
+    y = np.asarray(x, dtype=np.complex128)
+
+    # integrators
+    for _ in range(combs):
+        y = np.cumsum(y)
+
+    # decimate
+    y = y[::decimation]
+
+    # combs
+    for _ in range(combs):
+        y = y - np.concatenate([np.zeros(delay, dtype=y.dtype), y[:-delay]])
+
+    # normalize CIC DC gain
+    y /= (decimation * delay) ** combs
+    return y
+
+
+def mu_radar_filter_post_2004(
+    x,
+    t_samp_usec: float = 6.0,
+):
+    """
+    Model MUR chain accoring to [^1]
+    IF samples at complex baseband -> CIC decimation -> 16-tap FIR compensation.
+
+    [^1]: Hassenpflug, G., Yamamoto, M., Luce, H., Fukao, S., 2008.
+        Description and demonstration of the new Middle and Upper atmosphere Radar imaging system: 1-D, 2-D, and 3-D imaging of troposphere and stratosphere.
+        Radio Sci. 43, RS2013. https://doi.org/10.1029/2006RS003603
+
+    """
+    # CIC matched-filter / decimator
+    # TODO: guessing the cic decimation rate of 8, it kinda makes sense beacuse with 16 taps
+    # 8*15=120 which is the total decimation rate... but double check needed!
+    y_cic = cic_decimate(x, decimation=8, combs=6)
+
+    # 16-tap FIR amplitude/frequency compensator
+    # TODO: gussing the compensating FIR, no coefficients were available in the paper?
+    fir_taps = sc_signal.firwin(
+        numtaps=16,
+        cutoff=0.8,
+        window="hamming",
+    )
+    y_out = sc_signal.lfilter(fir_taps, [1.0], y_cic)
+    y_out = y_out[::15]
+
+    return y_out
+
+
 def match_pulse_code(
     tx_signal: npt.NDArray[np.complex128],
     codes: npt.NDArray[np.float64],
@@ -94,6 +148,9 @@ def tx_modulation_model(
         # TODO: i just magically know this filter chain is decimated by 15 - maybe this could be
         # better structured
         decimation = 15
+    elif fir_filter == FIRFilter.mu2004:
+        filt = mu_radar_filter_post_2004
+        decimation = 120
     else:
         # TODO: finish this
         raise ValueError("todo error here")
@@ -112,7 +169,7 @@ def tx_modulation_model(
 def simulate_pulse_code(
     code: npt.NDArray[np.float64],
     baud_length_usec: int,
-    t_samp_usec: int,
+    t_samp_usec: int | float,
     ipp_t_usec: int,
     signal_length: int,
     start_samp: int | float = 0,
@@ -163,6 +220,9 @@ def tx_signal_model(
     if fir_filter == FIRFilter.b414d15_gaus:
         filt = apply_b414d15_gaus
         decimation = 15
+    elif fir_filter == FIRFilter.mu2004:
+        filt = mu_radar_filter_post_2004
+        decimation = 120
     else:
         raise ValueError("todo error here")
 
@@ -179,12 +239,14 @@ def tx_signal_model(
             start_samp=(start_samp + offsets[ind]) * decimation,
         )
 
+        # filter to the initial bandwidth of the transmitter
         spectrum = fft(signal)
         freqs = fftfreq(read_length * decimation, d=decimation * 1e6 / t_samp_usec)
         mask = np.abs(freqs) <= bandwidth / 2
         filtered_spectrum = spectrum * mask
         fsignal = ifft(filtered_spectrum).real
 
+        # filter according to the receiver chain
         signals[:, ind] = filt(fsignal)
 
     # Signal value of tx_indices

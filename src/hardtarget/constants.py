@@ -15,6 +15,7 @@ class FIRFilter(StrEnum):
     """FIR Filter type"""
 
     b414d15_gaus = "b414d15_gaus"
+    mu2004 = "mu2004"
     unknown = "unknown"
 
 
