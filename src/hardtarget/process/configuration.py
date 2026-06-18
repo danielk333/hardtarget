@@ -159,7 +159,11 @@ def compute_process_params(
     # ---- Range gates ----
 
     # Sample index in ipp
-    _il0_rgs_min = tx_start_samp + 1
+    # TODO: i removed the +1 at _il0_rgs_min, because thats how i got range to line up in the
+    # stand-alone example but someone needs to review our conventions _again_ to make sure this
+    # makes sense and is consistent troughout the code and not a "two wrongs made an accidental
+    # right" thing
+    _il0_rgs_min = tx_start_samp
     _il0_rgs_max = rx_end_samp - tx_pulse_samps
     _il0_min_range_gate = cfg_params.min_range_gate
     _il0_min_range_gate += _il0_rgs_min if cfg_params.min_range_gate >= 0 else _il0_rgs_min
