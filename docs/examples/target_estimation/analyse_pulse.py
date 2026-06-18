@@ -461,7 +461,7 @@ for ri, r in enumerate(base_r_tests):
         #     f_est, phi_est = np.nan, np.nan
         # if np.isnan(f_est):
         # NOTE: apparently this is just better! although its a bit slower
-        f_est, phi_est = dtft_solve(
+        pwr, f_est, phi_est = dtft_solve(
             decoded_signal=decoded,
             sample_rate=exp_params.sample_rate,
             freq_bracket=(
@@ -470,10 +470,7 @@ for ri, r in enumerate(base_r_tests):
             ),
         )
 
-        dop_phasor = np.exp(-2j * np.pi * f_est * np.arange(len(tx)) / exp_params.sample_rate)
-        full_decoded = decoded * dop_phasor
-
-        corrs[ind] = np.abs(np.sum(full_decoded))
+        corrs[ind] = pwr
         # corrs[ind] = np.abs(spec[mi])
         dopps[ind] = f_est
 

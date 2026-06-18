@@ -35,7 +35,7 @@ def dtft_solve_with_acceleration(
     freq_limits: tuple[float, float] = (None, None),
     method: str = "Nelder-Mead",
     minimize_kwargs: dict[str, Any] | None = {},
-) -> float:
+) -> tuple[float, float, float, float]:
     """TODO docstring, this is a bit novel - maybe it works?"""
     t = np.arange(len(decoded_signal)) / sample_rate
     t2 = t**2
@@ -43,17 +43,17 @@ def dtft_solve_with_acceleration(
     def fun(x):
         dtft_fractors = np.exp(-1j * 2 * np.pi * x[0] * t)
         accel_factors = np.exp(-1j * np.pi * x[1] * t2).astype(np.complex64)
-        return -(np.abs(np.mean(dtft_fractors * decoded_signal * accel_factors)) ** 2)
+        return -(np.abs(np.sum(dtft_fractors * decoded_signal * accel_factors)) ** 2)
 
     res = optimize.minimize(
         fun, [start_freq, start_accel], bounds=[freq_limits, accel_limits], method=method, **minimize_kwargs
     )
 
-    # TODO: phase can be computed like this, double check it works and also add it as return value
     dtft_fractors = np.exp(-1j * 2 * np.pi * res.x[0] * t)
     accel_factors = np.exp(-1j * np.pi * res.x[1] * t2).astype(np.complex64)
-    phi = np.angle(np.mean(dtft_fractors * decoded_signal * accel_factors))
-    return res.x
+    phi = np.angle(np.sum(dtft_fractors * decoded_signal * accel_factors))
+
+    return -res.fun, res.x[0], res.x[1], phi
 
 
 def dtft_solve(
@@ -73,13 +73,13 @@ def dtft_solve(
 
     def fun(x):
         dtft_fractors = np.exp(-1j * 2 * np.pi * x * t)
-        return -(np.abs(np.mean(dtft_fractors * decoded_signal)) ** 2)
+        return -(np.abs(np.sum(dtft_fractors * decoded_signal)) ** 2)
 
     res = optimize.minimize_scalar(fun, bracket=freq_bracket, method="brent")
 
     dtft_fractors = np.exp(-1j * 2 * np.pi * res.x * t)
-    phi = np.angle(np.mean(dtft_fractors * decoded_signal))
-    return res.x, phi
+    phi = np.angle(np.sum(dtft_fractors * decoded_signal))
+    return -res.fun, res.x, phi
 
 
 def _dft_ratio_derivatives_at_zero(d: float) -> tuple[float, float, float, float]:

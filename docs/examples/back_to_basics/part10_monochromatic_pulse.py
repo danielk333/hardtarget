@@ -50,7 +50,7 @@ for ind, sigma in tqdm(enumerate(noise_sigmas), total=len(noise_sigmas)):
         spec_max = np.argmax(np.abs(spec))
         d_freq = freqs[spec_max] - freqs[spec_max - 1]
 
-        f_est_dtft, phi_est_dtft = dtft_solve(
+        _, f_est_dtft, phi_est_dtft = dtft_solve(
             decoded_signal=signal,
             sample_rate=sample_rate,
             freq_bracket=(
@@ -83,8 +83,6 @@ mu_phi_err = np.nanmean(np.abs(errs[1, :, :]), axis=1)
 std_phi_err = np.nanstd(np.abs(errs[1, :, :]), axis=1)
 mu_phi_dtft_err = np.nanmean(np.abs(errs[3, :, :]), axis=1)
 std_phi_dtft_err = np.nanstd(np.abs(errs[3, :, :]), axis=1)
-
-breakpoint()
 
 axes[0].loglog(noise_sigmas, mu_f_err, c="k", label="Taylor expanded FT equation")
 axes[0].loglog(noise_sigmas, mu_f_err + std_f_err * 3, ls="--", alpha=0.5, c="k", label="+3 sigma")
