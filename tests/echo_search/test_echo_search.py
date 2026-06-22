@@ -190,6 +190,7 @@ def test_crosscorrelate_tx_model(plot):
             dtype=np.float64,
         ),
         rx_channels=np.arange(1, 26).tolist(),
+        fir_filter=FIRFilter.mu2004,
         samples_per_file=10000000,
     )
 

@@ -46,8 +46,8 @@ assert reader is not None
 # In this case we choose to visualize the 500 first ipps of the measurement
 
 output_path = Path(tmp_dir.name) / "analysed"
-start_time = int(reader.exp_def.t_ipp_usec * 50)
-end_time = start_time + int(reader.exp_def.t_ipp_usec * 120)
+start_time = int(reader.exp_def.t_ipp_usec * 50) * 1e-6
+end_time = start_time + int(reader.exp_def.t_ipp_usec * 120) * 1e-6
 
 echo_search(
     data=data,
