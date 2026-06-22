@@ -624,19 +624,19 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         # TODO: the experiment file also contains a .fir file, for LEO 2024 its `b414d15_gaus.fir`
         # this should be translated into which filter we apply with what coefficients, i did some
         # guesswork now and hardcoded it here for now
-        fir_filter = FIRFilter.b414d15_gaus
+        # fir_filter = FIRFilter.b414d15_gaus
 
         # Extracting tx data
         if not self._tx_channel:
             assert self.exp_def.code is not None, (
                 "No code available from the metadata, not possible to simulate tx"
             )
-            # TODO: this should probably be configurable in the future
+            # TODO: this should probably be configurable in the future, should be cachable aswell
             tx = tx_signal_model(
                 code=self.exp_def.code,
                 baud_length_usec=self.exp_def.baud_length_usec,
                 t_samp_usec=self.exp_def.t_samp_usec,
-                tx_start_samp=int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec),
+                # tx_start_samp=int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec),
                 ipp_samps=self.exp_def.ipp_samps,
                 read_length=read_length,
                 bandwidth=1e6,  # TODO: this needs to be part of the config somewhere - its kinda a
@@ -644,14 +644,16 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 # experiment
                 start_samp=(start_sample % self.exp_def.ipp_samps) - self.cfg_params.samp_offset,
                 sub_resolution=sub_resolution,
-                fir_filter=fir_filter,  # TODO: again, probably should change name of this variable
+                fir_filter=FIRFilter(
+                    self.exp_def.fir_filter
+                ),  # TODO: again, probably should change name of this variable
             )
         elif self._tx_channel == self._rx_channels:
             tx = ipp.copy()
             tx = tx_modulation_model(
                 tx_signal=tx,
                 tx_stencil=self.pro_params.tx_stencil,
-                fir_filter=fir_filter,
+                fir_filter=FIRFilter(self.exp_def.fir_filter),
                 sub_resolution=sub_resolution,
             )
         else:
@@ -661,7 +663,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             tx = tx_modulation_model(
                 tx_signal=tx,
                 tx_stencil=self.pro_params.tx_stencil,
-                fir_filter=fir_filter,
+                fir_filter=FIRFilter(self.exp_def.fir_filter),
                 sub_resolution=sub_resolution,
             )
 

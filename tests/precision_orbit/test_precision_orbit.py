@@ -26,9 +26,8 @@ from hardtarget.target_estimation.dpt.types import DPTCfgParams
 from hardtarget.target_estimation.gmf.types import GMFCfgParams
 from hardtarget.target_estimation.types import MFOutArgs
 from hardtarget.types import CfgParams, ExpDef, ProParams
-
-from .utils import cdse
-from .utils.dt_standard import str_to_dt
+from tests.precision_orbit.utils import cdse
+from tests.precision_orbit.utils.dt_standard import str_to_dt
 
 # Process specific configurations
 # gmf_cfg = GMFCfgParams(
@@ -88,6 +87,7 @@ def test_verify_analysis_orbit_data(
     plot,
     data_params,
     params: tuple[TargetEstimationMethod, CfgParams],
+    progress=False,
 ):
 
     COPERNICUS_USR, COPERNICUS_PWD, MEASUREMENT, ORBIT, IMPL = data_params
@@ -145,7 +145,7 @@ def test_verify_analysis_orbit_data(
     # https://old.eiscat.se/scientist/user-documentation/receiver-documentation/#uhf-receiver
     # which is here 927.200 MHz
     # - apparently there is meta data in the matlab data file that documents frequency!
-    exp_params = reader.experiment.copy(radar_frequency=927.200)
+    exp_def = reader.exp_def.copy(radar_frequency=927.200)
 
     # Analyse data
     comm = get_mpi()
@@ -156,11 +156,11 @@ def test_verify_analysis_orbit_data(
         start_time=start_time,
         end_time=end_time,
         relative_time=False,
-        progress=True,
+        progress=progress,
         method_lib=method_lib,
         implementation=IMPL,
         comm=comm,
-        exp_params=exp_params,
+        exp_def=exp_def,
     )
     comm.barrier()
     if comm.rank != 0:
@@ -413,15 +413,11 @@ if __name__ == "__main__":
     parser.add_argument("--orbit-path")
     parser.add_argument("--radar-path")
     parser.add_argument("--impl", default="numpy")
+    parser.add_argument("--progress", action="store_true")
     args = parser.parse_args()
     test_verify_analysis_orbit_data(
         args.plot,
-        (
-            args.usr,
-            args.pwd,
-            args.radar_path,
-            args.orbit_path,
-            args.impl,
-        ),
+        (args.usr, args.pwd, args.radar_path, args.orbit_path, args.impl),
         (TargetEstimationMethod.fgmf, gmf_cfg),
+        True,
     )

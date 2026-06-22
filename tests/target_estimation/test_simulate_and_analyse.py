@@ -10,6 +10,7 @@ from scipy import constants
 import hardtarget
 from hardtarget.constants import Impl, TargetEstimationMethod
 from hardtarget.data_simulation import DRFSimParams, simulate_drf
+from src.hardtarget.constants import FIRFilter
 
 
 class TestTargetEstimation:
@@ -114,6 +115,7 @@ class TestTargetEstimation:
             t_cal_on_usec=19900,
             t_cal_off_usec=19997,
             code=load_radar_code("leo_bpark"),
+            fir_filter=FIRFilter.b414d15_gaus,
             samples_per_file=12800000,
         )
 
@@ -162,8 +164,8 @@ class TestTargetEstimation:
             _ = hardtarget.target_estimation(
                 data=Path(tmp_sim_path).resolve(),
                 config=tmp_config_path,
-                start_time=simulation_params.start_time_us,
-                end_time=simulation_params.end_time_us,
+                start_time=simulation_params.start_time_us * 1e-6,
+                end_time=simulation_params.end_time_us * 1e-6,
                 relative_time=True,
                 method_lib=mf_method,
                 implementation=mf_impl,

@@ -1,7 +1,7 @@
 """Plotting tools for raw data"""
 
-import warnings
 import logging
+import warnings
 from typing import Optional
 
 import matplotlib.pyplot as plt

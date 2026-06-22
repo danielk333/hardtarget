@@ -1,7 +1,9 @@
 import datetime as dt
-import requests
-from pathlib import Path
 import xml.etree.ElementTree as ET
+from pathlib import Path
+
+import requests
+
 from .dt_standard import dt_format, str_to_dt
 
 
@@ -36,8 +38,6 @@ def search_for_sentinel_data(
 
     if not value:
         raise Exception(f"No data for {collection} found between: {dt_start} and {dt_end}")
-    else:
-        print(f"Found {len(value)} items")
 
     return value
 

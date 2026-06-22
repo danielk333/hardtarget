@@ -6,7 +6,7 @@ import warnings
 from collections.abc import Generator
 from dataclasses import fields
 from pathlib import Path
-from typing import Any, Optional, TypeVar
+from typing import Any, Optional, TypeVar, get_args, get_origin
 
 import h5py
 import numpy as np
@@ -174,8 +174,14 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
                 excluded_keys = [field.name for field in fields(dc_type) if not field.init]
                 # Extract keys
                 group = file[dc_type.__name__]
+                key_type = {f.name: f.type for f in fields(dc_type)}
+
                 return dc_type(
-                    **{key: read_key(group, key) for key in group.keys() if key not in excluded_keys}
+                    **{
+                        key: read_key(group, key, key_type[key])
+                        for key in group.keys()
+                        if key not in excluded_keys
+                    }
                 )
 
             if exp_def is None:
@@ -218,7 +224,9 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
     )
 
 
-def read_key(group: h5py.Group, key: str, logger: Optional[logging.Logger] = None) -> Any:
+def read_key(
+    group: h5py.Group, key: str, d_type: Optional[Any] = None, logger: Optional[logging.Logger] = None
+) -> Any:
     """h5py saves dataset string as byte strings, needs to be decoded"""
     data = group[key][()]
     if isinstance(data, bytes):
@@ -230,6 +238,10 @@ def read_key(group: h5py.Group, key: str, logger: Optional[logging.Logger] = Non
         data = [d.decode() for d in data]
     elif isinstance(data, np.integer):
         data = int(data)
+
+    if any(get_origin(arg) is list for arg in get_args(d_type)) and type(data) is np.ndarray:
+        # Integer lists are stored as numpy arrays, must be converted back
+        data = data.tolist()
 
     return data
 

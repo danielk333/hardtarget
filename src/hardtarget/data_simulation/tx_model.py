@@ -132,6 +132,11 @@ def tx_modulation_model(
     sub_resolution: int = 1,
     kind: str = "linear",
 ) -> npt.NDArray[np.complex128]:
+    """
+    Extract subsamples from a existing tx signal
+
+    """
+
     modulated_tx = np.zeros((tx_signal.size, sub_resolution), dtype=tx_signal.dtype)
 
     # Create interpolator for signal
@@ -180,8 +185,9 @@ def simulate_pulse_code(
     t_in_ipp_usec = t_usec % ipp_t_usec
     t_ind = (t_in_ipp_usec // baud_length_usec).astype(np.int64)
     signal = np.zeros(t_usec.shape, dtype=np.complex128)
-    inds = np.logical_and(t_in_ipp_usec >= 0, t_in_ipp_usec <= baud_length_usec * len(code))
+    inds = np.logical_and(t_in_ipp_usec >= 0, t_in_ipp_usec < baud_length_usec * len(code))
     signal[inds] = code[t_ind[inds]]
+
     return signal
 
 
@@ -189,7 +195,6 @@ def tx_signal_model(
     code: npt.NDArray[np.float64],
     baud_length_usec: int,
     t_samp_usec: int,
-    tx_start_samp: int,
     ipp_samps: int,
     read_length: int,
     bandwidth: float,
@@ -204,13 +209,12 @@ def tx_signal_model(
         code: Transmitted code
         baud_length_usec: Transmission baud length
         t_samp_usec: Receiver sample time
-        tx_start_samp: tx start sample relative to the inter pulse period
-        start_samp: start sample relative to the inter pulse period, the generated data will start at this point.
-        read_length: How many samples to generate
         ipp_samps: interpulse period samples
+        read_length: How many samples to generate
+        bandwith: Bandwith of transmitter
+        start_samp: start sample relative to the inter pulse period, the generated data will start at this point.
         sub_resolution: Datapoints per sample to use when upsampling the tx signal
-        kind: interpolation kind {'linear', 'nearest', 'nearest-up', 'zero',
-            'slinear', 'quadratic', 'cubic', 'previous', 'next'}
+        fir_filter: Downsampling filter used on transmitter
 
     Returns:
         Tx signal of size (read_length, sub resolution) containing the interpolated signal based on the code
@@ -225,7 +229,7 @@ def tx_signal_model(
         filt = mu_radar_filter_post_2004
         decimation = 120
     else:
-        raise ValueError("todo error here")
+        raise ValueError("TODO: error here")
 
     signals = np.zeros((read_length, sub_resolution), dtype=np.complex128)
     offsets = np.linspace(0, 1, sub_resolution)

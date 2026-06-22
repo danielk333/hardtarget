@@ -6,8 +6,8 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
-from hardtarget.data_simulation.tx_model import tx_signal_model
 from hardtarget.constants import FIRFilter
+from hardtarget.data_simulation.tx_model import tx_signal_model
 
 # First we define a simple code
 # ```
@@ -26,12 +26,12 @@ code = np.array(
 
 t_samp_usec = 6
 baud_length_usec = 12
-ipp_samples = len(code) * int(baud_length_usec/t_samp_usec)
+ipp_samples = len(code) * int(baud_length_usec / t_samp_usec)
 tx = tx_signal_model(
     code=code,
     baud_length_usec=baud_length_usec,
     t_samp_usec=t_samp_usec,
-    tx_start_samp=0,
+    start_samp=0,
     ipp_samps=ipp_samples,
     read_length=ipp_samples,
     fir_filter=FIRFilter.mu2004,
@@ -39,7 +39,7 @@ tx = tx_signal_model(
 )
 
 fig, ax = plt.subplots()
-ls, = ax.plot(np.real(tx))
+(ls,) = ax.plot(np.real(tx))
 ax.plot(np.imag(tx), c=ls.get_color(), ls="--")
 
 # Now in some cases we want to increase the resolution of the signal, to do this *sub_resolution* is
@@ -52,7 +52,7 @@ tx = tx_signal_model(
     code=code,
     baud_length_usec=baud_length_usec,
     t_samp_usec=t_samp_usec,
-    tx_start_samp=0,
+    start_samp=0,
     ipp_samps=ipp_samples,
     read_length=ipp_samples,
     sub_resolution=sub_resolution,
@@ -61,7 +61,7 @@ tx = tx_signal_model(
 )
 fig, ax = plt.subplots()
 for ind in range(tx.shape[1]):
-    ls, = ax.plot(np.real(tx[:, ind]), label=f"{ind}")
+    (ls,) = ax.plot(np.real(tx[:, ind]), label=f"{ind}")
     ax.plot(np.imag(tx[:, ind]), c=ls.get_color(), ls="--")
 ax.legend()
 plt.show()
