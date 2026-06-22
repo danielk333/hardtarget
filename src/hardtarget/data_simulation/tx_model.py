@@ -6,18 +6,17 @@ import numpy as np
 import numpy.typing as npt
 import scipy.interpolate as interpolate
 import scipy.signal as sc_signal
-from scipy.fft import fft, ifft, fftfreq
-
+from scipy.fft import fft, fftfreq, ifft
 
 from hardtarget.constants import FIRFilter
 
 
-def boxcar(n: int, normalize: bool = True) -> np.ndarray:
+def boxcar(n: int, normalize: bool = True) -> npt.NDArray:
     h = np.ones(n, dtype=float)
     return h / h.sum() if normalize else h
 
 
-def apply_b414d15_gaus(x: np.ndarray) -> np.ndarray:
+def apply_b414d15_gaus(x: npt.NDArray[np.complexfloating]) -> npt.NDArray[np.complexfloating]:
     """
     Equivalent chain from b414d15_gaus.fir:
       total decimation = 15
@@ -33,7 +32,7 @@ def apply_b414d15_gaus(x: np.ndarray) -> np.ndarray:
     # HDF section: 5 boxcar FIRs, each 5 taps
     h5 = boxcar(5)
     for _ in range(5):
-        y = sc_signal.lfilter(h5, [1.0], y)
+        y = sc_signal.lfilter(h5, [1.0], y)  # type: ignore[attr-defined]
 
     # Decimate x MHz -> x/5 MHz
     y = y[::5]
@@ -41,7 +40,7 @@ def apply_b414d15_gaus(x: np.ndarray) -> np.ndarray:
     # FIR section: 2 boxcar FIRs, each 2 taps
     h2 = boxcar(2)
     for _ in range(2):
-        y = sc_signal.lfilter(h2, [1.0], y)
+        y = sc_signal.lfilter(h2, [1.0], y)  # type: ignore[attr-defined]
 
     # Decimate x/5 MHz -> x/15 MHz
     y = y[::3]
@@ -49,7 +48,9 @@ def apply_b414d15_gaus(x: np.ndarray) -> np.ndarray:
     return y
 
 
-def cic_decimate(x, decimation: int, combs: int, delay: int = 1):
+def cic_decimate(
+    x: npt.NDArray[np.complexfloating], decimation: int, combs: int, delay: int = 1
+) -> npt.NDArray[np.complexfloating]:
     """
     CIC decimator: N integrators at input rate that is decimated,
     then N comb stages at output rate with a delay.
@@ -73,9 +74,9 @@ def cic_decimate(x, decimation: int, combs: int, delay: int = 1):
 
 
 def mu_radar_filter_post_2004(
-    x,
+    x: npt.NDArray[np.complexfloating],
     t_samp_usec: float = 6.0,
-):
+) -> npt.NDArray[np.complexfloating]:
     """
     Model MUR chain accoring to [^1]
     IF samples at complex baseband -> CIC decimation -> 16-tap FIR compensation.
@@ -92,12 +93,12 @@ def mu_radar_filter_post_2004(
 
     # 16-tap FIR amplitude/frequency compensator
     # TODO: gussing the compensating FIR, no coefficients were available in the paper?
-    fir_taps = sc_signal.firwin(
+    fir_taps = sc_signal.firwin(  # type: ignore[attr-defined]
         numtaps=16,
         cutoff=0.8,
         window="hamming",
     )
-    y_out = sc_signal.lfilter(fir_taps, [1.0], y_cic)
+    y_out = sc_signal.lfilter(fir_taps, [1.0], y_cic)  # type: ignore[attr-defined]
     y_out = y_out[::15]
 
     return y_out
@@ -109,7 +110,7 @@ def match_pulse_code(
     baud_length_usec: int,
     t_samp_usec: int,
     ipp_t_usec: int,
-) -> int:
+) -> npt.NDArray[np.float64]:
 
     matches = np.zeros((codes.shape[0],), dtype=np.float64)
     for ind in range(len(matches)):

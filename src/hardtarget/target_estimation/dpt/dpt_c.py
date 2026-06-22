@@ -33,7 +33,7 @@ def fast_dpt_c(
     """
 
     size = (len(pro_params.ranges),)
-    dc, vals, v_ind, a_ind = default_mf_vars_items(size)
+    dc, vals, v_ind, a_ind, phi = default_mf_vars_items(size)
 
     tx = tx.flatten()
     # Below comments are for ctypes argument error debugging
@@ -61,4 +61,4 @@ def fast_dpt_c(
     if error_code != 0:
         raise Exception(f"DPT C-function returned error {error_code}")
 
-    return MFVariables(vals=vals, dc=dc, v_ind=v_ind, a_ind=a_ind, tx_pwr=tx_pwr)
+    return MFVariables(vals=vals, dc=dc, v=v_ind, a=a_ind, phi=np.zeros_like(vals), tx_pwr=tx_pwr)

@@ -1,6 +1,7 @@
 """The Numpy Implementations of the General Matched Filter, or GMF"""
 
 from typing import Any
+
 import numpy as np
 import numpy.typing as npt
 import scipy.fft as fft
@@ -31,22 +32,31 @@ def dtft_solve_with_acceleration(
     sample_rate: float | int,
     start_freq: float,
     start_accel: float,
-    accel_limits: tuple[float, float] = (None, None),
-    freq_limits: tuple[float, float] = (None, None),
+    accel_limits: tuple[float | None, float | None] = (None, None),
+    freq_limits: tuple[float | None, float | None] = (None, None),
     method: str = "Nelder-Mead",
-    minimize_kwargs: dict[str, Any] | None = {},
+    minimize_kwargs: dict[str, Any] = {},
 ) -> tuple[float, float, float, float]:
     """TODO docstring, this is a bit novel - maybe it works?"""
     t = np.arange(len(decoded_signal)) / sample_rate
     t2 = t**2
 
-    def fun(x):
+    def fun(x: tuple[float, float]) -> float:
+        """
+        Args:
+            x: frequence, acceleration
+        """
+
         dtft_fractors = np.exp(-1j * 2 * np.pi * x[0] * t)
         accel_factors = np.exp(-1j * np.pi * x[1] * t2).astype(np.complex64)
         return -(np.abs(np.sum(dtft_fractors * decoded_signal * accel_factors)) ** 2)
 
     res = optimize.minimize(
-        fun, [start_freq, start_accel], bounds=[freq_limits, accel_limits], method=method, **minimize_kwargs
+        fun,
+        [start_freq, start_accel],
+        bounds=[freq_limits, accel_limits],
+        method=method,
+        **minimize_kwargs,
     )
 
     dtft_fractors = np.exp(-1j * 2 * np.pi * res.x[0] * t)
@@ -60,7 +70,7 @@ def dtft_solve(
     decoded_signal: npt.NDArray[np.complexfloating],
     sample_rate: float | int,
     freq_bracket: tuple[float, float],
-) -> float:
+) -> tuple[float, float, float]:
     """TODO docstring, using the brent method
     NOTE: this is also the baysian MAP - see [^1]
 
@@ -71,7 +81,8 @@ def dtft_solve(
     """
     t = np.arange(len(decoded_signal)) / sample_rate
 
-    def fun(x):
+    def fun(x: float) -> float:
+
         dtft_fractors = np.exp(-1j * 2 * np.pi * x * t)
         return -(np.abs(np.sum(dtft_fractors * decoded_signal)) ** 2)
 
@@ -263,7 +274,7 @@ def fast_gmf_np(
 
                     # doppler that gives highest integrated energy at this range gate
                     v[index] = f_est
-                    v_index = mi
+                    v_index = int(mi)
                     # acceleration that gives highest integrated energy at this range gate
                     a[index] = pro_params.accelerations[ai]
                     a_index = ai
@@ -346,8 +357,9 @@ def fast_gmf_no_reduce_np(
     return MFVariables(
         vals=np.empty((1), dtype=np.float32),
         dc=np.empty((1), dtype=np.float32),
-        v_ind=np.empty((1), dtype=np.int32),
-        a_ind=np.empty((1), dtype=np.int32),
+        v=np.empty((1), dtype=np.float32),
+        a=np.empty((1), dtype=np.float32),
+        phi=np.empty((1), dtype=np.float32),
         tx_pwr=np.empty((1), dtype=np.float32),
     )
 

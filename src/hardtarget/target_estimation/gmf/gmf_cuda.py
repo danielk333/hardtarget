@@ -50,7 +50,7 @@ def fast_gmf_cuda(
     """
 
     size = (len(pro_params.ranges),)
-    dc, vals, v_ind, a_ind = default_mf_vars_items(size)
+    dc, vals, v_ind, a_ind, phi = default_mf_vars_items(size)
 
     error_code = gmfcudalib.gmf(
         tx,  # 1
@@ -76,4 +76,4 @@ def fast_gmf_cuda(
     if error_code != 0:
         raise Exception(f"GMF CUDA-function returned error {error_code}")
 
-    return MFVariables(vals=vals, dc=dc, v_ind=v_ind, a_ind=a_ind, tx_pwr=tx_pwr)
+    return MFVariables(vals=vals, dc=dc, v=v_ind, a=a_ind, phi=phi, tx_pwr=tx_pwr)

@@ -33,7 +33,7 @@ def fast_gmf_c(
     """
 
     size = (len(pro_params.ranges),)
-    dc, vals, v_ind, a_ind = default_mf_vars_items(size)
+    dc, vals, v_ind, a_ind, phi = default_mf_vars_items(size)
 
     tx = tx.flatten()
     # Below comments are for ctypes argument error debugging
@@ -59,4 +59,4 @@ def fast_gmf_c(
     a_ind[:] = pro_params.inds_accelerations[a_ind]
     assert error_code == 0, f"GMF C-function returned error {error_code}"
 
-    return MFVariables(vals=vals, dc=dc, v_ind=v_ind, a_ind=a_ind, tx_pwr=tx_pwr)
+    return MFVariables(vals=vals, dc=dc, v=v_ind, a=a_ind, phi=phi, tx_pwr=tx_pwr)

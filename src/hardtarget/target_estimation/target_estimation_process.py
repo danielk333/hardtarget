@@ -270,6 +270,7 @@ class TargetEstimationProcess(
             snr=snr,
             v=all_vars.v,
             a=all_vars.a,
+            phi=all_vars.phi,
             r_vec=r_vec,
             v_vec=v_vec,
             a_vec=a_vec,

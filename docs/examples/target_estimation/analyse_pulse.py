@@ -3,31 +3,29 @@
 # How to extract and analyse an individual radar pulse
 
 import argparse
+import datetime as dt
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from scipy import constants
-import scipy.interpolate as interpolate
-import scipy.signal
-from scipy import optimize
-from scipy.fft import fft, fftfreq, fftshift
 import numpy as np
+import radardef
+import requests
+import scipy.signal
 from matplotlib import pyplot as plt
+from radardef.types import BeamType, EiscatUHFLocation
+from scipy import constants
+from scipy.fft import fft, fftfreq, fftshift
+from spacecoords import interpolation
 from tqdm import tqdm
 
-from hardtarget.target_estimation.gmf.types import GMFCfgParams
 from hardtarget import plotting
+from hardtarget.data_simulation.tx_model import match_pulse_code, tx_modulation_model, tx_signal_model
 from hardtarget.plotting.raw_data_plots import extract_requested_range_gates
-from hardtarget.data_simulation.tx_model import tx_signal_model, tx_modulation_model, match_pulse_code
-from hardtarget.types import Bounds
 from hardtarget.process.utils import sample_interval_to_closest_ipp
-from radardef.types import BeamType, EiscatUHFLocation
+from hardtarget.target_estimation.gmf.gmf_numpy import dtft_solve
+from hardtarget.target_estimation.gmf.types import GMFCfgParams
+from hardtarget.types import Bounds
 from hardtarget.utils.time_conversion import time_interval_to_sample_bound, ts_from_str
-from hardtarget.target_estimation.gmf.gmf_numpy import dft_taylor, dtft_solve
-import radardef
-import datetime as dt
-import requests
-import xml.etree.ElementTree as ET
-from spacecoords import interpolation
 
 parser = argparse.ArgumentParser()
 parser.add_argument("data_file", type=Path)
@@ -248,18 +246,18 @@ request_bounds = time_interval_to_sample_bound(
     time_bounds=Bounds(int(reader.epoch_bounds.ts_start_usec), int(reader.epoch_bounds.ts_end_usec)),
     start_time=start_time,
     end_time=end_time,
-    sample_rate=reader.experiment.sample_rate,
+    sample_rate=reader.exp_def.sample_rate,
     relative_time=False,
 )
 
-samp_bounds = sample_interval_to_closest_ipp(request_bounds, reader.experiment.ipp_samps)
+samp_bounds = sample_interval_to_closest_ipp(request_bounds, reader.exp_def.ipp_samps)
 
-start_ipp_num = request_bounds.start // reader.experiment.ipp_samps
+start_ipp_num = request_bounds.start // reader.exp_def.ipp_samps
 
 # extract data within bounds
 n_samp = samp_bounds.end - samp_bounds.start
 data_vec = reader.read(
-    channel=reader.experiment.rx_channels,
+    channel=reader.exp_def.rx_channels,
     start_sample=samp_bounds.start + cfg.samp_offset,
     vector_length=n_samp,
 )
@@ -270,31 +268,29 @@ if data_vec.ndim > 1:
 
 # define experiment tx and rx intervals
 def usec_to_sample(t_usec: int) -> int:
-    return int(t_usec / reader.experiment.t_samp_usec)
+    return int(t_usec / reader.exp_def.t_samp_usec)
 
 
-t_rx_start_samp = usec_to_sample(reader.experiment.t_rx_start_usec)
-t_rx_end_samp = usec_to_sample(reader.experiment.t_rx_end_usec)
-t_tx_start_samp = usec_to_sample(reader.experiment.t_tx_start_usec)
-t_tx_end_samp = usec_to_sample(reader.experiment.t_tx_end_usec)
+t_rx_start_samp = usec_to_sample(reader.exp_def.t_rx_start_usec)
+t_rx_end_samp = usec_to_sample(reader.exp_def.t_rx_end_usec)
+t_tx_start_samp = usec_to_sample(reader.exp_def.t_tx_start_usec)
+t_tx_end_samp = usec_to_sample(reader.exp_def.t_tx_end_usec)
 t_cal_on_samp = (
-    usec_to_sample(int(reader.experiment.t_cal_on_usec)) if reader.experiment.t_cal_on_usec is not None else 0
+    usec_to_sample(int(reader.exp_def.t_cal_on_usec)) if reader.exp_def.t_cal_on_usec is not None else 0
 )
 t_cal_off_samp = (
-    usec_to_sample(int(reader.experiment.t_cal_off_usec))
-    if reader.experiment.t_cal_off_usec is not None
-    else 0
+    usec_to_sample(int(reader.exp_def.t_cal_off_usec)) if reader.exp_def.t_cal_off_usec is not None else 0
 )
 
-range_t = t_tx_start_samp / reader.experiment.sample_rate
-samp_vec = np.arange(reader.experiment.ipp_samps)
-rt_vec = np.arange(t_rx_end_samp - t_rx_start_samp) * reader.experiment.t_samp_usec - range_t
+range_t = t_tx_start_samp / reader.exp_def.sample_rate
+samp_vec = np.arange(reader.exp_def.ipp_samps)
+rt_vec = np.arange(t_rx_end_samp - t_rx_start_samp) * reader.exp_def.t_samp_usec - range_t
 
-mat_shape = (data_vec.size // reader.experiment.ipp_samps, reader.experiment.ipp_samps)
+mat_shape = (data_vec.size // reader.exp_def.ipp_samps, reader.exp_def.ipp_samps)
 data_ipp_vec_full = data_vec.reshape(mat_shape).T
 
 il0_rg0, il0_rg1 = extract_requested_range_gates(
-    cfg.min_range_gate, cfg.max_range_gate, "sample", reader.experiment
+    cfg.min_range_gate, cfg.max_range_gate, "sample", reader.exp_def
 )
 data_ipp_vec = data_ipp_vec_full[il0_rg0:il0_rg1, :]
 
@@ -303,7 +299,7 @@ data_ipp_vec = data_ipp_vec_full[il0_rg0:il0_rg1, :]
 t_analysed = np.arange(
     start=start_time_dt.timestamp(),
     stop=end_time_dt.timestamp(),
-    step=cfg.n_ipp * (reader.experiment.t_ipp_usec * 1e-6),
+    step=cfg.n_ipp * (reader.exp_def.t_ipp_usec * 1e-6),
 )
 satellite_orbit = interpolated_satellite_pos.get_state(t_analysed)
 
@@ -332,7 +328,7 @@ print(r_rel[ipp_index], v_rel[ipp_index])
 r_true, v_true = r_rel[ipp_index], v_rel[ipp_index]
 
 signal = data_ipp_vec_full[:, ipp_index]
-exp_params = reader.experiment.copy(radar_frequency=927.200)
+exp_params = reader.exp_def.copy(radar_frequency=927.200)
 
 
 def usec_to_samp(usec: int | float) -> int:
@@ -389,7 +385,7 @@ start_code_num = np.argmax(matches)
 # ax.plot(matches)
 # plt.show()
 
-print("guessed code id: ", start_ipp_num % reader.experiment.code.shape[0])
+print("guessed code id: ", start_ipp_num % reader.exp_def.code.shape[0])
 print("estimated code id: ", start_code_num)
 
 # TODO: this now works with both! implement that we can choose which to do, modulated or simulated

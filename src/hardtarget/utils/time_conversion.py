@@ -9,62 +9,75 @@ from hardtarget.types import Bounds
 
 
 def time_interval_to_sample_bound(
-    time_bounds: Bounds,
+    time_bounds: tuple[int | float, int | float],
     sample_rate: float,
-    start_time: Optional[np.datetime64 | float | dt.datetime] = None,
-    end_time: Optional[np.datetime64 | float | dt.datetime] = None,
+    start_time: Optional[np.datetime64 | int | float | dt.datetime] = None,
+    end_time: Optional[np.datetime64 | int | float | dt.datetime] = None,
     relative_time: bool = False,
 ) -> Bounds:
     """
     Convert a real time interval to sample indexes, each files sample always start from 0
 
     Args:
-        time_bounds: max/min file epoch bounds
+        time_bounds: [min, max] file epoch bounds (seconds since epoch)
         sample_rate: samples per second
-        start_time (optional): start time as datetime or microseconds since epoch
-        end_time (optional): end time as datetime or microseconds since epoch
+        start_time (optional): start time as datetime or seconds since epoch
+        end_time (optional): end time as datetime or seconds since epoch
         relative_time: If start and end should be measured from measusrement start or real time
 
-    start/end time should be a datetime object or microseconds since epoch
     """
 
     if start_time is not None:
         if relative_time:
-            assert isinstance(start_time, int)
-            start_sample = int(float(start_time) * 1e-6 * sample_rate)
+            if isinstance(start_time, int) or isinstance(start_time, float):
+                start_sample = int(start_time * sample_rate)
+            else:
+                raise ValueError("Relative time is only compatible with int or float start/end")
         else:
             if isinstance(start_time, np.datetime64):
-                start_us = start_time.astype("datetime64[us]").astype("int64")
+                start_sec = start_time.astype("datetime64[s]").astype("float64")
             elif isinstance(start_time, dt.datetime):
-                start_us = start_time.timestamp() * 1e6
+                start_sec = start_time.timestamp()
             else:
-                start_us = np.datetime64(start_time, "us").astype("datetime64[us]").astype("int64")
+                if isinstance(start_time, int):
+                    start_sec = np.datetime64(start_time, "s").astype("float64")
+                else:
+                    start_sec = (
+                        np.datetime64(int(start_time * 1e6), "us").astype("datetime64[s]").astype("float64")
+                    )
 
-            assert start_us >= time_bounds.start, (
-                f"Start time: {str_from_ts(start_us * 1e-6)} is before measurement start: {str_from_ts(time_bounds.start * 1e-6)}"
+            assert start_sec >= time_bounds[0], (
+                f"Start time: {str_from_ts(start_sec)} is before measurement start: {str_from_ts(time_bounds[0])}"
             )
-            start_sample = int((start_us - time_bounds.start) * 1e-6 * sample_rate)
+            start_sample = int((start_sec - time_bounds[0]) * sample_rate)
     else:
         start_sample = 0
 
     if end_time is not None:
         if relative_time:
-            assert isinstance(end_time, int)
-            end_sample = int(float(end_time) * 1e-6 * sample_rate)
+            if isinstance(end_time, int) or isinstance(end_time, float):
+                end_sample = int(end_time * sample_rate)
+            else:
+                raise ValueError("Relative time is only compatible with int or float start/end")
         else:
             if isinstance(end_time, np.datetime64):
-                end_us = end_time.astype("datetime64[us]").astype("int64")
+                end_sec = end_time.astype("datetime64[s]").astype("float64")
             elif isinstance(end_time, dt.datetime):
-                end_us = end_time.timestamp() * 1e6
+                end_sec = end_time.timestamp()
             else:
-                end_us = np.datetime64(end_time, "us").astype("datetime64[us]").astype("int64")
+                if isinstance(end_time, int):
+                    end_sec = np.datetime64(end_time, "s").astype("float64")
+                else:
+                    end_sec = (
+                        np.datetime64(int(end_time * 1e6), "us").astype("datetime64[s]").astype("float64")
+                    )
 
-            assert end_us <= time_bounds.end, (
-                f"End time: {str_from_ts(end_us * 1e-6)} s is after measurement end: {str_from_ts(time_bounds.end * 1e-6)}s"
+            assert end_sec <= time_bounds[1], (
+                f"End time: {str_from_ts(end_sec)} s is after measurement end: {str_from_ts(time_bounds[1])}s"
             )
-            end_sample = int((end_us - time_bounds.start) * 1e-6 * sample_rate)
+            end_sample = int((end_sec - time_bounds[0]) * sample_rate)
     else:
-        end_sample = int((time_bounds.end - time_bounds.start) * 1e-6 * sample_rate)
+        end_sample = int((time_bounds[1] - time_bounds[0]) * sample_rate)
 
     return Bounds(start_sample, end_sample)
 

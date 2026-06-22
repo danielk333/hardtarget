@@ -18,7 +18,7 @@ from radardef.tools.mpi_tools import CommBar
 from radardef.types import Pointing
 
 import hardtarget.process.utils as utils
-from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl, MethodLib
+from hardtarget.constants import AnalysisMethod, ConfigSubSection, FIRFilter, Impl, MethodLib
 from hardtarget.data_handling import dump_params_to_file
 from hardtarget.data_simulation.tx_model import tx_modulation_model, tx_signal_model
 from hardtarget.process.configuration import (
@@ -179,7 +179,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
         # Other needed parameters
         t_start_usec, t_end_usec = self.data.epoch_bounds
-        self.epoch = Bounds(int(t_start_usec), int(t_end_usec))
+        self.epoch_usec = Bounds(int(t_start_usec), int(t_end_usec))
         self.output_dir = Path(output_dir).resolve() if output_dir is not None else None
         self.store_mode = "w"
         self.store_params = True
@@ -409,8 +409,8 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self,
         comm_rank: int,
         comm_size: int,
-        start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
-        end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+        start_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
+        end_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
         relative_time: bool = False,
         sub_directory: Optional[str] = None,
         clobber: bool = True,
@@ -427,8 +427,8 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         Args:
             comm_rank: rank of the current mpi comm
             comm_size: Amount of available ranks
-            start_time (optional): Start time, if set data before this will be neglected
-            end_time (optional): End time, if set data after this will be neglected
+            start_time (optional): Start time, data before this will be neglected
+            end_time (optional): End time, data after this will be neglected
             relative_time (optional): If relative time should be used
             sub_directory (optional): If data should be stored in a sub directory of the designated output directory.
             clobber (optional): Overwrite previous datasets, default True
@@ -439,20 +439,20 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
         if isinstance(start_time, str):
             try:
-                start_time = int(ts_from_str(start_time) * 1e6)
+                start_time = ts_from_str(start_time)
             except ValueError:
-                start_time = int(start_time)
+                start_time = float(start_time)
         if isinstance(end_time, str):
             try:
-                end_time = int(ts_from_str(end_time) * 1e6)
+                end_time = ts_from_str(end_time)
             except ValueError:
-                end_time = int(end_time)
+                end_time = float(end_time)
         # bounds
         if start_time or end_time:
             sample_bounds = time_interval_to_sample_bound(
                 start_time=start_time,
                 end_time=end_time,
-                time_bounds=self.epoch,
+                time_bounds=(self.epoch_usec.start * 1e-6, self.epoch_usec.end * 1e-6),
                 sample_rate=self.exp_def.sample_rate,
                 relative_time=relative_time,
             )
@@ -507,7 +507,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             # Create directory and define filename.
             if self.output_dir is not None:
                 output_path = Path(self.output_dir) / utils.get_filepath(
-                    epoch_unix_us=self.epoch.start,
+                    epoch_unix_us=self.epoch_usec.start,
                     sample_id_us=file_idx_sample,
                     method=self.method,
                     sub_directory=sub_directory,
@@ -624,7 +624,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         # TODO: the experiment file also contains a .fir file, for LEO 2024 its `b414d15_gaus.fir`
         # this should be translated into which filter we apply with what coefficients, i did some
         # guesswork now and hardcoded it here for now
-        fir_filter = "b414d15_gaus"
+        fir_filter = FIRFilter.b414d15_gaus
 
         # Extracting tx data
         if not self._tx_channel:

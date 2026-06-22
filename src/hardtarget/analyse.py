@@ -32,8 +32,8 @@ def analyse(
     implementation: Optional[Impl] = None,
     rx_channel: Optional[str | int] = None,
     excluded_channels: Optional[list[str] | list[int]] = None,
-    start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
-    end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+    start_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
+    end_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
     relative_time: bool = False,
     exp_def: Optional[ExpDef] = None,
     progress: bool | mpi_tools.CommBar = False,
@@ -56,9 +56,9 @@ def analyse(
         implementation (optional): Implementation of the method to be used during the analysis (Numpy/Cuda/C),
                                    will override any implementation defined in the config params.
         rx_channel (optional): Specific rx channel to analyse, if none chosen all will be used from the meta data
-        start_time (optional): Start time of analysis
-        end_time (optional): End time of analysis
-        relative_time (optional): If to use relative time
+        start_time (optional): Start time of analysis, datetime object, date string or seconds since epoch.
+        end_time (optional): End time of analysis,datetime object, date string or seconds since epoch.
+        relative_time (optional): If to use relative time, start and end time must be specified in int or float then.
         exp_def (optional): If working with custom experiments it is needed to be able to load the data.
         progress (optional): If a progress bar should be visualized.
         clobber (optional): If previous analysis should be overwritten.
@@ -131,8 +131,8 @@ def target_estimation(
     implementation: Optional[Impl] = None,
     rx_channel: Optional[str | int] = None,
     excluded_channels: Optional[list[str] | list[int]] = None,
-    start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
-    end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+    start_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
+    end_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
     relative_time: bool = False,
     exp_def: Optional[ExpDef] = None,
     progress: bool | mpi_tools.CommBar = False,
@@ -170,8 +170,8 @@ def optimize(
     implementation: Optional[Impl] = None,
     rx_channel: Optional[str | int] = None,
     excluded_channels: Optional[list[str] | list[int]] = None,
-    start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
-    end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+    start_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
+    end_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
     relative_time: bool = False,
     exp_def: Optional[ExpDef] = None,
     progress: bool | mpi_tools.CommBar = False,
@@ -209,8 +209,8 @@ def echo_search(
     implementation: Optional[Impl] = None,
     rx_channel: Optional[str | int] = None,
     excluded_channels: Optional[list[str] | list[int]] = None,
-    start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
-    end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+    start_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
+    end_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
     relative_time: bool = False,
     exp_def: Optional[ExpDef] = None,
     progress: bool | mpi_tools.CommBar = False,
@@ -250,8 +250,8 @@ def direction_of_arrival(
     implementation: Optional[Impl] = None,
     rx_channel: Optional[str | int] = None,
     excluded_channels: Optional[list[str] | list[int]] = None,
-    start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
-    end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+    start_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
+    end_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
     relative_time: bool = False,
     exp_def: Optional[ExpDef] = None,
     progress: bool | mpi_tools.CommBar = False,

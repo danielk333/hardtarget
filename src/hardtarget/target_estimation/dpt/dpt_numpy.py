@@ -31,7 +31,7 @@ def fast_dpt_np(
     """
 
     size = (len(pro_params.ranges),)
-    dc, vals, v_ind, a_ind = default_mf_vars_items(size)
+    dc, vals, v, a, phi = default_mf_vars_items(size)
 
     for ri, rg in enumerate(pro_params.rel_rgs):
         for sub_res in range(cfg_params.range_gate_sub_resolution):
@@ -57,15 +57,15 @@ def fast_dpt_np(
             spec_peak = np.argmax(ft2)
 
             vals[index] = ft2[spec_peak]
-            v_ind[index] = spec_peak
-            a_ind[index] = dspec_peak
+            v[index] = spec_peak
+            a[index] = dspec_peak
 
     # TODO: add phase here and fix return values to not be inds, use dtft opt to get v and phase
     return MFVariables(
         vals=vals,
         dc=dc,
-        v=v_ind,
-        a=a_ind,
+        v=v,
+        a=a,
         phi=np.zeros_like(vals),
         tx_pwr=tx_pwr,
     )

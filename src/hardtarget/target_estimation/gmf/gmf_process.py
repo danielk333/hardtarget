@@ -113,7 +113,7 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
 
             mfvars = self.lib(tx, rx, np.array(tx_pwr), self.cfg_params, self.pro_params, **kwargs)
             # TODO: for now since we expect physical units at this level do the conversion here
-            mfvars.v[:] = mfvars.v * self.exp_params.wavelength
+            mfvars.v[:] = mfvars.v * self.exp_def.wavelength
             return mfvars
         else:
             # TODO: i think i have acceidentally used float64 some places and float32 others, maybe

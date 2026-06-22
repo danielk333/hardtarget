@@ -10,22 +10,22 @@ import datetime as dt
 import tempfile
 from pathlib import Path
 
-import scipy.constants
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 import radardef
+import scipy.constants
 from pyant.plotting import gain_heatmap
+from radardef.tools.mpi_tools import get_mpi
 from radardef.types import BeamType, EiscatUHFLocation
 from spacecoords import interpolation, linalg, spherical
 
 from hardtarget import load_analysed_data, target_estimation
-from hardtarget.constants import TargetEstimationMethod, Impl
+from hardtarget.constants import TargetEstimationMethod
 from hardtarget.target_estimation.dpt.types import DPTCfgParams
 from hardtarget.target_estimation.gmf.types import GMFCfgParams
 from hardtarget.target_estimation.types import MFOutArgs
 from hardtarget.types import CfgParams, ExpDef, ProParams
-from hardtarget.utils import global_mpi
 
 from .utils import cdse
 from .utils.dt_standard import str_to_dt
@@ -148,7 +148,7 @@ def test_verify_analysis_orbit_data(
     exp_params = reader.experiment.copy(radar_frequency=927.200)
 
     # Analyse data
-    comm = global_mpi.get_mpi()
+    comm = get_mpi()
     result = target_estimation(
         data=MEASUREMENT,
         config=cfg,

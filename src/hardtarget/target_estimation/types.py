@@ -89,10 +89,10 @@ class MFVariables(NamedTuple):
     """Container for compacting the variables set by the GMF Grid function."""
 
     vals: npt.NDArray[np.float32]  # match function values reduced over the requested axis
-    dc: npt.ndarray[np.float32]  # 0-frequency gmf output as a function of range
-    v: npt.NDArray[np.float32]  # best fitting range-rate
-    a: npt.NDArray[np.float32]  # best fitting range-rate change
-    phi: npt.ndarray[np.float32]  # best fitting phase
+    dc: npt.NDArray[np.float32]  # 0-frequency gmf output as a function of range
+    v: npt.NDArray[np.float64]  # best fitting range-rate
+    a: npt.NDArray[np.float64]  # best fitting range-rate change
+    phi: npt.NDArray[np.float64]  # best fitting phase
     tx_pwr: npt.NDArray[np.floating]  # tx power
 
 
@@ -110,6 +110,7 @@ class MFOutArgs(NamedTuple):
     snr: npt.NDArray[np.floating]
     v: npt.NDArray[np.float64]
     a: npt.NDArray[np.float64]
+    phi: npt.NDArray[np.float64]
     r_vec: npt.NDArray[np.float64]
     v_vec: npt.NDArray[np.float64]
     a_vec: npt.NDArray[np.float64]
