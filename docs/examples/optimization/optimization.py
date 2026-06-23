@@ -52,7 +52,7 @@ analyse(
     method_lib=TargetEstimationMethod.fgmf,
     output=output_path,
     start_time=0,
-    end_time=500 * 3120,  # 3120 = t_ipp_usec
+    end_time=(500 * 3120) * 1e-6,  # 3120 = t_ipp_usec
     relative_time=True,
 )
 
@@ -126,7 +126,7 @@ analyse(
     method_lib=OptimizationMethod.optimize_grid_gmf,
     output=optimization_path,
     start_time=0,
-    end_time=500 * 3120,  # 3120 = t_ipp_usec
+    end_time=(500 * 3120) * 1e-6,  # 3120 = t_ipp_usec
     relative_time=True,
 )
 

@@ -66,21 +66,17 @@ def rti(
 
     if isinstance(start_time, str):
         try:
-            ts_from_str(start_time)
-            start_time = int(ts_from_str(start_time) * 1e6)
+            start_time = ts_from_str(start_time)
         except ValueError:
-            start_time = int(start_time)
-    elif isinstance(start_time, float):
-        start_time = int(start_time * 1e6)
+            start_time = float(start_time)
 
     if isinstance(end_time, str):
         try:
-            ts_from_str(end_time)
-            end_time = int(ts_from_str(end_time) * 1e6)
+            end_time = ts_from_str(end_time)
         except ValueError:
-            end_time = int(end_time)
-    elif isinstance(end_time, float):
-        end_time = int(end_time * 1e6)
+            end_time = float(end_time)
+
+    print(f"Start: {start_time}, End: {end_time}")
 
     # Extract bounds
     if start_time or end_time:
@@ -97,6 +93,8 @@ def rti(
         request_bounds = Bounds(*data_loader.bounds(data_loader.exp_def.rx_channels[0]))
 
     samp_bounds = sample_interval_to_closest_ipp(request_bounds, data_loader.exp_def.ipp_samps)
+
+    print(f"Samp_bounds: [{samp_bounds.start},{samp_bounds.end}]")
 
     # Extract data within bounds
     n_samp = samp_bounds.end - samp_bounds.start
@@ -143,7 +141,7 @@ def rti(
             end_range_gate *= 2
 
     mat_shape = (data_vec.size // data_loader.exp_def.ipp_samps, data_loader.exp_def.ipp_samps)
-    data_ipp_vec = data_vec.reshape(mat_shape).T
+    data_ipp_vec = data_vec.reshape(mat_shape)
 
     il0_rg0, il0_rg1 = extract_requested_range_gates(
         start_range_gate, end_range_gate, range_gate_unit, data_loader.exp_def
@@ -162,15 +160,15 @@ def rti(
         f"requested end range gate {il0_rg1} after measurement end {t_rx_end_samp}"
     )
 
-    data_ipp_vec = data_ipp_vec[il0_rg0:il0_rg1, :]
+    data_ipp_vec = data_ipp_vec[:, il0_rg0:il0_rg1]
     samp_vec = samp_vec[il0_rg0:il0_rg1]
-    rt_vec = rt_vec[il0_rg0:il0_rg1]
+    rt_vec = rt_vec[il0_rg0 - t_rx_start_samp : il0_rg1 - t_rx_start_samp]
 
     # Remove tx-signal (if it exists) and null calibration signal
     if not keep_tx:
         tx_samps = np.logical_and(samp_vec <= t_tx_end_samp, samp_vec >= t_tx_start_samp)
-        data_ipp_vec[tx_samps, :] = 0
-        data_ipp_vec[t_cal_on_samp:t_cal_off_samp, :] = 0
+        data_ipp_vec[:, tx_samps] = 0
+        data_ipp_vec[:, t_cal_on_samp:t_cal_off_samp] = 0
 
     # Calculate signal power
     with warnings.catch_warnings(action="ignore", category=RuntimeWarning):
@@ -179,20 +177,20 @@ def rti(
     # Plot data
     if not axis_units:
         X, Y = np.meshgrid(
-            np.arange(data_ipp_vec.shape[1]),
+            np.arange(data_ipp_vec.shape[0]),
             samp_vec,
         )
         ax.set_xlabel("IPP")
         ax.set_ylabel("Level-0 sample")
     else:
         X, Y = np.meshgrid(
-            np.arange(data_ipp_vec.shape[1]) * data_loader.exp_def.t_ipp_usec * 1e-6,
+            np.arange(data_ipp_vec.shape[0]) * data_loader.exp_def.t_ipp_usec * 1e-6,
             1e-3 * rt_vec * constants.c,
         )
         ax.set_xlabel("Time [s]")
         ax.set_ylabel("Range [km]")
 
-    pmesh = ax.pcolormesh(X, Y, powsum, **pcolormesh_kw)
+    pmesh = ax.pcolormesh(X, Y, powsum.T, **pcolormesh_kw)
 
     if colorbar:
         cbar = plt.colorbar(pmesh, ax=ax)
@@ -204,8 +202,8 @@ def rti(
 def fti(
     ax: Axes,
     data_loader: DataLoader,
-    start_time: Optional[np.datetime64 | int | str] = None,
-    end_time: Optional[np.datetime64 | int | str] = None,
+    start_time: Optional[np.datetime64 | float | int | str] = None,
+    end_time: Optional[np.datetime64 | float | int | str] = None,
     relative_time: bool = False,
     keep_tx: bool = False,
     axis_units: bool = False,
@@ -247,17 +245,15 @@ def fti(
 
     if isinstance(start_time, str):
         try:
-            ts_from_str(start_time)
-            start_time = int(ts_from_str(start_time) * 1e6)
+            start_time = ts_from_str(start_time)
         except ValueError:
-            start_time = int(start_time)
+            start_time = float(start_time)
 
     if isinstance(end_time, str):
         try:
-            ts_from_str(end_time)
-            end_time = int(ts_from_str(end_time) * 1e6)
+            end_time = ts_from_str(end_time)
         except ValueError:
-            end_time = int(end_time)
+            end_time = float(end_time)
 
     # Extract bounds
     if start_time or end_time:

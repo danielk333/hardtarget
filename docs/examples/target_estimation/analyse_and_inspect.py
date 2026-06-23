@@ -49,7 +49,7 @@ target_estimation(
     config=config,
     output=output_path,
     start_time=0,
-    end_time=500 * 3120,  # 3120 = t_ipp_usec
+    end_time=(500 * 3120) * 1e-6,  # 3120 = t_ipp_usec
     relative_time=True,
 )
 
