@@ -5,6 +5,7 @@ abstract methods filled in. It supports a variety of datatypes.
 """
 
 import datetime as dt
+import functools
 import logging
 import sys
 import time
@@ -163,6 +164,11 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         # Check if cache is requested or not
         if self.cfg_params.cache != self.data.cache_state:
             self.data.cache_state = self.cfg_params.cache
+
+        if self.cfg_params.cache:
+            self.tx_signal_model = functools.lru_cache(maxsize=2)(tx_signal_model)
+        else:
+            self.tx_signal_model = tx_signal_model
 
         # Define library to be used during process
         self.lib, lib_name, impl = self.get_analysis_lib(method_lib, impl)
@@ -632,16 +638,16 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 "No code available from the metadata, not possible to simulate tx"
             )
             # TODO: this should probably be configurable in the future, should be cachable aswell
-            tx = tx_signal_model(
-                code=self.exp_def.code,
+            tx = self.tx_signal_model(
+                code=tuple(self.exp_def.code),
                 baud_length_usec=self.exp_def.baud_length_usec,
                 t_samp_usec=self.exp_def.t_samp_usec,
                 # tx_start_samp=int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec),
                 ipp_samps=self.exp_def.ipp_samps,
                 read_length=read_length,
-                bandwidth=1e6,  # TODO: this needs to be part of the config somewhere - its kinda a
+                bandwidth=3.5 * 1e6,  # TODO: this needs to be part of the config somewhere - its kinda a
                 # fundamental limits of the radar system but could in principle be configurable per
-                # experiment
+                # experiment #Mu = 3.5*1e6
                 start_samp=(start_sample % self.exp_def.ipp_samps) - self.cfg_params.samp_offset,
                 sub_resolution=sub_resolution,
                 fir_filter=FIRFilter(
@@ -672,3 +678,25 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         return ExtractedSignals(
             tx=tx.astype(np.complex64), rx=rx.astype(np.complex64), ipp=ipp.astype(np.complex64)
         )
+
+    def _setup_cache(self) -> None:
+        """Setup cache"""
+
+        if self.cfg_params.cache:
+            self.tx_signal_model = functools.lru_cache(maxsize=2)(tx_signal_model)
+        else:
+            self.tx_signal_model = tx_signal_model  # type: ignore[assignment]
+
+    def __getstate__(self) -> dict:
+        """
+        Prepare object for e.g pickling by removing the decorated functions (not supported by pickle)
+        """
+        state = self.__dict__.copy()
+        if "tx_signal_model" in state:
+            del state["tx_signal_model"]
+        return state
+
+    def __setstate__(self, state: dict) -> None:
+        """Restore object after unpickling"""
+        self.__dict__.update(state)
+        self._setup_cache()

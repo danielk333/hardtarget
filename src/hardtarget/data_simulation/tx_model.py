@@ -192,7 +192,7 @@ def simulate_pulse_code(
 
 
 def tx_signal_model(
-    code: npt.NDArray[np.float64],
+    code: tuple[float] | npt.NDArray[np.float64],
     baud_length_usec: int,
     t_samp_usec: int,
     ipp_samps: int,
@@ -220,6 +220,9 @@ def tx_signal_model(
         Tx signal of size (read_length, sub resolution) containing the interpolated signal based on the code
     """
     # TODO: update docstring
+
+    if isinstance(code, tuple):
+        code = np.array(code).astype(np.float64)
 
     ipp_t_usec = ipp_samps * t_samp_usec
     if fir_filter == FIRFilter.b414d15_gaus:
@@ -254,8 +257,8 @@ def tx_signal_model(
         # filter according to the receiver chain
         signals[:, ind] = filt(fsignal)
 
-    # Signal value of tx_indices
-    norms = np.sum(np.conj(signals) * signals, axis=0)
-    signals = signals / norms[None, :]
+    # Signal value of tx_indices, TODO: This uncommented as it is already done within the process.
+    # norms = np.sum(np.conj(signals) * signals, axis=0)
+    # signals = signals / norms[None, :]
 
     return signals

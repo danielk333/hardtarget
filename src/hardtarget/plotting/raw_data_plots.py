@@ -76,8 +76,6 @@ def rti(
         except ValueError:
             end_time = float(end_time)
 
-    print(f"Start: {start_time}, End: {end_time}")
-
     # Extract bounds
     if start_time or end_time:
         request_bounds = time_interval_to_sample_bound(
@@ -93,8 +91,6 @@ def rti(
         request_bounds = Bounds(*data_loader.bounds(data_loader.exp_def.rx_channels[0]))
 
     samp_bounds = sample_interval_to_closest_ipp(request_bounds, data_loader.exp_def.ipp_samps)
-
-    print(f"Samp_bounds: [{samp_bounds.start},{samp_bounds.end}]")
 
     # Extract data within bounds
     n_samp = samp_bounds.end - samp_bounds.start
