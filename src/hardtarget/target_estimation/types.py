@@ -62,8 +62,6 @@ class TargetEstimationProParams(ProParams):
     )
     range_rates: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty(2, dtype=np.float64))
     fft_frequencies: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty(2, dtype=np.float64))
-    # TODO: i shimmied this in here for now, it should probably be propagated down some other way?
-    sample_rate: float = 0
 
 
 # TODO: the name "Extended" should probably be changed as extended targets are a common phrase in

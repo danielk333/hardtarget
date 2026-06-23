@@ -2,6 +2,7 @@
 
 import numpy as np
 import numpy.typing as npt
+from radardef.types import ExpDef
 
 from hardtarget.libs import load_c_lib
 from hardtarget.target_estimation.dpt.types import DPTCfgParams, DPTProParams
@@ -15,6 +16,7 @@ def fast_dpt_c(
     tx: npt.NDArray[np.complex64],
     rx: npt.NDArray[np.complex64],
     tx_pwr: npt.NDArray,
+    exp_def: ExpDef,
     cfg_params: DPTCfgParams,
     pro_params: DPTProParams,
 ) -> MFVariables:

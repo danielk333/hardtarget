@@ -16,7 +16,7 @@ from scipy import constants
 
 from hardtarget import load_analysed_data
 from hardtarget.analyse import target_estimation
-from hardtarget.constants import Impl, TargetEstimationMethod
+from hardtarget.constants import FIRFilter, Impl, TargetEstimationMethod
 
 from .simulate_drf import DRFSimParams, simulate_drf
 
@@ -48,6 +48,7 @@ def linearized_mle_covariance(
         t_cal_off_usec=19997.0,
         code=load_radar_code("leo_bpark"),
         samples_per_file=12800000,
+        fir_filter=FIRFilter.b414d15_gaus,
     )
     snr = 10.0 ** (snr_db * 0.1)
     simulation_params = DRFSimParams(
@@ -170,6 +171,7 @@ def monte_carlo_sample_errors(
         t_cal_off_usec=0,
         code=load_radar_code("leo_bpark"),
         samples_per_file=12800000,
+        fir_filter=FIRFilter.b414d15_gaus,
     )
 
     bounds_params = BoundParams()

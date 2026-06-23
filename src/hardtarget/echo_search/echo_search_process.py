@@ -13,18 +13,18 @@ from hardtarget.echo_search.types import (
     EchoSearchVars,
 )
 from hardtarget.process import Process
-from hardtarget.types import DataItem, EventSearchLib, ExpDef, MethodLib, ProParams
+from hardtarget.types import DataItem, EchoSearchLib, ExpDef, MethodLib, ProParams
 
 
 class EchoSearchProcess(
-    Process[EchoSearchCfgParams, EchoSearchProParams, EchoSearchVars, EchoSearchOutArgs, EventSearchLib]
+    Process[EchoSearchCfgParams, EchoSearchProParams, EchoSearchVars, EchoSearchOutArgs, EchoSearchLib]
 ):
     method = AnalysisMethod.echo_search
     config_section = ConfigSubSection.ECHO_SEARCH
 
     def get_analysis_lib(
         self, lib: MethodLib | None, impl: Impl | None
-    ) -> tuple[EventSearchLib, EchoSearchMethod, Impl]:
+    ) -> tuple[EchoSearchLib, EchoSearchMethod, Impl]:
         return get_echo_search_lib(lib, impl)
 
     def get_process_params(

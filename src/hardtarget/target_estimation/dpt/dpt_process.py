@@ -14,7 +14,7 @@ from hardtarget.target_estimation.types import (
     MFVariables,
     TargetEstimationProParams,
 )
-from hardtarget.types import AnalysisLib, MethodLib
+from hardtarget.types import MethodLib, TargetEstimationLib
 
 
 class DPTProcess(TargetEstimationProcess[DPTCfgParams, DPTProParams]):
@@ -22,7 +22,7 @@ class DPTProcess(TargetEstimationProcess[DPTCfgParams, DPTProParams]):
 
     def get_analysis_lib(
         self, lib: MethodLib | None, impl: Impl | None
-    ) -> tuple[AnalysisLib, TargetEstimationMethod, Impl]:
+    ) -> tuple[TargetEstimationLib, TargetEstimationMethod, Impl]:
         return get_dbt_lib(lib, impl)
 
     def get_lib_specific_process_params(
@@ -128,6 +128,7 @@ class DPTProcess(TargetEstimationProcess[DPTCfgParams, DPTProParams]):
                 tx,
                 rx,
                 np.array(tx_pwr),
+                self.exp_def,
                 self.cfg_params,
                 self.pro_params,
             )

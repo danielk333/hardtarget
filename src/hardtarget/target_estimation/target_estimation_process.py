@@ -21,7 +21,7 @@ from hardtarget.target_estimation.types import (
     TargetEstimationProParams,
 )
 from hardtarget.types import (
-    AnalysisLib,
+    TargetEstimationLib,
     DataItem,
     ExpDef,
     ProParams,
@@ -44,7 +44,7 @@ class TargetEstimationProcess(
         TargetEstimationProParams,
         MFVariables,
         MFOutArgs,
-        AnalysisLib[TeLibCfg, TeLibPro, MFVariables],
+        TargetEstimationLib[TeLibCfg, TeLibPro, MFVariables],
     ],
     Generic[TeLibCfg, TeLibPro],
 ):
@@ -185,7 +185,6 @@ class TargetEstimationProcess(
             il0_dec_rx_window_indices=il0_dec_rx_window_indices,
             range_rates=range_rates,
             fft_frequencies=fft_frequencies,
-            sample_rate=exp_def.sample_rate,
         )
 
     @abstractmethod

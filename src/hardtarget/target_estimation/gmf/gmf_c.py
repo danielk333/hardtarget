@@ -2,6 +2,7 @@
 
 import numpy as np
 import numpy.typing as npt
+from radardef.types import ExpDef
 
 from hardtarget.libs import load_c_lib
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, GMFProParams
@@ -15,6 +16,7 @@ def fast_gmf_c(
     tx: npt.NDArray[np.complex64],
     rx: npt.NDArray[np.complex64],
     tx_pwr: npt.NDArray,
+    exp_def: ExpDef,
     cfg_params: GMFCfgParams,
     pro_params: GMFProParams,
 ) -> MFVariables:

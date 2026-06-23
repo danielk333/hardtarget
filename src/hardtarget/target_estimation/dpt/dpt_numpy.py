@@ -3,6 +3,7 @@
 import numpy as np
 import numpy.typing as npt
 import scipy.fft as fft
+from radardef.types import ExpDef
 
 from hardtarget.target_estimation.dpt.types import DPTCfgParams, DPTProParams
 from hardtarget.target_estimation.types import MFVariables
@@ -13,6 +14,7 @@ def fast_dpt_np(
     tx: npt.NDArray[np.complexfloating],
     rx: npt.NDArray[np.complexfloating],
     tx_pwr: npt.NDArray[np.floating],
+    exp_def: ExpDef,
     cfg_params: DPTCfgParams,
     pro_params: DPTProParams,
 ) -> MFVariables:

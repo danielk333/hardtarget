@@ -2,12 +2,12 @@ import logging
 from typing import Optional
 
 from hardtarget.constants import EchoSearchMethod, Impl
-from hardtarget.types import EventSearchLib, MethodLib
+from hardtarget.types import EchoSearchLib, MethodLib
 
 logger = logging.getLogger(__name__)
 
 # available libs
-ECHO_SEARCH_LIBS: dict[EchoSearchMethod, dict[Impl, EventSearchLib]] = {
+ECHO_SEARCH_LIBS: dict[EchoSearchMethod, dict[Impl, EchoSearchLib]] = {
     method: {} for method in EchoSearchMethod
 }
 
@@ -29,7 +29,7 @@ else:
 
 def get_echo_search_lib(
     method_lib: Optional[MethodLib] = None, implementation: Optional[Impl] = None
-) -> tuple[EventSearchLib, EchoSearchMethod, Impl]:
+) -> tuple[EchoSearchLib, EchoSearchMethod, Impl]:
 
     if method_lib is None:
         logger.debug("No method defined, default lib will be used")

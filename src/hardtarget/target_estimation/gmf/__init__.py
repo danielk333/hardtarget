@@ -2,12 +2,12 @@ import logging
 from typing import Optional
 
 from hardtarget.constants import Impl, TargetEstimationMethod
-from hardtarget.types import AnalysisLib, MethodLib
+from hardtarget.types import TargetEstimationLib, MethodLib
 
 logger = logging.getLogger(__name__)
 
 # available libs
-GMF_LIBS: dict[TargetEstimationMethod, dict[Impl, AnalysisLib]] = {
+GMF_LIBS: dict[TargetEstimationMethod, dict[Impl, TargetEstimationLib]] = {
     method: {} for method in TargetEstimationMethod
 }
 
@@ -38,7 +38,7 @@ else:
 
 def get_gmf_lib(
     method_lib: Optional[MethodLib] = None, implementation: Optional[Impl] = None
-) -> tuple[AnalysisLib, TargetEstimationMethod, Impl]:
+) -> tuple[TargetEstimationLib, TargetEstimationMethod, Impl]:
 
     if method_lib is None:
         logger.debug("No method defined, default lib will be used")

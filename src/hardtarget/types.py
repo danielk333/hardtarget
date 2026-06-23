@@ -175,11 +175,12 @@ class AnalysedResult(TypedDict, Generic[GenericOut, GenericCfg, GenericPro]):
     data: dict[int, tuple[GenericOut, ExpDef, GenericCfg, GenericPro]]
 
 
-AnalysisLib: TypeAlias = Callable[
+TargetEstimationLib: TypeAlias = Callable[
     [
         npt.NDArray[np.complex64],
         npt.NDArray[np.complex64],
         npt.NDArray[np.floating],
+        ExpDef,
         GenericCfg,
         GenericPro,
     ],
@@ -191,7 +192,7 @@ OptimizeLib: TypeAlias = Callable[
     tuple[float, float, float, float],
 ]
 
-EventSearchLib: TypeAlias = Callable[
+EchoSearchLib: TypeAlias = Callable[
     [
         npt.NDArray[np.complex64],
         npt.NDArray[np.complex64],
@@ -207,7 +208,7 @@ InterferometryLib: TypeAlias = Callable[
     GenericVars,
 ]
 
-LibType: TypeAlias = AnalysisLib | OptimizeLib | EventSearchLib | InterferometryLib
+LibType: TypeAlias = TargetEstimationLib | OptimizeLib | EchoSearchLib | InterferometryLib
 
 
 # Type hinting for a common declaration of what func_get_data should be passed to the processes

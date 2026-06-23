@@ -5,6 +5,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 import scipy.fft as fft
+from radardef.types import ExpDef
 from scipy import optimize
 
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, GMFProParams
@@ -217,6 +218,7 @@ def fast_gmf_np(
     tx: npt.NDArray[np.complexfloating],
     rx: npt.NDArray[np.complexfloating],
     tx_pwr: npt.NDArray[np.floating],
+    exp_def: ExpDef,
     cfg_params: GMFCfgParams,
     pro_params: GMFProParams,
 ) -> MFVariables:
@@ -293,7 +295,7 @@ def fast_gmf_np(
             if cfg_params.refine_acceleration:
                 pwr, f_est, a_est, phi_est = dtft_solve_with_acceleration(
                     decoded_signal=dec_signal,
-                    sample_rate=pro_params.sample_rate,
+                    sample_rate=exp_def.sample_rate,
                     start_freq=pro_params.fft_frequencies[v_index],
                     # TODO: i think this accel is the wrong variable and the wrong units, verify
                     start_accel=pro_params.accelerations[a_index],
@@ -312,7 +314,7 @@ def fast_gmf_np(
             elif cfg_params.refine_doppler:
                 pwr, f_est, phi_est = dtft_solve(
                     decoded_signal=dec_signal,
-                    sample_rate=pro_params.sample_rate,
+                    sample_rate=exp_def.sample_rate,
                     freq_bracket=(
                         pro_params.fft_frequencies[v_index_m],
                         pro_params.fft_frequencies[v_index_p],
@@ -334,6 +336,7 @@ def fast_gmf_no_reduce_np(
     tx: npt.NDArray[np.complexfloating],
     rx: npt.NDArray[np.complexfloating],
     tx_pwr: npt.NDArray,
+    exp_def: ExpDef,
     cfg_params: GMFCfgParams,
     pro_params: GMFProParams,
 ) -> MFVariables:

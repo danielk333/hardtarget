@@ -7,6 +7,7 @@
 
 import numpy as np
 import numpy.typing as npt
+from radardef.types import ExpDef
 
 from hardtarget.libs import load_cuda_lib
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, GMFProParams
@@ -30,6 +31,7 @@ def fast_gmf_cuda(
     tx: npt.NDArray[np.complexfloating],
     rx: npt.NDArray[np.complexfloating],
     tx_pwr: npt.NDArray,
+    exp_def: ExpDef,
     cfg_params: GMFCfgParams,
     pro_params: GMFProParams,
     gpu_id: int = 0,
