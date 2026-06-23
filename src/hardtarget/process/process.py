@@ -168,7 +168,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         if self.cfg_params.cache:
             self.tx_signal_model = functools.lru_cache(maxsize=2)(tx_signal_model)
         else:
-            self.tx_signal_model = tx_signal_model
+            self.tx_signal_model = tx_signal_model  # type: ignore[assignment]
 
         # Define library to be used during process
         self.lib, lib_name, impl = self.get_analysis_lib(method_lib, impl)
