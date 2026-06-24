@@ -107,3 +107,24 @@ int find_fftwf_peak(fftwf_complex* arr, int len) {
     }
     return index;
 }
+
+void fft_shift_1d(fftwf_complex* data, int len) {
+    // Determine the split point
+    int mid = (len + 1) / 2;
+    fftw_complex temp;
+
+    // Shift elements using a temporary buffer or loop swapping
+    for (int i = 0; i < len / 2; i++) {
+        int target_idx = (i + mid) % len;
+
+        // Swap real parts
+        double temp_r = data[i][0];
+        data[i][0] = data[target_idx][0];
+        data[target_idx][0] = temp_r;
+
+        // Swap imaginary parts
+        double temp_i = data[i][1];
+        data[i][1] = data[target_idx][1];
+        data[target_idx][1] = temp_i;
+    }
+}

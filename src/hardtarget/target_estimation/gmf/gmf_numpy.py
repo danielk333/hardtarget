@@ -261,8 +261,6 @@ def fast_gmf_np(
                 dec_signal[pro_params.il0_dec_rx_window_indices + drg] = (
                     pro_params.fgmf_acceleration_phasors[ai] * echo
                 )
-                # TODO: implement FFT shift in the C and CUDA versions since we need it now? or do
-                # we?
                 ft = fft.fftshift(fft.fft(dec_signal))
                 ft2 = np.abs(ft) ** 2
                 mi = np.argmax(ft2)

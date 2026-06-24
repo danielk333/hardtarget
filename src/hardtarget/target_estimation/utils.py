@@ -8,11 +8,11 @@ def default_mf_vars_items(
     vector_size: tuple,
 ) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
 
-    vals = np.zeros(vector_size, dtype=np.float32)
-    dc = np.zeros(vector_size, dtype=np.float32)
-    v = np.zeros(vector_size, dtype=np.float32)
-    a = np.zeros(vector_size, dtype=np.float32)
-    phi = np.zeros(vector_size, dtype=np.float32)
+    vals = np.zeros(vector_size, dtype=np.float64)
+    dc = np.zeros(vector_size, dtype=np.float64)
+    v = np.zeros(vector_size, dtype=np.float64)
+    a = np.zeros(vector_size, dtype=np.float64)
+    phi = np.zeros(vector_size, dtype=np.float64)
 
     return vals, dc, v, a, phi
 

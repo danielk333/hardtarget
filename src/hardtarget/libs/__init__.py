@@ -34,16 +34,23 @@ def load_c_lib() -> ctypes.CDLL:
             ctypes.c_int,  # 5
             nptype(np.complex64, 2),  # 6
             ctypes.c_int,  # 7
-            nptype(np.int32, 1),  # 8
-            ctypes.c_int,  # 9
+            nptype(np.float64, 1),  # 8
+            nptype(np.int32, 1),  # 9
             ctypes.c_int,  # 10
-            nptype(np.float32, 1, w=True),  # 11
-            nptype(np.float32, 1, w=True),  # 12
-            nptype(np.int32, 1, w=True),  # 13
-            nptype(np.int32, 1, w=True),  # 14
-            nptype(np.int32, 1),  # 15
-            nptype(np.int32, 1),  # 16
-            ctypes.c_int,  # 17
+            ctypes.c_int,  # 11
+            nptype(np.float64, 1, w=True),  # 12
+            nptype(np.float64, 1, w=True),  # 13
+            nptype(np.float64, 1, w=True),  # 14
+            nptype(np.float64, 1, w=True),  # 15
+            nptype(np.float64, 1, w=True),  # 16
+            nptype(np.int32, 1),  # 17
+            nptype(np.int32, 1),  # 18
+            ctypes.c_int,  # 19
+            nptype(np.float64, 1),  # 20,
+            ctypes.c_int,  # 21
+            ctypes.c_float,  # 22
+            ctypes.c_int,  # 23
+            ctypes.c_int,  # 24
         ]
 
         clib.fdpt.restype = ctypes.c_int

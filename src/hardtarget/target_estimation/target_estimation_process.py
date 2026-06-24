@@ -21,10 +21,10 @@ from hardtarget.target_estimation.types import (
     TargetEstimationProParams,
 )
 from hardtarget.types import (
-    TargetEstimationLib,
     DataItem,
     ExpDef,
     ProParams,
+    TargetEstimationLib,
 )
 from hardtarget.utils import noise
 from hardtarget.utils.range_conversion import range_gate_to_range
@@ -251,7 +251,7 @@ class TargetEstimationProcess(
         _t_conv = (cfg_params.n_ipp * exp_def.t_ipp_usec) * 1e-6
         t = (np.arange(num_cohints) + 1) * _t_conv + file_idx_sample * exp_def.t_samp_usec * 1e-6
 
-        pointing_vec = np.zeros((num_cohints, 2), dtype=np.float32)
+        pointing_vec = np.zeros((num_cohints, 2), dtype=np.float64)
         for i in range(num_cohints):
             pointing = self.get_pointing(file_idx_sample + i * (cfg_params.n_ipp * exp_def.ipp_samps))
             pointing_vec[i, 0] = pointing.azimuth

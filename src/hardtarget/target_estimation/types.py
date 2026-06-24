@@ -86,8 +86,8 @@ class ExtendedTargetEstimationProParams(TargetEstimationProParams):
 class MFVariables(NamedTuple):
     """Container for compacting the variables set by the GMF Grid function."""
 
-    vals: npt.NDArray[np.float32]  # match function values reduced over the requested axis
-    dc: npt.NDArray[np.float32]  # 0-frequency gmf output as a function of range
+    vals: npt.NDArray[np.float64]  # match function values reduced over the requested axis
+    dc: npt.NDArray[np.float64]  # 0-frequency gmf output as a function of range
     v: npt.NDArray[np.float64]  # best fitting range-rate
     a: npt.NDArray[np.float64]  # best fitting range-rate change
     phi: npt.NDArray[np.float64]  # best fitting phase
@@ -102,8 +102,8 @@ class MFOutArgs(NamedTuple):
     range_rates: npt.NDArray[np.float64]
     accelerations: npt.NDArray[np.float64]
     sample_numbers: npt.NDArray[np.int32]
-    vals: npt.NDArray[np.float32]
-    dc: npt.NDArray[np.float32]
+    vals: npt.NDArray[np.float64]
+    dc: npt.NDArray[np.float64]
     tx_pwr: npt.NDArray[np.floating]
     snr: npt.NDArray[np.floating]
     v: npt.NDArray[np.float64]
@@ -112,7 +112,7 @@ class MFOutArgs(NamedTuple):
     r_vec: npt.NDArray[np.float64]
     v_vec: npt.NDArray[np.float64]
     a_vec: npt.NDArray[np.float64]
-    g_vec: npt.NDArray[np.float32]
-    pointing_vec: npt.NDArray[np.float32]
+    g_vec: npt.NDArray[np.float64]
+    pointing_vec: npt.NDArray[np.float64]
     t: npt.NDArray[np.float32]
     epoch_us: float
