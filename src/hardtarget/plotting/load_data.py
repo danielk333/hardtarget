@@ -23,14 +23,15 @@ from hardtarget.types import (
     ProParams,
 )
 from hardtarget.utils.h5_tools import get_analysed_h5_files
+from hardtarget.utils.time_conversion import ts_from_str
 
 logger = logging.getLogger(__name__)
 
 
 def load_analysed_data(
     data_dir: str | Path,
-    start_time: Optional[int | np.datetime64] = None,
-    end_time: Optional[int | np.datetime64] = None,
+    start_time: Optional[int | float | np.datetime64] = None,
+    end_time: Optional[int | float | np.datetime64] = None,
     relative_time: bool = False,
     chunk_size: Optional[int] = None,
 ) -> Generator[tuple[GenericOut, ExpDef, GenericCfg, GenericPro], None, None]:
@@ -40,8 +41,8 @@ def load_analysed_data(
 
     Args:
         data_dir: Directory containing the analysed output
-        start_time (optional): start time, files containing data before this will be ignored.
-        end_time (optional): end time, files containing data after this will be ignored.
+        start_time (optional): start time, files containing data before this will be ignored. If relative time it should be declared in seconds.
+        end_time (optional): end time, files containing data after this will be ignored. If relative time it should be declared in seconds.
         relative_time (optional): If relative time should be used.
         chunk_size (optional): If selected will split the path list in sizes of chunk_size. Each subgroup will
                                be yielded.
@@ -70,8 +71,8 @@ def load_analysed_data(
 
 def collect_paths(
     folder: str | Path,
-    start_time: Optional[int | np.datetime64] = None,
-    end_time: Optional[int | np.datetime64] = None,
+    start_time: Optional[int | float | np.datetime64] = None,
+    end_time: Optional[int | float | np.datetime64] = None,
     relative_time: bool = False,
 ) -> list[Path]:
     """
@@ -79,8 +80,8 @@ def collect_paths(
 
     Args:
         folder: Directory containing the analyse output.
-        start_time (optional): Start time, filter out any file before this time.
-        end_time (optional): End time, filter out any file after this time.
+        start_time (optional): Start time, filter out any file before this time. If relative, declare in seconds.
+        end_time (optional): End time, filter out any file after this time. If relative, declare in seconds.
 
     Returns:
         Time sorted list of output paths.
@@ -109,10 +110,12 @@ def collect_paths(
                 dt64_t0 = np.datetime64(dt.datetime.fromtimestamp(epoch_unix, dt.timezone.utc))
         elif isinstance(start_time, np.datetime64):
             dt64_t0 = start_time  # type: ignore[assignment]
+        elif isinstance(start_time, str):
+            dt64_t0 = np.datetime64(int(ts_from_str(start_time) * 1e6), "us")
         else:
-            dt64_t0 = np.datetime64(start_time, "us")
+            dt64_t0 = np.datetime64(int(start_time * 1e6), "us")
 
-        unix_t0 = dt64_t0.astype("datetime64[us]").astype("int64") * 1e-6
+        unix_t0 = dt64_t0.astype("datetime64[us]").astype("float64") * 1e-6
 
     if relative_time:
         if end_time is None:
@@ -127,10 +130,12 @@ def collect_paths(
                 dt64_t1 = np.datetime64(dt.datetime.fromtimestamp(max_unix, dt.timezone.utc))
         elif isinstance(end_time, np.datetime64):
             dt64_t1 = end_time  # type: ignore[assignment]
+        elif isinstance(end_time, str):
+            dt64_t1 = np.datetime64(int(ts_from_str(end_time) * 1e6), "us")
         else:
-            dt64_t1 = np.datetime64(end_time, "us")
+            dt64_t1 = np.datetime64(int(end_time * 1e6), "us")
 
-        unix_t1 = dt64_t1.astype("datetime64[us]").astype("int64") * 1e-6
+        unix_t1 = dt64_t1.astype("datetime64[us]").astype("float64") * 1e-6
 
     fl = [file for file, ep in zip(fl, fl_epochs) if ep >= unix_t0 and ep <= unix_t1]
 

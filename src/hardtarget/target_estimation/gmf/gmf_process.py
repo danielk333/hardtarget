@@ -123,8 +123,8 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
             return MFVariables(
                 vals=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
                 dc=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
-                v=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
-                a=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
-                phi=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
+                v=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
+                a=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
+                phi=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
                 tx_pwr=np.array(tx_pwr),
             )

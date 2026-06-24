@@ -15,8 +15,8 @@ def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Adds mandatory and optional positional arguments to the parser."""
 
     parser.add_argument("path", help="path to analysed data")
-    parser.add_argument("-s", "--start_time", default=None, type=int)
-    parser.add_argument("-e", "--end_time", default=None, type=int)
+    parser.add_argument("-s", "--start_time", default=None, type=float)
+    parser.add_argument("-e", "--end_time", default=None, type=float)
     parser.add_argument("--relative_time", action="store_true")
     parser.add_argument("--chunk_size", type=int, default=None)
     parser.add_argument("--detection_limit", type=float, default=None)
@@ -36,8 +36,8 @@ def main(args: argparse.Namespace) -> None:
 
 def plot_analysed_data(
     path: Path,
-    start_time: Optional[int | np.datetime64] = None,
-    end_time: Optional[int | np.datetime64] = None,
+    start_time: Optional[int | float | np.datetime64] = None,
+    end_time: Optional[int | float | np.datetime64] = None,
     relative_time: bool = False,
     chunk_size: Optional[int] = None,
     detection_limit: Optional[float] = None,

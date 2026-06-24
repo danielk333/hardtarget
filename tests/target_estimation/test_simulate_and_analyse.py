@@ -140,14 +140,10 @@ class TestTargetEstimation:
             tempfile.TemporaryDirectory() as tmp_analysis_path,
             tempfile.NamedTemporaryFile(mode="w+") as tmp_config,
         ):
-            path = Path("test_drf")
-
             # hacky way to create a temp config
             tmp_config.write(config_str)
             tmp_config.seek(0)
             tmp_config_path = tmp_config.name
-
-            print(f"{tmp_config_path=}")
 
             simulate_drf(
                 Path(tmp_sim_path),
