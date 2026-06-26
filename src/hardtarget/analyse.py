@@ -286,10 +286,17 @@ def direction_of_arrival(
 
 def merge_results_from_all_ranks(results: list[AnalysedResult]) -> AnalysedResult:
 
-    result: AnalysedResult = {"dir": results[0]["dir"], "files": [], "data": {}}
+    result: AnalysedResult = {"dir": results[0]["dir"], "file_dir": [], "files": [], "data": {}}
 
     for res in results:
         for key, value in res.items():
+            if key == "file_dir":
+                if isinstance(value, list):
+                    if key not in result:
+                        result["file_dir"] = value
+                    else:
+                        if value not in result["file_dir"]:
+                            result["file_dir"].extend(value)
             if key == "files":
                 if isinstance(value, list):
                     if key not in result:

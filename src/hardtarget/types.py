@@ -164,13 +164,15 @@ class AnalysedResult(TypedDict, Generic[GenericOut, GenericCfg, GenericPro]):
     to access the data easily.
 
     Args:
-        dir: directory of stored files
+        dir: output directory of stored files
+        file_dir: List of each root directory of the files.
         files: list of all files
         data: if the data is not saved to file the data is stored here during runtime with start sample
               index as key
     """
 
     dir: str | Path | None
+    file_dir: list[Path]
     files: list[str]
     data: dict[int, tuple[GenericOut, ExpDef, GenericCfg, GenericPro]]
 

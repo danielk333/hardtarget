@@ -403,7 +403,8 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             )
 
             self._logger.debug(f"Analysed data stored in {filepath}")
-
+            if filepath.parent not in results["file_dir"]:
+                results["file_dir"].append(filepath.parent)
             results["files"].append(filepath.name)
         else:
             # Write data to dict at file_idx_sample
@@ -491,7 +492,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 desc=description,
                 tot=total_cohints,
                 parent_progress=parent_progress,
-                transient=bool(parent_progress),
             )
 
         else:
@@ -499,7 +499,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
         self._logger.info(f"starting job {comm_rank}/{comm_size} with {len(job_tasks)} tasks")
 
-        results: AnalysedResult = {"dir": self.output_dir, "files": [], "data": {}}
+        results: AnalysedResult = {"dir": self.output_dir, "file_dir": [], "files": [], "data": {}}
         for idx, task_idx in enumerate(job_tasks):
             # Calculate start sample of task
             file_idx_sample = (

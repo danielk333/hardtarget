@@ -11,7 +11,7 @@ from typing import Any, Optional, TypeVar, get_args, get_origin
 import h5py
 import numpy as np
 
-from hardtarget.constants import AnalysisMethod
+from hardtarget.constants import AnalysisMethod, MethodAbbreviation
 from hardtarget.process import get_analysis_process
 from hardtarget.target_estimation.types import MFOutArgs
 from hardtarget.types import (
@@ -29,10 +29,11 @@ logger = logging.getLogger(__name__)
 
 
 def load_analysed_data(
-    data_dir: str | Path,
+    data_dir: str | Path | list[str] | list[Path],
     start_time: Optional[int | float | np.datetime64] = None,
     end_time: Optional[int | float | np.datetime64] = None,
     relative_time: bool = False,
+    method: Optional[AnalysisMethod] = None,
     chunk_size: Optional[int] = None,
 ) -> Generator[tuple[GenericOut, ExpDef, GenericCfg, GenericPro], None, None]:
     """
@@ -44,6 +45,7 @@ def load_analysed_data(
         start_time (optional): start time, files containing data before this will be ignored. If relative time it should be declared in seconds.
         end_time (optional): end time, files containing data after this will be ignored. If relative time it should be declared in seconds.
         relative_time (optional): If relative time should be used.
+        method (optional): Specific method to load data from, if not specified it will try to read all the available data.
         chunk_size (optional): If selected will split the path list in sizes of chunk_size. Each subgroup will
                                be yielded.
     Yields:
@@ -51,10 +53,7 @@ def load_analysed_data(
     """
 
     paths = collect_paths(
-        data_dir,
-        start_time=start_time,
-        end_time=end_time,
-        relative_time=relative_time,
+        data_dir, start_time=start_time, end_time=end_time, relative_time=relative_time, method=method
     )
 
     paths.sort()
@@ -70,10 +69,11 @@ def load_analysed_data(
 
 
 def collect_paths(
-    folder: str | Path,
+    folder: str | Path | list[str] | list[Path],
     start_time: Optional[int | float | np.datetime64] = None,
     end_time: Optional[int | float | np.datetime64] = None,
     relative_time: bool = False,
+    method: Optional[AnalysisMethod] = None,
 ) -> list[Path]:
     """
     Sorts file according to start time, if requested filters out files that is not within the expected time.
@@ -87,7 +87,13 @@ def collect_paths(
         Time sorted list of output paths.
     """
 
-    fl = get_analysed_h5_files(folder)
+    if isinstance(folder, list):
+        fl = []
+        for dir in folder:
+            fl.extend(get_analysed_h5_files(dir, MethodAbbreviation[method] if method else None))
+    else:
+        fl = get_analysed_h5_files(folder, MethodAbbreviation[method] if method else None)
+
     if not fl:
         return []
 
