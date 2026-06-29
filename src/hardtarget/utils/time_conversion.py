@@ -35,22 +35,21 @@ def time_interval_to_sample_bound(
                 raise ValueError("Relative time is only compatible with int or float start/end")
         else:
             if isinstance(start_time, np.datetime64):
-                start_sec = start_time.astype("datetime64[s]").astype("float64")
+                start_sec = start_time.astype("datetime64[us]").astype("float64") * 1e-6
             elif isinstance(start_time, dt.datetime):
                 start_sec = start_time.timestamp()
             else:
                 if isinstance(start_time, int):
                     start_sec = np.datetime64(start_time, "s").astype("float64")
                 else:
-                    start_sec = (
-                        np.datetime64(int(start_time * 1e6), "us").astype("datetime64[s]").astype("float64")
-                    )
+                    start_sec = np.datetime64(int(start_time * 1e6), "us").astype("float64") * 1e-6
 
             if start_sec < time_bounds[0]:
                 raise ValueError(
                     f"Start time: {str_from_ts(start_sec)} is before measurement start: {str_from_ts(time_bounds[0])}"
                 )
             start_sample = int((start_sec - time_bounds[0]) * sample_rate)
+
     else:
         start_sample = 0
 
@@ -62,22 +61,21 @@ def time_interval_to_sample_bound(
                 raise ValueError("Relative time is only compatible with int or float start/end")
         else:
             if isinstance(end_time, np.datetime64):
-                end_sec = end_time.astype("datetime64[s]").astype("float64")
+                end_sec = end_time.astype("datetime64[us]").astype("float64") * 1e-6
             elif isinstance(end_time, dt.datetime):
                 end_sec = end_time.timestamp()
             else:
                 if isinstance(end_time, int):
                     end_sec = np.datetime64(end_time, "s").astype("float64")
                 else:
-                    end_sec = (
-                        np.datetime64(int(end_time * 1e6), "us").astype("datetime64[s]").astype("float64")
-                    )
+                    end_sec = np.datetime64(int(end_time * 1e6), "us").astype("float64") * 1e-6
 
             if end_sec > time_bounds[1]:
                 raise ValueError(
                     f"End time: {str_from_ts(end_sec)} s is after measurement end: {str_from_ts(time_bounds[1])}s"
                 )
             end_sample = int((end_sec - time_bounds[0]) * sample_rate)
+
     else:
         end_sample = int((time_bounds[1] - time_bounds[0]) * sample_rate)
 

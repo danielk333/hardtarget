@@ -88,8 +88,10 @@ def collect_paths(
     """
 
     if isinstance(folder, list):
+        folders = list(set(folder))
+
         fl = []
-        for dir in folder:
+        for dir in folders:
             fl.extend(get_analysed_h5_files(dir, MethodAbbreviation[method] if method else None))
     else:
         fl = get_analysed_h5_files(folder, MethodAbbreviation[method] if method else None)
@@ -97,7 +99,9 @@ def collect_paths(
     if not fl:
         return []
 
+    fl = list(set(fl))
     fl.sort()
+
     fl_epochs = [int(file.stem.split("-")[1]) * 1e-6 for file in fl]
 
     epoch_unix = fl_epochs[0]
