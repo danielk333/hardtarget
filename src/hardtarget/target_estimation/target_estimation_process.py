@@ -241,6 +241,7 @@ class TargetEstimationProcess(
 
         # finding peaks
         r_inds = np.argmax(snr, axis=1)
+        snr_vec = snr[coh_ints, r_inds]
         r_vec = pro_params.ranges[r_inds]
         v_vec = all_vars.v[coh_ints, r_inds]
         a_vec = all_vars.a[coh_ints, r_inds]
@@ -270,6 +271,7 @@ class TargetEstimationProcess(
             v=all_vars.v,
             a=all_vars.a,
             phi=all_vars.phi,
+            snr_vec=snr_vec,
             r_vec=r_vec,
             v_vec=v_vec,
             a_vec=a_vec,
@@ -361,21 +363,26 @@ class TargetEstimationProcess(
             f"{output.snr=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.snr,
                 dims=[(str_dims_num_cohints_per_file, str_t)],
-                long_name="SNR for best range gate index",
+                long_name="SNR for all gates",
+            ),
+            f"{output.snr_vec=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.snr_vec,
+                dims=[(str_dims_num_cohints_per_file, "1")],
+                long_name="SNR at peak GMF",
             ),
             f"{output.r_vec=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.r_vec,
-                dims=[(str_dims_num_cohints_per_file, str_t)],
+                dims=[(str_dims_num_cohints_per_file, "1")],
                 long_name="Range at peak GMF",
             ),
             f"{output.v_vec=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.v_vec,
-                dims=[(str_dims_num_cohints_per_file, str_t)],
+                dims=[(str_dims_num_cohints_per_file, "1")],
                 long_name="Range rate at peak GMF",
             ),
             f"{output.a_vec=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.a_vec,
-                dims=[(str_dims_num_cohints_per_file, str_t)],
+                dims=[(str_dims_num_cohints_per_file, "1")],
                 long_name="Acceleration at peak GMF",
             ),
             f"{output.g_vec=}".split("=")[0].split(".")[1]: DataItem(

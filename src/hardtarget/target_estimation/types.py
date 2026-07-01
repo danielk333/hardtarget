@@ -109,6 +109,7 @@ class MFOutArgs(NamedTuple):
     v: npt.NDArray[np.float64]
     a: npt.NDArray[np.float64]
     phi: npt.NDArray[np.float64]
+    snr_vec: npt.NDArray[np.float64]
     r_vec: npt.NDArray[np.float64]
     v_vec: npt.NDArray[np.float64]
     a_vec: npt.NDArray[np.float64]
