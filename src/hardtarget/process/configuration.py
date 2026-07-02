@@ -20,8 +20,8 @@ from hardtarget.types import CfgParams, ExpDef, GenericCfg, Impl, ProParams
 
 def extract_config_section(
     cfg_pth: Path,
-    section: str,
     cfg_type: Type[CfgParams],
+    section: Optional[str] = None,
     existing_cfg: Optional[CfgParams] = None,
     logger: Optional[logging.Logger] = None,
 ) -> dict[str, Any]:
@@ -31,8 +31,8 @@ def extract_config_section(
 
     Args:
         cfg_pth: Path to config
-        section: Config section to extract data from
         cfg_type: Config type
+        section(optional): Config section to extract data from, if none specified extraction will be done from all sections
         existing_cfg (optional): Existing configuration that shold be extended
 
     Returns:
@@ -52,20 +52,35 @@ def extract_config_section(
     config = configparser.ConfigParser()
     config.read(cfg_pth)
 
+    if section and section in config.keys():
+        iter_keys = {section: list(config[section].keys())}
+    else:
+        section = None
+        iter_keys = {section: config.options(section) for section in config.sections()}
+
     try:
-        for key in config[section].keys():
-            if key not in default_dict.keys():
-                raise ValueError(f"'{key}' option found in config file is not a valid config parameter")
-            # Convert values to specific types
-            if isinstance(default_dict[key], bool):
-                default_dict[key] = config.getboolean(section, key)
-            elif isinstance(default_dict[key], int):
-                default_dict[key] = config.getint(section, key)
-            elif isinstance(default_dict[key], float):
-                default_dict[key] = config.getfloat(section, key)
-            else:
-                # string
-                default_dict[key] = config.get(section, key).strip("'").strip('"')
+        for cfg_section, keys in iter_keys.items():
+            for key in keys:
+                if key not in default_dict.keys() and section:
+                    raise ValueError(f"'{key}' option found in config file is not a valid config parameter")
+                elif key not in default_dict.keys() and not section:
+                    continue
+                # Convert values to specific types
+                if isinstance(default_dict[key], bool):
+                    default_dict[key] = config.getboolean(cfg_section, key)
+                elif isinstance(default_dict[key], int):
+                    default_dict[key] = config.getint(cfg_section, key)
+                elif isinstance(default_dict[key], float):
+                    default_dict[key] = config.getfloat(cfg_section, key)
+                elif isinstance(default_dict[key], tuple):
+                    tuple_types = [type(i) for i in default_dict[key]]
+                    default_dict[key] = tuple(
+                        tuple_types[i](k.strip())
+                        for i, k in enumerate(config.get(cfg_section, key)[1:-1].split(","))
+                    )
+                else:
+                    # string
+                    default_dict[key] = config.get(cfg_section, key).strip("'").strip('"')
     except KeyError:
         if logger:
             logger.debug(f"No subsection {section} available in config file, default values will be used")
@@ -95,7 +110,7 @@ def load_config_params(configfile: Path | str) -> CfgParams:
     """
 
     cfg_pth = Path(configfile)
-    d = extract_config_section(cfg_pth, ConfigSubSection.PROCCESSING, CfgParams)
+    d = extract_config_section(cfg_pth, section=ConfigSubSection.PROCCESSING, cfg_type=CfgParams)
     return CfgParams(**d)
 
 

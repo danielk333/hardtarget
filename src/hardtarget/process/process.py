@@ -238,10 +238,10 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         cfg_type, _, _ = self.get_types()
         d = extract_config_section(
             cfg_path,
-            self.config_section,
-            cfg_type,
-            cfg_params,
-            self._logger,
+            cfg_type=cfg_type,
+            section=self.config_section,
+            existing_cfg=cfg_params,
+            logger=self._logger,
         )
 
         return cfg_type(**d)

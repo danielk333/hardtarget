@@ -138,7 +138,9 @@ def test_extract_config_section():
         tmp_config_path = Path(tmp_config.name)
 
         # --- Processing section ---
-        processing = extract_config_section(tmp_config_path, ConfigSubSection.PROCCESSING, CfgParams)
+        processing = extract_config_section(
+            tmp_config_path, section=ConfigSubSection.PROCCESSING, cfg_type=CfgParams
+        )
         cfg = CfgParams(**processing)
         assert cfg.n_ipp == 3
         assert cfg.ipp_offset == 0
@@ -152,7 +154,7 @@ def test_extract_config_section():
 
         # --- Target estimation section ---
         target_estimation_params = extract_config_section(
-            tmp_config_path, ConfigSubSection.TARGET_ESTIMATION, TargetEstimationCfgParams
+            tmp_config_path, section=ConfigSubSection.TARGET_ESTIMATION, cfg_type=TargetEstimationCfgParams
         )
         assert target_estimation_params["min_acceleration"] == 30
         assert target_estimation_params["max_acceleration"] == 93
@@ -162,18 +164,20 @@ def test_extract_config_section():
         assert target_estimation_params["node_gpus"] == 1
 
         # --- GMF section ---
-        gmf_params = extract_config_section(tmp_config_path, ConfigSubSection.GMF, GMFCfgParams)
+        gmf_params = extract_config_section(
+            tmp_config_path, section=ConfigSubSection.GMF, cfg_type=GMFCfgParams
+        )
         assert gmf_params["acceleration_steps"] == 10
 
         # --- Optimization section ---
         optimize_params = extract_config_section(
-            tmp_config_path, ConfigSubSection.OPTIMIZATION, OptimizeCfgParams
+            tmp_config_path, section=ConfigSubSection.OPTIMIZATION, cfg_type=OptimizeCfgParams
         )
         assert optimize_params["path"] == "example/path"
 
         # --- Echo search section ---
         echo_search_params = extract_config_section(
-            tmp_config_path, ConfigSubSection.ECHO_SEARCH, EchoSearchCfgParams
+            tmp_config_path, section=ConfigSubSection.ECHO_SEARCH, cfg_type=EchoSearchCfgParams
         )
         assert echo_search_params["doppler_freq_min"] == -30000
         assert echo_search_params["doppler_freq_max"] == 5000
