@@ -420,7 +420,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         end_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
         relative_time: bool = False,
         sub_directory: Optional[str] = None,
-        clobber: bool = True,
+        clobber: bool = False,
         progress: bool | CommBar = False,
     ) -> AnalysedResult:
         """
@@ -527,6 +527,9 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             # If file exists and clobber off, skip analysis.
             if output_path and output_path.is_file() and not clobber:
                 results["files"].append(output_path.name)
+                if output_path.parent not in results["file_dir"]:
+                    results["file_dir"].append(output_path.parent)
+
                 self._logger.debug(
                     f"File already existing and clobber is off, file: {output_path.name} is skipped."
                 )
