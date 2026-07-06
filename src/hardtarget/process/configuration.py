@@ -15,12 +15,12 @@ import numpy as np
 import numpy.typing as npt
 
 from hardtarget.constants import AnalysisMethod, ConfigSubSection, MethodLib
-from hardtarget.types import CfgParams, ExpDef, GenericCfg, Impl, ProParams
+from hardtarget.types import CfgParams, ExpDef, GenericCfg, Impl, IsDataclass, ProParams
 
 
 def extract_config_section(
     cfg_pth: Path,
-    cfg_type: Type[CfgParams],
+    cfg_type: Type[IsDataclass],
     section: Optional[str] = None,
     existing_cfg: Optional[CfgParams] = None,
     logger: Optional[logging.Logger] = None,

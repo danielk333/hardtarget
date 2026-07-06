@@ -92,7 +92,7 @@ def collect_paths(
 
         fl = []
         for dir in folders:
-            fl.extend(get_analysed_h5_files(dir, MethodAbbreviation[method] if method else None))
+            fl.extend(get_analysed_h5_files(dir, MethodAbbreviation[method] if method else None))  # type: ignore[arg-type]
     else:
         fl = get_analysed_h5_files(folder, MethodAbbreviation[method] if method else None)
 

@@ -64,8 +64,9 @@ def analyse(
         clobber (optional): If previous analysis should be overwritten.
         output (optional): Output directory for the analysed files, if None no files will be saved.
                            Path will be output/YYYY-MM-DD/HH-00-00
-        sub_directory(optional): Sub directory, stated if there is a need to store data in a specific subfolder in the output path.
+        sub_directory (optional): Sub directory, stated if there is a need to store data in a specific subfolder in the output path.
                                  More specifically output/YYYY-MM-DD/HH-00-00/sub_directory/
+        comm (optional): Mpi communication object if analysis is expected to run on MPI or a specific Comm object.
         **kwargs (optional): Extra data such as Beam and Beam parameters (needed for interferometry)
 
     """
