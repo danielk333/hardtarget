@@ -8,6 +8,7 @@ import numpy.typing as npt
 
 from hardtarget.types import (
     CfgParams,
+    OutputBase,
     ProParams,
 )
 
@@ -94,7 +95,8 @@ class MFVariables(NamedTuple):
     tx_pwr: npt.NDArray[np.floating]  # tx power
 
 
-class MFOutArgs(NamedTuple):
+@dataclass(frozen=True)
+class MFOutArgs(OutputBase):
     """Container for compacting the variables set by the GMF function."""
 
     num_cohints_per_file: int
@@ -116,4 +118,3 @@ class MFOutArgs(NamedTuple):
     g_vec: npt.NDArray[np.float64]
     pointing_vec: npt.NDArray[np.float64]
     t: npt.NDArray[np.float32]
-    epoch_us: float

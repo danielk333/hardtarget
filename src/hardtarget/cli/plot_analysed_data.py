@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Optional
 
 import matplotlib.pyplot as plt
-import numpy as np
 from matplotlib import gridspec
 
 from hardtarget import plotting
@@ -15,8 +14,8 @@ def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Adds mandatory and optional positional arguments to the parser."""
 
     parser.add_argument("path", help="path to analysed data")
-    parser.add_argument("-s", "--start_time", default=None, type=float)
-    parser.add_argument("-e", "--end_time", default=None, type=float)
+    parser.add_argument("-s", "--start_time", default=None, type=str)
+    parser.add_argument("-e", "--end_time", default=None, type=str)
     parser.add_argument("--relative_time", action="store_true")
     parser.add_argument("--chunk_size", type=int, default=None)
     parser.add_argument("--detection_limit", type=float, default=None)
@@ -36,8 +35,8 @@ def main(args: argparse.Namespace) -> None:
 
 def plot_analysed_data(
     path: Path,
-    start_time: Optional[int | float | np.datetime64] = None,
-    end_time: Optional[int | float | np.datetime64] = None,
+    start_time: Optional[int | float | str] = None,
+    end_time: Optional[int | float | str] = None,
     relative_time: bool = False,
     chunk_size: Optional[int] = None,
     detection_limit: Optional[float] = None,
@@ -45,8 +44,8 @@ def plot_analysed_data(
 
     data_generator = load_analysed_data(  # type: ignore[var-annotated]
         data_dir=path,
-        start_time=start_time,
-        end_time=end_time,
+        start_time=float(start_time) if relative_time else start_time,
+        end_time=float(end_time) if relative_time else end_time,
         relative_time=relative_time,
         chunk_size=chunk_size,
     )

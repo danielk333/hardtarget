@@ -6,7 +6,7 @@ from typing import NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from hardtarget.types import CfgParams, ProParams
+from hardtarget.types import CfgParams, OutputBase, ProParams
 
 
 @dataclass(frozen=True)
@@ -46,7 +46,14 @@ class MFOptimizeVariables(NamedTuple):
     t: npt.NDArray[np.float32]
 
 
-MFOptimizeOutArgs = MFOptimizeVariables
+@dataclass(frozen=True)
+class MFOptimizeOutArgs(OutputBase):
+    r_vec_opt: npt.NDArray[np.float64]
+    v_vec_opt: npt.NDArray[np.float64]
+    a_vec_opt: npt.NDArray[np.float64]
+    peak_vals: npt.NDArray[np.float64]  # peak magnitude
+    dc: npt.NDArray[np.float32]
+    t: npt.NDArray[np.float32]
 
 
 class OptStart(NamedTuple):

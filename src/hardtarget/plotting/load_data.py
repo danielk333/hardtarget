@@ -13,7 +13,6 @@ import numpy as np
 
 from hardtarget.constants import AnalysisMethod, MethodAbbreviation
 from hardtarget.process import get_analysis_process
-from hardtarget.target_estimation.types import MFOutArgs
 from hardtarget.types import (
     ExpDef,
     GenericCfg,
@@ -68,6 +67,17 @@ def load_analysed_data(
         yield collect_analysis_data(sub_paths)
 
 
+def get_epoch_us(file: str | Path):
+    file = Path(file)
+    with h5py.File(file, "r") as hf:
+        try:
+            epoch_us = hf["OutArgs"]["epoch_us"][()]
+        except KeyError:
+            epoch_us = 0
+
+    return epoch_us
+
+
 def collect_paths(
     folder: str | Path | list[str] | list[Path],
     start_time: Optional[int | float | np.datetime64] = None,
@@ -102,7 +112,7 @@ def collect_paths(
     fl = list(set(fl))
     fl.sort()
 
-    fl_epochs = [int(file.stem.split("-")[1]) * 1e-6 for file in fl]
+    fl_epochs = [(int(file.stem.split("-")[1]) + get_epoch_us(file)) * 1e-6 for file in fl]
 
     epoch_unix = fl_epochs[0]
     max_unix = fl_epochs[-1]
@@ -152,6 +162,24 @@ def collect_paths(
     return fl
 
 
+GenericDataclass = TypeVar("GenericDataclass", bound=IsDataclass)
+
+
+def extract_dataclass(
+    file: h5py.File, dc_type: type[GenericDataclass], group_name: Optional[str] = None
+) -> GenericDataclass:
+    # If init is false for the dataclass, ignore it
+    excluded_keys = [field.name for field in fields(dc_type) if not field.init]
+    # Extract keys
+    group_name = group_name if group_name else dc_type.__name__
+    group = file[group_name]
+    key_type = {f.name: f.type for f in fields(dc_type)}
+
+    return dc_type(
+        **{key: read_key(group, key, key_type[key]) for key in group.keys() if key not in excluded_keys}
+    )
+
+
 def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, GenericCfg, GenericPro]:
     """
     From the stored analysed data, determines what method was used during analysis and loads
@@ -170,35 +198,17 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
 
     cfg_type, pro_type, out_type = get_process_types_from_file(paths[0])
 
-    out_args: dict[str, Any] = {}
+    out_args = None
     exp_def: ExpDef | None = None
     cfg_params: GenericCfg | None = None
     pro_params: GenericPro | None = None
 
     for path in paths:
-        out_tmp = {}
         with h5py.File(path, "r") as hf:
             group = hf["OutArgs"]  # TODO: Update to proper type
 
-            out_tmp = {key: read_key(group, key) for key in out_type._fields}
-
-            GenericDataclass = TypeVar("GenericDataclass", bound=IsDataclass)
-
-            def extract_dataclass(file: h5py.File, dc_type: type[GenericDataclass]) -> GenericDataclass:
-                # If init is false for the dataclass, ignore it
-                excluded_keys = [field.name for field in fields(dc_type) if not field.init]
-                # Extract keys
-                group = file[dc_type.__name__]
-                key_type = {f.name: f.type for f in fields(dc_type)}
-
-                return dc_type(
-                    **{
-                        key: read_key(group, key, key_type[key])
-                        for key in group.keys()
-                        if key not in excluded_keys
-                    }
-                )
-
+            # out_tmp = {key: read_key(group, key) for key in out_type._fields}
+            out_tmp = extract_dataclass(hf, out_type, "OutArgs")
             if exp_def is None:
                 exp_def = extract_dataclass(hf, ExpDef)
             if cfg_params is None:
@@ -208,31 +218,18 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
                 group = hf[pro_type.__name__]
                 pro_params = pro_type(**{key: read_key(group, key) for key in group.keys()})
 
-        def _append_data(main_data: dict, tmp_data: dict, logger: logging.Logger) -> dict:
-            if not main_data:
-                for key in tmp_data:
-                    main_data[key] = tmp_data[key]
-            else:
-                for key in tmp_data:
-                    # only interested in the epoch start of the measurement TODO: adjust this
-                    if key == f"{MFOutArgs.epoch_us=}".split("=")[0].split(".")[1]:
-                        continue
-                    if isinstance(tmp_data[key], np.ndarray):
-                        logger.debug(f"Append mat {key}: {tmp_data[key].shape} [{tmp_data[key].dtype}]")
-                        main_data[key] = np.append(main_data[key], tmp_data[key], axis=0)
-                    else:
-                        logger.debug(f"Add {key}: {type(tmp_data[key])}")
-                        main_data[key] = main_data[key] + tmp_data[key]
-            return main_data
+        if not out_args:
+            out_args = out_tmp
+        else:
+            out_args = out_args.copy_and_concatenate(out_tmp)
 
-        out_args = _append_data(out_args, out_tmp, logger)
-
-    if not exp_def or not cfg_params or not pro_params:
+    if not exp_def or not cfg_params or not pro_params or not out_args:
         raise FileNotFoundError(
-            f"Exp present: {exp_def is not None}, Cfg present: {cfg_params is not None}, Pro present: {pro_params is not None} "
+            f"Exp present: {exp_def is not None}, Cfg present: {cfg_params is not None}, Pro present: {pro_params is not None}, Output present: {out_args is not None} "
         )
+
     return (
-        out_type(**out_args),
+        out_args,
         exp_def,
         cfg_params,
         pro_params,

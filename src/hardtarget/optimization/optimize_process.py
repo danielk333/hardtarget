@@ -207,7 +207,17 @@ class OptimizeProcess(
         Returns:
             Output data
         """
-        return all_vars
+        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_def.t_samp_usec)
+
+        return MFOptimizeOutArgs(
+            r_vec_opt=all_vars.r_vec_opt,
+            v_vec_opt=all_vars.v_vec_opt,
+            a_vec_opt=all_vars.a_vec_opt,
+            peak_vals=all_vars.peak_vals,
+            dc=all_vars.dc,
+            t=all_vars.t,
+            epoch_us=epoch_us,
+        )
 
     def define_h5_vars(self, output: MFOptimizeOutArgs) -> dict[str, DataItem]:
         """
@@ -248,6 +258,11 @@ class OptimizeProcess(
             f"{output.t=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.t,
                 long_name="time vector",
+                scale=True,
+            ),
+            f"{output.epoch_us=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.epoch_us,
+                long_name="Epoch of the first analysed datapoint in microseconds",
                 scale=True,
             ),
         }

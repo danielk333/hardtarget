@@ -5,9 +5,9 @@ but not too verbose in the code itself.
 
 import argparse
 import sys
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Generic, NamedTuple, Protocol, TypeAlias, TypeVar
+from typing import Any, Callable, ClassVar, Generic, NamedTuple, Protocol, Self, TypeAlias, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -22,9 +22,9 @@ from hardtarget.constants import (
 
 if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
     # in python 3.10 there is a bug present for TypedDict
-    from typing_extensions import TypedDict
+    from typing_extensions import Self, TypedDict
 else:
-    from typing import TypedDict
+    from typing import Self, TypedDict
 
 
 @dataclass(frozen=True)
@@ -87,6 +87,32 @@ class ProParams:
     tx_stencil: npt.NDArray = field(default_factory=lambda: np.zeros((1,), dtype=bool))
     rel_rgs: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
     range_gates: npt.NDArray[np.int32] = field(default_factory=lambda: np.zeros((1,), dtype=np.int32))
+
+
+@dataclass(frozen=True)
+class OutputBase:
+    """
+    Base output need for any process
+
+    epoch_us: Date of first analysed sample
+    """
+
+    epoch_us: int
+
+    def copy_and_concatenate(self, additonal_data: Self) -> Self:
+        concatenated_data = asdict(self)
+        for arg in fields(additonal_data):
+            key = arg.name
+            data = getattr(additonal_data, key)
+            # only interested in the epoch start of the measurement TODO: adjust this
+            if key == f"{self.epoch_us=}".split("=")[0].split(".")[1]:
+                continue
+            if isinstance(data, np.ndarray):
+                concatenated_data[key] = np.append(concatenated_data[key], data, axis=0)
+            else:
+                concatenated_data[key] = concatenated_data[key] + data
+
+        return self.__class__(**concatenated_data)
 
 
 class ExtractedSignals(NamedTuple):
@@ -154,7 +180,7 @@ class ArrayKwargs(TypedDict, total=False):
 GenericCfg = TypeVar("GenericCfg", bound=CfgParams)
 GenericPro = TypeVar("GenericPro", bound=ProParams)
 GenericVars = TypeVar("GenericVars", bound=NamedTuple)
-GenericOut = TypeVar("GenericOut", bound=NamedTuple)
+GenericOut = TypeVar("GenericOut", bound=OutputBase)
 GenericLib = TypeVar("GenericLib", bound=Callable)
 
 
