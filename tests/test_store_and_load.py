@@ -1,4 +1,5 @@
 import tempfile
+from dataclasses import asdict
 from pathlib import Path
 from typing import NamedTuple
 
@@ -86,18 +87,19 @@ class TestStoreAndLoad:
             range_rates=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
             accelerations=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
             sample_numbers=np.random.rand(cfg_org.num_cohints_per_file).astype(np.int32),
-            vals=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float32),
-            dc=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float32),
+            vals=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float64),
+            dc=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float64),
             v=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float64),
             a=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float64),
             phi=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float64),
             tx_pwr=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
             snr=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float64),
-            r_vec=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float64),
-            v_vec=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float64),
-            a_vec=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float64),
-            g_vec=np.random.rand(cfg_org.num_cohints_per_file, t_size).astype(np.float32),
-            pointing_vec=np.random.rand(cfg_org.num_cohints_per_file, 2).astype(np.float32),
+            snr_vec=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            r_vec=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            v_vec=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            a_vec=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            g_vec=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            pointing_vec=np.random.rand(cfg_org.num_cohints_per_file, 2).astype(np.float64),
             epoch_us=100,
             t=np.random.rand(t_size).astype(np.float32),
         )
@@ -209,8 +211,8 @@ class TestStoreAndLoad:
             )
 
             # validate out data
-            out_d = out._asdict()
-            for key, value in out_org._asdict().items():
+            out_d = asdict(out)
+            for key, value in asdict(out_org).items():
                 try:
                     assert out_d[key] == value
                 except ValueError:
@@ -260,6 +262,7 @@ class TestStoreAndLoad:
 
         analysed_results: AnalysedResult = {
             "dir": None,
+            "file_dir": [],
             "files": [],
             "data": {
                 1: (out_org, self.exp_org, cfg_org, pro_org),

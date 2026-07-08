@@ -65,10 +65,7 @@ class OptimizeProcess(
                 ][()]
                 # Extract sample relative to file start
                 self.mf_sample_start: int = int(
-                    (
-                        self.data.epoch_bounds[0]
-                        - int(hf["OutArgs"][f"{MFOutArgs.epoch_us=}".split("=")[0].split(".")[1]][()])
-                    )
+                    (self.data.epoch_bounds[0] - int(hf["OutArgs"]["epoch_us"][()]))
                     / self.exp_def.t_samp_usec
                 )
             except KeyError:
@@ -94,11 +91,11 @@ class OptimizeProcess(
         with h5py.File(self.sorted_mf_files[file_id], "r") as hf:
             # TODO: Should r/v/a_vec from all files be read at start and loaded to RAM to access it faster?
             opt_start = OptStart(
-                r_vec=hf["OutArgs"][f"{MFOutArgs.r_vec=}".split("=")[0].split(".")[1]][cohind],
-                v_vec=hf["OutArgs"][f"{MFOutArgs.v_vec=}".split("=")[0].split(".")[1]][cohind],
-                a_vec=hf["OutArgs"][f"{MFOutArgs.a_vec=}".split("=")[0].split(".")[1]][cohind],
-                dc=hf["OutArgs"][f"{MFOutArgs.dc=}".split("=")[0].split(".")[1]][cohind],
-                t=hf["OutArgs"][f"{MFOutArgs.t=}".split("=")[0].split(".")[1]][cohind],
+                r_vec=hf["OutArgs"][f"{MFOutArgs.r_vec=}".split("=")[0].split(".")[1]][cohind],  # type: ignore[misc]
+                v_vec=hf["OutArgs"][f"{MFOutArgs.v_vec=}".split("=")[0].split(".")[1]][cohind],  # type: ignore[misc]
+                a_vec=hf["OutArgs"][f"{MFOutArgs.a_vec=}".split("=")[0].split(".")[1]][cohind],  # type: ignore[misc]
+                dc=hf["OutArgs"][f"{MFOutArgs.dc=}".split("=")[0].split(".")[1]][cohind],  # type: ignore[misc]
+                t=hf["OutArgs"][f"{MFOutArgs.t=}".split("=")[0].split(".")[1]][cohind],  # type: ignore[misc]
             )
 
         return opt_start

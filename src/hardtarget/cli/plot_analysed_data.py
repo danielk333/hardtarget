@@ -44,8 +44,8 @@ def plot_analysed_data(
 
     data_generator = load_analysed_data(  # type: ignore[var-annotated]
         data_dir=path,
-        start_time=float(start_time) if relative_time else start_time,
-        end_time=float(end_time) if relative_time else end_time,
+        start_time=float(start_time) if relative_time and start_time else start_time,
+        end_time=float(end_time) if relative_time and end_time else end_time,
         relative_time=relative_time,
         chunk_size=chunk_size,
     )

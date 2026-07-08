@@ -99,6 +99,15 @@ class OutputBase:
 
     epoch_us: int
 
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """
+        Used to add each variable name to annotations
+
+        """
+        super().__init_subclass__(**kwargs)
+        for field_name in cls.__annotations__:
+            setattr(cls, field_name, field_name)
+
     def copy_and_concatenate(self, additonal_data: Self) -> Self:
         concatenated_data = asdict(self)
         for arg in fields(additonal_data):
@@ -108,7 +117,11 @@ class OutputBase:
             if key == f"{self.epoch_us=}".split("=")[0].split(".")[1]:
                 continue
             if isinstance(data, np.ndarray):
-                concatenated_data[key] = np.append(concatenated_data[key], data, axis=0)
+                if data.ndim >= 2:
+                    concatenated_data[key] = np.vstack([concatenated_data[key], data])
+                else:
+                    concatenated_data[key] = np.hstack([concatenated_data[key], data])
+                # concatenated_data[key] = np.append(concatenated_data[key], data, axis=0)
             else:
                 concatenated_data[key] = concatenated_data[key] + data
 

@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 def load_analysed_data(
     data_dir: str | Path | list[str] | list[Path],
-    start_time: Optional[int | float | np.datetime64] = None,
-    end_time: Optional[int | float | np.datetime64] = None,
+    start_time: Optional[int | float | np.datetime64 | str] = None,
+    end_time: Optional[int | float | np.datetime64 | str] = None,
     relative_time: bool = False,
     method: Optional[AnalysisMethod] = None,
     chunk_size: Optional[int] = None,
@@ -51,6 +51,18 @@ def load_analysed_data(
         Tuple of experiment params, process specific configuration, process specific params and analysed data.
     """
 
+    if isinstance(start_time, str):
+        try:
+            start_time = ts_from_str(start_time)
+        except ValueError:
+            start_time = float(start_time)
+
+    if isinstance(end_time, str):
+        try:
+            end_time = ts_from_str(end_time)
+        except ValueError:
+            end_time = float(end_time)
+
     paths = collect_paths(
         data_dir, start_time=start_time, end_time=end_time, relative_time=relative_time, method=method
     )
@@ -67,7 +79,7 @@ def load_analysed_data(
         yield collect_analysis_data(sub_paths)
 
 
-def get_epoch_us(file: str | Path):
+def get_epoch_us(file: str | Path) -> int:
     file = Path(file)
     with h5py.File(file, "r") as hf:
         try:
@@ -297,25 +309,21 @@ def stack_analysed_data(
         )
 
     sorted_data_list = list(dict(sorted(data.items())).values())
-    out_type = type(sorted_data_list[0][0])
+    _, exp_def, cfg, pro = sorted_data_list[0]
 
-    gathered_data = {}
-    output_start, exp_def, cfg, pro = sorted_data_list[0]
-    for field in out_type._fields:
-        attr = getattr(output_start, field)
-        if isinstance(attr, np.ndarray):
-            if attr.ndim >= 2:
-                gathered_data[field] = np.vstack(
-                    [getattr(output, field) for output, _, _, _ in sorted_data_list]
-                )
-            else:
-                gathered_data[field] = np.hstack(
-                    [getattr(output, field) for output, _, _, _ in sorted_data_list]
-                )
-        elif field not in gathered_data:
-            gathered_data[field] = getattr(output_start, field)
+    out = None
+    for output, _, _, _ in sorted_data_list:
+        if not out:
+            out = output
+        else:
+            out = out.copy_and_concatenate(output)
 
-    return out_type(**gathered_data), exp_def, cfg, pro  # type: ignore[call-overload]
+    if not exp_def or not cfg or not pro or not out:
+        raise FileNotFoundError(
+            f"Exp present: {exp_def is not None}, Cfg present: {cfg is not None}, Pro present: {pro is not None}, Output present: {out is not None} "
+        )
+
+    return out, exp_def, cfg, pro
 
 
 """
