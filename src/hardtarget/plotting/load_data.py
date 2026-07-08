@@ -126,52 +126,53 @@ def collect_paths(
     fl = list(set(fl))
     fl.sort()
 
-    fl_epochs = [get_start_time(file) for file in fl]
+    if start_time or end_time:
+        fl_epochs = [get_start_time(file) for file in fl]
 
-    epoch_unix = fl_epochs[0]
-    max_unix = fl_epochs[-1]
+        epoch_unix = fl_epochs[0]
+        max_unix = fl_epochs[-1]
 
-    if relative_time:
-        if start_time is None:
-            start = 0.0
+        if relative_time:
+            if start_time is None:
+                start = 0.0
+            else:
+                start = float(start_time)
+            unix_t0 = epoch_unix + start
         else:
-            start = float(start_time)
-        unix_t0 = epoch_unix + start
-    else:
-        if start_time is None:
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=UserWarning)
-                dt64_t0 = np.datetime64(dt.datetime.fromtimestamp(epoch_unix, dt.timezone.utc))
-        elif isinstance(start_time, np.datetime64):
-            dt64_t0 = start_time  # type: ignore[assignment]
-        elif isinstance(start_time, str):
-            dt64_t0 = np.datetime64(int(ts_from_str(start_time) * 1e6), "us")
+            if start_time is None:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning)
+                    dt64_t0 = np.datetime64(dt.datetime.fromtimestamp(epoch_unix, dt.timezone.utc))
+            elif isinstance(start_time, np.datetime64):
+                dt64_t0 = start_time  # type: ignore[assignment]
+            elif isinstance(start_time, str):
+                dt64_t0 = np.datetime64(int(ts_from_str(start_time) * 1e6), "us")
+            else:
+                dt64_t0 = np.datetime64(int(start_time * 1e6), "us")
+
+            unix_t0 = dt64_t0.astype("datetime64[us]").astype("float64") * 1e-6
+
+        if relative_time:
+            if end_time is None:
+                end = max_unix - epoch_unix
+            else:
+                end = float(end_time)
+            unix_t1 = epoch_unix + end
         else:
-            dt64_t0 = np.datetime64(int(start_time * 1e6), "us")
+            if end_time is None:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning)
+                    dt64_t1 = np.datetime64(dt.datetime.fromtimestamp(max_unix, dt.timezone.utc))
+            elif isinstance(end_time, np.datetime64):
+                dt64_t1 = end_time  # type: ignore[assignment]
+            elif isinstance(end_time, str):
+                dt64_t1 = np.datetime64(int(ts_from_str(end_time) * 1e6), "us")
+            else:
+                dt64_t1 = np.datetime64(int(end_time * 1e6), "us")
 
-        unix_t0 = dt64_t0.astype("datetime64[us]").astype("float64") * 1e-6
+            unix_t1 = dt64_t1.astype("datetime64[us]").astype("float64") * 1e-6
 
-    if relative_time:
-        if end_time is None:
-            end = max_unix - epoch_unix
-        else:
-            end = float(end_time)
-        unix_t1 = epoch_unix + end
-    else:
-        if end_time is None:
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=UserWarning)
-                dt64_t1 = np.datetime64(dt.datetime.fromtimestamp(max_unix, dt.timezone.utc))
-        elif isinstance(end_time, np.datetime64):
-            dt64_t1 = end_time  # type: ignore[assignment]
-        elif isinstance(end_time, str):
-            dt64_t1 = np.datetime64(int(ts_from_str(end_time) * 1e6), "us")
-        else:
-            dt64_t1 = np.datetime64(int(end_time * 1e6), "us")
-
-        unix_t1 = dt64_t1.astype("datetime64[us]").astype("float64") * 1e-6
-
-    fl = [file for file, ep in zip(fl, fl_epochs) if ep >= unix_t0 and ep <= unix_t1]
+        fl = [file for file, ep in zip(fl, fl_epochs) if ep >= unix_t0 and ep <= unix_t1]
 
     return fl
 
