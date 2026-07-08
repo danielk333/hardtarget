@@ -53,7 +53,6 @@ class MFOptimizeOutArgs(OutputBase):
     a_vec_opt: npt.NDArray[np.float64]
     peak_vals: npt.NDArray[np.float64]  # peak magnitude
     dc: npt.NDArray[np.float32]
-    t: npt.NDArray[np.float32]
 
 
 class OptStart(NamedTuple):

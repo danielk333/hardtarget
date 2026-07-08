@@ -126,6 +126,7 @@ class TestStoreAndLoad:
             mean=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
             std_dev=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
             epoch_us=int(np.random.rand()),
+            t=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float32),
         )
 
         self.store_and_load(
@@ -146,6 +147,7 @@ class TestStoreAndLoad:
             azimuth=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float32),
             elevation=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float32),
             epoch_us=int(np.random.rand()),
+            t=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float32),
         )
 
         array_kwargs = ArrayKwargs(beam=radardef.Mu().beam, parameters=radardef.Mu().beam_parameters)
@@ -247,6 +249,7 @@ class TestStoreAndLoad:
             mean=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
             std_dev=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
             epoch_us=int(np.random.rand()),
+            t=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float32),
         )
 
         _cfg = extract_config_params_from_derived_object(cfg_org)

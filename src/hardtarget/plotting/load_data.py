@@ -79,15 +79,17 @@ def load_analysed_data(
         yield collect_analysis_data(sub_paths)
 
 
-def get_epoch_us(file: str | Path) -> int:
+def get_start_time(file: str | Path) -> float:
     file = Path(file)
     with h5py.File(file, "r") as hf:
         try:
             epoch_us = hf["OutArgs"]["epoch_us"][()]
+            t = hf["OutArgs"]["t"][0]
+            time_sec = epoch_us * 1e-6 + t
         except KeyError:
-            epoch_us = 0
+            time_sec = 0
 
-    return epoch_us
+    return time_sec
 
 
 def collect_paths(
@@ -124,7 +126,7 @@ def collect_paths(
     fl = list(set(fl))
     fl.sort()
 
-    fl_epochs = [(int(file.stem.split("-")[1]) + get_epoch_us(file)) * 1e-6 for file in fl]
+    fl_epochs = [get_start_time(file) for file in fl]
 
     epoch_unix = fl_epochs[0]
     max_unix = fl_epochs[-1]

@@ -106,7 +106,9 @@ class EchoSearchProcess(
              Output data
         """
 
-        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_def.t_samp_usec)
+        n_cohints = len(all_vars.max_corr) if isinstance(all_vars.max_corr, np.ndarray) else 1
+        _t_conv = (cfg_params.n_ipp * exp_def.t_ipp_usec) * 1e-6
+        t = (np.arange(n_cohints) + 1) * _t_conv + file_idx_sample * exp_def.t_samp_usec * 1e-6
 
         return EchoSearchOutArgs(
             max_corr=all_vars.max_corr
@@ -128,7 +130,8 @@ class EchoSearchProcess(
             std_dev=all_vars.std_dev
             if isinstance(all_vars.std_dev, np.ndarray)
             else np.array(all_vars.std_dev),
-            epoch_us=epoch_us,
+            epoch_us=int(self.data.epoch_bounds[0]),
+            t=t,
         )
 
     def define_h5_vars(self, output: EchoSearchOutArgs) -> dict[str, DataItem]:
@@ -174,6 +177,11 @@ class EchoSearchProcess(
             ),
             f"{output.epoch_us=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.epoch_us,
-                long_name="Epoch of the first analysed datapoint in microseconds",
+                long_name="Epoch of the first data sample of the measurement",
+            ),
+            f"{output.t=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.t,
+                long_name="time vector relative to epoch_us",
+                scale=True,
             ),
         }

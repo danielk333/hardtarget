@@ -95,18 +95,23 @@ class OutputBase:
     Base output need for any process
 
     epoch_us: Date of first analysed sample
+    t: time of coherent integration relative to epoch_us
     """
 
     epoch_us: int
+    t: npt.NDArray[np.float32]
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """
-        Used to add each variable name to annotations
+        Initiates each variable name to attributes
 
         """
         super().__init_subclass__(**kwargs)
-        for field_name in cls.__annotations__:
-            setattr(cls, field_name, field_name)
+        for base in cls.__mro__:
+            if hasattr(base, "__annotations__"):
+                for field_name in base.__annotations__:
+                    if not hasattr(cls, field_name):
+                        setattr(cls, field_name, field_name)
 
     def copy_and_concatenate(self, additonal_data: Self) -> Self:
         concatenated_data = asdict(self)

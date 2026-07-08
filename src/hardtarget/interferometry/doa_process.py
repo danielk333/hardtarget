@@ -120,14 +120,17 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
         Returns:
             Output data
         """
-        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_def.t_samp_usec)
+
+        _t_conv = (cfg_params.n_ipp * exp_def.t_ipp_usec) * 1e-6
+        t = (np.arange(len(all_vars.azimuth)) + 1) * _t_conv + file_idx_sample * exp_def.t_samp_usec * 1e-6
 
         return DOAOutArgs(
             k_vec=all_vars.k_vec,
             peak=all_vars.peak,
             azimuth=all_vars.azimuth,
             elevation=all_vars.elevation,
-            epoch_us=epoch_us,
+            epoch_us=int(self.data.epoch_bounds[0]),
+            t=t,
         )
 
     def define_h5_vars(self, output: DOAOutArgs) -> dict[str, DataItem]:
@@ -160,6 +163,11 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
             ),
             f"{output.epoch_us=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.epoch_us,
-                long_name="Epoch of the first analysed datapoint in microseconds",
+                long_name="Epoch of the first data sample of the measurement",
+            ),
+            f"{output.t=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.t,
+                long_name="time vector relative to epoch_us",
+                scale=True,
             ),
         }

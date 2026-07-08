@@ -247,8 +247,6 @@ class TargetEstimationProcess(
         a_vec = all_vars.a[coh_ints, r_inds]
         g_vec = all_vars.vals[coh_ints, r_inds]
 
-        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_def.t_samp_usec)
-
         _t_conv = (cfg_params.n_ipp * exp_def.t_ipp_usec) * 1e-6
         t = (np.arange(num_cohints) + 1) * _t_conv + file_idx_sample * exp_def.t_samp_usec * 1e-6
 
@@ -277,8 +275,8 @@ class TargetEstimationProcess(
             a_vec=a_vec,
             g_vec=g_vec,
             pointing_vec=pointing_vec,
+            epoch_us=int(self.data.epoch_bounds[0]),
             t=t,
-            epoch_us=epoch_us,
         )
 
     def define_h5_vars(self, output: MFOutArgs) -> dict[str, DataItem]:
@@ -300,11 +298,6 @@ class TargetEstimationProcess(
             str_dims_num_cohints_per_file: DataItem(
                 data=output.num_cohints_per_file,
                 long_name="Number of cohints per file",
-                scale=True,
-            ),
-            str_t: DataItem(
-                data=output.t,
-                long_name="time vector",
                 scale=True,
             ),
             str_ranges: DataItem(
@@ -395,7 +388,12 @@ class TargetEstimationProcess(
             ),
             f"{output.epoch_us=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.epoch_us,
-                long_name="Epoch of the first analysed datapoint in microseconds",
+                long_name="Epoch of the first data sample of the measurement",
+                scale=True,
+            ),
+            str_t: DataItem(
+                data=output.t,
+                long_name="time vector relative to epoch_us",
                 scale=True,
             ),
         }

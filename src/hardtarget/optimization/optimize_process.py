@@ -95,7 +95,7 @@ class OptimizeProcess(
                 v_vec=hf["OutArgs"][f"{MFOutArgs.v_vec=}".split("=")[0].split(".")[1]][cohind],  # type: ignore[misc]
                 a_vec=hf["OutArgs"][f"{MFOutArgs.a_vec=}".split("=")[0].split(".")[1]][cohind],  # type: ignore[misc]
                 dc=hf["OutArgs"][f"{MFOutArgs.dc=}".split("=")[0].split(".")[1]][cohind],  # type: ignore[misc]
-                t=hf["OutArgs"][f"{MFOutArgs.t=}".split("=")[0].split(".")[1]][cohind],  # type: ignore[misc]
+                t=hf["OutArgs"][f"{MFOutArgs.t=}".split("=")[0].split(".")[1]][cohind],
             )
 
         return opt_start
@@ -204,7 +204,6 @@ class OptimizeProcess(
         Returns:
             Output data
         """
-        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_def.t_samp_usec)
 
         return MFOptimizeOutArgs(
             r_vec_opt=all_vars.r_vec_opt,
@@ -213,7 +212,7 @@ class OptimizeProcess(
             peak_vals=all_vars.peak_vals,
             dc=all_vars.dc,
             t=all_vars.t,
-            epoch_us=epoch_us,
+            epoch_us=int(self.data.epoch_bounds[0]),
         )
 
     def define_h5_vars(self, output: MFOptimizeOutArgs) -> dict[str, DataItem]:
@@ -252,14 +251,13 @@ class OptimizeProcess(
                 # dims=[(str_dims_num_cohints_per_file, str_t), (str_ranges, "r")],
                 long_name="Range dependant noise floor (0-frequency gmf output)",
             ),
-            f"{output.t=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.t,
-                long_name="time vector",
-                scale=True,
-            ),
             f"{output.epoch_us=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.epoch_us,
-                long_name="Epoch of the first analysed datapoint in microseconds",
+                long_name="Epoch of the first data sample of the measurement",
+            ),
+            f"{output.t=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.t,
+                long_name="time vector relative to epoch_us",
                 scale=True,
             ),
         }
