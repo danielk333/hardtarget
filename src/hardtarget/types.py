@@ -130,7 +130,7 @@ class OutputBase:
                         concatenated_data[key] = np.hstack([concatenated_data[key], data])
                 else:
                     concatenated_data[key] = concatenated_data[key] + data
-        else:
+        elif additonal_data:
             tmp_buffer: dict[str, Any] = {key: [] for key in asdict(self).keys()}
             # Fill each key with a list containing data from the new data points
             for obj in additonal_data:

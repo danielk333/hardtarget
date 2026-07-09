@@ -185,11 +185,21 @@ GenericDataclass = TypeVar("GenericDataclass", bound=IsDataclass)
 def extract_dataclass(
     file: h5py.File, dc_type: type[GenericDataclass], group_name: Optional[str] = None
 ) -> GenericDataclass:
+    """
+    Args:
+        file: h5py file to gather data from
+        dc_type: Dataclass type to reconstruct from group
+        group_name: If a specific group_name should be extracted from the file, default is the dc_type name
+    """
+
     # If init is false for the dataclass, ignore it
     excluded_keys = [field.name for field in fields(dc_type) if not field.init]
     # Extract keys
     group_name = group_name if group_name else dc_type.__name__
-    group = file[group_name]
+    try:
+        group = file[group_name]
+    except:
+        breakpoint()
     key_type = {f.name: f.type for f in fields(dc_type)}
 
     return dc_type(
@@ -233,9 +243,9 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
                 pro_params = pro_type(**{key: read_key(group, key) for key in group.keys()})
 
             if not out_args:
-                out_args = extract_dataclass(hf["OutArgs"], out_type, "OutArgs")
+                out_args = extract_dataclass(hf, out_type, "OutArgs")
             else:
-                out_buffer.append(extract_dataclass(hf["OutArgs"], out_type, "OutArgs"))
+                out_buffer.append(extract_dataclass(hf, out_type, "OutArgs"))
 
     if not exp_def or not cfg_params or not pro_params or not out_args:
         raise FileNotFoundError(
@@ -243,7 +253,8 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
         )
 
     # Concatenate output from all files to one
-    out_args = out_args.copy_and_concatenate(out_buffer)
+    if out_buffer:
+        out_args = out_args.copy_and_concatenate(out_buffer)
 
     return (
         out_args,
