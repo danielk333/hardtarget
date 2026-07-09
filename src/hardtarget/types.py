@@ -92,7 +92,7 @@ class ProParams:
 @dataclass(frozen=True)
 class OutputBase:
     """
-    Base output need for any process
+    Base output for any process
 
     epoch_us: Date of first analysed sample
     t: time of coherent integration relative to epoch_us
@@ -113,22 +113,41 @@ class OutputBase:
                     if not hasattr(cls, field_name):
                         setattr(cls, field_name, field_name)
 
-    def copy_and_concatenate(self, additonal_data: Self) -> Self:
+    def copy_and_concatenate(self, additonal_data: Self | list[Self]) -> Self:
         concatenated_data = asdict(self)
-        for arg in fields(additonal_data):
-            key = arg.name
-            data = getattr(additonal_data, key)
-            # only interested in the epoch start of the measurement TODO: adjust this
-            if key == f"{self.epoch_us=}".split("=")[0].split(".")[1]:
-                continue
-            if isinstance(data, np.ndarray):
-                if data.ndim >= 2:
-                    concatenated_data[key] = np.vstack([concatenated_data[key], data])
+
+        if not isinstance(additonal_data, list):
+            for arg in fields(additonal_data):
+                key = arg.name
+                data = getattr(additonal_data, key)
+                # only interested in the epoch start of the measurement TODO: adjust this
+                if key == f"{self.epoch_us=}".split("=")[0].split(".")[1]:
+                    continue
+                if isinstance(data, np.ndarray):
+                    if data.ndim >= 2:
+                        concatenated_data[key] = np.vstack([concatenated_data[key], data])
+                    else:
+                        concatenated_data[key] = np.hstack([concatenated_data[key], data])
                 else:
-                    concatenated_data[key] = np.hstack([concatenated_data[key], data])
-                # concatenated_data[key] = np.append(concatenated_data[key], data, axis=0)
-            else:
-                concatenated_data[key] = concatenated_data[key] + data
+                    concatenated_data[key] = concatenated_data[key] + data
+        else:
+            tmp_buffer: dict[str, Any] = {key: [] for key in asdict(self).keys()}
+            # Fill each key with a list containing data from the new data points
+            for obj in additonal_data:
+                for arg in fields(obj):
+                    tmp_buffer[arg.name].append(getattr(obj, arg.name))
+            # Merge the data from all lists to create one single object
+            for key, data in tmp_buffer.items():
+                # only interested in the epoch start of the measurement
+                if key == f"{self.epoch_us=}".split("=")[0].split(".")[1]:
+                    continue
+                if isinstance(data[0], np.ndarray):
+                    if data[0].ndim >= 2:
+                        concatenated_data[key] = np.vstack((concatenated_data[key], np.vstack(data)))
+                    else:
+                        concatenated_data[key] = np.hstack((concatenated_data[key], np.hstack(data)))
+                else:
+                    concatenated_data[key] += np.sum(data)
 
         return self.__class__(**concatenated_data)
 

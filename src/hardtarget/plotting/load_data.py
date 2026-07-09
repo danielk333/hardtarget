@@ -19,6 +19,7 @@ from hardtarget.types import (
     GenericOut,
     GenericPro,
     IsDataclass,
+    OutputBase,
     ProParams,
 )
 from hardtarget.utils.h5_tools import get_analysed_h5_files
@@ -37,7 +38,8 @@ def load_analysed_data(
 ) -> Generator[tuple[GenericOut, ExpDef, GenericCfg, GenericPro], None, None]:
     """
     Loads and concatenates all analysed output data from 'data_dir'. Optionally specific timespans can be
-    extracted, the result will be yielded in sizes of 'chunk_size' if given.
+    extracted, the result will be yielded in sizes of 'chunk_size' if given. Not that when merging a whole directory
+    the data amount can cause quite the RAM usage.
 
     Args:
         data_dir: Directory containing the analysed output
@@ -218,12 +220,9 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
     cfg_params: GenericCfg | None = None
     pro_params: GenericPro | None = None
 
+    out_buffer: list[OutputBase] = []
     for path in paths:
         with h5py.File(path, "r") as hf:
-            group = hf["OutArgs"]  # TODO: Update to proper type
-
-            # out_tmp = {key: read_key(group, key) for key in out_type._fields}
-            out_tmp = extract_dataclass(hf, out_type, "OutArgs")
             if exp_def is None:
                 exp_def = extract_dataclass(hf, ExpDef)
             if cfg_params is None:
@@ -233,15 +232,18 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
                 group = hf[pro_type.__name__]
                 pro_params = pro_type(**{key: read_key(group, key) for key in group.keys()})
 
-        if not out_args:
-            out_args = out_tmp
-        else:
-            out_args = out_args.copy_and_concatenate(out_tmp)
+            if not out_args:
+                out_args = extract_dataclass(hf["OutArgs"], out_type, "OutArgs")
+            else:
+                out_buffer.append(extract_dataclass(hf["OutArgs"], out_type, "OutArgs"))
 
     if not exp_def or not cfg_params or not pro_params or not out_args:
         raise FileNotFoundError(
             f"Exp present: {exp_def is not None}, Cfg present: {cfg_params is not None}, Pro present: {pro_params is not None}, Output present: {out_args is not None} "
         )
+
+    # Concatenate output from all files to one
+    out_args = out_args.copy_and_concatenate(out_buffer)
 
     return (
         out_args,
