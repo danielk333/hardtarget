@@ -5,6 +5,7 @@ but not too verbose in the code itself.
 
 import argparse
 import sys
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Generic, NamedTuple, Protocol, Self, TypeAlias, TypeVar
@@ -61,6 +62,11 @@ class CfgParams:
     tx_amp_limit: float = 1.0
     node_gpus: int = 1
     cache: bool = True
+
+    def copy(self: Self, **modifications: Any) -> Self:
+        kwargs = {key.name: deepcopy(getattr(self, key.name)) for key in fields(self) if key.init}
+        kwargs.update(modifications)
+        return self.__class__(**kwargs)
 
 
 @dataclass(frozen=True)
