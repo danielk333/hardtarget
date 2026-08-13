@@ -125,6 +125,7 @@ int fgmf(
                 // do stuff
             } else if (refine_doppler) {
                 float pwr = 0;
+                /*
                 v[ind] = dtft_solve(
                     dec_signal,
                     dec_signal_len,
@@ -133,7 +134,8 @@ int fgmf(
                     fft_frequencies[v_ind_p],
                     &pwr,
                     &phi[ind]
-                );
+                    );
+                */
             }
         }
     }

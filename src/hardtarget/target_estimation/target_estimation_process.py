@@ -346,7 +346,7 @@ class TargetEstimationProcess(
             f"{output.phi=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.a,
                 dims=[(str_dims_num_cohints_per_file, str_t), (str_ranges, "r")],
-                long_name="TODO",
+                long_name="Phase",
             ),
             f"{output.tx_pwr=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.tx_pwr,

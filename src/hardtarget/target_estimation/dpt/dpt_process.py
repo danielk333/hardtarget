@@ -124,7 +124,7 @@ class DPTProcess(TargetEstimationProcess[DPTCfgParams, DPTProParams]):
         tx = np.conj(tx) / tx_amp
 
         if tx_amp > self.cfg_params.tx_amp_limit:
-            return self.lib(
+            mfvars = self.lib(
                 tx,
                 rx,
                 np.array(tx_pwr),
@@ -132,6 +132,9 @@ class DPTProcess(TargetEstimationProcess[DPTCfgParams, DPTProParams]):
                 self.cfg_params,
                 self.pro_params,
             )
+            # TODO: for now since we expect physical units at this level do the conversion here
+            mfvars.v[:] = mfvars.v * self.exp_def.wavelength
+            return mfvars
         else:
             return MFVariables(
                 vals=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),

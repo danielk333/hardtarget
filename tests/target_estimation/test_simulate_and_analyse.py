@@ -19,18 +19,20 @@ class TestTargetEstimation:
     """
 
     @pytest.mark.parametrize("mf_impl", [Impl.numpy, Impl.c])
-    def test_dpt(self, mf_impl, plot):
-        self.run_test(TargetEstimationMethod.fdpt, mf_impl, plot)
+    @pytest.mark.parametrize("refine_results", [False, True])
+    def test_dpt(self, mf_impl, refine_results, plot):
+        self.run_test(TargetEstimationMethod.fdpt, mf_impl, refine_results, False, plot)
 
     @pytest.mark.parametrize("mf_impl", [Impl.numpy, Impl.c])
-    def test_gmf(self, mf_impl, plot):
-        self.run_test(TargetEstimationMethod.fgmf, mf_impl, plot)
+    @pytest.mark.parametrize("refine_results", [False, True])
+    def test_gmf(self, mf_impl, refine_results, plot):
+        self.run_test(TargetEstimationMethod.fgmf, mf_impl, refine_results, False, plot)
 
     @pytest.mark.cuda
     def test_gmf_cuda(self, plot):
-        self.run_test(TargetEstimationMethod.fgmf, Impl.cuda, plot)
+        self.run_test(TargetEstimationMethod.fgmf, Impl.cuda, False, False, plot)
 
-    def run_test(self, mf_method, mf_impl, plot):
+    def run_test(self, mf_method, mf_impl, refine_doppler, refine_acceleration, plot):
         """Simulate echoes without noise and analyse the echoes to verify parameters are recovered.
 
         There is a minimum acceleration thats theoretically detectable depending
@@ -63,6 +65,8 @@ class TestTargetEstimation:
             min_acceleration=-300.0
             max_acceleration=300.0
             frequency_decimation={frequency_decimation}
+            refine_doppler={refine_doppler}
+            refine_acceleration={refine_acceleration}
         [dpt]
             ipp_delay_parameter={tau_ipp}
         [gmf]

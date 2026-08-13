@@ -35,7 +35,7 @@ def fast_dpt_c(
     """
 
     size = (len(pro_params.ranges),)
-    dc, vals, v_ind, a_ind, phi = default_mf_vars_items(size)
+    dc, vals, v, a, phi = default_mf_vars_items(size)
 
     tx = tx.flatten()
     # Below comments are for ctypes argument error debugging
@@ -46,21 +46,27 @@ def fast_dpt_c(
         rx.size,  # 4
         cfg_params.range_gate_sub_resolution,  # 5
         pro_params.acceleration_phasors,  # 6
-        pro_params.acceleration_phasors.shape[0],  # 7
+        pro_params.accelerations,  # 7
         pro_params.rel_rgs,  # 8
         pro_params.rel_rgs.size,  # 9
         cfg_params.frequency_decimation,  # 10
         vals,  # 11
         dc,  # 12
-        v_ind,  # 13
-        a_ind,  # 14
-        pro_params.il1_rx_window_indices,  # 15
-        pro_params.il0_dec_rx_window_indices.astype("i4"),  # 16
-        pro_params.decimated_read_length,  # 17
-        pro_params.decimated_ipp_delay_parameter,  # 18
+        v,  # 13
+        a,  # 14
+        phi,  # 15
+        pro_params.il1_rx_window_indices,  # 16
+        pro_params.il0_dec_rx_window_indices.astype("i4"),  # 17
+        pro_params.decimated_read_length,  # 18
+        pro_params.decimated_ipp_delay_parameter,  # 19
+        pro_params.fft_frequencies,  # 20
+        len(pro_params.fft_frequencies),  # 21
+        exp_def.sample_rate,  # 22
+        cfg_params.refine_acceleration,  # 23
+        cfg_params.refine_doppler,  # 24
     )
 
     if error_code != 0:
         raise Exception(f"DPT C-function returned error {error_code}")
 
-    return MFVariables(vals=vals, dc=dc, v=v_ind, a=a_ind, phi=np.zeros_like(vals), tx_pwr=tx_pwr)
+    return MFVariables(vals=vals, dc=dc, v=v, a=a, phi=phi, tx_pwr=tx_pwr)

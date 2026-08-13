@@ -29,7 +29,7 @@ class TargetEstimationCfgParams(CfgParams):
     """
 
     range_gate_sub_resolution: int = 1
-    refine_doppler: bool = True
+    refine_doppler: bool = False
     refine_acceleration: bool = False
     frequency_decimation: int = 1
     clutter_length: int = 0

@@ -196,10 +196,7 @@ def extract_dataclass(
     excluded_keys = [field.name for field in fields(dc_type) if not field.init]
     # Extract keys
     group_name = group_name if group_name else dc_type.__name__
-    try:
-        group = file[group_name]
-    except:
-        breakpoint()
+    group = file[group_name]
     key_type = {f.name: f.type for f in fields(dc_type)}
 
     return dc_type(
