@@ -12,7 +12,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-float complex dtft_fractor_sum(float freq, const fftwf_complex* decoded_signal, float sample_rate, int signal_len) {
+double complex dtft_fractor_sum(double freq, const fftwf_complex* decoded_signal, float sample_rate, int signal_len) {
     // Accumulate the DTFT sum using native single-precision float complex types
     float complex sum = 0.0f + 0.0f * I;
 
@@ -26,47 +26,49 @@ float complex dtft_fractor_sum(float freq, const fftwf_complex* decoded_signal, 
     return sum;
 }
 
-float dtft_optimize_fun(float freq, const fftwf_complex* decoded_signal, float sample_rate, int signal_len) {
-    float complex fractor_sum = dtft_fractor_sum(freq, decoded_signal, sample_rate, signal_len);
+double dtft_optimize_fun(double freq, const fftwf_complex* decoded_signal, float sample_rate, int signal_len) {
+    double complex fractor_sum = dtft_fractor_sum(freq, decoded_signal, sample_rate, signal_len);
 
     // Absolute magnitude
-    float mag = cabsf(fractor_sum);
+    double mag = cabs(fractor_sum);
     // Return negative magnitude squared (converting maximization to minimization)
     return -(float)(mag * mag);
 }
 
+typedef struct {
+    const fftwf_complex* decoded_signal;
+    float sample_rate;
+    int signal_len;
+} dtft_params;
+
+static double dtft_optimize_wrapper(double freq, void* params) {
+    dtft_params* ctx = (dtft_params*)params;
+
+    return dtft_optimize_fun(freq, ctx->decoded_signal, ctx->sample_rate, ctx->signal_len);
+}
 double dtft_solve(
     const fftwf_complex* decoded_signal,
     int signal_len,
     float sample_rate,
-    float freq_start,
-    float freq_end,
-    float* fmin_pwr,
+    double freq_start,
+    double freq_end,
+    double* fmin_pwr,
     double* phi
 ) {
-    double a = freq_start;
-    double b = freq_end;
     double freq_est = 0.0;
     double value = 0.0;
-    int status = 0;
+    double xmin = 0.0;
 
-    while (1) {
-        status = local_min_rc(&a, &b, &status, value);
+    dtft_params params = {.decoded_signal = decoded_signal, .sample_rate = sample_rate, .signal_len = signal_len};
 
-        if (status <= 0) {
-            // IF minimization completed or converged, break loop.
-            break;
-        }
-
-        value = dtft_optimize_fun(freq_est, decoded_signal, sample_rate, signal_len);
-    }
+    value = minimize_scalar(freq_start, freq_end, &dtft_optimize_wrapper, &params, &freq_est);
 
     // Power
     *fmin_pwr = -value;
 
     // Phase estimation
-    float complex fractor_sum = dtft_fractor_sum(freq_est, decoded_signal, sample_rate, signal_len);
-    *phi = cargf(fractor_sum);
+    double complex fractor_sum = dtft_fractor_sum(freq_est, decoded_signal, sample_rate, signal_len);
+    *phi = carg(fractor_sum);
 
     return freq_est;  // optimized freq
 }

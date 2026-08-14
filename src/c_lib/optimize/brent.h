@@ -1,22 +1,22 @@
 
 /*
- C version by John Burkardt.
-
- Algorthm by
-
- Richard Brent,
- Algorithms for Minimization without Derivatives,
- Dover, 2002,
- ISBN: 0-486-41998-3,
- LC: QA402.5.B74.
+ C Brent version from Numerical Recipes in C second edition
  */
+#include <math.h>
 
-double glomin ( double a, double b, double c, double m, double machep,double e, double t, double f ( double x ), double *x );
-double local_min ( double a, double b, double eps, double t, double f ( double x ), double *x );
-double local_min_rc ( double *a, double *b, int *status, double value );
-double r8_epsilon ( );
-double r8_max ( double x, double y );
-double r8_sign ( double x );
-void timestamp ();
-double zero ( double a, double b, double machep, double t, double f ( double x ) );
-void zero_rc ( double a, double b, double t, double *arg, int *status, double value );
+#define FMAX(a,b) ({ \
+    double _a = (a); \
+    double _b = (b); \
+    _a > _b ? _a : _b; \
+})
+
+#define SIGN(a, b) ((b) >= 0.0 ? fabs(a) : -fabs(a))
+
+#define SHFT(a, b, c, d) \
+    (a) = (b);           \
+    (b) = (c);           \
+    (c) = (d);
+
+double minimize_scalar(double start_a, double start_b, double (*func)(double, void*), void* params, double* xmin);
+double brent(double ax, double bx, double cx, double (*func)(double, void*), void* context, double* xmin);
+double minimize_scalar(double start_a, double start_b, double (*func)(double, void *), void *context, double *xmin) ;

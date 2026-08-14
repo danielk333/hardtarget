@@ -102,15 +102,17 @@ int fgmf(
                     if (pwr > vals[ind]) {
                         vals[ind] = pwr;
                         v_ind = ti;
-                        v[ind] = fft_frequencies[ti];
                         a_ind = ai;
-                        a[ind] = accelerations[ai];
-                        phi[ind] = cargf(ft[ti]);
                     }
                 }
             }
 
+            // Store best results
+            v[ind] = fft_frequencies[v_ind];
+            a[ind] = accelerations[a_ind];
             multiply_acc_phasors(dec_signal, echo, echo_len, acc_phasors, 2 * a_ind * echo_len, dec_rx_inds);
+            fftwf_execute(p);
+            phi[ind] = cargf(ft[v_ind]);
 
             int v_ind_p = v_ind;
             if (v_ind < fft_frequencies_len - 1) {
@@ -124,8 +126,8 @@ int fgmf(
             if (refine_acceleration) {
                 // do stuff
             } else if (refine_doppler) {
-                float pwr = 0;
-                /*
+                double pwr = 0;
+
                 v[ind] = dtft_solve(
                     dec_signal,
                     dec_signal_len,
@@ -134,8 +136,7 @@ int fgmf(
                     fft_frequencies[v_ind_p],
                     &pwr,
                     &phi[ind]
-                    );
-                */
+                );
             }
         }
     }

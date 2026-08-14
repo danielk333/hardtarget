@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "mf.h"
+#include "optimize/solvers.h"
 #include "utils/fftw_utils.h"
 
 /*
@@ -98,7 +99,24 @@ int fdpt(
             v[ind] = fft_frequencies[in_peak];    // frequency index
             a[ind] = accelerations[in_tau_peak];  // acceleration
 
-            // TODO: Refine acceleration and doppler
+            int v_ind_p = in_peak;
+            if (in_peak < fft_frequencies_len - 1) {
+                v_ind_p += 1;
+            }
+            int v_ind_m = in_peak;
+            if (in_peak > 0) {
+                v_ind_m -= 1;
+            }
+
+            if (refine_acceleration) {
+                // do stuff
+            } else if (refine_doppler) {
+                double pwr = 0;
+
+                v[ind] = dtft_solve(
+                    in, dec_signal_len, sample_rate, fft_frequencies[v_ind_m], fft_frequencies[v_ind_p], &pwr, &phi[ind]
+                );
+            }
         }
     }
     fftwf_free(in);
