@@ -42,7 +42,7 @@ for impl in [hardtarget.types.Impl.c, hardtarget.types.Impl.numpy]:
         method_lib=TargetEstimationMethod.fgmf,
         implementation=impl,
         start_time=0,
-        end_time=200000,
+        end_time=2,
         relative_time=True,
         progress=False,
     )

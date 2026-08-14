@@ -1,5 +1,6 @@
 #include <fftw3.h>
-
+#include <stdlib.h>
+#include <string.h>
 // complex arrays are indexed as tx[2*index] = real part, tx[2*index+1] = imaginary part
 
 void compute_echo_signal(
@@ -111,20 +112,12 @@ int find_fftwf_peak(fftwf_complex* arr, int len) {
 void fft_shift_1d(fftwf_complex* data, int len) {
     // Determine the split point
     int mid = (len + 1) / 2;
-    fftw_complex temp;
+    fftwf_complex* tmp = (fftwf_complex*)malloc((size_t)len * sizeof(fftwf_complex));
 
-    // Shift elements using a temporary buffer or loop swapping
-    for (int i = 0; i < len / 2; i++) {
-        int target_idx = (i + mid) % len;
+    memcpy(tmp, data + mid, (size_t)(len - mid) * sizeof(fftwf_complex));
+    memcpy(tmp + (len - mid), data, (size_t)mid * sizeof(fftwf_complex));
 
-        // Swap real parts
-        double temp_r = data[i][0];
-        data[i][0] = data[target_idx][0];
-        data[target_idx][0] = temp_r;
+    memcpy(data, tmp, (size_t)len * sizeof(fftwf_complex));
 
-        // Swap imaginary parts
-        double temp_i = data[i][1];
-        data[i][1] = data[target_idx][1];
-        data[target_idx][1] = temp_i;
-    }
+    free(tmp);
 }

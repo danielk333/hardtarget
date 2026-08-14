@@ -14,14 +14,17 @@
 
 double complex dtft_fractor_sum(double freq, const fftwf_complex* decoded_signal, float sample_rate, int signal_len) {
     // Accumulate the DTFT sum using native single-precision float complex types
-    float complex sum = 0.0f + 0.0f * I;
+    double complex sum = 0.0 + 0.0 * I;
+
+    double delta_theta = -2.0 * M_PI * freq / (double)sample_rate;
+    double complex rotation_step = cos(delta_theta) + sin(delta_theta) * I;
+
+    // Start for  e^(i*0) which is 1.0
+    double complex dtft_fractor = 1.0 + 0.0 * I;
 
     for (int n = 0; n < signal_len; n++) {
-        double t = (float)n / sample_rate;
-
-        float complex dtft_fractor = cexp(2.0 * M_PI * freq * t * -I);
-
-        sum += dtft_fractor * decoded_signal[n];
+        sum += dtft_fractor * (decoded_signal[n]);
+        dtft_fractor *= rotation_step;
     }
     return sum;
 }
@@ -30,9 +33,12 @@ double dtft_optimize_fun(double freq, const fftwf_complex* decoded_signal, float
     double complex fractor_sum = dtft_fractor_sum(freq, decoded_signal, sample_rate, signal_len);
 
     // Absolute magnitude
-    double mag = cabs(fractor_sum);
+    double real = creal(fractor_sum);
+    double imag = cimag(fractor_sum);
+    double mag = (real * real) + (imag * imag);  // Faster variant of cabs
+
     // Return negative magnitude squared (converting maximization to minimization)
-    return -(float)(mag * mag);
+    return -mag;
 }
 
 typedef struct {
@@ -57,7 +63,6 @@ double dtft_solve(
 ) {
     double freq_est = 0.0;
     double value = 0.0;
-    double xmin = 0.0;
 
     dtft_params params = {.decoded_signal = decoded_signal, .sample_rate = sample_rate, .signal_len = signal_len};
 
@@ -68,7 +73,8 @@ double dtft_solve(
 
     // Phase estimation
     double complex fractor_sum = dtft_fractor_sum(freq_est, decoded_signal, sample_rate, signal_len);
-    *phi = carg(fractor_sum);
+
+    *phi = atan2(cimag(fractor_sum), creal(fractor_sum));
 
     return freq_est;  // optimized freq
 }

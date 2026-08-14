@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "mf.h"
 #include "optimize/solvers.h"
@@ -70,9 +71,10 @@ int fgmf(
         // For each sub resolution
         for (int sri = 0; sri < sub_res_len; sri++) {
             int ind = sri + ri * sub_res_len;
-            for (int fi = 0; fi < dec_signal_len; fi++) {
-                dec_signal[fi] = 0.0 + 0.0 * I;
-            }
+
+            // Reset dec_signal
+            memset(dec_signal, 0, sizeof(*dec_signal) * dec_signal_len);
+
             compute_echo_signal(
                 echo, echo_len, tx, tx_len, rx, rx_len, sri, sub_res_len, frequency_decimation, rgs[ri], rx_window
             );
@@ -92,9 +94,10 @@ int fgmf(
                 // Shift ft
                 fft_shift_1d(ft, dec_signal_len);
 
-                float pwr;
                 for (int ti = 0; ti < dec_signal_len; ti++) {
-                    pwr = cpowf(cabsf(ft[ti]), 2);
+                    float real = crealf(ft[ti]);
+                    float imag = cimagf(ft[ti]);
+                    float pwr = (real * real) + (imag * imag);
                     if (ai == 0 && ti == 0) {
                         // zero-frequency (DC) component in FFTW out[0] according to docs
                         dc[ind] = pwr;

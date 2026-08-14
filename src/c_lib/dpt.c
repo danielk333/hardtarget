@@ -95,7 +95,9 @@ int fdpt(
 
             in_peak = find_fftwf_peak(out, dec_signal_len);
 
-            vals[ind] = cpowf(cabsf(out[in_peak]), 2);
+            float real = crealf(out[in_peak]);
+            float imag = cimagf(out[in_peak]);
+            vals[ind] = (real * real) + (imag * imag);
             v[ind] = fft_frequencies[in_peak];    // frequency index
             a[ind] = accelerations[in_tau_peak];  // acceleration
 

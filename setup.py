@@ -69,7 +69,7 @@ gmfcmodule = Extension(
     # Libraries used
     libraries=clibraries,
     extra_compile_args={
-        "gcc": [],
+        "gcc": ["-O2", "-Wall"],
     },
     # Path to c source files, relative to repo root
     sources=csources,

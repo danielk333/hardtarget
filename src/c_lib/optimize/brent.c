@@ -3,10 +3,10 @@
 #include <math.h>
 
 // brent
-#define ITMAX 100        // Maximum iterations
-#define CGOLD 0.3819660  // Golden ratio
-#define ZEPS 1.0e-10
-#define XTOL 1.48e-8  // Tolerance, square root of machine epsilon for double-precision floats
+#define ITMAX 100                    // Maximum iterations
+#define CGOLD 0.3819660112501051518  // Golden ratio
+#define ZEPS 1.0e-11
+#define XTOL 1.4901161193847656e-8  // Tolerance, square root of machine epsilon for double-precision floats
 
 // mnbrack
 #define GOLD 1.618034  // Default ratio by which successive intervals are magnified
@@ -23,8 +23,8 @@ double brent(double ax, double bx, double cx, double (*f)(double, void*), void* 
      optimization
     */
     int iter;
-    float a, b, d, etemp, fu, fv, fw, fx, p, q, r, tol1, tol2, u, v, w, x, xm;
-    float e = 0.0;
+    double a, b, d, etemp, fu, fv, fw, fx, p, q, r, tol1, tol2, u, v, w, x, xm;
+    double e = 0.0;
 
     a = (ax < cx ? ax : cx);
     b = (ax > cx ? ax : cx);
@@ -106,7 +106,7 @@ void mnbrak(
     the downhill direction (defined by the function as evaluated at the initial points) and returns
     new points ax, bx, cx that bracket a minimum
      */
-    float ulim, u, r, q, fu, dum;
+    double ulim, u, r, q, fu, dum;
     *fa = (*func)(*ax, params);
     *fb = (*func)(*bx, params);
     if (*fb > *fa) {
