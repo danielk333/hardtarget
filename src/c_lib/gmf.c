@@ -11,19 +11,7 @@
 
 /*
   Range-Velocity-Acceleration matched filter
-
-  todo optimizations:
-    - avx
-    - range dependent acceleration grid. The expected acceleration is a function
-      of altitude. we only would need to search through a finite grid around
-      the expected value. This would save a lot of computation.
-
-  Notes:
-    - Here the input signals are complex but interpreted as floats making
-      them 2*len long and interpreted as [ind0_re, ind0_im, ind0_re...]
-
-    The commented numbers are the argument numbers, useful for debugging the ctypes interface.
-
+  The commented numbers are the argument numbers, useful for debugging the ctypes interface.
  */
 
 int fgmf(
@@ -79,11 +67,22 @@ int fgmf(
                 echo, echo_len, tx, tx_len, rx, rx_len, sri, sub_res_len, frequency_decimation, rgs[ri], rx_window
             );
 
-            int v_ind = -1;
-            int a_ind = -1;
+            float complex echo_sum = 0.0f + 0.0f * I;
+
+            for (int i = 0; i < echo_len; i++) {
+                echo_sum += echo[i];
+            }
+
+            float real = crealf(echo_sum);
+            float imag = cimagf(echo_sum);
+            dc[ind] = real * real + imag * imag;
 
             // for all accelerations
             // add range gate dependent accelerations
+            int v_ind = -1;
+            int a_ind = -1;
+            float best_real = 0.0f;
+            float best_imag = 0.0f;
             for (int ai = 0; ai < n_accs; ai++) {
                 int phasor_i = 2 * ai * echo_len;
 
@@ -98,14 +97,12 @@ int fgmf(
                     float real = crealf(ft[ti]);
                     float imag = cimagf(ft[ti]);
                     float pwr = (real * real) + (imag * imag);
-                    if (ai == 0 && ti == 0) {
-                        // zero-frequency (DC) component in FFTW out[0] according to docs
-                        dc[ind] = pwr;
-                    }
                     if (pwr > vals[ind]) {
                         vals[ind] = pwr;
                         v_ind = ti;
                         a_ind = ai;
+                        best_real = real;
+                        best_imag = imag;
                     }
                 }
             }
@@ -113,9 +110,7 @@ int fgmf(
             // Store best results
             v[ind] = fft_frequencies[v_ind];
             a[ind] = accelerations[a_ind];
-            multiply_acc_phasors(dec_signal, echo, echo_len, acc_phasors, 2 * a_ind * echo_len, dec_rx_inds);
-            fftwf_execute(p);
-            phi[ind] = cargf(ft[v_ind]);
+            phi[ind] = atan2f(best_imag, best_real);
 
             int v_ind_p = v_ind;
             if (v_ind < fft_frequencies_len - 1) {

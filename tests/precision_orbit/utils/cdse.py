@@ -138,6 +138,9 @@ def download_orbit_data(data_id: str, access_token: str, output_dir: Path) -> Pa
     Returns:
         Orbit data within dt_start and dt_end format (timepoint, [x y z vx vy vz] (m, m/s))
     """
+    data_path = output_dir / "data.eof"
+    if data_path.is_file():
+        return data_path
 
     url = f"https://download.dataspace.copernicus.eu/odata/v1/Products({data_id})/$value"
 
@@ -152,7 +155,6 @@ def download_orbit_data(data_id: str, access_token: str, output_dir: Path) -> Pa
 
     # Check if the request was successful
     if response.status_code == 200:
-        data_path = output_dir / "data.eof"
         output_dir.mkdir(exist_ok=True, parents=True)
 
         with open(str(data_path), "wb") as file:

@@ -3,7 +3,7 @@
 #include <math.h>
 
 // brent
-#define ITMAX 100                    // Maximum iterations
+#define ITMAX 500                    // Maximum iterations
 #define CGOLD 0.3819660112501051518  // Golden ratio
 #define ZEPS 1.0e-11
 #define XTOL 1.4901161193847656e-8  // Tolerance, square root of machine epsilon for double-precision floats
