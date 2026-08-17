@@ -239,11 +239,11 @@ assert reader is not None
 # So what is seen here is the power for each rx sample for each ipp on the logarithmic scale, for a specific
 # set of ipps
 
-start_time = int(ts_from_str(start_time_str) * 1e6)
-end_time = int(ts_from_str(end_time_str) * 1e6)
+start_time = ts_from_str(start_time_str)
+end_time = ts_from_str(end_time_str)
 
 request_bounds = time_interval_to_sample_bound(
-    time_bounds=Bounds(int(reader.epoch_bounds.ts_start_usec), int(reader.epoch_bounds.ts_end_usec)),
+    time_bounds=(reader.epoch_bounds.ts_start_usec * 1e-6, reader.epoch_bounds.ts_end_usec * 1e-6),
     start_time=start_time,
     end_time=end_time,
     sample_rate=reader.exp_def.sample_rate,
@@ -393,7 +393,6 @@ modulated_tx_sim = tx_signal_model(
     code=exp_params.code[start_code_num, :],
     baud_length_usec=exp_params.baud_length_usec,
     t_samp_usec=exp_params.t_samp_usec,
-    tx_start_samp=0,
     ipp_samps=exp_params.ipp_samps,
     read_length=len(tx),
     sub_resolution=sub_resolution,

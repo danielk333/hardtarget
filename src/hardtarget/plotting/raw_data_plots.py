@@ -79,8 +79,9 @@ def rti(
     # Extract bounds
     if start_time or end_time:
         request_bounds = time_interval_to_sample_bound(
-            time_bounds=Bounds(
-                int(data_loader.epoch_bounds.ts_start_usec), int(data_loader.epoch_bounds.ts_end_usec)
+            time_bounds=(
+                data_loader.epoch_bounds.ts_start_usec * 1e-6,
+                data_loader.epoch_bounds.ts_end_usec * 1e-6,
             ),
             start_time=start_time,
             end_time=end_time,

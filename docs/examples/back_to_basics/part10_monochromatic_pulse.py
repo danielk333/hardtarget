@@ -16,13 +16,13 @@
 # Using this we can create an equation for the true frequency f_0 based on what the FFT
 # output would be of the function above. TODO: put in ref to paper here
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+from scipy import fft
 from tqdm import tqdm
-import scipy.fft as fft
 
 # TODO: we might need to put this function in a different location
-from hardtarget.target_estimation.gmf.gmf_numpy import dft_taylor, dtft_solve
+from hardtarget.target_estimation.dtft_solvers import dft_taylor, dtft_solve
 
 np.random.seed(233442)
 
