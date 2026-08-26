@@ -67,15 +67,16 @@ int fgmf(
                 echo, echo_len, tx, tx_len, rx, rx_len, sri, sub_res_len, frequency_decimation, rgs[ri], rx_window
             );
 
-            float complex echo_sum = 0.0f + 0.0f * I;
+            // Separated into doubles(float64) to avoid float32 accumulation error.
+            double echo_sum_real = 0.0;
+            double echo_sum_imag = 0.0;
 
             for (int i = 0; i < echo_len; i++) {
-                echo_sum += echo[i];
+                echo_sum_real += (double)creal(echo[i]);
+                echo_sum_imag += (double)cimag(echo[i]);
             }
 
-            float real = crealf(echo_sum);
-            float imag = cimagf(echo_sum);
-            dc[ind] = real * real + imag * imag;
+            dc[ind] = echo_sum_real * echo_sum_real + echo_sum_imag * echo_sum_imag;
 
             // for all accelerations
             // add range gate dependent accelerations

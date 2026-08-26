@@ -16,35 +16,45 @@ void compute_echo_signal(
     int rg,
     int* rx_window
 ) {
-    // zero echo
-    for (int fi = 0; fi < echo_len; fi++) {
-        echo[fi][0] = 0.0;
-        echo[fi][1] = 0.0;
-    }
-    int tidx;
+    // Temporary double-precision accumulators.
+    double echo_re[echo_len];
+    double echo_im[echo_len];
+
+    memset(echo_re, 0, (size_t)echo_len * sizeof(double));
+    memset(echo_im, 0, (size_t)echo_len * sizeof(double));
+
     for (int ti = 0; ti < tx_len; ti++) {
-        // rea*reb - ima*imb
-        // tx*conj(rx)
-        tidx = ti / decimation;
-        // Real part of z_t[ti]x*rx[rg+ti]
-        int tx_real_i = 2 * ti * (sub_res_len) + sub_res;
+        int tidx = ti / decimation;
+
+        int tx_real_i = 2 * ti * sub_res_len + sub_res;
         int tx_imag_i = tx_real_i + 1;
-        echo[tidx][0] +=
-            tx[tx_real_i] * rx[(rx_window[ti] + rg) * 2] - tx[tx_imag_i] * rx[(rx_window[ti] + rg) * 2 + 1];
-        // rea*imb + ima*reb
-        // Imag part of z_t[ti]x*rx[rg+ti]
-        echo[tidx][1] +=
-            tx[tx_real_i] * rx[(rx_window[ti] + rg) * 2 + 1] + tx[tx_imag_i] * rx[(rx_window[ti] + rg) * 2];
+
+        int rx_i = 2 * (rx_window[ti] + rg);
+
+        float product_re = tx[tx_real_i] * rx[rx_i] - tx[tx_imag_i] * rx[rx_i + 1];
+        float product_im = tx[tx_real_i] * rx[rx_i + 1] + tx[tx_imag_i] * rx[rx_i];
+
+        // Accumulate in float64 to not accumulate any errors.
+        echo_re[tidx] += (double)product_re;
+        echo_im[tidx] += (double)product_im;
+    }
+
+    // Convert to float32 only once, after all accumulation.
+    for (int i = 0; i < echo_len; i++) {
+        echo[i][0] = (float)echo_re[i];
+        echo[i][1] = (float)echo_im[i];
     }
 }
 
-float compute_echo_power(fftwf_complex* echo, int echo_len) {
-    float sum_re = 0;
-    float sum_im = 0;
+double compute_echo_power(fftwf_complex* echo, int echo_len) {
+    double sum_re = 0.0;
+    double sum_im = 0.0;
+
     for (int i = 0; i < echo_len; i++) {
-        sum_re += echo[i][0];
-        sum_im += echo[i][1];
+        sum_re += (double)echo[i][0];
+        sum_im += (double)echo[i][1];
     }
+
     return sum_re * sum_re + sum_im * sum_im;
 }
 

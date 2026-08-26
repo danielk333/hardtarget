@@ -13,7 +13,7 @@ void compute_echo_signal(
     int rg,
     int* rx_window
 );
-float compute_echo_power(fftwf_complex* echo, int echo_len);
+double compute_echo_power(fftwf_complex* echo, int echo_len);
 void multiply_acc_phasors(
     fftwf_complex* in,
     fftwf_complex* echo,
