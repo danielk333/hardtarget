@@ -6,6 +6,7 @@ import warnings
 from collections.abc import Generator
 from dataclasses import fields
 from pathlib import Path
+from types import GenericAlias
 from typing import Any, Optional, TypeVar, get_args, get_origin
 
 import h5py
@@ -259,6 +260,30 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
         cfg_params,
         pro_params,
     )
+
+
+def extract_data_chunk_from_out(data: GenericOut, index: tuple[int, int]) -> GenericOut:
+    data_chunk = {}
+    object_type = type(data)
+
+    t = np.zeros((0,), dtype=np.float32)
+    epoch_us = 0
+
+    for field in fields(data):
+        dtype = field.type.__origin__ if isinstance(field.type, GenericAlias) else field.type
+
+        if field.name == f"{data.t=}".split("=")[0].split(".")[1]:
+            t = data.t[index[0] : index[1]]
+        elif field.name == f"{data.epoch_us=}".split("=")[0].split(".")[1]:
+            epoch_us = data.epoch_us + data.t[index[0]]
+        elif field.name == "num_cohints_per_file":
+            data_chunk[field.name] = index[1] - index[0]
+        elif dtype is np.ndarray:
+            data_chunk[field.name] = getattr(data, field.name)[index[0] : index[1]]
+        elif dtype is list:
+            data_chunk[field.name] = getattr(data, field.name)[index[0] : index[1]]
+
+    return object_type(t=t, epoch_us=epoch_us, **data_chunk)
 
 
 def read_key(
