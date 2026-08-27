@@ -20,7 +20,8 @@ void multiply_acc_phasors(
     int echo_len,
     float* acc_phasors,
     int phasor_index,
-    int* dec_rx_inds
+    int* dec_rx_inds,
+    int drg
 );
 void compute_phase_difference(
     fftwf_complex* in,
@@ -29,7 +30,8 @@ void compute_phase_difference(
     int dec_tau_samp,
     fftwf_complex* echo,
     int echo_len,
-    int* dec_rx_inds
+    int* dec_rx_inds,
+    int drg
 );
 int find_fftwf_peak(fftwf_complex* arr, int len);
 void fft_shift_1d(fftwf_complex* data, int len);

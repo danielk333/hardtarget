@@ -1,6 +1,9 @@
+#include "fftw_utils.h"
+
 #include <fftw3.h>
 #include <stdlib.h>
 #include <string.h>
+
 // complex arrays are indexed as tx[2*index] = real part, tx[2*index+1] = imaginary part
 
 void compute_echo_signal(
@@ -26,13 +29,21 @@ void compute_echo_signal(
     for (int ti = 0; ti < tx_len; ti++) {
         int tidx = ti / decimation;
 
-        int tx_real_i = 2 * ti * sub_res_len + sub_res;
+        int tx_real_i = 2 * (ti * sub_res_len + sub_res);
         int tx_imag_i = tx_real_i + 1;
 
         int rx_i = 2 * (rx_window[ti] + rg);
 
-        float product_re = tx[tx_real_i] * rx[rx_i] - tx[tx_imag_i] * rx[rx_i + 1];
-        float product_im = tx[tx_real_i] * rx[rx_i + 1] + tx[tx_imag_i] * rx[rx_i];
+        float tx_re = tx[tx_real_i];
+        float tx_im = tx[tx_imag_i];
+        float rx_re = rx[rx_i];
+        float rx_im = rx[rx_i + 1];
+
+        float p1 = tx_re * rx_re;
+        float p2 = tx_im * rx_im;
+
+        float product_re = tx_re * rx_re - tx_im * rx_im;
+        float product_im = tx_re * rx_im + tx_im * rx_re;
 
         // Accumulate in float64 to not accumulate any errors.
         echo_re[tidx] += (double)product_re;
@@ -64,18 +75,18 @@ void multiply_acc_phasors(
     int echo_len,
     float* acc_phasors,
     int phasor_index,
-    int* dec_rx_inds
+    int* dec_rx_inds,
+    int drg
 ) {
-    // echo*acc_phasors
-    float rep, imp;
     for (int tidx = 0; tidx < echo_len; tidx++) {
-        rep = acc_phasors[phasor_index + 2 * tidx];
-        imp = acc_phasors[phasor_index + 2 * tidx + 1];
+        float rep = acc_phasors[phasor_index + 2 * tidx];
+        float imp = acc_phasors[phasor_index + 2 * tidx + 1];
 
-        // rea*reb - ima*imb
-        in[dec_rx_inds[tidx]][0] = echo[tidx][0] * rep - echo[tidx][1] * imp;
-        // rea*imb + ima*reb
-        in[dec_rx_inds[tidx]][1] = echo[tidx][0] * imp + echo[tidx][1] * rep;
+        int out_index = dec_rx_inds[tidx] + drg;
+
+        in[out_index][0] = echo[tidx][0] * rep - echo[tidx][1] * imp;
+
+        in[out_index][1] = echo[tidx][0] * imp + echo[tidx][1] * rep;
     }
 }
 
@@ -86,22 +97,21 @@ void compute_phase_difference(
     int dec_tau_samp,
     fftwf_complex* echo,
     int echo_len,
-    int* dec_rx_inds
+    int* dec_rx_inds,
+    int drg
 ) {
     for (int tidx = 0; tidx < echo_len; tidx++) {
-        in[dec_rx_inds[tidx]][0] = echo[tidx][0];
-        in[dec_rx_inds[tidx]][1] = echo[tidx][1];
+        int out_index = dec_rx_inds[tidx] + drg;
+
+        in[out_index][0] = echo[tidx][0];
+        in[out_index][1] = echo[tidx][1];
     }
-    int ti_inv;
+
     for (int ti = 0; ti < dec_tau_samp; ti++) {
-        ti_inv = dec_tau_samp + ti;
-        // dec_signal[dec_tau_samp:] * np.conj(dec_signal[:-dec_tau_samp])
-        // formula for complex mult
-        // rea*reb - ima*imb
+        int ti_inv = dec_tau_samp + ti;
+
         in_tau[ti][0] = in[ti_inv][0] * in[ti][0] + in[ti_inv][1] * in[ti][1];
-        // rea*imb + ima*reb
         in_tau[ti][1] = -in[ti_inv][0] * in[ti][1] + in[ti_inv][1] * in[ti][0];
-        // But we take imb = -imb for the complex conj
     }
 }
 

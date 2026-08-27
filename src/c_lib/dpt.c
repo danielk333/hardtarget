@@ -63,6 +63,7 @@ int fdpt(
 
     // for each range gate
     for (int ri = 0; ri < n_rg; ri++) {
+        int drg = rgs[ri] / frequency_decimation;
         for (int sri = 0; sri < sub_res_len; sri++) {
             int ind = sri + ri * sub_res_len;
             for (int fi = 0; fi < dec_signal_len; fi++) {
@@ -76,7 +77,7 @@ int fdpt(
             );
             dc[ind] = compute_echo_power(echo, echo_len);
 
-            compute_phase_difference(in, dec_signal_len, in_tau, dec_tau_samp, echo, echo_len, dec_rx_inds);
+            compute_phase_difference(in, dec_signal_len, in_tau, dec_tau_samp, echo, echo_len, dec_rx_inds, drg);
             fftwf_execute(p_tau);
 
             in_tau_peak = find_fftwf_peak(out_tau, dec_tau_samp);
@@ -86,7 +87,7 @@ int fdpt(
             // Calculate phasor location in array
             phasor_i = 2 * in_tau_peak * echo_len;
 
-            multiply_acc_phasors(in, echo, echo_len, acc_phasors, phasor_i, dec_rx_inds);
+            multiply_acc_phasors(in, echo, echo_len, acc_phasors, phasor_i, dec_rx_inds, drg);
 
             // fft in and store result in out
             fftwf_execute(p);

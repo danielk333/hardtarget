@@ -56,6 +56,7 @@ int fgmf(
 
     // for each range gate
     for (int ri = 0; ri < n_rg; ri++) {
+        int drg = rgs[ri] / frequency_decimation;
         // For each sub resolution
         for (int sri = 0; sri < sub_res_len; sri++) {
             int ind = sri + ri * sub_res_len;
@@ -67,13 +68,13 @@ int fgmf(
                 echo, echo_len, tx, tx_len, rx, rx_len, sri, sub_res_len, frequency_decimation, rgs[ri], rx_window
             );
 
-            // Separated into doubles(float64) to avoid float32 accumulation error.
+            // Accumulate in float64 to not accumulate any errors.
             double echo_sum_real = 0.0;
             double echo_sum_imag = 0.0;
 
             for (int i = 0; i < echo_len; i++) {
-                echo_sum_real += (double)creal(echo[i]);
-                echo_sum_imag += (double)cimag(echo[i]);
+                echo_sum_real += (double)crealf(echo[i]);
+                echo_sum_imag += (double)cimagf(echo[i]);
             }
 
             dc[ind] = echo_sum_real * echo_sum_real + echo_sum_imag * echo_sum_imag;
@@ -87,7 +88,9 @@ int fgmf(
             for (int ai = 0; ai < n_accs; ai++) {
                 int phasor_i = 2 * ai * echo_len;
 
-                multiply_acc_phasors(dec_signal, echo, echo_len, acc_phasors, phasor_i, dec_rx_inds);
+                int drg = rgs[ri] / frequency_decimation;
+
+                multiply_acc_phasors(dec_signal, echo, echo_len, acc_phasors, phasor_i, dec_rx_inds, drg);
 
                 // execute fft in and store result in out
                 fftwf_execute(p);
