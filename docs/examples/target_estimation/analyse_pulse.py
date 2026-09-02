@@ -19,12 +19,12 @@ from spacecoords import interpolation
 from tqdm import tqdm
 
 from hardtarget import plotting
+from hardtarget.constants import FIRFilter
 from hardtarget.data_simulation.tx_model import match_pulse_code, tx_modulation_model, tx_signal_model
 from hardtarget.plotting.raw_data_plots import extract_requested_range_gates
 from hardtarget.process.utils import sample_interval_to_closest_ipp
 from hardtarget.target_estimation.gmf.gmf_numpy import dtft_solve
 from hardtarget.target_estimation.gmf.types import GMFCfgParams
-from hardtarget.types import Bounds
 from hardtarget.utils.time_conversion import time_interval_to_sample_bound, ts_from_str
 
 parser = argparse.ArgumentParser()
@@ -191,7 +191,7 @@ cfg = GMFCfgParams(
     min_acceleration=0,
     max_acceleration=0,
     range_gate_step=1,
-    range_gate_sub_resolution=10,
+    range_gate_sub_resolution=15,
     frequency_decimation=1,
     num_cohints_per_file=2,
     node_gpus=1,
@@ -321,7 +321,7 @@ r_rel, v_rel = generate_measurements(
     satellite_enu,
 )
 
-ipp_index = 13
+ipp_index = 14
 # ipp_index = 1
 
 print(r_rel[ipp_index], v_rel[ipp_index])
@@ -329,6 +329,17 @@ r_true, v_true = r_rel[ipp_index], v_rel[ipp_index]
 
 signal = data_ipp_vec_full[:, ipp_index]
 exp_params = reader.exp_def.copy(radar_frequency=927.200)
+
+# cal_s = signal[t_cal_on_samp:t_cal_off_samp]
+#
+# fig, axes = plt.subplots(1,3)
+# axes[0].plot(np.real(cal_s))
+# axes[1].plot(np.real(signal))
+# axes[1].axvline(t_cal_on_samp, c="g")
+# axes[1].axvline(t_cal_off_samp, c="g")
+# axes[2].plot(np.real(cal_s), np.imag(cal_s), ".")
+#
+# plt.show()
 
 
 def usec_to_samp(usec: int | float) -> int:
@@ -358,13 +369,14 @@ print(il0_rg0, il0_rg1, il0_min_range_gate, il0_max_range_gate)
 
 doppler = v_true * (exp_params.radar_frequency * 1e6) / constants.c
 ture_dop_phasor = np.exp(-2j * np.pi * doppler * rx_inds / exp_params.sample_rate)
-sub_resolution = 10
 sub_resolution_doppler = 50
 
 base_range_gates = np.arange(cfg.min_range_gate, cfg.max_range_gate - len(tx), 1) + 1
 base_r_tests = base_range_gates * constants.c / exp_params.sample_rate
 
-range_gates = np.arange(cfg.min_range_gate, cfg.max_range_gate - len(tx), 1.0 / sub_resolution) + 1
+range_gates = (
+    np.arange(cfg.min_range_gate, cfg.max_range_gate - len(tx), 1.0 / cfg.range_gate_sub_resolution) + 1
+)
 r_tests = range_gates * constants.c / exp_params.sample_rate
 
 sample = np.arange(tx.size)
@@ -389,15 +401,34 @@ print("guessed code id: ", start_ipp_num % reader.exp_def.code.shape[0])
 print("estimated code id: ", start_code_num)
 
 # TODO: this now works with both! implement that we can choose which to do, modulated or simulated
-modulated_tx_sim = tx_signal_model(
+
+sub_resolution = np.linspace(0, 1, num=cfg.range_gate_sub_resolution)
+tx_match = tx_signal_model(
     code=exp_params.code[start_code_num, :],
     baud_length_usec=exp_params.baud_length_usec,
     t_samp_usec=exp_params.t_samp_usec,
     ipp_samps=exp_params.ipp_samps,
     read_length=len(tx),
     sub_resolution=sub_resolution,
-    bandwidth=1e6,
+    bandwidth=None,
+    fir_filter=FIRFilter.b414d15_gaus,
+    # normalize=True,
 )
+rg0 = r_true / constants.c * exp_params.sample_rate
+ri0 = np.argmin(np.abs(base_range_gates - rg0))
+n_sig = rx[ri0 : (ri0 + len(tx))]
+mu = np.mean(n_sig)
+sig = np.std(n_sig)
+noisy_signal = (n_sig - mu) / sig
+match = np.abs(np.sum(noisy_signal[:, None] * np.conj(tx_match), axis=0))
+best_match = np.argmax(match)
+
+fig, axes = plt.subplots(3, 1)
+axes[0].plot(np.real(n_sig))
+axes[1].plot(sub_resolution, match)
+axes[2].plot(np.real(n_sig) / np.max(np.real(n_sig)), "-b")
+axes[2].plot(np.real(tx_match[:, best_match]) / np.max(np.real(tx_match[:, best_match])), "-r")
+# plt.show()
 
 # TODO: we can probably use the tx signal to measure phase drift and apply that to the analytic
 # model? something like this
@@ -413,9 +444,10 @@ tx_phase_smooth = moving_average(
     tx_phase_direct,
     5 * int(exp_params.baud_length_usec * 1e-6 * exp_params.sample_rate),
 )
-tx_phase_mod = np.exp(-1j * tx_phase_smooth)
-modulated_tx = modulated_tx_sim * tx_phase_mod[:, None]
-# modulated_tx = modulated_tx_sim
+tx_phase_mod = np.exp(1j * tx_phase_smooth)
+
+# modulated_tx = tx_match * tx_phase_mod[:, None]
+modulated_tx = tx_match
 
 fig, ax = plt.subplots()
 ax.plot(tx_phase_direct)
@@ -424,7 +456,7 @@ ax.plot(tx_phase_smooth, ls="--")
 modulated_tx_meas = tx_modulation_model(
     tx_signal=tx,
     tx_stencil=np.full(tx.shape, True, dtype=np.bool),
-    sub_resolution=sub_resolution,
+    sub_resolution=cfg.range_gate_sub_resolution,
 )
 # modulated_tx = modulated_tx_meas
 
@@ -439,8 +471,9 @@ dopps = np.zeros_like(r_tests)
 pbar = tqdm(total=corrs.size)
 for ri, r in enumerate(base_r_tests):
     z = rx[ri : (ri + len(tx))]
-    for rii in range(sub_resolution):
-        ind = ri * sub_resolution + rii
+    # z = (z - np.mean(z)) / np.std(z)
+    for rii in range(cfg.range_gate_sub_resolution):
+        ind = ri * cfg.range_gate_sub_resolution + rii
         decoded = z * np.conj(modulated_tx[:, rii])
 
         spec = fftshift(fft(decoded, n=fft_len))
@@ -484,15 +517,15 @@ for ri, r in enumerate(base_r_tests):
 pbar.close()
 
 ri_max = np.argmax(corrs)
-ri = int(ri_max // sub_resolution)
+ri = int(ri_max // cfg.range_gate_sub_resolution)
 
 rg_true = r_true / constants.c * exp_params.sample_rate
 
-rii = int(ri_max - ri * sub_resolution)
+rii = int(ri_max - ri * cfg.range_gate_sub_resolution)
 z = rx[ri : (ri + len(tx))]
+# z = (z - np.mean(z)) / np.std(z)
 z_dop = z * np.conj(modulated_tx[:, rii])
 
-z = rx[ri : (ri + len(tx))]
 dop_phasor = np.exp(-2j * np.pi * dopps[ri_max] * np.arange(len(tx)) / exp_params.sample_rate)
 tx_sel = modulated_tx[:, rii]
 
@@ -521,7 +554,7 @@ axes[2].plot(fvec, np.abs(spec))
 # axes[2].set_xlim()
 
 fig, axes = plt.subplots(2, 1)
-for ind in range(sub_resolution):
+for ind in range(cfg.range_gate_sub_resolution):
     axes[0].plot(np.real(modulated_tx[:, ind]), label=f"{ind}")
     axes[0].plot(np.imag(modulated_tx[:, ind]))
     axes[1].plot(np.real(modulated_tx_meas[:, ind]))
@@ -542,6 +575,72 @@ axes[2].plot(np.imag(z_dop / np.max(np.abs(z_dop))), c="r")
 axes[3].plot(np.real(decode / np.max(np.abs(decode))), c="b")
 axes[3].plot(np.imag(decode / np.max(np.abs(decode))), c="r")
 
+
+rg_true = r_true / constants.c * exp_params.sample_rate
+dop_true = v_true * exp_params.radar_frequency * 1e6 / constants.c
+
+ri_est = int(ri_max // cfg.range_gate_sub_resolution)
+rii_est = int(ri_max - ri * cfg.range_gate_sub_resolution)
+
+ri = int(rg_true) - cfg.min_range_gate - 1
+rii = int((rg_true - cfg.min_range_gate - 1 - ri) * cfg.range_gate_sub_resolution)
+ri_max_true = rii + ri * cfg.range_gate_sub_resolution
+
+print(f"{ri=}, {ri_est=}")
+print(f"{rii=}, {rii_est=}")
+
+true_offset = rii / cfg.range_gate_sub_resolution
+tx_sel = tx_signal_model(
+    code=exp_params.code[start_code_num, :],
+    baud_length_usec=exp_params.baud_length_usec,
+    t_samp_usec=exp_params.t_samp_usec,
+    ipp_samps=exp_params.ipp_samps,
+    read_length=len(tx),
+    sub_resolution=np.array([true_offset]),
+    bandwidth=None,
+    fir_filter=FIRFilter.b414d15_gaus,
+    # normalize=True,
+)
+tx_sel = tx_sel[:, 0]
+z = rx[ri : (ri + len(tx))]
+# z = (z - np.mean(z)) / np.std(z)
+z_dop = z * np.conj(tx_sel)
+
+dop_phasor = np.exp(-2j * np.pi * dop_true * np.arange(len(tx)) / exp_params.sample_rate)
+
+z_comp = z * dop_phasor
+decode = z * dop_phasor * np.conj(tx_sel)
+z_dop = z * np.conj(tx_sel)
+
+spec = fftshift(fft(z_dop, n=fft_len))
+mi = np.argmax(np.abs(spec))
+pwr, f_est, phi_est = dtft_solve(
+    decoded_signal=z_dop,
+    sample_rate=exp_params.sample_rate,
+    freq_bracket=(
+        fvec[mi] - d_freq,
+        fvec[mi] + d_freq,
+    ),
+)
+v_est = f_est / (exp_params.radar_frequency * 1e6) * constants.c
+r_est = r_tests[ri_max_true]
+print(f"{r_est - r_true=} m")
+print(f"{v_est - v_true=} m/s")
+
+fig, axes = plt.subplots(4, 1, sharex=True)
+fig.suptitle("True match?")
+axes[0].plot(np.real(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="b")
+axes[0].plot(np.imag(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="r")
+axes[0].plot(np.real(z / np.max(np.abs(z))), c="b")
+axes[0].plot(np.imag(z / np.max(np.abs(z))), c="r")
+axes[1].plot(np.real(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="b")
+axes[1].plot(np.imag(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="r")
+axes[1].plot(np.real(z_comp / np.max(np.abs(z_comp))), c="b")
+axes[1].plot(np.imag(z_comp / np.max(np.abs(z_comp))), c="r")
+axes[2].plot(np.real(z_dop / np.max(np.abs(z_dop))), c="b")
+axes[2].plot(np.imag(z_dop / np.max(np.abs(z_dop))), c="r")
+axes[3].plot(np.real(decode / np.max(np.abs(decode))), c="b")
+axes[3].plot(np.imag(decode / np.max(np.abs(decode))), c="r")
 
 fig, ax = plt.subplots()
 ax, handles = plotting.rti(
