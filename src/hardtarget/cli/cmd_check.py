@@ -119,7 +119,7 @@ def range_gates_main(args: argparse.Namespace) -> None:
         rg0_unit = SI_to_unit(rg0_sec * constants.c, args.unit.lower())
 
         rg0 = il0_rg0 - (T_tx_start_samp + 1)
-        print(f" - Requested start range ({rg0_unit} {args.unit}): IL0 sample {il0_rg0} (range-gate {rg0})")
+        print(f" - Requested start two-way range ({rg0_unit} {args.unit}): IL0 sample {il0_rg0} (range-gate {rg0})")
         assert il0_rg0 <= T_rx_end_samp, "start range gate cannot be after than RX end"
         assert il0_rg0 > T_rx_start_samp, "start range gate cannot be before than RX start"
 
@@ -131,7 +131,7 @@ def range_gates_main(args: argparse.Namespace) -> None:
         rg1_unit = SI_to_unit(rg1_sec * constants.c, args.unit.lower())
 
         rg1 = il0_rg1 - (T_tx_start_samp + 1)
-        print(f" - Requested end range ({rg1_unit} {args.unit}): IL0 sample {il0_rg1} (range-gate {rg1})")
+        print(f" - Requested end two-way range ({rg1_unit} {args.unit}): IL0 sample {il0_rg1} (range-gate {rg1})")
         assert il0_rg1 <= T_rx_end_samp, "end range gate cannot be after than RX end"
         assert il0_rg1 > T_rx_start_samp, "end range gate cannot be before than RX start"
 
@@ -151,12 +151,41 @@ def cuda_main(args: argparse.Namespace) -> None:
     except ImportError as e:
         print(e)
 
+def accelerations_parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Adds mandatory and optional positional arguments to the parser."""
+
+    parser.add_argument("minimum_acceleration",type=float, help="Desired acceleration minimum limit [m/s^2]")
+    parser.add_argument("maximum_acceleration",type=float, help="Desired acceleration maximum limit [m/s^2]")
+    parser.add_argument("integration_time",type=float, help="The largest integration time to consider [s]")
+    parser.add_argument("frequency", type=float, help="The radar frequency [MHz]")
+    parser.add_argument("--minimum_cycle_resolution", type=float, default=0.2)
+    return parser
+
+def accelerations_main(args: argparse.Namespace) -> None:
+    lam = constants.c / (args.frequency * 1e6)
+    alpha_rate = args.integration_time**2 / 2
+    accel_step = args.minimum_cycle_resolution / alpha_rate * lam
+    step_num = (args.maximum_acceleration - args.minimum_acceleration) / accel_step
+    print("Signal phase acceleration:")
+    print(f" - Input frequency: {args.frequency} MHz")
+    print(f" - Integration time: {args.integration_time} s")
+    print(f" - Maximum acceleration: {args.maximum_acceleration} m/s^2")
+    print(f" - Cycle drift at end of integration: {alpha_rate} cycle/(cycle/s^2)")
+    print(f" - Accelecation step resulting in cycle dift {args.minimum_cycle_resolution:.2f}: {accel_step} m/s^2")
+    print(f" - Accelecation steps to cover range: {step_num}")
+
+
 
 SOURCES: dict[str, SubParser] = {
     "cuda": SubParser(
         main=cuda_main,
         parser_build=cuda_parser_build,
         parser_args=ParserArgs(description="Check cuda devices and functionality", usage=""),
+    ),
+    "accelerations": SubParser(
+        main=accelerations_main,
+        parser_build=accelerations_parser_build,
+        parser_args=ParserArgs(description="Check acceleration steps based on limits", usage=""),
     ),
     "range-gates": SubParser(
         main=range_gates_main,

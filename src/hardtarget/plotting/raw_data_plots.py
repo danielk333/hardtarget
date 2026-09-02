@@ -131,11 +131,14 @@ def rti(
     rt_vec = rg_vec / data_loader.exp_def.sample_rate
 
     if monostatic:
+        mono_str = ""
         rt_vec *= 0.5
         if start_range_gate is not None:
             start_range_gate *= 2
         if end_range_gate is not None:
             end_range_gate *= 2
+    else:
+        mono_str = "Two-way "
 
     mat_shape = (data_vec.size // data_loader.exp_def.ipp_samps, data_loader.exp_def.ipp_samps)
     data_ipp_vec = data_vec.reshape(mat_shape)
@@ -185,7 +188,7 @@ def rti(
             1e-3 * rt_vec * constants.c,
         )
         ax.set_xlabel("Time [s]")
-        ax.set_ylabel("Range [km]")
+        ax.set_ylabel(f"{mono_str}Range [km]")
 
     pmesh = ax.pcolormesh(X, Y, powsum.T, **pcolormesh_kw)
 
