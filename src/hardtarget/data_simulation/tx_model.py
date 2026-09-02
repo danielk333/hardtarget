@@ -25,16 +25,17 @@ def apply_b414d15_gaus(x: npt.NDArray[np.complexfloating]) -> npt.NDArray[np.com
       decimate by 5
       2 cascaded 2-tap boxcar FIRs
       decimate by 3
-    """
 
-    y = np.asarray(x)
+      TODO: this seems to have a lag of exactly 1 output sample - maybe that is compensated for?
+    """
+    y = x.copy()
 
     # HDF section: 5 boxcar FIRs, each 5 taps
     h5 = boxcar(5)
     for _ in range(5):
         y = sc_signal.lfilter(h5, [1.0], y)  # type: ignore[attr-defined]
 
-    # Decimate x MHz -> x/5 MHz
+    # # Decimate x MHz -> x/5 MHz
     y = y[::5]
 
     # FIR section: 2 boxcar FIRs, each 2 taps
@@ -44,7 +45,6 @@ def apply_b414d15_gaus(x: npt.NDArray[np.complexfloating]) -> npt.NDArray[np.com
 
     # Decimate x/5 MHz -> x/15 MHz
     y = y[::3]
-
     return y
 
 
@@ -128,8 +128,7 @@ def match_pulse_code(
 def tx_modulation_model(
     tx_signal: npt.NDArray[np.complex128],
     tx_stencil: npt.NDArray[np.bool],
-    fir_filter: FIRFilter = FIRFilter.b414d15_gaus,
-    sub_resolution: int = 1,
+    sub_resolution: int | npt.NDArray[np.float64] = 1,
     kind: str = "linear",
 ) -> npt.NDArray[np.complex128]:
     """
@@ -137,7 +136,11 @@ def tx_modulation_model(
 
     """
 
-    modulated_tx = np.zeros((tx_signal.size, sub_resolution), dtype=tx_signal.dtype)
+    if isinstance(sub_resolution, int):
+        offsets = np.linspace(0, 1, sub_resolution)
+    else:
+        offsets = sub_resolution
+    modulated_tx = np.zeros((tx_signal.size, len(offsets)), dtype=tx_signal.dtype)
 
     # Create interpolator for signal
     sample = np.arange(tx_signal.size)
@@ -149,25 +152,10 @@ def tx_modulation_model(
         fill_value=0,
     )
 
-    if fir_filter == FIRFilter.b414d15_gaus:
-        filt = apply_b414d15_gaus
-        # TODO: i just magically know this filter chain is decimated by 15 - maybe this could be
-        # better structured
-        decimation = 15
-    elif fir_filter == FIRFilter.mu2004:
-        filt = mu_radar_filter_post_2004
-        decimation = 120
-    else:
-        # TODO: finish this
-        raise ValueError("todo error here")
-
-    super_sample = np.arange(tx_signal.size * decimation) / decimation
-
     # Signal value of tx sub resolutions
-    offsets = np.linspace(0, 1, sub_resolution, endpoint=False)
-    for ind in range(sub_resolution):
-        x = fun(super_sample - offsets[ind])
-        modulated_tx[tx_stencil, ind] = filt(x)[tx_stencil]
+    for ind in range(len(offsets)):
+        x = fun(np.arange(tx_signal.size) - offsets[ind])
+        modulated_tx[tx_stencil, ind] = x[tx_stencil]
 
     return modulated_tx
 
@@ -175,10 +163,10 @@ def tx_modulation_model(
 def simulate_pulse_code(
     code: npt.NDArray[np.float64],
     baud_length_usec: int,
-    t_samp_usec: int | float,
+    t_samp_usec: float,
     ipp_t_usec: int,
     signal_length: int,
-    start_samp: int | float = 0,
+    start_samp: float = 0,
 ) -> npt.NDArray[np.complex128]:
     t_usec = (np.arange(signal_length) - start_samp) * t_samp_usec
 
@@ -191,16 +179,46 @@ def simulate_pulse_code(
     return signal
 
 
+def phase_flip_model(
+    fir_filter: FIRFilter = FIRFilter.b414d15_gaus,
+    sample_offset: float = 0.5,
+) -> npt.NDArray[np.complex128]:
+    if fir_filter == FIRFilter.b414d15_gaus:
+        filt = apply_b414d15_gaus
+        decimation = 15
+    elif fir_filter == FIRFilter.mu2004:
+        filt = mu_radar_filter_post_2004
+        decimation = 120
+    elif fir_filter == FIRFilter.none:
+        filt = lambda x: x
+        decimation = 1
+    else:
+        raise ValueError("TODO: error here")
+    offsets = np.linspace(-sample_offset, sample_offset, int(decimation * 2 * sample_offset))
+
+    res = np.full((len(offsets), 3), np.nan, dtype=np.complex128)
+    for ind, offset in enumerate(offsets):
+        signal = np.full((10 * decimation,), -1, dtype=np.complex128)
+        signal[:np.floor((5 + offset) * decimation).astype(np.int64)] = 1
+        fsignal = filt(signal)
+
+        res[ind, 0] = fsignal[6]
+        res[ind, 1] = fsignal[7]
+        res[ind, 2] = fsignal[5]
+    return res, offsets
+
+
 def tx_signal_model(
     code: tuple[float] | npt.NDArray[np.float64],
-    baud_length_usec: int,
-    t_samp_usec: int,
+    baud_length_usec: float,
+    t_samp_usec: float,
     ipp_samps: int,
     read_length: int,
-    bandwidth: float,
+    bandwidth: float | None,
     start_samp: int = 0,
-    sub_resolution: int = 1,
+    sub_resolution: int | npt.NDArray[np.float64] = 1,
     fir_filter: FIRFilter = FIRFilter.b414d15_gaus,
+    normalize: bool = False,
 ) -> npt.NDArray[np.complex128]:
     """
     Tx signal simulation, based on a filtered version of a analytic coded finite bandwidth signal.
@@ -215,6 +233,7 @@ def tx_signal_model(
         start_samp: start sample relative to the inter pulse period, the generated data will start at this point.
         sub_resolution: Datapoints per sample to use when upsampling the tx signal
         fir_filter: Downsampling filter used on transmitter
+        normalize: Normalize the output signal (z-score transform)
 
     Returns:
         Tx signal of size (read_length, sub resolution) containing the interpolated signal based on the code
@@ -231,13 +250,19 @@ def tx_signal_model(
     elif fir_filter == FIRFilter.mu2004:
         filt = mu_radar_filter_post_2004
         decimation = 120
+    elif fir_filter == FIRFilter.none:
+        filt = lambda x: x
+        decimation = 1
     else:
         raise ValueError("TODO: error here")
 
-    signals = np.zeros((read_length, sub_resolution), dtype=np.complex128)
-    offsets = np.linspace(0, 1, sub_resolution)
+    if isinstance(sub_resolution, int):
+        offsets = np.linspace(0, 1, sub_resolution)
+    else:
+        offsets = sub_resolution
+    signals = np.zeros((read_length, len(offsets)), dtype=np.complex128)
 
-    for ind in range(sub_resolution):
+    for ind in range(len(offsets)):
         signal = simulate_pulse_code(
             code=code,
             baud_length_usec=baud_length_usec,
@@ -246,19 +271,22 @@ def tx_signal_model(
             signal_length=read_length * decimation,
             start_samp=(start_samp + offsets[ind]) * decimation,
         )
-
         # filter to the initial bandwidth of the transmitter
-        spectrum = fft(signal)
-        freqs = fftfreq(read_length * decimation, d=decimation * 1e6 / t_samp_usec)
-        mask = np.abs(freqs) <= bandwidth / 2
-        filtered_spectrum = spectrum * mask
-        fsignal = ifft(filtered_spectrum).real
+        if bandwidth is not None:
+            spectrum = fft(signal)
+            freqs = fftfreq(read_length * decimation, d=decimation * 1e6 / t_samp_usec)
+            mask = np.abs(freqs) <= bandwidth / 2
+            filtered_spectrum = spectrum * mask
+            fsignal = ifft(filtered_spectrum)
+            inds = np.abs(signal) > 0
+            signal[inds] = fsignal[inds]
 
         # filter according to the receiver chain
-        signals[:, ind] = filt(fsignal)
+        signals[:, ind] = filt(signal)
 
-    # Signal value of tx_indices, TODO: This uncommented as it is already done within the process.
-    # norms = np.sum(np.conj(signals) * signals, axis=0)
-    # signals = signals / norms[None, :]
+    if normalize:
+        mu = np.mean(signals, axis=0)
+        sig = np.std(signals, axis=0)
+        signals = (signals - mu[None, :]) / sig[None, :]
 
     return signals
