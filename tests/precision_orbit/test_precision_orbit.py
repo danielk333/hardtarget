@@ -54,7 +54,7 @@ gmf_cfg = GMFCfgParams(
     min_acceleration=0,
     max_acceleration=0,
     range_gate_step=1,
-    range_gate_sub_resolution=10,
+    range_gate_sub_resolution=15,
     frequency_decimation=1,
     num_cohints_per_file=2,
     node_gpus=1,
@@ -208,15 +208,15 @@ def test_verify_analysis_orbit_data(
 
     # Calculate delta range (real vs estimated)
     dr = np.abs(r_rel[inds] - out.r_vec[inds])
-    dr_limit = 500
+    dr_limit = 100
 
     # Calculate delta velocity (real vs estimated)
     dv = np.abs(v_rel[inds] - out.v_vec[inds])
-    dv_limit = 12
+    dv_limit = 5
 
     if plot:
         # --- Plot estimation vs real range/velocity ---
-        fix, ax = plt.subplots(2, 2)
+        fig, ax = plt.subplots(2, 2)
 
         # Real vs estimated range
         ax[0, 0].plot(t_analysed, (r_rel * 0.5) / 1000, marker=".", color="g", label="Real range")

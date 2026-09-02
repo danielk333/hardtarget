@@ -1,16 +1,20 @@
-# # Analyse individual radar pulse
-# ---
-# How to extract and analyse an individual radar pulse
+"""Analyse the range and range rate of one radar pulse.
+
+The measured echo is matched against sub-sample transmit-pulse templates. A
+precision orbit file is used to get the expected range and range rate for comparison.
+"""
+
+from __future__ import annotations
 
 import argparse
 import datetime as dt
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 import radardef
-import requests
-import scipy.signal
 from matplotlib import pyplot as plt
 from radardef.types import BeamType, EiscatUHFLocation
 from scipy import constants
@@ -23,654 +27,590 @@ from hardtarget.constants import FIRFilter
 from hardtarget.data_simulation.tx_model import match_pulse_code, tx_modulation_model, tx_signal_model
 from hardtarget.plotting.raw_data_plots import extract_requested_range_gates
 from hardtarget.process.utils import sample_interval_to_closest_ipp
-from hardtarget.target_estimation.gmf.gmf_numpy import dtft_solve
-from hardtarget.target_estimation.gmf.types import GMFCfgParams
+from hardtarget.target_estimation.dtft_solvers import dtft_solve
 from hardtarget.utils.time_conversion import time_interval_to_sample_bound, ts_from_str
 
-parser = argparse.ArgumentParser()
-parser.add_argument("data_file", type=Path)
-parser.add_argument("orb_file", type=Path)
-parser.add_argument("--offset", type=int, default=0)
-args = parser.parse_args()
+DEFAULT_START_TIME = "2024-07-04T10:21:17.500"
+DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 
 
-def generate_measurements(ecefs, rx_enu, tx_enu):
+@dataclass(frozen=True)
+class OrbitReference:
+    """Expected two-way range and range rate at one IPP."""
 
-    tx_range = np.linalg.norm(tx_enu, axis=0)
-    rx_range = np.linalg.norm(rx_enu, axis=0)
-    r_sim = tx_range + rx_range
-    v_tx = -np.sum(tx_enu[:3, :] * tx_enu[3:, :], axis=0) / tx_range
-    v_rx = -np.sum(rx_enu[:3, :] * rx_enu[3:, :], axis=0) / rx_range
-    v_sim = v_tx + v_rx
-
-    return r_sim, v_sim
+    range: float
+    range_rate: float
 
 
-def search_for_sentinel_data(
-    dt_start: dt.datetime,
-    dt_end: dt.datetime,
-    collection: str = "SENTINEL-2",
-    object: str = "S2B",
-    product_catalogue: str = "AUX_POEORB",
-):
-    query = f"https://catalogue.dataspace.copernicus.eu/odata/v1/Products?$filter=((Collection/Name eq '{collection}') and (ContentDate/Start gt {dt_start.strftime(dt_format)}Z) and (ContentDate/Start lt {dt_end.strftime(dt_format)}Z) and ((Attributes/OData.CSC.StringAttribute/any(i0:i0/Name eq 'productType' and i0/Value eq '{product_catalogue}'))))&$orderby=ContentDate/Start&$top=10"
-    json_res = requests.get(query).json()
+@dataclass(frozen=True)
+class PulseEstimate:
+    """Best matched-filter result for one pulse."""
 
-    value = json_res["value"]
-
-    if not value:
-        raise Exception(f"No data for {collection} found between: {dt_start} and {dt_end}")
-    else:
-        print(f"Found {len(value)} items")
-
-    return value
+    range: float
+    range_rate: float
+    frequency_hz: float
+    power: npt.NDArray[np.float64]
+    frequencies_hz: npt.NDArray[np.float64]
+    range_gates: npt.NDArray[np.float64]
+    template: npt.NDArray[np.complex128]
+    echo: npt.NDArray[np.complex128]
+    template_index: int
+    range_index: int
 
 
-def get_orbit_data_id(dt_start: dt.datetime, dt_end: dt.datetime):
-    data = search_for_sentinel_data(dt_start - dt.timedelta(days=1), dt_end, "SENTINEL-2", "AUX_POEORB")
-    return data[1]["Id"]
+@dataclass(frozen=True)
+class PulseData:
+    """Signals and indices retained for diagnostic plots."""
+
+    signal: npt.NDArray[np.complex128]
+    rx: npt.NDArray[np.complex128]
+    tx: npt.NDArray[np.complex128]
+    templates: npt.NDArray[np.complex128]
+    measured_templates: npt.NDArray[np.complex128]
+    range_start: int
+    tx_start: int
+    tx_end: int
 
 
-def extract_eof_data_block(data_path: Path, dt_start: dt.datetime, dt_end: dt.datetime):
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("data_file", type=Path, help="Radar data file")
+    parser.add_argument("orbit_file", type=Path, help="Sentinel precision orbit EOF file")
+    parser.add_argument("--start-time", default=DEFAULT_START_TIME, help="UTC ISO timestamp")
+    parser.add_argument("--duration", type=float, default=2.5, help="Analysis interval in seconds")
+    parser.add_argument("--ipp-index", type=int, default=14, help="IPP relative to the analysis interval")
+    parser.add_argument("--offset", type=int, default=0, help="Raw-data sample alignment offset")
+    parser.add_argument("--min-range-gate", type=int, default=5500)
+    parser.add_argument("--max-range-gate", type=int, default=7700)
+    parser.add_argument("--sub-resolution", type=int, default=15, help="Templates per range sample")
+    parser.add_argument("--radar-frequency-mhz", type=float, default=927.2)
+    parser.add_argument(
+        "--template",
+        choices=("model", "measured"),
+        default="model",
+        help="Use an analytic or interpolated measured transmit pulse",
+    )
+    # TODO: for some reason my "predicted" code does not match??? look at the tlan files or
+    # something to figure out how to predict the code
+    parser.add_argument(
+        "--code-source",
+        choices=("detected", "sequence"),
+        default="detected",
+        help="Detect the pulse code or take it from the experiment sequence",
+    )
+    parser.add_argument("--rti", action="store_true", help="Include a range-time-intensity plot")
+    parser.add_argument(
+        "--diagnostics",
+        choices=("summary", "full"),
+        default="full",
+        help="Plot the summary only or all signal/template diagnostics",
+    )
+    parser.add_argument("--output-dir", type=Path, help="Save figures to this directory")
+    parser.add_argument("--no-show", action="store_true", help="Do not open interactive figures")
+    return parser.parse_args()
+
+
+def parse_datetime(value: str) -> dt.datetime:
+    return dt.datetime.strptime(value, DATETIME_FORMAT).replace(tzinfo=dt.timezone.utc)
+
+
+def load_orbit(path: Path, start: dt.datetime, end: dt.datetime) -> interpolation.Legendre8:
+    """Load orbit states surrounding the requested observation."""
+    epochs: list[float] = []
+    states: list[list[float]] = []
+    for osv in ET.parse(path).getroot().findall(".//OSV"):
+        utc = osv.findtext("UTC")
+        if utc is None:
+            continue
+        epoch = parse_datetime(utc.removeprefix("UTC="))
+        if start <= epoch <= end:
+            epochs.append(epoch.timestamp())
+            states.append([float(osv.findtext(key, "nan")) for key in ("X", "Y", "Z", "VX", "VY", "VZ")])
+
+    if len(epochs) < 9:
+        raise ValueError(f"Orbit file contains only {len(epochs)} usable states around the observation")
+    return interpolation.Legendre8(states=np.asarray(states, dtype=np.float64).T, t=np.asarray(epochs))
+
+
+def orbit_references(
+    radar: radardef.EiscatUHF,
+    orbit: interpolation.Legendre8,
+    epochs: npt.NDArray[np.float64],
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    """TODO: this does a really janky "light-time" correction to account for the actuall
+    scattering time - it might play a role but still not sure. Investigate more.
     """
 
-    Returns:
-        list of tuples, each tuple is the timepoint with a list of x,y,z,vx.vy,vz
+    def measurements(enu: npt.NDArray[np.float64]) -> tuple[npt.NDArray, npt.NDArray]:
+        one_way_range = np.linalg.norm(enu, axis=0)
+        one_way_rate = -np.sum(enu[:3] * enu[3:], axis=0) / one_way_range
+        return 2 * one_way_range, 2 * one_way_rate
 
-    """
+    state = orbit.get_state(epochs)
+    enu = radar.enu(state)
+    ranges, _ = measurements(enu)
+    state = orbit.get_state(epochs + 0.5 * ranges / constants.c)
+    return measurements(radar.enu(state))
 
-    tree = ET.parse(str(data_path))
-    root = tree.getroot()
-    data_block = root.find("Data_Block")
 
-    def data_structure(x: ET.Element):
-        return [
-            x.find("X").text,
-            x.find("Y").text,
-            x.find("Z").text,
-            x.find("VX").text,
-            x.find("VY").text,
-            x.find("VZ").text,
-        ]
+def select_code(
+    tx: npt.NDArray[np.complex128],
+    exp_def: object,
+    sequence_index: int,
+    source: str,
+) -> int:
+    """Select the code used to construct the matching template."""
+    sequence_index %= exp_def.code.shape[0]
+    if source == "sequence":
+        return sequence_index
+    matches = match_pulse_code(
+        tx_signal=tx,
+        codes=exp_def.code,
+        baud_length_usec=exp_def.baud_length_usec,
+        t_samp_usec=exp_def.t_samp_usec,
+        ipp_t_usec=exp_def.ipp_samps * exp_def.t_samp_usec,
+    )
+    detected = int(np.argmax(matches))
+    print(f"Code index: {detected} detected, {sequence_index} expected from sequence")
+    return detected
 
-    data = [
-        (x.find("UTC").text[4:], data_structure(x))
-        for x in data_block.findall(".//OSV")
-        if time_within_block(x.find("UTC").text[4:], dt_start, dt_end)
-    ]
 
-    if not data:
-        raise Exception(
-            f"No data available between {dt_start.strftime(dt_format)} and {dt_end.strftime(dt_format)}, try a larger timespan"
+def make_templates(
+    tx: npt.NDArray[np.complex128],
+    exp_def: object,
+    code_index: int,
+    count: int,
+    source: str,
+) -> npt.NDArray[np.complex128]:
+    offsets = np.linspace(0.0, 1.0, num=count)
+    if source == "measured":
+        return tx_modulation_model(tx, np.ones(tx.size, dtype=bool), sub_resolution=offsets)
+    return tx_signal_model(
+        code=exp_def.code[code_index],
+        baud_length_usec=exp_def.baud_length_usec,
+        t_samp_usec=exp_def.t_samp_usec,
+        ipp_samps=exp_def.ipp_samps,
+        read_length=tx.size,
+        sub_resolution=offsets,
+        bandwidth=None,
+        fir_filter=FIRFilter.b414d15_gaus,
+    )
+
+
+def estimate_pulse(
+    rx: npt.NDArray[np.complex128],
+    templates: npt.NDArray[np.complex128],
+    min_range_gate: int,
+    max_range_gate: int,
+    sample_rate: float,
+    carrier_hz: float,
+) -> PulseEstimate:
+    """Search range offsets and estimate Doppler at every offset."""
+    count = templates.shape[1]
+    # TODO: is the +1 an actual offset or is the group delay of the filter???
+    base_gates = np.arange(min_range_gate, max_range_gate - templates.shape[0]) + 1
+    range_gates = np.arange(min_range_gate, max_range_gate - templates.shape[0], 1.0 / count) + 1
+    fft_length = 2 ** (int(np.log2(templates.shape[0])) + 2)
+    fft_frequencies = fftshift(fftfreq(fft_length, d=1.0 / sample_rate))
+    bin_width = fft_frequencies[1] - fft_frequencies[0]
+    power = np.empty(range_gates.size, dtype=np.float64)
+    frequencies = np.empty_like(power)
+
+    with tqdm(total=range_gates.size, desc="Matching pulse", unit="template") as progress:
+        for range_index, _ in enumerate(base_gates):
+            echo = rx[range_index : range_index + templates.shape[0]]
+            for offset_index in range(count):
+                index = range_index * count + offset_index
+                decoded = echo * np.conj(templates[:, offset_index])
+                spectrum = fftshift(fft(decoded, n=fft_length))
+                peak = int(np.argmax(np.abs(spectrum)))
+                power[index], frequencies[index], _ = dtft_solve(
+                    decoded_signal=decoded,
+                    sample_rate=sample_rate,
+                    freq_bracket=(
+                        fft_frequencies[peak] - bin_width,
+                        fft_frequencies[peak] + bin_width,
+                    ),
+                )
+                progress.update()
+
+    best = int(np.argmax(power))
+    base_index, offset_index = divmod(best, count)
+    echo = rx[base_index : base_index + templates.shape[0]]
+    return PulseEstimate(
+        range=float(range_gates[best] * constants.c / sample_rate),
+        range_rate=float(frequencies[best] * constants.c / carrier_hz),
+        frequency_hz=float(frequencies[best]),
+        power=power,
+        frequencies_hz=frequencies,
+        range_gates=range_gates,
+        template=np.asarray(templates[:, offset_index], dtype=np.complex128),
+        echo=np.asarray(echo, dtype=np.complex128),
+        template_index=offset_index,
+        range_index=base_index,
+    )
+
+
+def normalized(signal: npt.NDArray[np.complex128]) -> npt.NDArray[np.complex128]:
+    scale = np.max(np.abs(signal))
+    return signal / scale if scale else signal
+
+
+def plot_diagnostics(
+    estimate: PulseEstimate,
+    reference: OrbitReference,
+    sample_rate: float,
+    carrier_hz: float,
+    code: npt.NDArray[np.floating],
+    samples_per_baud: int,
+    template_offset: float,
+) -> list[plt.Figure]:
+    """Create summary plots for the range search and best match."""
+    ranges_km = estimate.range_gates * constants.c * 1e-3 / sample_rate
+    best = int(np.argmax(estimate.power))
+
+    fig_summary, axes = plt.subplots(3, 1, figsize=(10, 9), constrained_layout=True)
+    axes[0].plot(ranges_km, 10 * np.log10(np.maximum(estimate.power, np.finfo(float).tiny)))
+    axes[0].axvline(reference.range * 1e-3, color="tab:red", linestyle="--", label="Orbit reference")
+    axes[0].scatter(
+        ranges_km[best], 10 * np.log10(estimate.power[best]), color="tab:orange", zorder=3, label="Estimate"
+    )
+    axes[0].set(xlabel="Two-way range (km)", ylabel="Matched power (dB)", title="Sub-sample range search")
+    axes[0].legend()
+    rates = estimate.frequencies_hz * constants.c / carrier_hz
+    axes[1].plot(ranges_km, rates, linewidth=1)
+    axes[1].axhline(reference.range_rate, color="tab:red", linestyle="--", label="Orbit reference")
+    axes[1].scatter(ranges_km[best], rates[best], color="tab:orange", zorder=3, label="Estimate")
+    axes[1].set(xlabel="Two-way range (km)", ylabel="Range rate (m/s)", title="Doppler estimate")
+    axes[1].legend()
+
+    fft_length = 2 ** (int(np.log2(estimate.echo.size)) + 2)
+    spectrum = fftshift(fft(estimate.echo * np.conj(estimate.template), n=fft_length))
+    spectrum_frequencies = fftshift(fftfreq(fft_length, d=1.0 / sample_rate))
+    axes[2].plot(spectrum_frequencies * 1e-3, np.abs(spectrum), color="tab:purple")
+    axes[2].axvline(estimate.frequency_hz * 1e-3, color="tab:orange", linestyle="--")
+    axes[2].set(xlabel="Doppler frequency (kHz)", ylabel="Magnitude", title="Decoded echo spectrum")
+
+    phase = np.exp(-2j * np.pi * estimate.frequency_hz * np.arange(estimate.echo.size) / sample_rate)
+    compensated = normalized(estimate.echo * phase)
+    template = normalized(estimate.template)
+    mask = transition_mask(code, samples_per_baud, template.size, sample_offset=template_offset)
+    masked_samples = np.flatnonzero(~mask)
+
+    fig_match, axes = plt.subplots(2, 1, sharex=True, figsize=(10, 6), constrained_layout=True)
+    axes[0].plot(template.real, label="Template I", color="tab:blue")
+    axes[0].plot(compensated.real, label="Echo I", color="tab:orange", alpha=0.8)
+    axes[0].plot(
+        masked_samples,
+        template.real[~mask],
+        ".",
+        color="tab:red",
+        label="Masked transitions",
+    )
+    axes[1].plot(template.imag, label="Template Q", color="tab:blue")
+    axes[1].plot(compensated.imag, label="Echo Q", color="tab:orange", alpha=0.8)
+    axes[1].plot(
+        masked_samples,
+        template.imag[~mask],
+        ".",
+        color="tab:red",
+        label="Masked transitions",
+    )
+
+    axes[0].set_title("Best template and Doppler-compensated echo")
+    axes[1].set_xlabel("Sample")
+    for axis in axes:
+        axis.set_ylabel("Normalized amplitude")
+        axis.legend(loc="upper right")
+    return [fig_summary, fig_match]
+
+
+def plot_signal_chain(
+    template: npt.NDArray[np.complex128],
+    echo: npt.NDArray[np.complex128],
+    doppler_hz: float,
+    sample_rate: float,
+    title: str,
+) -> plt.Figure:
+    """Show the template multiplication and Doppler compensation step by step."""
+    doppler_phasor = np.exp(-2j * np.pi * doppler_hz * np.arange(echo.size) / sample_rate)
+    compensated = echo * doppler_phasor
+    decoded = echo * np.conj(template)
+    compensated_decoded = compensated * np.conj(template)
+    template_norm = normalized(template)
+
+    fig, axes = plt.subplots(4, 1, sharex=True, figsize=(11, 9), constrained_layout=True)
+    fig.suptitle(title)
+
+    axes[0].plot(template_norm.real, "--", color="tab:blue", label="Template I")
+    axes[0].plot(template_norm.imag, "--", color="tab:red", label="Template Q")
+    axes[0].plot(normalized(echo).real, color="tab:blue", alpha=0.65, label="Echo I")
+    axes[0].plot(normalized(echo).imag, color="tab:red", alpha=0.65, label="Echo Q")
+    axes[0].set_title("Template and raw echo")
+
+    axes[1].plot(template_norm.real, "--", color="tab:blue", label="Template I")
+    axes[1].plot(template_norm.imag, "--", color="tab:red", label="Template Q")
+    axes[1].plot(normalized(compensated).real, color="tab:blue", alpha=0.65, label="Echo I")
+    axes[1].plot(normalized(compensated).imag, color="tab:red", alpha=0.65, label="Echo Q")
+    axes[1].set_title("Template and Doppler-compensated echo")
+
+    axes[2].plot(normalized(decoded).real, color="tab:blue", label="I")
+    axes[2].plot(normalized(decoded).imag, color="tab:red", label="Q")
+    axes[2].set_title("Echo × conjugate(template)")
+
+    axes[3].plot(normalized(compensated_decoded).real, color="tab:blue", label="I")
+    axes[3].plot(normalized(compensated_decoded).imag, color="tab:red", label="Q")
+    axes[3].set_title("Doppler-compensated echo × conjugate(template)")
+    axes[3].set_xlabel("Sample")
+    for axis in axes:
+        axis.set_ylabel("Normalized amplitude")
+        axis.legend(loc="upper right", ncols=2)
+    return fig
+
+
+def plot_full_diagnostics(
+    data: PulseData,
+    estimate: PulseEstimate,
+    reference: OrbitReference,
+    code: npt.NDArray[np.float64],
+    exp_def: object,
+    min_range_gate: int,
+    sub_resolution: int,
+    sample_rate: float,
+    carrier_hz: float,
+) -> list[plt.Figure]:
+    """Template, phase, raw-signal, and true-match plots."""
+    figures: list[plt.Figure] = []
+
+    # Compare every analytic sub-sample template with its measured counterpart.
+    fig, axes = plt.subplots(2, 1, sharex=True, figsize=(11, 7), constrained_layout=True)
+    colors = plt.colormaps["viridis"](np.linspace(0, 1, sub_resolution))
+    for index, color in enumerate(colors):
+        axes[0].plot(data.templates[:, index].real, color=color, alpha=0.8)
+        axes[1].plot(data.measured_templates[:, index].real, color=color, alpha=0.8)
+    axes[0].set_title("Analytic templates across sub-sample offsets")
+    axes[1].set_title("Measured templates across sub-sample offsets")
+    axes[1].set_xlabel("Sample")
+    for axis in axes:
+        axis.set_ylabel("In-phase amplitude")
+    figures.append(fig)
+
+    phase = np.unwrap(2 * np.angle(data.tx)) / 2
+    window = max(1, 5 * int(exp_def.baud_length_usec * 1e-6 * sample_rate))
+    padded = np.pad(phase, (window // 2, window - 1 - window // 2), mode="edge")
+    smooth_phase = np.convolve(padded, np.ones(window) / window, mode="valid")
+    fig, ax = plt.subplots(figsize=(10, 4), constrained_layout=True)
+    ax.plot(phase, alpha=0.55, label="Measured phase")
+    ax.plot(smooth_phase, "--", linewidth=2, label="Smoothed phase")
+    ax.set(title="Transmit-pulse phase", xlabel="Sample", ylabel="Unwrapped phase (rad)")
+    ax.legend()
+    figures.append(fig)
+
+    figures.append(
+        plot_signal_chain(
+            estimate.template,
+            estimate.echo,
+            estimate.frequency_hz,
+            sample_rate,
+            "Signal chain at the estimated range and Doppler",
+        )
+    )
+
+    true_gate = reference.range / constants.c * sample_rate
+    true_range_index = int(true_gate) - min_range_gate - 1
+    true_template_index = int((true_gate - min_range_gate - 1 - true_range_index) * sub_resolution)
+    true_offset = true_template_index / sub_resolution
+    true_template = tx_signal_model(
+        code=code,
+        baud_length_usec=exp_def.baud_length_usec,
+        t_samp_usec=exp_def.t_samp_usec,
+        ipp_samps=exp_def.ipp_samps,
+        read_length=data.tx.size,
+        sub_resolution=np.array([true_offset]),
+        bandwidth=None,
+        fir_filter=FIRFilter.b414d15_gaus,
+    )[:, 0]
+    true_echo = data.rx[true_range_index : true_range_index + data.tx.size]
+    true_doppler = reference.range_rate * carrier_hz / constants.c
+    figures.append(
+        plot_signal_chain(
+            true_template,
+            true_echo,
+            true_doppler,
+            sample_rate,
+            "Signal chain at the orbit-derived range and Doppler",
+        )
+    )
+
+    echo_sample = sample_rate * reference.range / constants.c + data.tx_start
+    fig, axes = plt.subplots(2, 1, figsize=(11, 7), constrained_layout=True)
+    cropped = data.signal[data.range_start : data.range_start + data.rx.size]
+    axes[0].plot(cropped.real, label="I")
+    axes[0].plot(cropped.imag, label="Q", alpha=0.75)
+    axes[0].axvline(echo_sample - data.range_start, color="tab:red", linestyle="--", label="Orbit echo")
+    axes[0].set_title("Selected receive range")
+    axes[1].plot(data.signal.real, label="I")
+    axes[1].plot(data.signal.imag, label="Q", alpha=0.75)
+    axes[1].axvline(echo_sample, color="tab:red", linestyle="--", label="Orbit echo")
+    axes[1].axvspan(data.tx_start, data.tx_end, color="tab:green", alpha=0.15, label="Transmit pulse")
+    axes[1].set_title("Full IPP")
+    axes[1].set_xlabel("Sample")
+    for axis in axes:
+        axis.set_ylabel("Amplitude")
+        axis.legend(loc="upper right")
+    figures.append(fig)
+    return figures
+
+
+def transition_mask(
+    code: npt.NDArray[np.floating],
+    samples_per_baud: int,
+    length: int,
+    margin: int = 1,
+    sample_offset: float = 0.0,
+) -> npt.NDArray[np.bool_]:
+    """Mask code transitions at the selected template's fractional offset."""
+    mask = np.ones(length, dtype=bool)
+    mask[:margin] = False
+    mask[-margin:] = False
+    flips = np.flatnonzero(np.diff(code) != 0) + 1
+    for flip in flips:
+        centre = int(np.ceil(flip * samples_per_baud + sample_offset))
+        mask[max(0, centre - margin) : min(length, centre + margin + 1)] = False
+    return mask
+
+
+def main() -> None:
+    args = parse_args()
+    if args.duration <= 0 or args.sub_resolution < 1 or args.min_range_gate >= args.max_range_gate:
+        raise ValueError(
+            "Duration and sub-resolution must be positive, and the range-gate interval non-empty"
         )
 
-    return data
-
-
-def time_within_block(dt_curr: str | dt.datetime, dt_start: dt.datetime, dt_end: dt.datetime) -> bool:
-
-    if isinstance(dt_curr, str):
-        dt_curr = str_to_dt(dt_curr)
-    return dt_curr >= dt_start and dt_curr <= dt_end
-
-
-def generate_token(username: str, password: str) -> str:
-
-    url = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
-
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    data = {
-        "grant_type": "password",
-        "username": username,
-        "password": password,
-        "client_id": "cdse-public",
-    }
-
-    response = requests.post(
-        url,
-        headers=headers,
-        data=data,
-    ).json()
-
-    if "access_token" in response:
-        return response["access_token"]
-    else:
-        raise Exception("Bad credentials, no access token generated")
-
-
-dt_format = "%Y-%m-%dT%H:%M:%S.%f"
-
-
-def str_to_dt(dt_str: str):
-    return dt.datetime.strptime(dt_str, dt_format).replace(tzinfo=dt.timezone.utc)
-
-
-def download_orbit_data(data_id: str, access_token: str, output_dir: Path) -> Path:
-    """
-    https://www.esa.int/Applications/Observing_the_Earth/Copernicus/Sentinel-2/Satellite_constellation
-
-    Args:
-        dt_start: start of data
-        dt_end: end of data
-    Returns:
-        Orbit data within dt_start and dt_end format (timepoint, [x y z vx vy vz] (m, m/s))
-    """
-
-    url = f"https://download.dataspace.copernicus.eu/odata/v1/Products({data_id})/$value"
-
-    headers = {"Authorization": f"Bearer {access_token}"}
-
-    # Create a session and update headers
-    session = requests.Session()
-    session.headers.update(headers)
-
-    # Perform the GET request
-    response = session.get(url, stream=True)
-
-    # Check if the request was successful
-    if response.status_code == 200:
-        data_path = output_dir / "data.eof"
-        output_dir.mkdir(exist_ok=True, parents=True)
-
-        with open(str(data_path), "wb") as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    file.write(chunk)
-        return data_path
-    else:
-        print(f"GET response: {response.text}")
-        raise Exception(f"Failed to download orbit data. Status code: {response.status_code} ")
-
-
-cfg = GMFCfgParams(
-    n_ipp=1,
-    ipp_offset=0,
-    samp_offset=args.offset,
-    min_range_gate=5500,
-    max_range_gate=7700,
-    min_acceleration=0,
-    max_acceleration=0,
-    range_gate_step=1,
-    range_gate_sub_resolution=15,
-    frequency_decimation=1,
-    num_cohints_per_file=2,
-    node_gpus=1,
-    acceleration_steps=1,
-)
-# ##Prerequisites
-# ---
-
-# Data to analyse
-
-# Time object is noticed in eiscat data
-start_time_str = "2024-07-04T10:21:17.500"
-end_time_str = "2024-07-04T10:21:20.000"
-start_time_dt = str_to_dt(start_time_str)
-end_time_dt = str_to_dt(end_time_str)
-
-# get precision orbit data to interpolate
-data_id = get_orbit_data_id(start_time_dt, end_time_dt)
-
-orbit_data = extract_eof_data_block(
-    args.orb_file, start_time_dt - dt.timedelta(hours=1), end_time_dt + dt.timedelta(hours=1)
-)
-t, pos = zip(*orbit_data)
-
-t = np.array(
-    [str_to_dt(x).timestamp() for x in t],
-    dtype=np.float64,
-)
-
-# interpolate satellite position to get the full orbit
-pos = np.asarray(pos, dtype=np.float64).T
-interpolated_satellite_pos = interpolation.Legendre8(states=pos, t=t)
-
-# Measurement source station
-radar_station = radardef.EiscatUHF(
-    location=EiscatUHFLocation.TROMSO,
-    beam_type=BeamType.CASSEGRAIN,
-)
-
-reader = radar_station.load_data(args.data_file)
-assert reader is not None
-
-# ## Plot
-# ---
-# So what is seen here is the power for each rx sample for each ipp on the logarithmic scale, for a specific
-# set of ipps
-
-start_time = ts_from_str(start_time_str)
-end_time = ts_from_str(end_time_str)
-
-request_bounds = time_interval_to_sample_bound(
-    time_bounds=(reader.epoch_bounds.ts_start_usec * 1e-6, reader.epoch_bounds.ts_end_usec * 1e-6),
-    start_time=start_time,
-    end_time=end_time,
-    sample_rate=reader.exp_def.sample_rate,
-    relative_time=False,
-)
-
-samp_bounds = sample_interval_to_closest_ipp(request_bounds, reader.exp_def.ipp_samps)
-
-start_ipp_num = request_bounds.start // reader.exp_def.ipp_samps
-
-# extract data within bounds
-n_samp = samp_bounds.end - samp_bounds.start
-data_vec = reader.read(
-    channel=reader.exp_def.rx_channels,
-    start_sample=samp_bounds.start + cfg.samp_offset,
-    vector_length=n_samp,
-)
-
-if data_vec.ndim > 1:
-    data_vec = np.sum(data_vec, axis=0)
-
-
-# define experiment tx and rx intervals
-def usec_to_sample(t_usec: int) -> int:
-    return int(t_usec / reader.exp_def.t_samp_usec)
-
-
-t_rx_start_samp = usec_to_sample(reader.exp_def.t_rx_start_usec)
-t_rx_end_samp = usec_to_sample(reader.exp_def.t_rx_end_usec)
-t_tx_start_samp = usec_to_sample(reader.exp_def.t_tx_start_usec)
-t_tx_end_samp = usec_to_sample(reader.exp_def.t_tx_end_usec)
-t_cal_on_samp = (
-    usec_to_sample(int(reader.exp_def.t_cal_on_usec)) if reader.exp_def.t_cal_on_usec is not None else 0
-)
-t_cal_off_samp = (
-    usec_to_sample(int(reader.exp_def.t_cal_off_usec)) if reader.exp_def.t_cal_off_usec is not None else 0
-)
-
-range_t = t_tx_start_samp / reader.exp_def.sample_rate
-samp_vec = np.arange(reader.exp_def.ipp_samps)
-rt_vec = np.arange(t_rx_end_samp - t_rx_start_samp) * reader.exp_def.t_samp_usec - range_t
-
-mat_shape = (data_vec.size // reader.exp_def.ipp_samps, reader.exp_def.ipp_samps)
-data_ipp_vec_full = data_vec.reshape(mat_shape).T
-
-il0_rg0, il0_rg1 = extract_requested_range_gates(
-    cfg.min_range_gate, cfg.max_range_gate, "sample", reader.exp_def
-)
-data_ipp_vec = data_ipp_vec_full[il0_rg0:il0_rg1, :]
-
-
-# Get satellite position over the analysed interval
-t_analysed = np.arange(
-    start=start_time_dt.timestamp(),
-    stop=end_time_dt.timestamp(),
-    step=cfg.n_ipp * (reader.exp_def.t_ipp_usec * 1e-6),
-)
-satellite_orbit = interpolated_satellite_pos.get_state(t_analysed)
-
-# Get local enu coordinates relative to the radar station
-satellite_enu = radar_station.enu(satellite_orbit)
-
-# Calculate range and velocity relative to the radar station
-r_rel, v_rel = generate_measurements(
-    satellite_orbit,
-    satellite_enu,
-    satellite_enu,
-)
-time_correction = 0.5 * r_rel / scipy.constants.c
-satellite_orbit = interpolated_satellite_pos.get_state(t_analysed + time_correction)
-satellite_enu = radar_station.enu(satellite_orbit)
-r_rel, v_rel = generate_measurements(
-    satellite_orbit,
-    satellite_enu,
-    satellite_enu,
-)
-
-ipp_index = 14
-# ipp_index = 1
-
-print(r_rel[ipp_index], v_rel[ipp_index])
-r_true, v_true = r_rel[ipp_index], v_rel[ipp_index]
-
-signal = data_ipp_vec_full[:, ipp_index]
-exp_params = reader.exp_def.copy(radar_frequency=927.200)
-
-# cal_s = signal[t_cal_on_samp:t_cal_off_samp]
-#
-# fig, axes = plt.subplots(1,3)
-# axes[0].plot(np.real(cal_s))
-# axes[1].plot(np.real(signal))
-# axes[1].axvline(t_cal_on_samp, c="g")
-# axes[1].axvline(t_cal_off_samp, c="g")
-# axes[2].plot(np.real(cal_s), np.imag(cal_s), ".")
-#
-# plt.show()
-
-
-def usec_to_samp(usec: int | float) -> int:
-    return int(usec / exp_params.t_samp_usec)
-
-
-rx_start_samp = usec_to_samp(exp_params.t_rx_start_usec)
-rx_end_samp = usec_to_samp(exp_params.t_rx_end_usec)
-tx_start_samp = usec_to_samp(exp_params.t_tx_start_usec)
-tx_end_samp = usec_to_samp(exp_params.t_tx_end_usec)
-tx_pulse_samps = tx_end_samp - tx_start_samp
-
-# Sample index in ipp
-il0_rgs_min = tx_start_samp + 1
-il0_rgs_max = rx_end_samp - tx_pulse_samps
-il0_min_range_gate = cfg.min_range_gate + il0_rgs_min
-il0_max_range_gate = cfg.max_range_gate + il0_rgs_min
-
-rx_inds = np.arange(il0_rg0, il0_rg1)
-tx_inds = np.arange(tx_start_samp, tx_end_samp)
-# rx = signal[il0_min_range_gate:il0_max_range_gate]
-rx = signal[il0_rg0:il0_rg1]
-tx = signal[tx_start_samp:tx_end_samp]
-
-# for some reason these are 1 off??
-print(il0_rg0, il0_rg1, il0_min_range_gate, il0_max_range_gate)
-
-doppler = v_true * (exp_params.radar_frequency * 1e6) / constants.c
-ture_dop_phasor = np.exp(-2j * np.pi * doppler * rx_inds / exp_params.sample_rate)
-sub_resolution_doppler = 50
-
-base_range_gates = np.arange(cfg.min_range_gate, cfg.max_range_gate - len(tx), 1) + 1
-base_r_tests = base_range_gates * constants.c / exp_params.sample_rate
-
-range_gates = (
-    np.arange(cfg.min_range_gate, cfg.max_range_gate - len(tx), 1.0 / cfg.range_gate_sub_resolution) + 1
-)
-r_tests = range_gates * constants.c / exp_params.sample_rate
-
-sample = np.arange(tx.size)
-
-
-# determine pulse code here
-
-matches = match_pulse_code(
-    tx_signal=tx,
-    codes=exp_params.code,
-    baud_length_usec=exp_params.baud_length_usec,
-    t_samp_usec=exp_params.t_samp_usec,
-    ipp_t_usec=exp_params.ipp_samps * exp_params.t_samp_usec,
-)
-start_code_num = np.argmax(matches)
-
-# fig, ax = plt.subplots()
-# ax.plot(matches)
-# plt.show()
-
-print("guessed code id: ", start_ipp_num % reader.exp_def.code.shape[0])
-print("estimated code id: ", start_code_num)
-
-# TODO: this now works with both! implement that we can choose which to do, modulated or simulated
-
-sub_resolution = np.linspace(0, 1, num=cfg.range_gate_sub_resolution)
-tx_match = tx_signal_model(
-    code=exp_params.code[start_code_num, :],
-    baud_length_usec=exp_params.baud_length_usec,
-    t_samp_usec=exp_params.t_samp_usec,
-    ipp_samps=exp_params.ipp_samps,
-    read_length=len(tx),
-    sub_resolution=sub_resolution,
-    bandwidth=None,
-    fir_filter=FIRFilter.b414d15_gaus,
-    # normalize=True,
-)
-rg0 = r_true / constants.c * exp_params.sample_rate
-ri0 = np.argmin(np.abs(base_range_gates - rg0))
-n_sig = rx[ri0 : (ri0 + len(tx))]
-mu = np.mean(n_sig)
-sig = np.std(n_sig)
-noisy_signal = (n_sig - mu) / sig
-match = np.abs(np.sum(noisy_signal[:, None] * np.conj(tx_match), axis=0))
-best_match = np.argmax(match)
-
-fig, axes = plt.subplots(3, 1)
-axes[0].plot(np.real(n_sig))
-axes[1].plot(sub_resolution, match)
-axes[2].plot(np.real(n_sig) / np.max(np.real(n_sig)), "-b")
-axes[2].plot(np.real(tx_match[:, best_match]) / np.max(np.real(tx_match[:, best_match])), "-r")
-# plt.show()
-
-# TODO: we can probably use the tx signal to measure phase drift and apply that to the analytic
-# model? something like this
-
-
-def moving_average(x, w):
-    x_padded = np.pad(x, (w // 2, w - 1 - w // 2), mode="edge")
-    return np.convolve(x_padded, np.ones(w), "valid") / w
-
-
-tx_phase_direct = np.unwrap(2 * np.angle(tx)) / 2
-tx_phase_smooth = moving_average(
-    tx_phase_direct,
-    5 * int(exp_params.baud_length_usec * 1e-6 * exp_params.sample_rate),
-)
-tx_phase_mod = np.exp(1j * tx_phase_smooth)
-
-# modulated_tx = tx_match * tx_phase_mod[:, None]
-modulated_tx = tx_match
-
-fig, ax = plt.subplots()
-ax.plot(tx_phase_direct)
-ax.plot(tx_phase_smooth, ls="--")
-
-modulated_tx_meas = tx_modulation_model(
-    tx_signal=tx,
-    tx_stencil=np.full(tx.shape, True, dtype=np.bool),
-    sub_resolution=cfg.range_gate_sub_resolution,
-)
-# modulated_tx = modulated_tx_meas
-
-samp_r_true = exp_params.sample_rate * r_true / constants.c + tx_start_samp
-fft_len = 2 ** (int(np.log2(len(tx))) + 2)
-fvec = fftshift(fftfreq(fft_len, d=1.0 / exp_params.sample_rate))
-d_freq = fvec[1] - fvec[0]
-
-samp_inds = np.arange(len(rx))
-corrs = np.zeros_like(r_tests)
-dopps = np.zeros_like(r_tests)
-pbar = tqdm(total=corrs.size)
-for ri, r in enumerate(base_r_tests):
-    z = rx[ri : (ri + len(tx))]
-    # z = (z - np.mean(z)) / np.std(z)
-    for rii in range(cfg.range_gate_sub_resolution):
-        ind = ri * cfg.range_gate_sub_resolution + rii
-        decoded = z * np.conj(modulated_tx[:, rii])
-
-        spec = fftshift(fft(decoded, n=fft_len))
-        mi = np.argmax(np.abs(spec))
-
-        # try:
-        #     f_est, phi_est = dft_taylor(
-        #         spectrum=spec,
-        #         signal_len=len(decoded),
-        #         sample_rate=exp_params.sample_rate,
-        #     )
-        # except RuntimeError:
-        #     f_est, phi_est = np.nan, np.nan
-        # if np.isnan(f_est):
-        # NOTE: apparently this is just better! although its a bit slower
-        pwr, f_est, phi_est = dtft_solve(
-            decoded_signal=decoded,
-            sample_rate=exp_params.sample_rate,
-            freq_bracket=(
-                fvec[mi] - d_freq,
-                fvec[mi] + d_freq,
-            ),
+    start_dt = parse_datetime(args.start_time)
+    end_dt = start_dt + dt.timedelta(seconds=args.duration)
+    orbit = load_orbit(args.orbit_file, start_dt - dt.timedelta(hours=1), end_dt + dt.timedelta(hours=1))
+    radar = radardef.EiscatUHF(location=EiscatUHFLocation.TROMSO, beam_type=BeamType.CASSEGRAIN)
+    reader = radar.load_data(args.data_file)
+    if reader is None:
+        raise RuntimeError(f"Could not load radar data from {args.data_file}")
+
+    request = time_interval_to_sample_bound(
+        time_bounds=(reader.epoch_bounds.ts_start_usec * 1e-6, reader.epoch_bounds.ts_end_usec * 1e-6),
+        start_time=ts_from_str(args.start_time),
+        end_time=ts_from_str(end_dt.strftime(DATETIME_FORMAT)[:-3]),
+        sample_rate=reader.exp_def.sample_rate,
+        relative_time=False,
+    )
+    bounds = sample_interval_to_closest_ipp(request, reader.exp_def.ipp_samps)
+    raw = reader.read(
+        channel=reader.exp_def.rx_channels,
+        start_sample=bounds.start + args.offset,
+        vector_length=bounds.end - bounds.start,
+    )
+    if raw.ndim > 1:
+        raw = np.sum(raw, axis=0)
+    pulses = raw.reshape((-1, reader.exp_def.ipp_samps))
+    if not 0 <= args.ipp_index < pulses.shape[0]:
+        raise IndexError(
+            f"IPP index {args.ipp_index} is outside the available range [0, {pulses.shape[0] - 1}]"
         )
+    signal = np.asarray(pulses[args.ipp_index], dtype=np.complex128)
 
-        corrs[ind] = pwr
-        # corrs[ind] = np.abs(spec[mi])
-        dopps[ind] = f_est
+    tx_start = int(reader.exp_def.t_tx_start_usec / reader.exp_def.t_samp_usec)
+    tx_end = int(reader.exp_def.t_tx_end_usec / reader.exp_def.t_samp_usec)
+    tx = signal[tx_start:tx_end]
+    range_start, range_end = extract_requested_range_gates(
+        args.min_range_gate, args.max_range_gate, "sample", reader.exp_def
+    )
+    rx = signal[range_start:range_end]
+    first_ipp = request.start // reader.exp_def.ipp_samps
+    code_index = select_code(tx, reader.exp_def, first_ipp + args.ipp_index, args.code_source)
+    templates = make_templates(tx, reader.exp_def, code_index, args.sub_resolution, args.template)
+    measured_templates = tx_modulation_model(
+        tx,
+        np.ones(tx.size, dtype=bool),
+        sub_resolution=args.sub_resolution,
+    )
 
-        pbar.update(1)
-        # if np.abs(r_tests[ind] - r_true) < 300.0:
-        #     fig, axes = plt.subplots(3, 1)
-        #     axes[0].plot(np.real(decoded))
-        #     axes[0].plot(np.imag(decoded))
-        #     axes[1].plot(samp_inds, np.real(rx))
-        #     axes[1].plot(samp_inds, np.imag(rx))
-        #     axes[1].axvline(ri, c="g", ls="--")
-        #     axes[1].axvline(ri + len(tx), c="g", ls="--")
-        #     axes[2].plot(r_tests, corrs)
-        #     axes[2].plot(r_tests[ind], corrs[ind], "or")
-        #     plt.show()
-pbar.close()
+    analysed_epochs = np.arange(
+        start=start_dt.timestamp(),
+        stop=end_dt.timestamp(),
+        step=reader.exp_def.t_ipp_usec * 1e-6,
+    )
+    reference_ranges, reference_rates = orbit_references(radar, orbit, analysed_epochs)
+    reference = OrbitReference(
+        range=reference_ranges[args.ipp_index],
+        range_rate=reference_rates[args.ipp_index],
+    )
+    sample_rate = float(reader.exp_def.sample_rate)
+    carrier_hz = args.radar_frequency_mhz * 1e6
+    estimate = estimate_pulse(
+        rx, templates, args.min_range_gate, args.max_range_gate, sample_rate, carrier_hz
+    )
+    print(f"Range:      {estimate.range / 1e3:.3f} km ({estimate.range - reference.range:+.1f} m)")
+    print(
+        f"Range rate: {estimate.range_rate:.3f} m/s ({estimate.range_rate - reference.range_rate:+.3f} m/s)"
+    )
 
-ri_max = np.argmax(corrs)
-ri = int(ri_max // cfg.range_gate_sub_resolution)
-
-rg_true = r_true / constants.c * exp_params.sample_rate
-
-rii = int(ri_max - ri * cfg.range_gate_sub_resolution)
-z = rx[ri : (ri + len(tx))]
-# z = (z - np.mean(z)) / np.std(z)
-z_dop = z * np.conj(modulated_tx[:, rii])
-
-dop_phasor = np.exp(-2j * np.pi * dopps[ri_max] * np.arange(len(tx)) / exp_params.sample_rate)
-tx_sel = modulated_tx[:, rii]
-
-z_comp = z * dop_phasor
-decode = z * dop_phasor * np.conj(modulated_tx[:, rii])
-z_dop = z * np.conj(modulated_tx[:, rii])
-
-r_est = r_tests[ri_max]
-v_est = dopps[ri_max] / (exp_params.radar_frequency * 1e6) * constants.c
-
-spec = fftshift(fft(z_dop, n=fft_len))
-fvec = fftshift(fftfreq(fft_len, d=1 / exp_params.sample_rate))
-
-print(f"{r_est - r_true=} m")
-print(f"{v_est - v_true=} m/s")
-
-fig, axes = plt.subplots(3, 1)
-axes[0].plot(range_gates, corrs, "-")
-axes[0].plot(range_gates[ri_max], corrs[ri_max], "or")
-axes[0].axvline(rg_true, c="r")
-axes[1].plot(range_gates, corrs, "-x")
-axes[1].plot(range_gates[ri_max], corrs[ri_max], "or")
-axes[1].axvline(rg_true, c="r")
-axes[1].set_xlim(rg_true - 10, rg_true + 10)
-axes[2].plot(fvec, np.abs(spec))
-# axes[2].set_xlim()
-
-fig, axes = plt.subplots(2, 1)
-for ind in range(cfg.range_gate_sub_resolution):
-    axes[0].plot(np.real(modulated_tx[:, ind]), label=f"{ind}")
-    axes[0].plot(np.imag(modulated_tx[:, ind]))
-    axes[1].plot(np.real(modulated_tx_meas[:, ind]))
-    axes[1].plot(np.imag(modulated_tx_meas[:, ind]))
-axes[0].legend()
-
-fig, axes = plt.subplots(4, 1)
-axes[0].plot(np.real(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="b")
-axes[0].plot(np.imag(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="r")
-axes[0].plot(np.real(z / np.max(np.abs(z))), c="b")
-axes[0].plot(np.imag(z / np.max(np.abs(z))), c="r")
-axes[1].plot(np.real(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="b")
-axes[1].plot(np.imag(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="r")
-axes[1].plot(np.real(z_comp / np.max(np.abs(z_comp))), c="b")
-axes[1].plot(np.imag(z_comp / np.max(np.abs(z_comp))), c="r")
-axes[2].plot(np.real(z_dop / np.max(np.abs(z_dop))), c="b")
-axes[2].plot(np.imag(z_dop / np.max(np.abs(z_dop))), c="r")
-axes[3].plot(np.real(decode / np.max(np.abs(decode))), c="b")
-axes[3].plot(np.imag(decode / np.max(np.abs(decode))), c="r")
-
-
-rg_true = r_true / constants.c * exp_params.sample_rate
-dop_true = v_true * exp_params.radar_frequency * 1e6 / constants.c
-
-ri_est = int(ri_max // cfg.range_gate_sub_resolution)
-rii_est = int(ri_max - ri * cfg.range_gate_sub_resolution)
-
-ri = int(rg_true) - cfg.min_range_gate - 1
-rii = int((rg_true - cfg.min_range_gate - 1 - ri) * cfg.range_gate_sub_resolution)
-ri_max_true = rii + ri * cfg.range_gate_sub_resolution
-
-print(f"{ri=}, {ri_est=}")
-print(f"{rii=}, {rii_est=}")
-
-true_offset = rii / cfg.range_gate_sub_resolution
-tx_sel = tx_signal_model(
-    code=exp_params.code[start_code_num, :],
-    baud_length_usec=exp_params.baud_length_usec,
-    t_samp_usec=exp_params.t_samp_usec,
-    ipp_samps=exp_params.ipp_samps,
-    read_length=len(tx),
-    sub_resolution=np.array([true_offset]),
-    bandwidth=None,
-    fir_filter=FIRFilter.b414d15_gaus,
-    # normalize=True,
-)
-tx_sel = tx_sel[:, 0]
-z = rx[ri : (ri + len(tx))]
-# z = (z - np.mean(z)) / np.std(z)
-z_dop = z * np.conj(tx_sel)
-
-dop_phasor = np.exp(-2j * np.pi * dop_true * np.arange(len(tx)) / exp_params.sample_rate)
-
-z_comp = z * dop_phasor
-decode = z * dop_phasor * np.conj(tx_sel)
-z_dop = z * np.conj(tx_sel)
-
-spec = fftshift(fft(z_dop, n=fft_len))
-mi = np.argmax(np.abs(spec))
-pwr, f_est, phi_est = dtft_solve(
-    decoded_signal=z_dop,
-    sample_rate=exp_params.sample_rate,
-    freq_bracket=(
-        fvec[mi] - d_freq,
-        fvec[mi] + d_freq,
-    ),
-)
-v_est = f_est / (exp_params.radar_frequency * 1e6) * constants.c
-r_est = r_tests[ri_max_true]
-print(f"{r_est - r_true=} m")
-print(f"{v_est - v_true=} m/s")
-
-fig, axes = plt.subplots(4, 1, sharex=True)
-fig.suptitle("True match?")
-axes[0].plot(np.real(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="b")
-axes[0].plot(np.imag(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="r")
-axes[0].plot(np.real(z / np.max(np.abs(z))), c="b")
-axes[0].plot(np.imag(z / np.max(np.abs(z))), c="r")
-axes[1].plot(np.real(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="b")
-axes[1].plot(np.imag(tx_sel / np.max(np.abs(tx_sel))), ls="--", c="r")
-axes[1].plot(np.real(z_comp / np.max(np.abs(z_comp))), c="b")
-axes[1].plot(np.imag(z_comp / np.max(np.abs(z_comp))), c="r")
-axes[2].plot(np.real(z_dop / np.max(np.abs(z_dop))), c="b")
-axes[2].plot(np.imag(z_dop / np.max(np.abs(z_dop))), c="r")
-axes[3].plot(np.real(decode / np.max(np.abs(decode))), c="b")
-axes[3].plot(np.imag(decode / np.max(np.abs(decode))), c="r")
-
-fig, ax = plt.subplots()
-ax, handles = plotting.rti(
-    ax,
-    reader,
-    start_time=start_time_str,
-    end_time=end_time_str,
-    start_range_gate=cfg.min_range_gate,
-    end_range_gate=cfg.max_range_gate,
-    range_gate_unit="sample",
-    axis_units=True,
-    log=True,
-)
-# plt.show()
+    samples_per_baud = int(round(reader.exp_def.baud_length_usec / reader.exp_def.t_samp_usec))
+    template_offsets = np.linspace(0.0, 1.0, num=args.sub_resolution)
+    template_offset = float(template_offsets[estimate.template_index])
+    figures = plot_diagnostics(
+        estimate,
+        reference,
+        sample_rate,
+        carrier_hz,
+        reader.exp_def.code[code_index],
+        samples_per_baud,
+        template_offset,
+    )
+    if args.diagnostics == "full":
+        figures.extend(
+            plot_full_diagnostics(
+                PulseData(
+                    signal=signal,
+                    rx=rx,
+                    tx=tx,
+                    templates=make_templates(tx, reader.exp_def, code_index, args.sub_resolution, "model"),
+                    measured_templates=measured_templates,
+                    range_start=range_start,
+                    tx_start=tx_start,
+                    tx_end=tx_end,
+                ),
+                estimate,
+                reference,
+                reader.exp_def.code[code_index],
+                reader.exp_def,
+                args.min_range_gate,
+                args.sub_resolution,
+                sample_rate,
+                carrier_hz,
+            )
+        )
+    if args.rti:
+        fig, ax = plt.subplots(figsize=(10, 5), constrained_layout=True)
+        plotting.rti(
+            ax,
+            reader,
+            start_time=args.start_time,
+            end_time=end_dt.strftime(DATETIME_FORMAT)[:-3],
+            start_range_gate=args.min_range_gate,
+            end_range_gate=args.max_range_gate,
+            range_gate_unit="sample",
+            axis_units=True,
+            log=True,
+        )
+        ax.set_title("Range-time intensity")
+        figures.append(fig)
+    if args.output_dir:
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        for index, figure in enumerate(figures, start=1):
+            name = f"pulse_analysis_{index:02d}"
+            figure.savefig(args.output_dir / f"{name}.png", dpi=180, bbox_inches="tight")
+    if not args.no_show:
+        plt.show()
 
 
-fig, ax = plt.subplots()
-ax.plot(np.real(tx))
-ax.plot(np.imag(tx))
-
-
-fig, axes = plt.subplots(2, 1)
-axes[0].plot(np.real(data_ipp_vec[:, ipp_index]))
-axes[0].plot(np.imag(data_ipp_vec[:, ipp_index]))
-axes[0].axvline(samp_r_true - il0_rg0, color="r")
-
-axes[1].plot(np.real(data_ipp_vec_full[:, ipp_index]))
-axes[1].plot(np.imag(data_ipp_vec_full[:, ipp_index]))
-axes[1].axvline(samp_r_true, color="r")
-axes[1].axvline(t_tx_start_samp, color="g", ls="--")
-axes[1].axvline(t_tx_end_samp, color="g", ls="--")
-
-plt.show()
+if __name__ == "__main__":
+    main()
