@@ -38,19 +38,19 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 class OrbitReference:
     """Expected two-way range and range rate at one IPP."""
 
-    range: float
-    range_rate: float
+    r: float
+    v: float
 
 
 @dataclass(frozen=True)
 class PulseEstimate:
     """Best matched-filter result for one pulse."""
 
-    range: float
-    range_rate: float
-    frequency_hz: float
+    r: float
+    v: float
+    frequency: float
     power: npt.NDArray[np.float64]
-    frequencies_hz: npt.NDArray[np.float64]
+    frequencies: npt.NDArray[np.float64]
     range_gates: npt.NDArray[np.float64]
     template: npt.NDArray[np.complex128]
     echo: npt.NDArray[np.complex128]
@@ -203,7 +203,7 @@ def estimate_pulse(
     min_range_gate: int,
     max_range_gate: int,
     sample_rate: float,
-    carrier_hz: float,
+    carrier: float,
 ) -> PulseEstimate:
     """Search range offsets and estimate Doppler at every offset."""
     count = templates.shape[1]
@@ -238,11 +238,11 @@ def estimate_pulse(
     base_index, offset_index = divmod(best, count)
     echo = rx[base_index : base_index + templates.shape[0]]
     return PulseEstimate(
-        range=float(range_gates[best] * constants.c / sample_rate),
-        range_rate=float(frequencies[best] * constants.c / carrier_hz),
-        frequency_hz=float(frequencies[best]),
+        r=float(range_gates[best] * constants.c / sample_rate),
+        v=float(frequencies[best] * constants.c / carrier),
+        frequency=float(frequencies[best]),
         power=power,
-        frequencies_hz=frequencies,
+        frequencies=frequencies,
         range_gates=range_gates,
         template=np.asarray(templates[:, offset_index], dtype=np.complex128),
         echo=np.asarray(echo, dtype=np.complex128),
@@ -260,7 +260,7 @@ def plot_diagnostics(
     estimate: PulseEstimate,
     reference: OrbitReference,
     sample_rate: float,
-    carrier_hz: float,
+    carrier: float,
     code: npt.NDArray[np.floating],
     samples_per_baud: int,
     template_offset: float,
@@ -271,15 +271,15 @@ def plot_diagnostics(
 
     fig_summary, axes = plt.subplots(3, 1, figsize=(10, 9), constrained_layout=True)
     axes[0].plot(ranges_km, 10 * np.log10(np.maximum(estimate.power, np.finfo(float).tiny)))
-    axes[0].axvline(reference.range * 1e-3, color="tab:red", linestyle="--", label="Orbit reference")
+    axes[0].axvline(reference.r * 1e-3, color="tab:red", linestyle="--", label="Orbit reference")
     axes[0].scatter(
         ranges_km[best], 10 * np.log10(estimate.power[best]), color="tab:orange", zorder=3, label="Estimate"
     )
     axes[0].set(xlabel="Two-way range (km)", ylabel="Matched power (dB)", title="Sub-sample range search")
     axes[0].legend()
-    rates = estimate.frequencies_hz * constants.c / carrier_hz
+    rates = estimate.frequencies * constants.c / carrier
     axes[1].plot(ranges_km, rates, linewidth=1)
-    axes[1].axhline(reference.range_rate, color="tab:red", linestyle="--", label="Orbit reference")
+    axes[1].axhline(reference.v, color="tab:red", linestyle="--", label="Orbit reference")
     axes[1].scatter(ranges_km[best], rates[best], color="tab:orange", zorder=3, label="Estimate")
     axes[1].set(xlabel="Two-way range (km)", ylabel="Range rate (m/s)", title="Doppler estimate")
     axes[1].legend()
@@ -288,10 +288,10 @@ def plot_diagnostics(
     spectrum = fftshift(fft(estimate.echo * np.conj(estimate.template), n=fft_length))
     spectrum_frequencies = fftshift(fftfreq(fft_length, d=1.0 / sample_rate))
     axes[2].plot(spectrum_frequencies * 1e-3, np.abs(spectrum), color="tab:purple")
-    axes[2].axvline(estimate.frequency_hz * 1e-3, color="tab:orange", linestyle="--")
+    axes[2].axvline(estimate.frequency * 1e-3, color="tab:orange", linestyle="--")
     axes[2].set(xlabel="Doppler frequency (kHz)", ylabel="Magnitude", title="Decoded echo spectrum")
 
-    phase = np.exp(-2j * np.pi * estimate.frequency_hz * np.arange(estimate.echo.size) / sample_rate)
+    phase = np.exp(-2j * np.pi * estimate.frequency * np.arange(estimate.echo.size) / sample_rate)
     compensated = normalized(estimate.echo * phase)
     template = normalized(estimate.template)
     mask = transition_mask(code, samples_per_baud, template.size, sample_offset=template_offset)
@@ -328,12 +328,12 @@ def plot_diagnostics(
 def plot_signal_chain(
     template: npt.NDArray[np.complex128],
     echo: npt.NDArray[np.complex128],
-    doppler_hz: float,
+    doppler: float,
     sample_rate: float,
     title: str,
 ) -> plt.Figure:
     """Show the template multiplication and Doppler compensation step by step."""
-    doppler_phasor = np.exp(-2j * np.pi * doppler_hz * np.arange(echo.size) / sample_rate)
+    doppler_phasor = np.exp(-2j * np.pi * doppler * np.arange(echo.size) / sample_rate)
     compensated = echo * doppler_phasor
     decoded = echo * np.conj(template)
     compensated_decoded = compensated * np.conj(template)
@@ -377,7 +377,7 @@ def plot_full_diagnostics(
     min_range_gate: int,
     sub_resolution: int,
     sample_rate: float,
-    carrier_hz: float,
+    carrier: float,
 ) -> list[plt.Figure]:
     """Template, phase, raw-signal, and true-match plots."""
     figures: list[plt.Figure] = []
@@ -410,13 +410,13 @@ def plot_full_diagnostics(
         plot_signal_chain(
             estimate.template,
             estimate.echo,
-            estimate.frequency_hz,
+            estimate.frequency,
             sample_rate,
             "Signal chain at the estimated range and Doppler",
         )
     )
 
-    true_gate = reference.range / constants.c * sample_rate
+    true_gate = reference.r / constants.c * sample_rate
     true_range_index = int(true_gate) - min_range_gate - 1
     true_template_index = int((true_gate - min_range_gate - 1 - true_range_index) * sub_resolution)
     true_offset = true_template_index / sub_resolution
@@ -431,7 +431,7 @@ def plot_full_diagnostics(
         fir_filter=FIRFilter.b414d15_gaus,
     )[:, 0]
     true_echo = data.rx[true_range_index : true_range_index + data.tx.size]
-    true_doppler = reference.range_rate * carrier_hz / constants.c
+    true_doppler = reference.v * carrier / constants.c
     figures.append(
         plot_signal_chain(
             true_template,
@@ -442,7 +442,7 @@ def plot_full_diagnostics(
         )
     )
 
-    echo_sample = sample_rate * reference.range / constants.c + data.tx_start
+    echo_sample = sample_rate * reference.r / constants.c + data.tx_start
     fig, axes = plt.subplots(2, 1, figsize=(11, 7), constrained_layout=True)
     cropped = data.signal[data.range_start : data.range_start + data.rx.size]
     axes[0].plot(cropped.real, label="I")
@@ -540,18 +540,14 @@ def main() -> None:
     )
     reference_ranges, reference_rates = orbit_references(radar, orbit, analysed_epochs)
     reference = OrbitReference(
-        range=reference_ranges[args.ipp_index],
-        range_rate=reference_rates[args.ipp_index],
+        r=reference_ranges[args.ipp_index],
+        v=reference_rates[args.ipp_index],
     )
     sample_rate = float(reader.exp_def.sample_rate)
-    carrier_hz = args.radar_frequency_mhz * 1e6
-    estimate = estimate_pulse(
-        rx, templates, args.min_range_gate, args.max_range_gate, sample_rate, carrier_hz
-    )
-    print(f"Range:      {estimate.range / 1e3:.3f} km ({estimate.range - reference.range:+.1f} m)")
-    print(
-        f"Range rate: {estimate.range_rate:.3f} m/s ({estimate.range_rate - reference.range_rate:+.3f} m/s)"
-    )
+    carrier = args.radar_frequency_mhz * 1e6
+    estimate = estimate_pulse(rx, templates, args.min_range_gate, args.max_range_gate, sample_rate, carrier)
+    print(f"Range:      {estimate.r / 1e3:.3f} km ({estimate.r - reference.r:+.1f} m)")
+    print(f"Range rate: {estimate.v:.3f} m/s ({estimate.v - reference.v:+.3f} m/s)")
 
     samples_per_baud = int(round(reader.exp_def.baud_length_usec / reader.exp_def.t_samp_usec))
     template_offsets = np.linspace(0.0, 1.0, num=args.sub_resolution)
@@ -560,7 +556,7 @@ def main() -> None:
         estimate,
         reference,
         sample_rate,
-        carrier_hz,
+        carrier,
         reader.exp_def.code[code_index],
         samples_per_baud,
         template_offset,
@@ -585,7 +581,7 @@ def main() -> None:
                 args.min_range_gate,
                 args.sub_resolution,
                 sample_rate,
-                carrier_hz,
+                carrier,
             )
         )
     if args.rti:
