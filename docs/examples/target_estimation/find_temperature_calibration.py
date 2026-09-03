@@ -1,7 +1,13 @@
-"""Estimate the ADC-to-noise-temperature calibration from injected noise.
+"""Estimate the sample-power-to-noise-temperature calibration from injected noise.
 
 The EISCAT calibration source alternates between IPPs. Its known temperature
 can be used to determine the conversion between signal power and units of energy (or temperature).
+
+> As typically in signal processing, I take the samples to have the unit of a Volt, and will also assume unit impedance, to that the power has unit of V2.
+Markkanen, J. I. EISCAT Digital Receiver Signal Processing. (2014).
+
+And we shall do the same!
+
 """
 
 from __future__ import annotations
@@ -113,13 +119,13 @@ def plot_diagnostics(
 
     image = axes[0, 0].imshow(np.abs(samples), aspect="auto", interpolation="nearest", origin="lower")
     axes[0, 0].set(title="Calibration-gate magnitude", xlabel="Sample in gate", ylabel="IPP")
-    fig.colorbar(image, ax=axes[0, 0], label="ADC magnitude")
+    fig.colorbar(image, ax=axes[0, 0], label="Sample amplitude [V]")
 
     indices = np.arange(result.per_ipp_variance.size)
     for parity, label, color in ((0, "Even IPPs", "tab:blue"), (1, "Odd IPPs", "tab:orange")):
         selected = indices % 2 == parity
         suffix = " (cal on)" if parity == result.on_parity else " (cal off)"
-        axes[0, 1].plot(indices[selected], result.per_ipp_variance[selected], ".", color=color, label=label + suffix)
+        axes[0, 1].plot(indices[selected], 2*result.per_ipp_variance[selected], ".", color=color, label=label + suffix)
         axes[1, 0].hist(
             np.sqrt(result.per_ipp_variance[selected]),
             bins="auto",
@@ -127,9 +133,9 @@ def plot_diagnostics(
             color=color,
             label=label + suffix,
         )
-    axes[0, 1].set(title="Component variance per IPP", xlabel="IPP", ylabel=r"Variance $\sigma^2$ (ADC$^2$)")
+    axes[0, 1].set(title="Component variance per IPP", xlabel="IPP", ylabel=r"Sample power $2\sigma^2$ [W]")
     axes[0, 1].legend()
-    axes[1, 0].set(title="Noise-sigma distributions", xlabel=r"Component $\sigma$ (ADC)", ylabel="Count")
+    axes[1, 0].set(title="Noise-sigma distributions", xlabel=r"Component $\sigma$ [V]", ylabel="Count")
     axes[1, 0].legend()
 
     max_points = min(samples.size, 30_000)
@@ -137,8 +143,8 @@ def plot_diagnostics(
     axes[1, 1].hexbin(flattened.real, flattened.imag, gridsize=55, bins="log", mincnt=1, cmap="viridis")
     axes[1, 1].set(
         title="Complex calibration samples",
-        xlabel="In-phase component (ADC)",
-        ylabel="Quadrature component (ADC)",
+        xlabel="In-phase component [V]",
+        ylabel="Quadrature component [V]",
         aspect="equal",
     )
     return fig
@@ -188,9 +194,9 @@ def main() -> None:
     )
     parity_name = "even" if result.on_parity == 0 else "odd"
     print(f"Calibration-on parity:                {parity_name}")
-    print(f"Mean Calibration-off variance:        {result.sky_variance.mean():.6g} ADC units")
-    print(f"Mean Calibration-on variance:         {result.cal_variance.mean():.6g} ADC units")
-    print(f"Mean temperature / complex power:     {result.kelvin_per_complex_power.mean():.6g} K/ADC^2")
+    print(f"Mean Calibration-off power:           {2*result.sky_variance.mean():.6g} [W]")
+    print(f"Mean Calibration-on power:            {2*result.cal_variance.mean():.6g} [W]")
+    print(f"Mean temperature / complex power:     {result.kelvin_per_complex_power.mean():.6g} K/W")
     print(f"Mean equivalent receiver temperature: {result.receiver_temperature.mean():.3f} K")
 
     figure = plot_diagnostics(calibration_samples, result)
