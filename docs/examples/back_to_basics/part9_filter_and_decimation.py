@@ -67,7 +67,7 @@ plt.plot(t * 1e6, np.real(x), label="Original BPSK signal, 40 MHz", alpha=0.6)
 plt.plot(t_dec * 1e6, np.real(x_filt_dec), "o-", label="Filtered + decimated to 1 MHz")
 plt.plot(t_dec * 1e6, np.real(x_dec_no_filter), "x--", label="Decimated without filtering")
 
-plt.xlabel("Time [µs]")
+plt.xlabel("Time [us]")
 plt.ylabel("Amplitude, real part")
 plt.title("BPSK pulse: original, filtered-decimated, and naïvely decimated")
 plt.legend()

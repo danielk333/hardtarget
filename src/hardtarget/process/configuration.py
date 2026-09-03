@@ -181,7 +181,7 @@ def compute_process_params(
     _il0_rgs_min = tx_start_samp
     _il0_rgs_max = rx_end_samp - tx_pulse_samps
     _il0_min_range_gate = cfg_params.min_range_gate
-    _il0_min_range_gate += _il0_rgs_min if cfg_params.min_range_gate >= 0 else _il0_rgs_min
+    _il0_min_range_gate += _il0_rgs_min
     _il0_max_range_gate = cfg_params.max_range_gate
     _il0_max_range_gate += _il0_rgs_min if cfg_params.max_range_gate >= 0 else _il0_rgs_max
 

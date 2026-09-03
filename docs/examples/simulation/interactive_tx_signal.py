@@ -109,7 +109,7 @@ def update_title():
     ax.set_title(
         f"Decimation: {signal_decimation[fir_filter]} | "
         f"Sample rate: {sample_rate_mhz:g} MHz | "
-        f"Baud length: {baud_lengths_usec[fir_filter]:g} µs"
+        f"Baud length: {baud_lengths_usec[fir_filter]:g} us"
     )
 
 
