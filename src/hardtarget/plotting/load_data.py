@@ -278,7 +278,7 @@ def extract_data_chunk_from_out(data: GenericOut, index: tuple[int, int]) -> Gen
             epoch_us = data.epoch_us + data.t[index[0]]
         elif field.name == "num_cohints_per_file":
             data_chunk[field.name] = index[1] - index[0]
-        elif dtype is np.ndarray:
+        elif dtype is np.ndarray or dtype is np.typing.NDArray:
             data_chunk[field.name] = getattr(data, field.name)[index[0] : index[1]]
         elif dtype is list:
             data_chunk[field.name] = getattr(data, field.name)[index[0] : index[1]]

@@ -60,9 +60,11 @@ class OptimizeProcess(
                     f"It is only possible to run optimization on a previous target estimation analysis, not on {method}"
                 )
             try:
-                self.sub_resolution: int = hf[GMFCfgParams.__name__][
-                    f"{GMFCfgParams.range_gate_sub_resolution=}".split("=")[0].split(".")[1]
-                ][()]
+                self.sub_resolution: int = int(
+                    hf[GMFCfgParams.__name__][
+                        f"{GMFCfgParams.range_gate_sub_resolution=}".split("=")[0].split(".")[1]
+                    ][()]
+                )
                 # Extract sample relative to file start
                 self.mf_sample_start: int = int(
                     (self.data.epoch_bounds[0] - int(hf["OutArgs"]["epoch_us"][()]))
