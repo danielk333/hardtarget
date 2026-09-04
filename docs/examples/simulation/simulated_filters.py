@@ -87,11 +87,20 @@ ax.legend()
 
 lims = (0, 1)
 
+
 # Monte-Carlo that stuff!
-def run_est(mc_num, sig_num, true_n):
+def run_est(mc_num, sig_num, true_n, all_samps=True):
     sigs = np.linspace(0.1, 0.5, sig_num)
     true_offsets = np.linspace(lims[0], lims[1], true_n)
-    pbar = tqdm(total=sig_num*true_n*mc_num)
+    pbar = tqdm(total=sig_num * true_n * mc_num)
+    if all_samps:
+        samps = np.arange(3)
+    else:
+        samps = np.array([1])
+
+    def fit_transition(offset, points):
+        s = f((samps - offset) * decimation)
+        return np.sum((s - points) ** 2)
 
     res_mat = np.full((len(sigs), true_n), np.nan, dtype=np.float64)
     for si, sig_n in enumerate(sigs):
@@ -114,8 +123,15 @@ def run_est(mc_num, sig_num, true_n):
 sig_num = 10
 true_n = 40
 mcn = 500
-sigs, true_offsets, res_mat = run_est(mcn, sig_num, true_n)
-X, Y = np.meshgrid(sigs, true_offsets)
+sigs_3, true_offsets_3, res_mat_3 = run_est(mcn, sig_num, true_n)
+S3, O3 = np.meshgrid(sigs_3, true_offsets_3)
+
+fig, ax = plt.subplots(1,2)
+pm = ax.pcolormesh(S3, O3, res_mat)
+fig.colorbar(pm, ax=ax)
+
+sigs_1, true_offsets_1, res_mat_1 = run_est(mcn, sig_num, true_n, all_samps=False)
+S1, O1 = np.meshgrid(sigs_1, true_offsets_1)
 
 fig, ax = plt.subplots()
 pm = ax.pcolormesh(X, Y, res_mat)
