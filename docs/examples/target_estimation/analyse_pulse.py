@@ -194,8 +194,23 @@ def make_templates(
         sub_resolution=offsets,
         bandwidth=None,
         fir_filter=FIRFilter.b414d15_gaus,
+        # normalize=True,
     )
 
+def estimate_pulse_phase_flips(
+    rx: npt.NDArray[np.complex128],
+    impulse_response,
+    detected_range_gate: int,
+):
+    """Search range offsets and estimate Doppler at every offset."""
+    # The steps to do this is:
+    # 1. estimate range gate
+    # 2. estimate doppler by decoding
+    # 3. remove doppler, estimate phase flip locations `mask`
+    # 4. remove constant phase by doing signal/mean(signal[~mask])
+    # 5. invert phase flip signals to step-function offset
+    # 6. fit linear function to phase flip ranges
+    raise NotImplementedError()
 
 def estimate_pulse(
     rx: npt.NDArray[np.complex128],
@@ -207,9 +222,8 @@ def estimate_pulse(
 ) -> PulseEstimate:
     """Search range offsets and estimate Doppler at every offset."""
     count = templates.shape[1]
-    # TODO: is the +1 an actual offset or is the group delay of the filter???
-    base_gates = np.arange(min_range_gate, max_range_gate - templates.shape[0]) + 1
-    range_gates = np.arange(min_range_gate, max_range_gate - templates.shape[0], 1.0 / count) + 1
+    base_gates = np.arange(min_range_gate, max_range_gate - templates.shape[0])
+    range_gates = np.arange(min_range_gate, max_range_gate - templates.shape[0], 1.0 / count)
     fft_length = 2 ** (int(np.log2(templates.shape[0])) + 2)
     fft_frequencies = fftshift(fftfreq(fft_length, d=1.0 / sample_rate))
     bin_width = fft_frequencies[1] - fft_frequencies[0]
@@ -263,7 +277,6 @@ def plot_diagnostics(
     carrier: float,
     code: npt.NDArray[np.floating],
     samples_per_baud: int,
-    template_offset: float,
 ) -> list[plt.Figure]:
     """Create summary plots for the range search and best match."""
     ranges_km = estimate.range_gates * constants.c * 1e-3 / sample_rate
@@ -294,7 +307,7 @@ def plot_diagnostics(
     phase = np.exp(-2j * np.pi * estimate.frequency * np.arange(estimate.echo.size) / sample_rate)
     compensated = normalized(estimate.echo * phase)
     template = normalized(estimate.template)
-    mask = transition_mask(code, samples_per_baud, template.size, sample_offset=template_offset)
+    mask = transition_mask(code, samples_per_baud, template.size)
     masked_samples = np.flatnonzero(~mask)
 
     fig_match, axes = plt.subplots(2, 1, sharex=True, figsize=(10, 6), constrained_layout=True)
@@ -467,7 +480,6 @@ def transition_mask(
     samples_per_baud: int,
     length: int,
     margin: int = 1,
-    sample_offset: float = 0.0,
 ) -> npt.NDArray[np.bool_]:
     """Mask code transitions at the selected template's fractional offset."""
     mask = np.ones(length, dtype=bool)
@@ -475,7 +487,7 @@ def transition_mask(
     mask[-margin:] = False
     flips = np.flatnonzero(np.diff(code) != 0) + 1
     for flip in flips:
-        centre = int(np.ceil(flip * samples_per_baud + sample_offset))
+        centre = flip * samples_per_baud
         mask[max(0, centre - margin) : min(length, centre + margin + 1)] = False
     return mask
 
@@ -551,7 +563,6 @@ def main() -> None:
 
     samples_per_baud = int(round(reader.exp_def.baud_length_usec / reader.exp_def.t_samp_usec))
     template_offsets = np.linspace(0.0, 1.0, num=args.sub_resolution)
-    template_offset = float(template_offsets[estimate.template_index])
     figures = plot_diagnostics(
         estimate,
         reference,
@@ -559,7 +570,6 @@ def main() -> None:
         carrier,
         reader.exp_def.code[code_index],
         samples_per_baud,
-        template_offset,
     )
     if args.diagnostics == "full":
         figures.extend(
