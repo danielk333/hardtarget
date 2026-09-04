@@ -1,0 +1,216 @@
+"""Receiver-chain impulse responses.
+
+Currently implements reading from from EISCAT `.fir` files based on `get_impresp.m` written by Jussi
+Markkanen [(c) EISCAT Scientific Association 1998-]
+
+"""
+
+from __future__ import annotations
+
+import warnings
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable
+
+import numpy as np
+import numpy.typing as npt
+from scipy.interpolate import PchipInterpolator
+
+
+@dataclass
+class DigitalReceiverChain:
+    """Desscribes the digital receiver-chain of a radar system, 
+    i.e. all the steps that occur after the initial ADC such as filtering and decimation
+    """
+    model: Callable[[npt.NDArray[np.complexfloating]], npt.NDArray[np.complexfloating]]
+    delay: float
+    decimation: int
+
+
+def _parse_integer(value: str, line_number: int) -> int:
+    """Conveniant debugging when parsing files"""
+    try:
+        return int(value, 0)
+    except ValueError as exc:
+        raise ValueError(f"line {line_number}: invalid integer {value!r}") from exc
+
+
+def read_fir(firpar_file: str | Path) -> tuple[npt.NDArray[np.float64], int, int, int]:
+    """Read an EISCAT FIRPAR 0.1 filter definition.
+
+    Returns
+    -------
+    fir
+        The complete FIR tap sequence, with symmetry expanded and signed
+        20-bit values decoded.
+    f_dec
+        FIR decimation factor.
+    h_dec
+        HDF/CIC decimation factor.
+    h_order
+        Number of HDF/CIC stages.
+    """
+    path = Path(firpar_file)
+    entries: list[tuple[int, list[str]]] = []
+    for line_number, raw_line in enumerate(path.read_text().splitlines(), start=1):
+        line = raw_line.strip()
+        if line and not line.startswith("%"):
+            # Comments may be after a value (as they do in the EISCAT files).
+            entries.append((line_number, line.split("%", maxsplit=1)[0].split()))
+
+    if not entries:
+        raise ValueError(f"{path} appears empty?")
+    if not any(words == ["FIRPAR_VS", "0.1"] for _, words in entries):
+        raise ValueError("Illegal format: only FIRPAR_VS 0.1")
+
+    scalar_keys = {"H_STAGES", "H_DRATE", "F_DRATE", "F_TAPS", "F_ESYM"}
+    values: dict[str, int] = {}
+    tap_values: dict[int, int] = {}
+    for line_number, words in entries:
+        key = words[0]
+        if key == "TAP":
+            if len(words) < 3:
+                raise ValueError(f"line {line_number}: TAP requires an index and value")
+            index = _parse_integer(words[1], line_number)
+            if index < 0:
+                raise ValueError(f"line {line_number}: TAP index cannot be negative")
+            tap_values[index] = _parse_integer(words[2], line_number)
+        elif key in scalar_keys:
+            if len(words) < 2:
+                raise ValueError(f"line {line_number}: {key} requires a value")
+            values[key] = _parse_integer(words[1], line_number)
+
+    missing = scalar_keys.difference(values)
+    if missing:
+        raise ValueError(f"Required parameter(s) not defined: {', '.join(sorted(missing))}")
+    if not tap_values:
+        raise ValueError("TAPs not defined")
+
+    # MATLAB grows a numeric array and fills skipped indices with zero.
+    # The rest is mostly a direct copy from the .m file
+    taps = np.zeros(max(tap_values) + 1, dtype=np.int64)
+    for index, value in tap_values.items():
+        taps[index] = value - 2**20 if value >= 2**19 else value
+
+    f_taps = values["F_TAPS"] + 1
+    if values["F_ESYM"] == 1:
+        reflected = taps[::-1] if f_taps % 2 == 0 else taps[-2::-1]
+    elif values["F_ESYM"] == 0:
+        reflected = taps[-2::-1]
+    else:
+        raise ValueError("'F_ESYM' must be 0 or 1")
+    fir = np.concatenate((taps, reflected)).astype(np.float64)
+
+    if fir.size != f_taps:
+        raise ValueError(f"Number of FIR taps ({f_taps}) does not match expanded TAPs ({fir.size})")
+    return fir, values["F_DRATE"] + 1, values["H_DRATE"] + 1, values["H_STAGES"]
+
+
+def _cic_impulse_response(order: int, decimation: int) -> npt.NDArray[np.float64]:
+    response = np.ones(decimation, dtype=np.float64)
+    for _ in range(order - 1):
+        response = np.convolve(response, np.ones(decimation, dtype=np.float64))
+    # This reproduces hcic's scaling. Later normalizations make the scale cancel,
+    # but retaining it makes the intermediate MATLAB-compatible too.
+    response /= 2.0 ** np.ceil(np.log2(response.sum()))
+    return response
+
+
+def _insert_zeros(values: npt.NDArray[np.float64], count: int) -> npt.NDArray[np.float64]:
+    """replica of the matlab function used"""
+    if count < 1:
+        return values.copy()
+    result = np.zeros((values.size - 1) * (count + 1) + 1, dtype=np.float64)
+    result[:: count + 1] = values
+    return result
+
+
+def get_impresp(
+    firpar_file: str | Path, p_dtau: float, do_plot: bool = False
+) -> tuple[npt.NDArray[np.float64] | float, float, npt.NDArray[np.float64], int]:
+    """Build the equivalent receiver-chain impulse response.
+
+    Parameters are compatible with the original MATLAB `get_impresp` from GUISDAP(?).
+    Times, including `p_dtau` and the returned `t0`, are in microseconds.
+    `taps` has unit sum.
+    """
+    if not np.isscalar(p_dtau) or isinstance(p_dtau, (str, bytes)):
+        raise TypeError("p_dtau must be a numeric scalar")
+    p_dtau = float(p_dtau)
+
+    path = Path(firpar_file)
+    initial = path.stem[:1].lower()
+    if initial == "w":
+        adc_rate = 10.0
+    else:
+        adc_rate = 15.0
+        if initial != "b":
+            # Dont know if this can happen? better warn if it does
+            warnings.warn(
+                f"Cannot infer ADC rate from {path.name!r}; using 15 MHz",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+
+    fir, f_dec, h_dec, h_order = read_fir(path)
+    total_decimation = h_dec * f_dec
+    fir /= fir.max()
+    hdf = _cic_impulse_response(h_order, h_dec)
+    hdf /= np.max(np.abs(hdf))
+    zero_stuffed_fir = _insert_zeros(fir, h_dec - 1)
+    zero_stuffed_fir /= np.max(np.abs(zero_stuffed_fir))
+    taps = np.convolve(hdf, zero_stuffed_fir)
+    taps /= taps.sum()
+
+    # TODO: this was in the original code but i would rather split this across two functions later
+    # and have this return path the default for this function
+    if p_dtau <= 0:
+        return np.nan, np.nan, taps, total_decimation
+
+    ddf = taps / np.sum(taps / adc_rate)
+    t_ddf = np.arange(ddf.size, dtype=np.float64) / adc_rate
+    center = t_ddf[-1] / 2.0
+    half_step = p_dtau / 2.0
+    n_side = np.floor((center - half_step) / p_dtau)
+    t0 = center - half_step - n_side * p_dtau
+    t_end = center + half_step + n_side * p_dtau
+    # arange with a half-step tolerance mirrors MATLAB's inclusive colon.
+    t_ip = np.arange(t0, t_end + p_dtau / 2.0, p_dtau)
+    impresp = PchipInterpolator(t_ddf, ddf, extrapolate=False)(t_ip)
+
+    if do_plot:
+        # TODO: this should be moved away from here
+        plot_response(path, adc_rate, h_dec, f_dec, hdf, fir, ddf, t_ip, impresp)
+    return impresp, t0, taps, total_decimation
+
+
+def plot_response(
+    path: Path,
+    adc_rate: float,
+    h_dec: int,
+    f_dec: int,
+    hdf: npt.NDArray[np.float64],
+    fir: npt.NDArray[np.float64],
+    ddf: npt.NDArray[np.float64],
+    t_ip: npt.NDArray[np.float64],
+    impresp: npt.NDArray[np.float64],
+):
+    """Plot the HDF, FIR, and combined DDF like the MATLAB implementation.
+
+    TODO: Move this to the plotting subpackage
+    """
+    import matplotlib.pyplot as plt
+
+    t_hdf = np.arange(hdf.size) / adc_rate
+    t_fir = h_dec * np.arange(fir.size) / adc_rate
+    t_ddf = np.arange(ddf.size) / adc_rate
+    fig, axes = plt.subplots(2, 2, layout="tight")
+    axes[0, 0].plot(t_hdf, hdf, "-" if hdf.size >= 20 else "o-")
+    axes[0, 0].set_title(f"HDF / {path.stem} + Decimation {h_dec}")
+    axes[0, 1].plot(t_fir, fir, "-" if fir.size >= 20 else "o-")
+    axes[0, 1].set_title(f"FIR / {path.stem} + Decimation {f_dec}")
+    axes[1, 0].remove()
+    ddf_axis = axes[1, 1]
+    ddf_axis.plot(t_ddf, ddf, "b-", t_ip, impresp, "r-")
+    ddf_axis.set(title="DDF", xlabel="time [us]", xlim=(0, t_ddf[-1]))
+    return fig, axes

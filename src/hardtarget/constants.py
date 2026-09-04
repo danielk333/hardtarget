@@ -10,12 +10,17 @@ except ImportError:
         LowercaseStrEnum as StrEnum,  # type: ignore[import-not-found,no-redef, unused-ignore]
     )
 
-
-# TODO: i think this should be called ReceiverChainModel instead since that is what it is, usually
-# its several FIR filters and decimations chained together and we might model other things like
-# analouge effects later
+# TODO: left this to now break everythng
 class FIRFilter(StrEnum):
-    """FIR Filter type"""
+
+    b414d15_gaus = "b414d15_gaus"
+    mu2004 = "mu2004"
+    none = "none"
+    unknown = "unknown"
+
+# TODO: something like this?
+class ReceiverChainModel(StrEnum):
+    """Receiver Chain Model type"""
 
     b414d15_gaus = "b414d15_gaus"
     mu2004 = "mu2004"

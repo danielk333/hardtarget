@@ -9,6 +9,7 @@ import scipy.signal as sc_signal
 from scipy.fft import fft, fftfreq, ifft
 
 from hardtarget.constants import FIRFilter
+from .receiver_chain import get_impresp
 
 
 def boxcar(n: int, normalize: bool = True) -> npt.NDArray:
@@ -16,6 +17,7 @@ def boxcar(n: int, normalize: bool = True) -> npt.NDArray:
     return h / h.sum() if normalize else h
 
 
+# TODO: move all these that relate to the model to receiver_chain.py
 def apply_b414d15_gaus(x: npt.NDArray[np.complexfloating]) -> npt.NDArray[np.complexfloating]:
     """
     Equivalent chain from b414d15_gaus.fir:
@@ -179,9 +181,9 @@ def simulate_pulse_code(
     return signal
 
 
-def phase_flip_model(
-    fir_filter: FIRFilter = FIRFilter.b414d15_gaus,
-    sample_offset: float = 0.5,
+def phase_flip_model_impulse(
+    fir_filter: FIRFilter,
+    sample_offsets: npt.NDArray[np.float64],
 ) -> npt.NDArray[np.complex128]:
     if fir_filter == FIRFilter.b414d15_gaus:
         filt = apply_b414d15_gaus
@@ -199,7 +201,26 @@ def phase_flip_model(
     res = np.full((len(offsets), 3), np.nan, dtype=np.complex128)
     for ind, offset in enumerate(offsets):
         signal = np.full((10 * decimation,), -1, dtype=np.complex128)
-        signal[:np.floor((5 + offset) * decimation).astype(np.int64)] = 1
+        signal[: np.floor((5 + offset) * decimation).astype(np.int64)] = 1
+        fsignal = filt(signal)
+
+        res[ind, 0] = fsignal[6]
+        res[ind, 1] = fsignal[7]
+        res[ind, 2] = fsignal[5]
+    return res, offsets
+
+
+def phase_flip_model(
+    fir_filter: FIRFilter = FIRFilter.b414d15_gaus,
+    sample_offset: float = 0.5,
+) -> npt.NDArray[np.complex128]:
+    taps, total_decimation
+    offsets = np.linspace(-sample_offset, sample_offset, int(decimation * 2 * sample_offset))
+
+    res = np.full((len(offsets), 3), np.nan, dtype=np.complex128)
+    for ind, offset in enumerate(offsets):
+        signal = np.full((10 * decimation,), -1, dtype=np.complex128)
+        signal[: np.floor((5 + offset) * decimation).astype(np.int64)] = 1
         fsignal = filt(signal)
 
         res[ind, 0] = fsignal[6]
@@ -247,12 +268,15 @@ def tx_signal_model(
     if fir_filter == FIRFilter.b414d15_gaus:
         filt = apply_b414d15_gaus
         decimation = 15
+        filter_lag = 1
     elif fir_filter == FIRFilter.mu2004:
         filt = mu_radar_filter_post_2004
         decimation = 120
+        filter_lag = 0
     elif fir_filter == FIRFilter.none:
         filt = lambda x: x
         decimation = 1
+        filter_lag = 0
     else:
         raise ValueError("TODO: error here")
 
@@ -268,13 +292,13 @@ def tx_signal_model(
             baud_length_usec=baud_length_usec,
             t_samp_usec=t_samp_usec / decimation,
             ipp_t_usec=ipp_t_usec,
-            signal_length=read_length * decimation,
+            signal_length=(read_length + filter_lag) * decimation,
             start_samp=(start_samp + offsets[ind]) * decimation,
         )
         # filter to the initial bandwidth of the transmitter
         if bandwidth is not None:
             spectrum = fft(signal)
-            freqs = fftfreq(read_length * decimation, d=decimation * 1e6 / t_samp_usec)
+            freqs = fftfreq(len(signal), d=decimation * 1e6 / t_samp_usec)
             mask = np.abs(freqs) <= bandwidth / 2
             filtered_spectrum = spectrum * mask
             fsignal = ifft(filtered_spectrum)
@@ -282,7 +306,8 @@ def tx_signal_model(
             signal[inds] = fsignal[inds]
 
         # filter according to the receiver chain
-        signals[:, ind] = filt(signal)
+        signal = filt(signal)[filter_lag:]
+        signals[:, ind] = signal
 
     if normalize:
         mu = np.mean(signals, axis=0)
