@@ -21,6 +21,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 colors = ["tab:blue", "tab:orange", "tab:green"]
+offset_limits = (0, 1)
 
 impresp, t0, taps, decimation = receiver_chain.get_impresp(
     args.firpar_file,
@@ -30,7 +31,7 @@ impresp, t0, taps, decimation = receiver_chain.get_impresp(
 
 
 dc_gain = np.sum(taps)
-y = -dc_gain + 2 * np.cumsum(taps)
+y = np.real(-dc_gain + 2 * np.cumsum(taps))
 n = np.arange(len(y))
 
 f = interp1d(n, y, kind="linear", fill_value=(-1, 1), bounds_error=False)
@@ -38,15 +39,19 @@ f = interp1d(n, y, kind="linear", fill_value=(-1, 1), bounds_error=False)
 
 t = np.linspace(0, len(y) - 1, 1000)
 fig, ax = plt.subplots()
-ax.plot(t, f(t))
-ax.set(xlabel="Sample", ylabel="Amplitude")
+ax.plot(t, f(t), "-", c=colors[0], label="Interpolation")
+ax.plot(n, y, "o", c=colors[0], label="Filter output")
+ax.set(
+    xlabel="Sample (@ input sample rate)",
+    ylabel="Amplitude",
+    title="Interpolated filter step response",
+)
+ax.legend()
 ax.grid()
+plt.show()
 
 num = 100
 offsets = np.linspace(-1, 1, num)
-# given the filter group delay of 1, we can sample the transitions around the step
-# and the offset is just a offset in this function?
-
 
 np.random.seed(124)
 sig_n = 0.1
@@ -63,35 +68,48 @@ def fit_transition(offset, points):
 
 
 # we rotate it back to real plane by ~mask samples
-# and y/np.mean(y[~mask]) in real data
+# and y/np.mean(y[~mask]) in real data 
+# but here we assume that is already done
 
 s = np.real(syn_data)
 
 fig, ax = plt.subplots()
 ax.plot(offsets, np.array([fit_transition(x, s) for x in offsets]))
+ax.axvline(true_offset, c="r", label="True offset")
+ax.set(
+    xlabel="Trial offset [samples]",
+    ylabel="Sum of squared errors",
+    title="Transition-fit objective",
+)
+ax.legend()
+ax.grid()
 
-# one can use interp as an inverter! but for now we minimze
-res = minimize_scalar(fit_transition, bounds=(0, 1), args=(s,))
+# One can use interpolation as an inverter, but for now we minimize.
+res = minimize_scalar(fit_transition, bounds=offset_limits, args=(s,))
 print(res)
 
 
 fig, ax = plt.subplots()
-ax.plot(offsets, f((0 - offsets) * decimation), label="sample -1", c=colors[0])
-ax.plot(offsets, f((1 - offsets) * decimation), label="sample 0", c=colors[1])
-ax.plot(offsets, f((2 - offsets) * decimation), label="sample +1", c=colors[2])
+ax.plot(offsets, f((0 - offsets) * decimation), label="Sample -1", c=colors[0])
+ax.plot(offsets, f((1 - offsets) * decimation), label="Sample 0", c=colors[1])
+ax.plot(offsets, f((2 - offsets) * decimation), label="Sample +1", c=colors[2])
 for ind in range(len(samps)):
-    ax.plot(true_offset, f0[ind], "o", c=colors[ind])
-    ax.plot(true_offset, syn_data[ind], "x", c=colors[ind])
-ax.axvline(res.x, c="g")
+    ax.plot(true_offset, f0[ind], "o", c=colors[ind], label="True offset/signal")
+    ax.plot(true_offset, syn_data[ind], "x", c=colors[ind], label="Noisy signal")
+ax.axvline(res.x, c="g", label="Estimated offset")
+ax.set(
+    xlabel="Transition offset [samples]",
+    ylabel="Amplitude",
+    title="Transition samples and fitted offset",
+)
+ax.grid()
 ax.legend()
 
-lims = (0, 1)
 
-
-# Monte-Carlo that stuff!
 def run_est(mc_num, sig_num, true_n, all_samps=True):
+    """Estimate mean absolute offset errors with a Monte Carlo simulation."""
     sigs = np.linspace(0.1, 0.5, sig_num)
-    true_offsets = np.linspace(lims[0], lims[1], true_n)
+    true_offsets = np.linspace(*offset_limits, true_n)
     pbar = tqdm(total=sig_num * true_n * mc_num)
     if all_samps:
         samps = np.arange(3)
@@ -107,11 +125,18 @@ def run_est(mc_num, sig_num, true_n, all_samps=True):
         est_offset = np.empty((true_n, mc_num), dtype=np.float64)
         for ind, true_offset in enumerate(true_offsets):
             for mci in range(mc_num):
-                xi = sig_n * (np.random.randn(len(samps)) + 1j * np.random.randn(len(samps)))
+                xi = sig_n * (
+                    np.random.randn(len(samps))
+                    + 1j * np.random.randn(len(samps))
+                )
                 f0 = f((samps - true_offset) * decimation)
                 syn_data = f0 + xi
                 s = np.real(syn_data)
-                res = minimize_scalar(fit_transition, bounds=lims, args=(s,))
+                res = minimize_scalar(
+                    fit_transition,
+                    bounds=offset_limits,
+                    args=(s,),
+                )
                 est_offset[ind, mci] = res.x
                 pbar.update()
 
@@ -122,20 +147,37 @@ def run_est(mc_num, sig_num, true_n, all_samps=True):
 
 sig_num = 10
 true_n = 40
-mcn = 500
+mcn = 100
 sigs_3, true_offsets_3, res_mat_3 = run_est(mcn, sig_num, true_n)
-S3, O3 = np.meshgrid(sigs_3, true_offsets_3)
-
-fig, ax = plt.subplots(1,2)
-pm = ax.pcolormesh(S3, O3, res_mat)
-fig.colorbar(pm, ax=ax)
-
 sigs_1, true_offsets_1, res_mat_1 = run_est(mcn, sig_num, true_n, all_samps=False)
-S1, O1 = np.meshgrid(sigs_1, true_offsets_1)
 
-fig, ax = plt.subplots()
-pm = ax.pcolormesh(X, Y, res_mat)
-fig.colorbar(pm, ax=ax)
+color_limits = {
+    "vmin": min(res_mat_3.min(), res_mat_1.min()),
+    "vmax": max(res_mat_3.max(), res_mat_1.max()),
+}
+fig, axes = plt.subplots(1, 2, sharex=True, sharey=True, constrained_layout=True)
+for ax, sigs, true_offsets, errors, title in zip(
+    axes,
+    (sigs_3, sigs_1),
+    (true_offsets_3, true_offsets_1),
+    (res_mat_3, res_mat_1),
+    ("Three transition samples", "One transition sample"),
+):
+    mesh = ax.pcolormesh(
+        sigs,
+        true_offsets,
+        errors,
+        shading="auto",
+        **color_limits,
+    )
+    ax.set(
+        xlabel="Noise standard deviation",
+        ylabel="True offset [samples]",
+        title=title,
+    )
+
+fig.suptitle("Monte Carlo offset-estimation error")
+fig.colorbar(mesh, ax=axes, label="Mean absolute error [samples]")
 
 
 plt.show()
