@@ -9,7 +9,7 @@ from radardef.radar_stations.eiscat.experiments import load_radar_code
 from scipy import constants
 from tqdm import tqdm
 
-from hardtarget.constants import FIRFilter
+from hardtarget.constants import ReceiverChainModel
 from hardtarget.data_simulation.tx_model import phase_flip_model, tx_signal_model
 
 # First we define a simple code
@@ -19,7 +19,7 @@ from hardtarget.data_simulation.tx_model import phase_flip_model, tx_signal_mode
 # ```
 
 code = load_radar_code("leo_bpark")[0, :]
-fir_filter = FIRFilter.b414d15_gaus
+fir_filter = ReceiverChainModel.b414d15_gaus
 t_samp_usec = 1
 baud_length_usec = 30
 decimation = 15
@@ -36,7 +36,7 @@ tx = tx_signal_model(
     start_samp=0,
     ipp_samps=tx_samples,
     read_length=tx_samples,
-    fir_filter=fir_filter,
+    filt=fir_filter,
     bandwidth=1e6,
 )
 
@@ -58,7 +58,7 @@ tx = tx_signal_model(
     ipp_samps=tx_samples * 10,
     read_length=tx_samples * 2,
     sub_resolution=example_sub_resolution,
-    fir_filter=fir_filter,
+    filt=fir_filter,
     bandwidth=1e6,
 )
 fig, axes = plt.subplots(2, 1)
@@ -71,7 +71,7 @@ axes[1].set_xlim((tx_samples * 0.5, tx_samples * 0.5 + baud_length_usec / t_samp
 
 
 # We can also model the phase flip behaviour directly
-values, offsets = phase_flip_model(fir_filter=fir_filter, sample_offset=2)
+values, offsets = phase_flip_model(filt=fir_filter, sample_offset=2)
 
 fig, ax = plt.subplots()
 ax.plot(offsets, np.real(values[:, -1]), label="Index -1")
@@ -101,7 +101,7 @@ def simulate_and_match(noise_sigma, offset):
         ipp_samps=tx_samples * 10,
         read_length=tx_samples * 2,
         sub_resolution=np.array([offset]),
-        fir_filter=fir_filter,
+        filt=fir_filter,
         bandwidth=None,
     )
     xi = noise_sigma * (np.random.randn(tx.shape[0]) + 1j * np.random.randn(tx.shape[0]))
@@ -115,7 +115,7 @@ def simulate_and_match(noise_sigma, offset):
         ipp_samps=tx_samples * 10,
         read_length=tx_samples * 2,
         sub_resolution=sub_resolution,
-        fir_filter=fir_filter,
+        filt=fir_filter,
         bandwidth=None,
         normalize=True,
     )
@@ -182,7 +182,7 @@ plt.show()
 #         ipp_samps=tx_samples * 10,
 #         read_length=tx_samples * 2,
 #         sub_resolution=sub_resolution,
-#         fir_filter=fir_filter,
+#         filt=fir_filter,
 #         bandwidth=1e6,
 #     )
 #     match = np.abs(np.sum(noisy_signal * np.conj(tx_match[:, 0])))

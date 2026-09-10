@@ -17,13 +17,14 @@ import numpy.typing as npt
 import radardef
 from matplotlib import pyplot as plt
 from radardef.types import BeamType, EiscatUHFLocation
+from radardef.types.types import ExpDef
 from scipy import constants
 from scipy.fft import fft, fftfreq, fftshift
 from spacecoords import interpolation
 from tqdm import tqdm
 
 from hardtarget import plotting
-from hardtarget.constants import FIRFilter
+from hardtarget.constants import ReceiverChainModel
 from hardtarget.data_simulation.tx_model import match_pulse_code, tx_modulation_model, tx_signal_model
 from hardtarget.plotting.raw_data_plots import extract_requested_range_gates
 from hardtarget.process.utils import sample_interval_to_closest_ipp
@@ -155,7 +156,7 @@ def orbit_references(
 
 def select_code(
     tx: npt.NDArray[np.complex128],
-    exp_def: object,
+    exp_def: ExpDef,
     sequence_index: int,
     source: str,
 ) -> int:
@@ -177,25 +178,26 @@ def select_code(
 
 def make_templates(
     tx: npt.NDArray[np.complex128],
-    exp_def: object,
+    exp_def: ExpDef,
     code_index: int,
     count: int,
     source: str,
 ) -> npt.NDArray[np.complex128]:
-    offsets = np.linspace(0.0, 1.0, num=count)
+
     if source == "measured":
-        return tx_modulation_model(tx, np.ones(tx.size, dtype=bool), sub_resolution=offsets)
+        return tx_modulation_model(tx, np.ones(tx.size, dtype=bool), sub_resolution=count)
     return tx_signal_model(
         code=exp_def.code[code_index],
         baud_length_usec=exp_def.baud_length_usec,
         t_samp_usec=exp_def.t_samp_usec,
         ipp_samps=exp_def.ipp_samps,
         read_length=tx.size,
-        sub_resolution=offsets,
+        sub_resolution=count,
         bandwidth=None,
-        fir_filter=FIRFilter.b414d15_gaus,
+        filt=ReceiverChainModel.b414d15_gaus,
         # normalize=True,
     )
+
 
 def estimate_pulse_phase_flips(
     rx: npt.NDArray[np.complex128],
@@ -211,6 +213,7 @@ def estimate_pulse_phase_flips(
     # 5. invert phase flip signals to step-function offset
     # 6. fit linear function to phase flip ranges
     raise NotImplementedError()
+
 
 def estimate_pulse(
     rx: npt.NDArray[np.complex128],
@@ -441,7 +444,7 @@ def plot_full_diagnostics(
         read_length=data.tx.size,
         sub_resolution=np.array([true_offset]),
         bandwidth=None,
-        fir_filter=FIRFilter.b414d15_gaus,
+        filt=ReceiverChainModel.b414d15_gaus,
     )[:, 0]
     true_echo = data.rx[true_range_index : true_range_index + data.tx.size]
     true_doppler = reference.v * carrier / constants.c

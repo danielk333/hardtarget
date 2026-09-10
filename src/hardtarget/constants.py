@@ -10,22 +10,13 @@ except ImportError:
         LowercaseStrEnum as StrEnum,  # type: ignore[import-not-found,no-redef, unused-ignore]
     )
 
-# TODO: left this to now break everythng
-class FIRFilter(StrEnum):
 
-    b414d15_gaus = "b414d15_gaus"
-    mu2004 = "mu2004"
-    none = "none"
-    unknown = "unknown"
-
-# TODO: something like this?
 class ReceiverChainModel(StrEnum):
     """Receiver Chain Model type"""
 
     b414d15_gaus = "b414d15_gaus"
     mu2004 = "mu2004"
     none = "none"
-    unknown = "unknown"
 
 
 class AnalysisMethod(StrEnum):

@@ -27,14 +27,12 @@ def fir_file(tmp_path: Path) -> Path:
 
 def test_read_fir_hex_taps(fir_file: Path) -> None:
     fir, f_dec, h_dec, h_order = read_fir(fir_file)
-
     np.testing.assert_array_equal(fir, [0x29F17, 0x53E2D, 0x29F17])
     assert (f_dec, h_dec, h_order) == (3, 5, 5)
 
 
 def test_get_impresp(fir_file: Path) -> None:
     _, _, taps, decimation = get_impresp(fir_file, 0.05)
-
     assert decimation == 15
     assert taps.size == 31
     assert taps.sum() == pytest.approx(1.0)

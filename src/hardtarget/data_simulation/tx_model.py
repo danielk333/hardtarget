@@ -5,105 +5,14 @@ Tx signal models, used to simulate tx signals when not available.
 import numpy as np
 import numpy.typing as npt
 import scipy.interpolate as interpolate
-import scipy.signal as sc_signal
 from scipy.fft import fft, fftfreq, ifft
 
-from hardtarget.constants import FIRFilter
-from .receiver_chain import get_impresp
-
-
-def boxcar(n: int, normalize: bool = True) -> npt.NDArray:
-    h = np.ones(n, dtype=float)
-    return h / h.sum() if normalize else h
-
-
-# TODO: move all these that relate to the model to receiver_chain.py
-def apply_b414d15_gaus(x: npt.NDArray[np.complexfloating]) -> npt.NDArray[np.complexfloating]:
-    """
-    Equivalent chain from b414d15_gaus.fir:
-      total decimation = 15
-
-      5 cascaded 5-tap boxcar FIRs
-      decimate by 5
-      2 cascaded 2-tap boxcar FIRs
-      decimate by 3
-
-      TODO: this seems to have a lag of exactly 1 output sample - maybe that is compensated for?
-    """
-    y = x.copy()
-
-    # HDF section: 5 boxcar FIRs, each 5 taps
-    h5 = boxcar(5)
-    for _ in range(5):
-        y = sc_signal.lfilter(h5, [1.0], y)  # type: ignore[attr-defined]
-
-    # # Decimate x MHz -> x/5 MHz
-    y = y[::5]
-
-    # FIR section: 2 boxcar FIRs, each 2 taps
-    h2 = boxcar(2)
-    for _ in range(2):
-        y = sc_signal.lfilter(h2, [1.0], y)  # type: ignore[attr-defined]
-
-    # Decimate x/5 MHz -> x/15 MHz
-    y = y[::3]
-    return y
-
-
-def cic_decimate(
-    x: npt.NDArray[np.complexfloating], decimation: int, combs: int, delay: int = 1
-) -> npt.NDArray[np.complexfloating]:
-    """
-    CIC decimator: N integrators at input rate that is decimated,
-    then N comb stages at output rate with a delay.
-    """
-    y = np.asarray(x, dtype=np.complex128)
-
-    # integrators
-    for _ in range(combs):
-        y = np.cumsum(y)
-
-    # decimate
-    y = y[::decimation]
-
-    # combs
-    for _ in range(combs):
-        y = y - np.concatenate([np.zeros(delay, dtype=y.dtype), y[:-delay]])
-
-    # normalize CIC DC gain
-    y /= (decimation * delay) ** combs
-    return y
-
-
-def mu_radar_filter_post_2004(
-    x: npt.NDArray[np.complexfloating],
-    t_samp_usec: float = 6.0,
-) -> npt.NDArray[np.complexfloating]:
-    """
-    Model MUR chain accoring to [^1]
-    IF samples at complex baseband -> CIC decimation -> 16-tap FIR compensation.
-
-    [^1]: Hassenpflug, G., Yamamoto, M., Luce, H., Fukao, S., 2008.
-        Description and demonstration of the new Middle and Upper atmosphere Radar imaging system: 1-D, 2-D, and 3-D imaging of troposphere and stratosphere.
-        Radio Sci. 43, RS2013. https://doi.org/10.1029/2006RS003603
-
-    """
-    # CIC matched-filter / decimator
-    # TODO: guessing the cic decimation rate of 8, it kinda makes sense beacuse with 16 taps
-    # 8*15=120 which is the total decimation rate... but double check needed!
-    y_cic = cic_decimate(x, decimation=8, combs=6)
-
-    # 16-tap FIR amplitude/frequency compensator
-    # TODO: gussing the compensating FIR, no coefficients were available in the paper?
-    fir_taps = sc_signal.firwin(  # type: ignore[attr-defined]
-        numtaps=16,
-        cutoff=0.8,
-        window="hamming",
-    )
-    y_out = sc_signal.lfilter(fir_taps, [1.0], y_cic)  # type: ignore[attr-defined]
-    y_out = y_out[::15]
-
-    return y_out
+from hardtarget.constants import ReceiverChainModel
+from hardtarget.data_simulation.receiver_chain import (
+    DigitalReceiverChain,
+    b414d15_gaus,
+    get_reciver_chain,
+)
 
 
 def match_pulse_code(
@@ -139,7 +48,7 @@ def tx_modulation_model(
     """
 
     if isinstance(sub_resolution, int):
-        offsets = np.linspace(0, 1, sub_resolution)
+        offsets = np.linspace(0, 1, sub_resolution, endpoint=False)
     else:
         offsets = sub_resolution
     modulated_tx = np.zeros((tx_signal.size, len(offsets)), dtype=tx_signal.dtype)
@@ -155,9 +64,19 @@ def tx_modulation_model(
     )
 
     # Signal value of tx sub resolutions
-    for ind in range(len(offsets)):
-        x = fun(np.arange(tx_signal.size) - offsets[ind])
-        modulated_tx[tx_stencil, ind] = x[tx_stencil]
+    # for ind in range(len(offsets)):
+    #    x = fun(np.arange(tx_signal.size) - offsets[ind])  # Shouldn't this be +? or -[-ind]
+    #    modulated_tx[tx_stencil, ind] = x[tx_stencil]
+    #
+    #
+    # TODO: Add filter as input again!
+    super_sample = np.arange(tx_signal.size * 15) / 15  # 15 = decimation
+
+    for ind in range(sub_resolution):
+        x = fun(super_sample - offsets[ind])
+        modulated_tx[tx_stencil, ind] = b414d15_gaus(
+            x, h_stages=5, h_drate=4, f_taps=2, f_esym=1, f_drate=2, taps=[0x29F17, 0x53E2D]
+        )[tx_stencil]
 
     return modulated_tx
 
@@ -182,26 +101,18 @@ def simulate_pulse_code(
 
 
 def phase_flip_model_impulse(
-    fir_filter: FIRFilter,
+    filt: ReceiverChainModel | DigitalReceiverChain | str,
     sample_offsets: npt.NDArray[np.float64],
 ) -> npt.NDArray[np.complex128]:
-    if fir_filter == FIRFilter.b414d15_gaus:
-        filt = apply_b414d15_gaus
-        decimation = 15
-    elif fir_filter == FIRFilter.mu2004:
-        filt = mu_radar_filter_post_2004
-        decimation = 120
-    elif fir_filter == FIRFilter.none:
-        filt = lambda x: x
-        decimation = 1
-    else:
-        raise ValueError("TODO: error here")
-    offsets = np.linspace(-sample_offset, sample_offset, int(decimation * 2 * sample_offset))
+    if isinstance(filt, (ReceiverChainModel, str)):
+        filt = get_reciver_chain(filt)
+
+    offsets = np.linspace(-sample_offset, sample_offset, int(filt.decimation * 2 * sample_offset))
 
     res = np.full((len(offsets), 3), np.nan, dtype=np.complex128)
     for ind, offset in enumerate(offsets):
-        signal = np.full((10 * decimation,), -1, dtype=np.complex128)
-        signal[: np.floor((5 + offset) * decimation).astype(np.int64)] = 1
+        signal = np.full((10 * filt.decimation,), -1, dtype=np.complex128)
+        signal[: np.floor((5 + offset) * filt.decimation).astype(np.int64)] = 1
         fsignal = filt(signal)
 
         res[ind, 0] = fsignal[6]
@@ -211,16 +122,19 @@ def phase_flip_model_impulse(
 
 
 def phase_flip_model(
-    fir_filter: FIRFilter = FIRFilter.b414d15_gaus,
+    filt: ReceiverChainModel | DigitalReceiverChain | str,
     sample_offset: float = 0.5,
 ) -> npt.NDArray[np.complex128]:
-    taps, total_decimation
-    offsets = np.linspace(-sample_offset, sample_offset, int(decimation * 2 * sample_offset))
+
+    if isinstance(filt, (ReceiverChainModel, str)):
+        filt = get_reciver_chain(filt)
+
+    offsets = np.linspace(-sample_offset, sample_offset, int(filt.decimation * 2 * sample_offset))
 
     res = np.full((len(offsets), 3), np.nan, dtype=np.complex128)
     for ind, offset in enumerate(offsets):
-        signal = np.full((10 * decimation,), -1, dtype=np.complex128)
-        signal[: np.floor((5 + offset) * decimation).astype(np.int64)] = 1
+        signal = np.full((10 * filt.decimation,), -1, dtype=np.complex128)
+        signal[: np.floor((5 + offset) * filt.decimation).astype(np.int64)] = 1
         fsignal = filt(signal)
 
         res[ind, 0] = fsignal[6]
@@ -238,7 +152,7 @@ def tx_signal_model(
     bandwidth: float | None,
     start_samp: int = 0,
     sub_resolution: int | npt.NDArray[np.float64] = 1,
-    fir_filter: FIRFilter = FIRFilter.b414d15_gaus,
+    filt: ReceiverChainModel | DigitalReceiverChain | str = ReceiverChainModel.b414d15_gaus,
     normalize: bool = False,
 ) -> npt.NDArray[np.complex128]:
     """
@@ -261,27 +175,16 @@ def tx_signal_model(
     """
     # TODO: update docstring
 
+    if isinstance(filt, (ReceiverChainModel, str)):
+        filt = get_reciver_chain(filt)
+
+    ipp_t_usec = ipp_samps * t_samp_usec
+
     if isinstance(code, tuple):
         code = np.array(code).astype(np.float64)
 
-    ipp_t_usec = ipp_samps * t_samp_usec
-    if fir_filter == FIRFilter.b414d15_gaus:
-        filt = apply_b414d15_gaus
-        decimation = 15
-        filter_lag = 1
-    elif fir_filter == FIRFilter.mu2004:
-        filt = mu_radar_filter_post_2004
-        decimation = 120
-        filter_lag = 0
-    elif fir_filter == FIRFilter.none:
-        filt = lambda x: x
-        decimation = 1
-        filter_lag = 0
-    else:
-        raise ValueError("TODO: error here")
-
     if isinstance(sub_resolution, int):
-        offsets = np.linspace(0, 1, sub_resolution)
+        offsets = np.linspace(0, 1, sub_resolution, endpoint=False)
     else:
         offsets = sub_resolution
     signals = np.zeros((read_length, len(offsets)), dtype=np.complex128)
@@ -290,15 +193,15 @@ def tx_signal_model(
         signal = simulate_pulse_code(
             code=code,
             baud_length_usec=baud_length_usec,
-            t_samp_usec=t_samp_usec / decimation,
+            t_samp_usec=t_samp_usec / filt.decimation,
             ipp_t_usec=ipp_t_usec,
-            signal_length=(read_length + filter_lag) * decimation,
-            start_samp=(start_samp + offsets[ind]) * decimation,
+            signal_length=(read_length + filt.delay) * filt.decimation,
+            start_samp=(start_samp + offsets[ind]) * filt.decimation,
         )
         # filter to the initial bandwidth of the transmitter
         if bandwidth is not None:
             spectrum = fft(signal)
-            freqs = fftfreq(len(signal), d=decimation * 1e6 / t_samp_usec)
+            freqs = fftfreq(len(signal), d=filt.decimation * 1e6 / t_samp_usec)
             mask = np.abs(freqs) <= bandwidth / 2
             filtered_spectrum = spectrum * mask
             fsignal = ifft(filtered_spectrum)
@@ -306,7 +209,7 @@ def tx_signal_model(
             signal[inds] = fsignal[inds]
 
         # filter according to the receiver chain
-        signal = filt(signal)[filter_lag:]
+        signal = filt.model(signal)[filt.delay :]
         signals[:, ind] = signal
 
     if normalize:

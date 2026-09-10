@@ -17,7 +17,7 @@ from hardtarget.echo_search import EchoSearchOutArgs, EchoSearchProParams
 from hardtarget.echo_search.types import EchoSearchCfgParams
 from hardtarget.libs import load_c_lib
 from hardtarget.plotting import echo_search_plot, rti
-from src.hardtarget.constants import FIRFilter
+from src.hardtarget.constants import ReceiverChainModel
 
 
 @pytest.mark.parametrize("impl", [Impl.c])  # Impl.numpy
@@ -190,7 +190,7 @@ def test_crosscorrelate_tx_model(plot):
             dtype=np.float64,
         ),
         rx_channels=np.arange(1, 26).tolist(),
-        fir_filter=FIRFilter.mu2004,
+        fir_filter=ReceiverChainModel.mu2004,
         samples_per_file=10000000,
     )
 
@@ -205,7 +205,7 @@ def test_crosscorrelate_tx_model(plot):
             read_length=len(exp_def.code) * 2,
             bandwidth=1e6,
             start_samp=0,
-            fir_filter=FIRFilter.mu2004,
+            fir_filter=ReceiverChainModel.mu2004,
         )
         .flatten()
         .astype(np.complex64)

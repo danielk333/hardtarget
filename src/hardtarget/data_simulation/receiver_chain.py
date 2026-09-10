@@ -7,24 +7,160 @@ Markkanen [(c) EISCAT Scientific Association 1998-]
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Protocol
 
 import numpy as np
 import numpy.typing as npt
+import scipy.signal as sc_signal
 from scipy.interpolate import PchipInterpolator
+
+from hardtarget.constants import ReceiverChainModel
+
+
+def boxcar(n: int, normalize: bool = True) -> npt.NDArray:
+    h = np.ones(n, dtype=float)
+    return h / h.sum() if normalize else h
+
+
+def b414d15_gaus(
+    x: npt.NDArray[np.complexfloating],
+    h_stages: int,
+    h_drate: int,
+    f_taps: int,
+    f_esym: int,
+    f_drate: int,
+    taps: list[int],
+) -> npt.NDArray[np.complexfloating]:
+    """
+    https://www.renesas.com/en/document/dst/hsp43220-datasheet?r=528226
+
+    """
+
+    y = x.copy()
+
+    # --- High Order Decimation Filter ---
+    hodf_decimation = h_drate + 1
+    h_hdf = boxcar(hodf_decimation)
+    for _ in range(h_stages):
+        y = sc_signal.lfilter(h_hdf, [1.0], y)
+
+    # Downsample
+    y = y[::hodf_decimation]
+
+    # --- FIR Decimation filter ---
+
+    norm_taps = np.array(taps[:f_taps]) / 0x7FFFF
+
+    if f_esym:
+        h_fir = np.concatenate((norm_taps, norm_taps[::-1]))
+    else:
+        h_fir = np.concatenate((norm_taps, -norm_taps[::-1]))
+
+    h_fir = h_fir / h_fir.sum()
+
+    y = sc_signal.lfilter(h_fir, [1.0], y)
+
+    # Final decimation downsample step
+    y = y[:: f_drate + 1]
+
+    return np.array(y)
+
+
+def cic_decimate(
+    x: npt.NDArray[np.complexfloating], decimation: int, combs: int, delay: int = 1
+) -> npt.NDArray[np.complexfloating]:
+    """
+    CIC decimator: N integrators at input rate that is decimated,
+    then N comb stages at output rate with a delay.
+    """
+    y = np.asarray(x, dtype=np.complex128)
+
+    # integrators
+    for _ in range(combs):
+        y = np.cumsum(y)
+
+    # decimate
+    y = y[::decimation]
+
+    # combs
+    for _ in range(combs):
+        y = y - np.concatenate([np.zeros(delay, dtype=y.dtype), y[:-delay]])
+
+    # normalize CIC DC gain
+    y /= (decimation * delay) ** combs
+    return y
+
+
+def mu_radar_filter_post_2004(
+    x: npt.NDArray[np.complexfloating],
+) -> npt.NDArray[np.complexfloating]:
+    """
+    Model MUR chain accoring to [^1]
+    IF samples at complex baseband -> CIC decimation -> 16-tap FIR compensation.
+
+    [^1]: Hassenpflug, G., Yamamoto, M., Luce, H., Fukao, S., 2008.
+        Description and demonstration of the new Middle and Upper atmosphere Radar imaging system: 1-D, 2-D, and 3-D imaging of troposphere and stratosphere.
+        Radio Sci. 43, RS2013. https://doi.org/10.1029/2006RS003603
+
+    """
+    # CIC matched-filter / decimator
+    # TODO: guessing the cic decimation rate of 8, it kinda makes sense beacuse with 16 taps
+    # 8*15=120 which is the total decimation rate... but double check needed!
+    y_cic = cic_decimate(x, decimation=8, combs=6)
+
+    # 16-tap FIR amplitude/frequency compensator
+    # TODO: gussing the compensating FIR, no coefficients were available in the paper?
+    fir_taps = sc_signal.firwin(  # type: ignore[attr-defined]
+        numtaps=16,
+        cutoff=0.8,
+        window="hamming",
+    )
+    y_out = sc_signal.lfilter(fir_taps, [1.0], y_cic)  # type: ignore[attr-defined]
+    y_out = y_out[::15]
+
+    return np.array(y_out)
+
+
+class PulseFilter(Protocol):
+    def __call__(self, x: npt.NDArray[np.complexfloating]) -> npt.NDArray[np.complexfloating]: ...
 
 
 @dataclass
 class DigitalReceiverChain:
-    """Desscribes the digital receiver-chain of a radar system, 
+    """Describes the digital receiver-chain of a radar system,
     i.e. all the steps that occur after the initial ADC such as filtering and decimation
     """
-    model: Callable[[npt.NDArray[np.complexfloating]], npt.NDArray[np.complexfloating]]
-    delay: float
-    decimation: int
+
+    model: PulseFilter = lambda x: x
+    delay: float = 0
+    decimation: int = 1
+
+
+B414d15Filter = DigitalReceiverChain(
+    model=lambda x: b414d15_gaus(
+        x, h_stages=5, h_drate=4, f_taps=2, f_esym=1, f_drate=2, taps=[0x29F17, 0x53E2D]
+    ),
+    delay=1,
+    decimation=15,
+)
+
+MuPost2004Filter = DigitalReceiverChain(model=mu_radar_filter_post_2004, delay=0, decimation=120)
+
+
+def get_reciver_chain(model: ReceiverChainModel | str) -> DigitalReceiverChain:
+    if model == ReceiverChainModel.b414d15_gaus:
+        filt = B414d15Filter
+    elif model == ReceiverChainModel.mu2004:
+        filt = MuPost2004Filter
+    elif model == ReceiverChainModel.none:
+        filt = DigitalReceiverChain()
+    else:
+        raise ValueError(
+            f"No reciver chain available with name: {model}, available models are: {'/'.join(ReceiverChainModel)} "
+        )
+    return filt
 
 
 def _parse_integer(value: str, line_number: int) -> int:

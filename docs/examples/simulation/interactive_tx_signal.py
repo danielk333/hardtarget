@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from matplotlib.widgets import Button, Slider
 from radardef.radar_stations.eiscat.experiments import load_radar_code
 
-from hardtarget.constants import FIRFilter
+from hardtarget.constants import ReceiverChainModel
 from hardtarget.data_simulation.tx_model import tx_signal_model
 
 # First we define a simple code
@@ -20,27 +20,27 @@ barker13 = np.array(
     dtype=np.float64,
 )
 
-# fir_filter = FIRFilter.mu2004
-fir_filter = FIRFilter.b414d15_gaus
+# fir_filter = ReceiverChainModel.mu2004
+fir_filter = ReceiverChainModel.b414d15_gaus
 signal_decimation = {
-    FIRFilter.b414d15_gaus: 15,
-    FIRFilter.mu2004: 120,
-    FIRFilter.none: 1,
+    ReceiverChainModel.b414d15_gaus: 15,
+    ReceiverChainModel.mu2004: 120,
+    ReceiverChainModel.none: 1,
 }
 sample_time_usec = {
-    FIRFilter.b414d15_gaus: 1,
-    FIRFilter.mu2004: 6,
-    FIRFilter.none: 6,
+    ReceiverChainModel.b414d15_gaus: 1,
+    ReceiverChainModel.mu2004: 6,
+    ReceiverChainModel.none: 6,
 }
 baud_lengths_usec = {
-    FIRFilter.b414d15_gaus: 30,
-    FIRFilter.mu2004: 12,
-    FIRFilter.none: 12,
+    ReceiverChainModel.b414d15_gaus: 30,
+    ReceiverChainModel.mu2004: 12,
+    ReceiverChainModel.none: 12,
 }
 codes = {
-    FIRFilter.b414d15_gaus: load_radar_code("leo_bpark")[0, :],
-    FIRFilter.mu2004: barker13,
-    FIRFilter.none: barker13,
+    ReceiverChainModel.b414d15_gaus: load_radar_code("leo_bpark")[0, :],
+    ReceiverChainModel.mu2004: barker13,
+    ReceiverChainModel.none: barker13,
 }
 
 tx_samples = len(codes[fir_filter]) * int(baud_lengths_usec[fir_filter] / sample_time_usec[fir_filter])
@@ -57,11 +57,11 @@ tx_base = tx_signal_model(
     start_samp=tx_samples * signal_decimation[fir_filter] * 0.5,
     ipp_samps=ipp_samps * signal_decimation[fir_filter],
     read_length=tx_samples * signal_decimation[fir_filter] * 2,
-    fir_filter=FIRFilter.none,
+    filt=ReceiverChainModel.none,
     sub_resolution=sub_resolution * signal_decimation[fir_filter],
     bandwidth=1e6,
 )
-filter_options = (FIRFilter.b414d15_gaus, FIRFilter.mu2004, FIRFilter.none)
+filter_options = (ReceiverChainModel.b414d15_gaus, ReceiverChainModel.mu2004, ReceiverChainModel.none)
 signals = {}
 
 
@@ -74,7 +74,7 @@ def signal_for(selected_filter):
             start_samp=tx_samples * 0.5,
             ipp_samps=ipp_samps,
             read_length=tx_samples * 2,
-            fir_filter=selected_filter,
+            filt=selected_filter,
             sub_resolution=sub_resolution,
             bandwidth=1e6,
         )
@@ -89,7 +89,9 @@ fig, ax = plt.subplots()
 # Center the view on a phase change and show one baud width.  Using sample
 # coordinates makes the extent independent of the length of the radar code.
 transition_baud = np.flatnonzero(np.diff(codes[fir_filter]) != 0)[0] + 1
-transition_sample = tx_samples * 0.5 + transition_baud * baud_lengths_usec[fir_filter] / sample_time_usec[fir_filter]
+transition_sample = (
+    tx_samples * 0.5 + transition_baud * baud_lengths_usec[fir_filter] / sample_time_usec[fir_filter]
+)
 zoom_start = transition_sample - 0.5 * baud_lengths_usec[fir_filter] / sample_time_usec[fir_filter]
 zoom_stop = transition_sample + 0.5 * baud_lengths_usec[fir_filter] / sample_time_usec[fir_filter]
 sample = model_len * tx_samples * 2

@@ -10,7 +10,7 @@ from scipy import constants
 import hardtarget
 from hardtarget.constants import Impl, TargetEstimationMethod
 from hardtarget.data_simulation import DRFSimParams, simulate_drf
-from src.hardtarget.constants import FIRFilter
+from src.hardtarget.constants import ReceiverChainModel
 
 
 class TestTargetEstimation:
@@ -119,7 +119,7 @@ class TestTargetEstimation:
             t_cal_on_usec=19900,
             t_cal_off_usec=19997,
             code=load_radar_code("leo_bpark"),
-            fir_filter=FIRFilter.b414d15_gaus,
+            fir_filter=ReceiverChainModel.b414d15_gaus,
             samples_per_file=12800000,
         )
 

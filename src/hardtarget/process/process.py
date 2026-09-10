@@ -19,7 +19,7 @@ from radardef.tools.mpi_tools import CommBar
 from radardef.types import Pointing
 
 import hardtarget.process.utils as utils
-from hardtarget.constants import AnalysisMethod, ConfigSubSection, FIRFilter, Impl, MethodLib
+from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl, MethodLib, ReceiverChainModel
 from hardtarget.data_handling import dump_params_to_file
 from hardtarget.data_simulation.tx_model import tx_modulation_model, tx_signal_model
 from hardtarget.process.configuration import (
@@ -650,7 +650,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 # experiment #Mu = 3.5*1e6
                 start_samp=(start_sample % self.exp_def.ipp_samps) - self.cfg_params.samp_offset,
                 sub_resolution=sub_resolution,
-                fir_filter=FIRFilter(
+                filt=ReceiverChainModel(
                     self.exp_def.fir_filter
                 ),  # TODO: again, probably should change name of this variable
             )
