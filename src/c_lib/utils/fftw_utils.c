@@ -90,6 +90,17 @@ void multiply_acc_phasors(
     }
 }
 
+void array_acc_multiply(fftwf_complex* arr1, int arr_len, float* acc_phasors, int phasor_index, fftwf_complex* out) {
+    for (int tidx = 0; tidx < arr_len; tidx++) {
+        float rep = acc_phasors[phasor_index + 2 * tidx];
+        float imp = acc_phasors[phasor_index + 2 * tidx + 1];
+
+        out[tidx][0] = arr1[tidx][0] * rep - arr1[tidx][1] * imp;
+
+        out[tidx][1] = arr1[tidx][0] * imp + arr1[tidx][1] * rep;
+    }
+}
+
 void compute_phase_difference(
     fftwf_complex* in,
     int dec_signal_len,

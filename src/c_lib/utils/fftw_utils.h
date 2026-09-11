@@ -23,6 +23,7 @@ void multiply_acc_phasors(
     int* dec_rx_inds,
     int drg
 );
+void array_acc_multiply(fftwf_complex* arr1, int arr_len, float* acc_phasors, int phasor_index, fftwf_complex* out);
 void compute_phase_difference(
     fftwf_complex* in,
     int dec_signal_len,

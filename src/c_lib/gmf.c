@@ -43,7 +43,7 @@ int fgmf(
     fftwf_complex* echo;
     fftwf_complex* dec_signal;
     fftwf_complex* ft;
-
+    fftwf_complex* dec_opt_signal;
     fftwf_plan p;
     int echo_len;
 
@@ -51,7 +51,7 @@ int fgmf(
     echo = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * echo_len);
     dec_signal = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * dec_signal_len);
     ft = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * dec_signal_len);
-
+    dec_opt_signal = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * echo_len);
     p = fftwf_plan_dft_1d(dec_signal_len, dec_signal, ft, FFTW_FORWARD, FFT_PLAN_ID);
 
     // for each range gate
@@ -130,10 +130,12 @@ int fgmf(
             } else if (refine_doppler) {
                 double pwr = 0;
 
+                array_acc_multiply(echo, echo_len, acc_phasors, 2 * a_ind * echo_len, dec_opt_signal);
+
                 v[ind] = dtft_solve(
-                    dec_signal,
-                    dec_signal_len,
-                    sample_rate,
+                    dec_opt_signal,
+                    echo_len,
+                    sample_rate / frequency_decimation,
                     fft_frequencies[v_ind_m],
                     fft_frequencies[v_ind_p],
                     &pwr,
@@ -143,6 +145,7 @@ int fgmf(
         }
     }
     fftwf_free(dec_signal);
+    fftwf_free(dec_opt_signal);
     fftwf_free(ft);
     fftwf_free(echo);
     fftwf_destroy_plan(p);

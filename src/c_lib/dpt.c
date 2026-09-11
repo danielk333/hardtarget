@@ -43,6 +43,7 @@ int fdpt(
     fftwf_complex* in_tau;
     fftwf_complex* out;
     fftwf_complex* out_tau;
+    fftwf_complex* dec_opt_signal;
 
     fftwf_plan p;
     fftwf_plan p_tau;
@@ -54,6 +55,7 @@ int fdpt(
     out = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * dec_signal_len);
     in_tau = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * dec_tau_samp);
     out_tau = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * dec_tau_samp);
+    dec_opt_signal = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * echo_len);
 
     p = fftwf_plan_dft_1d(dec_signal_len, in, out, FFTW_FORWARD, FFT_PLAN_ID);
     p_tau = fftwf_plan_dft_1d(dec_tau_samp, in_tau, out_tau, FFTW_FORWARD, FFT_PLAN_ID);
@@ -116,8 +118,16 @@ int fdpt(
             } else if (refine_doppler) {
                 double pwr = 0;
 
+                array_acc_multiply(echo, echo_len, acc_phasors, phasor_i, dec_opt_signal);
+
                 v[ind] = dtft_solve(
-                    in, dec_signal_len, sample_rate, fft_frequencies[v_ind_m], fft_frequencies[v_ind_p], &pwr, &phi[ind]
+                    dec_opt_signal,
+                    echo_len,
+                    sample_rate / frequency_decimation,
+                    fft_frequencies[v_ind_m],
+                    fft_frequencies[v_ind_p],
+                    &pwr,
+                    &phi[ind]
                 );
             }
         }
@@ -127,6 +137,7 @@ int fdpt(
     fftwf_free(in_tau);
     fftwf_free(out_tau);
     fftwf_free(echo);
+    fftwf_free(dec_opt_signal);
     fftwf_destroy_plan(p);
     fftwf_destroy_plan(p_tau);
     return 0;  // Success
