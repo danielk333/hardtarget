@@ -200,10 +200,7 @@ def test_verify_analysis_orbit_data(
     )
 
     # Extract indexes where an object is present
-    r_inds = np.argmax(out.snr, axis=1)
-    coh_inds = np.arange(out.vals.shape[0])
-    snr = out.snr[coh_inds, r_inds]
-    snrdb = 10 * np.log10(snr)
+    snrdb = 10 * np.log10(out.snr_vec)
     inds = snrdb > 15.0
 
     # Calculate delta range (real vs estimated)

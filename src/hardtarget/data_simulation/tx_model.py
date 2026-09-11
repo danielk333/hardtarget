@@ -10,7 +10,6 @@ from scipy.fft import fft, fftfreq, ifft
 from hardtarget.constants import ReceiverChainModel
 from hardtarget.data_simulation.receiver_chain import (
     DigitalReceiverChain,
-    b414d15_gaus,
     get_reciver_chain,
 )
 
@@ -41,16 +40,21 @@ def tx_modulation_model(
     tx_stencil: npt.NDArray[np.bool],
     sub_resolution: int | npt.NDArray[np.float64] = 1,
     kind: str = "linear",
+    filt: ReceiverChainModel | DigitalReceiverChain | str = ReceiverChainModel.none,
 ) -> npt.NDArray[np.complex128]:
     """
     Extract subsamples from a existing tx signal
 
     """
 
+    if isinstance(filt, (ReceiverChainModel, str)):
+        filt = get_reciver_chain(filt)
+
     if isinstance(sub_resolution, int):
         offsets = np.linspace(0, 1, sub_resolution, endpoint=False)
     else:
         offsets = sub_resolution
+
     modulated_tx = np.zeros((tx_signal.size, len(offsets)), dtype=tx_signal.dtype)
 
     # Create interpolator for signal
@@ -63,20 +67,11 @@ def tx_modulation_model(
         fill_value=0,
     )
 
-    # Signal value of tx sub resolutions
-    # for ind in range(len(offsets)):
-    #    x = fun(np.arange(tx_signal.size) - offsets[ind])  # Shouldn't this be +? or -[-ind]
-    #    modulated_tx[tx_stencil, ind] = x[tx_stencil]
-    #
-    #
-    # TODO: Add filter as input again!
-    super_sample = np.arange(tx_signal.size * 15) / 15  # 15 = decimation
+    super_sample = np.arange(tx_signal.size * filt.decimation) / filt.decimation
 
-    for ind in range(sub_resolution):
+    for ind in range(len(offsets)):
         x = fun(super_sample - offsets[ind])
-        modulated_tx[tx_stencil, ind] = b414d15_gaus(
-            x, h_stages=5, h_drate=4, f_taps=2, f_esym=1, f_drate=2, taps=[0x29F17, 0x53E2D]
-        )[tx_stencil]
+        modulated_tx[tx_stencil, ind] = filt.model(x)[tx_stencil]
 
     return modulated_tx
 
@@ -102,7 +97,7 @@ def simulate_pulse_code(
 
 def phase_flip_model_impulse(
     filt: ReceiverChainModel | DigitalReceiverChain | str,
-    sample_offsets: npt.NDArray[np.float64],
+    sample_offset: float = 0.5,
 ) -> npt.NDArray[np.complex128]:
     if isinstance(filt, (ReceiverChainModel, str)):
         filt = get_reciver_chain(filt)
@@ -113,12 +108,12 @@ def phase_flip_model_impulse(
     for ind, offset in enumerate(offsets):
         signal = np.full((10 * filt.decimation,), -1, dtype=np.complex128)
         signal[: np.floor((5 + offset) * filt.decimation).astype(np.int64)] = 1
-        fsignal = filt(signal)
+        fsignal = filt.model(signal)
 
         res[ind, 0] = fsignal[6]
         res[ind, 1] = fsignal[7]
         res[ind, 2] = fsignal[5]
-    return res, offsets
+    return res
 
 
 def phase_flip_model(
@@ -135,18 +130,18 @@ def phase_flip_model(
     for ind, offset in enumerate(offsets):
         signal = np.full((10 * filt.decimation,), -1, dtype=np.complex128)
         signal[: np.floor((5 + offset) * filt.decimation).astype(np.int64)] = 1
-        fsignal = filt(signal)
+        fsignal = filt.model(signal)
 
         res[ind, 0] = fsignal[6]
         res[ind, 1] = fsignal[7]
         res[ind, 2] = fsignal[5]
-    return res, offsets
+    return res
 
 
 def tx_signal_model(
     code: tuple[float] | npt.NDArray[np.float64],
-    baud_length_usec: float,
-    t_samp_usec: float,
+    baud_length_usec: int,
+    t_samp_usec: int,
     ipp_samps: int,
     read_length: int,
     bandwidth: float | None,
@@ -195,7 +190,7 @@ def tx_signal_model(
             baud_length_usec=baud_length_usec,
             t_samp_usec=t_samp_usec / filt.decimation,
             ipp_t_usec=ipp_t_usec,
-            signal_length=(read_length + filt.delay) * filt.decimation,
+            signal_length=int((read_length + filt.delay) * filt.decimation),
             start_samp=(start_samp + offsets[ind]) * filt.decimation,
         )
         # filter to the initial bandwidth of the transmitter
@@ -209,8 +204,7 @@ def tx_signal_model(
             signal[inds] = fsignal[inds]
 
         # filter according to the receiver chain
-        signal = filt.model(signal)[filt.delay :]
-        signals[:, ind] = signal
+        signals[:, ind] = filt.model(signal)[filt.delay :]
 
     if normalize:
         mu = np.mean(signals, axis=0)

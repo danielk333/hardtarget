@@ -205,7 +205,7 @@ def test_crosscorrelate_tx_model(plot):
             read_length=len(exp_def.code) * 2,
             bandwidth=1e6,
             start_samp=0,
-            fir_filter=ReceiverChainModel.mu2004,
+            filt=ReceiverChainModel.mu2004,
         )
         .flatten()
         .astype(np.complex64)

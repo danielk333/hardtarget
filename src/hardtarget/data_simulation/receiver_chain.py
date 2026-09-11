@@ -7,6 +7,7 @@ Markkanen [(c) EISCAT Scientific Association 1998-]
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -14,6 +15,7 @@ from typing import Protocol
 import numpy as np
 import numpy.typing as npt
 import scipy.signal as sc_signal
+from matplotlib.figure import Figure
 from scipy.interpolate import PchipInterpolator
 
 from hardtarget.constants import ReceiverChainModel
@@ -44,7 +46,7 @@ def b414d15_gaus(
     hodf_decimation = h_drate + 1
     h_hdf = boxcar(hodf_decimation)
     for _ in range(h_stages):
-        y = sc_signal.lfilter(h_hdf, [1.0], y)
+        y = sc_signal.lfilter(h_hdf, [1.0], y)  # type: ignore[attr-defined]
 
     # Downsample
     y = y[::hodf_decimation]
@@ -60,8 +62,7 @@ def b414d15_gaus(
 
     h_fir = h_fir / h_fir.sum()
 
-    y = sc_signal.lfilter(h_fir, [1.0], y)
-
+    y = sc_signal.lfilter(h_fir, [1.0], y)  # type: ignore[attr-defined]
     # Final decimation downsample step
     y = y[:: f_drate + 1]
 
@@ -141,9 +142,9 @@ class DigitalReceiverChain:
 B414d15Filter = DigitalReceiverChain(
     model=lambda x: b414d15_gaus(
         x, h_stages=5, h_drate=4, f_taps=2, f_esym=1, f_drate=2, taps=[0x29F17, 0x53E2D]
-    ),
+    ),  # TODO: Hardcoded for now, should be read from FIR file.
     delay=1,
-    decimation=15,
+    decimation=15,  # (h_drate+1)*(f_drate+1)
 )
 
 MuPost2004Filter = DigitalReceiverChain(model=mu_radar_filter_post_2004, delay=0, decimation=120)
@@ -330,7 +331,7 @@ def plot_response(
     ddf: npt.NDArray[np.float64],
     t_ip: npt.NDArray[np.float64],
     impresp: npt.NDArray[np.float64],
-):
+) -> tuple[Figure, npt.NDArray]:
     """Plot the HDF, FIR, and combined DDF like the MATLAB implementation.
 
     TODO: Move this to the plotting subpackage

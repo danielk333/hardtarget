@@ -74,8 +74,7 @@ def fit_trajectory(
 
     if reference_time is None:
         reference_time = 0.5 * (
-            min(range_times.min(), range_rate_times.min())
-            + max(range_times.max(), range_rate_times.max())
+            min(range_times.min(), range_rate_times.min()) + max(range_times.max(), range_rate_times.max())
         )
 
     range_theory = range_theory_matrix(range_times - reference_time)
@@ -95,9 +94,7 @@ def fit_trajectory(
     inverse_standard_deviations = 1.0 / np.sqrt(variances)
     weighted_theory = inverse_standard_deviations[:, None] * theory_matrix
     weighted_observations = inverse_standard_deviations * observations
-    parameters = np.linalg.lstsq(
-        weighted_theory, weighted_observations, rcond=None
-    )[0]
+    parameters = np.linalg.lstsq(weighted_theory, weighted_observations, rcond=None)[0]
 
     fitted_ranges = range_theory @ parameters
     fitted_rates = range_rate_theory @ parameters
@@ -108,8 +105,8 @@ def fit_trajectory(
 
     return TrajectoryFit(
         reference_time=reference_time,
-        parameters=parameters,
-        parameter_covariance=parameter_covariance,
+        parameters=parameters.astype(np.float64),
+        parameter_covariance=parameter_covariance.astype(np.float64),
         fitted_ranges=fitted_ranges,
         fitted_range_rates=fitted_rates,
         range_residuals=range_residuals,

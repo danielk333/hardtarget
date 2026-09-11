@@ -660,6 +660,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 tx_signal=tx,
                 tx_stencil=self.pro_params.tx_stencil,
                 sub_resolution=sub_resolution,
+                filt=self.exp_def.fir_filter,
             )
         else:
             # TODO: is it possible to have the sub-resolutions already calculated in the data but as
@@ -669,6 +670,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 tx_signal=tx,
                 tx_stencil=self.pro_params.tx_stencil,
                 sub_resolution=sub_resolution,
+                filt=self.exp_def.fir_filter,
             )
 
         tx = tx[self.pro_params.tx_stencil, :]

@@ -185,7 +185,12 @@ def make_templates(
 ) -> npt.NDArray[np.complex128]:
 
     if source == "measured":
-        return tx_modulation_model(tx, np.ones(tx.size, dtype=bool), sub_resolution=count)
+        return tx_modulation_model(
+            tx,
+            np.ones(tx.size, dtype=bool),
+            sub_resolution=count,
+            filt=ReceiverChainModel.b414d15_gaus,
+        )
     return tx_signal_model(
         code=exp_def.code[code_index],
         baud_length_usec=exp_def.baud_length_usec,

@@ -174,32 +174,6 @@ class TestTargetEstimation:
                 progress=False,
             )
 
-            data_generator = hardtarget.load_analysed_data(tmp_analysis_path)
-            for out_args, exp_def, cfg_params, pro_params in data_generator:
-                dr = out_args.r_vec - sim_r[:-1]
-                dv = out_args.v_vec - sim_v[:-1]
-                da = out_args.a_vec - sim_a[:-1]
-
-                def assert_simulated_vs_estimated(delta, limit, param_str):
-                    mean_error = np.abs(np.mean(delta))
-                    print(f"{param_str} = {mean_error} (std = {np.std(delta)}) < {limit}")
-                    assert mean_error < limit, (
-                        f"mean {param_str} is over the limit, x̄({param_str}): {mean_error}, limit: {limit}"
-                    )
-                    std = np.std(delta)
-                    assert std < limit, (
-                        f"{param_str} standard deviation is to large, std({param_str}): {std} > {limit} "
-                    )
-
-                # Assert expected range is equal to estimated range
-                assert_simulated_vs_estimated(dr, range_gate, "delta_r")
-
-                # Assert expected velocity is equal to estimated velocity
-                assert_simulated_vs_estimated(dv, doppler_gate, "delta_v")
-
-                # Assert expected acceleration is equal to estimated acceleration
-                assert_simulated_vs_estimated(da, accel_gate, "delta_a")
-
             # # This is test debugging code
             if plot:
                 import matplotlib.pyplot as plt
@@ -259,3 +233,29 @@ class TestTargetEstimation:
                     axes[1, 1].set_ylabel("sqrt(ENR) [1]")
 
                 plt.show()
+
+            data_generator = hardtarget.load_analysed_data(tmp_analysis_path)
+            for out_args, exp_def, cfg_params, pro_params in data_generator:
+                dr = out_args.r_vec - sim_r[:-1]
+                dv = out_args.v_vec - sim_v[:-1]
+                da = out_args.a_vec - sim_a[:-1]
+
+                def assert_simulated_vs_estimated(delta, limit, param_str):
+                    mean_error = np.abs(np.mean(delta))
+                    print(f"{param_str} = {mean_error} (std = {np.std(delta)}) < {limit}")
+                    assert mean_error < limit, (
+                        f"mean {param_str} is over the limit, x̄({param_str}): {mean_error}, limit: {limit}"
+                    )
+                    std = np.std(delta)
+                    assert std < limit, (
+                        f"{param_str} standard deviation is to large, std({param_str}): {std} > {limit} "
+                    )
+
+                # Assert expected range is equal to estimated range
+                assert_simulated_vs_estimated(dr, range_gate, "delta_r")
+
+                # Assert expected velocity is equal to estimated velocity
+                assert_simulated_vs_estimated(dv, doppler_gate, "delta_v")
+
+                # Assert expected acceleration is equal to estimated acceleration
+                assert_simulated_vs_estimated(da, accel_gate, "delta_a")
