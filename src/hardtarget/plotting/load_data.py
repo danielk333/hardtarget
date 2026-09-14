@@ -7,7 +7,7 @@ from collections.abc import Generator
 from dataclasses import fields
 from pathlib import Path
 from types import GenericAlias
-from typing import Any, Optional, TypeVar, get_args, get_origin
+from typing import Any, Optional, TypeVar, get_args, get_origin, overload
 
 import h5py
 import numpy as np
@@ -29,14 +29,50 @@ from hardtarget.utils.time_conversion import ts_from_str
 logger = logging.getLogger(__name__)
 
 
+def load_analysed_data_chunks(
+    paths: list, chunk_size: int
+) -> Generator[tuple[GenericOut, ExpDef, GenericCfg, GenericPro], None, None]:
+    pth_num = len(paths)
+    chunks = pth_num // chunk_size + 1
+    for ind in range(chunks):
+        sub_paths = paths[(ind * chunk_size) : ((ind + 1) * chunk_size)]
+        if sub_paths:
+            yield collect_analysis_data(sub_paths)
+
+
+@overload
 def load_analysed_data(
     data_dir: str | Path | list[str] | list[Path],
+    chunk_size: None = None,
     start_time: Optional[int | float | np.datetime64 | str] = None,
     end_time: Optional[int | float | np.datetime64 | str] = None,
     relative_time: bool = False,
     method: Optional[AnalysisMethod] = None,
-    chunk_size: Optional[int] = None,
-) -> Generator[tuple[GenericOut, ExpDef, GenericCfg, GenericPro], None, None]:
+) -> tuple[GenericOut, ExpDef, GenericCfg, GenericPro]: ...
+
+
+@overload
+def load_analysed_data(
+    data_dir: str | Path | list[str] | list[Path],
+    chunk_size: int,
+    start_time: Optional[int | float | np.datetime64 | str] = None,
+    end_time: Optional[int | float | np.datetime64 | str] = None,
+    relative_time: bool = False,
+    method: Optional[AnalysisMethod] = None,
+) -> Generator[tuple[GenericOut, ExpDef, GenericCfg, GenericPro], None, None]: ...
+
+
+def load_analysed_data(
+    data_dir: str | Path | list[str] | list[Path],
+    chunk_size: int | None = None,
+    start_time: Optional[int | float | np.datetime64 | str] = None,
+    end_time: Optional[int | float | np.datetime64 | str] = None,
+    relative_time: bool = False,
+    method: Optional[AnalysisMethod] = None,
+) -> (
+    Generator[tuple[GenericOut, ExpDef, GenericCfg, GenericPro], None, None]
+    | tuple[GenericOut, ExpDef, GenericCfg, GenericPro]
+):
     """
     Loads and concatenates all analysed output data from 'data_dir'. Optionally specific timespans can be
     extracted, the result will be yielded in sizes of 'chunk_size' if given. Not that when merging a whole directory
@@ -71,15 +107,11 @@ def load_analysed_data(
     )
 
     paths.sort()
-    pth_num = len(paths)
-    if chunk_size is None:
-        chunks = 1
-        chunk_size = pth_num
-    else:
-        chunks = pth_num // chunk_size + 1
-    for ind in range(chunks):
-        sub_paths = paths[(ind * chunk_size) : ((ind + 1) * chunk_size)]
-        yield collect_analysis_data(sub_paths)
+
+    if chunk_size is None or chunk_size == 0:
+        return collect_analysis_data(paths)
+
+    return load_analysed_data_chunks(paths, chunk_size)
 
 
 def get_start_time(file: str | Path) -> float:

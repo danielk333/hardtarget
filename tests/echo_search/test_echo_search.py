@@ -13,7 +13,6 @@ from radardef.types import ExpDef
 import hardtarget
 from hardtarget.constants import Impl
 from hardtarget.data_simulation import simulate_h5, tx_signal_model
-from hardtarget.echo_search import EchoSearchOutArgs, EchoSearchProParams
 from hardtarget.echo_search.types import EchoSearchCfgParams
 from hardtarget.libs import load_c_lib
 from hardtarget.plotting import echo_search_plot, rti
@@ -122,10 +121,7 @@ def test_echo(plot, impl: Impl):
             exp_def=exp_def,
             implementation=impl,
         )
-        output: tuple[EchoSearchOutArgs, ExpDef, EchoSearchCfgParams, EchoSearchProParams] = list(
-            hardtarget.load_analysed_data(output_analysis)
-        )[0]
-
+        output = hardtarget.load_analysed_data(output_analysis)
         out, exp, _cfg, pro = output
 
         cohint_timepoints = np.arange(0, measurement_length_us, exp.t_ipp_usec * _cfg.n_ipp)

@@ -196,7 +196,7 @@ class TestStoreAndLoad:
             dump_params_to_file(h5_vars, exp_org, cfg_org, pro_org, outfile)
 
             # load
-            out, exp, cfg, pro = list(load_analysed_data(temp_dir))[0]
+            out, exp, cfg, pro = load_analysed_data(temp_dir)
 
             # Validate data types
             assert type(out) is type(out_org), (

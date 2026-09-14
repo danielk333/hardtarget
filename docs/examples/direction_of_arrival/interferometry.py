@@ -75,8 +75,7 @@ direction_of_arrival(
 
 # Load analysed data
 
-data_generator = load_analysed_data(output_path)
-output: tuple[DOAVars, ExpDef, DOACfgParams, DOAProParams] = list(data_generator)[0]
+output: tuple[DOAVars, ExpDef, DOACfgParams, DOAProParams] = load_analysed_data(output_path)
 out_data, exp_def, cfg_params, pro_params = output
 
 # ## Plot results

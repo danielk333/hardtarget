@@ -128,8 +128,7 @@ echo_search(
 # As we can see in the plots below there is an echo of an object.
 
 # load data
-data_generator = load_analysed_data(output_path)
-out_data, exp_def, cfg_params, pro_params = list(data_generator)[0]
+out_data, exp_def, cfg_params, pro_params = load_analysed_data(output_path)
 #
 fig, ax = plt.subplots(2, 2)
 plotting.plot_echo_search(ax, exp_def, out_data, limit=0.6)
@@ -159,8 +158,7 @@ target_estimation(
 # Target estimation we can visualise with several different plots.
 
 # load data,
-data_generator = load_analysed_data(output_path)
-out_data, exp_def, cfg_params, pro_params = list(data_generator)[0]
+out_data, exp_def, cfg_params, pro_params = load_analysed_data(output_path)
 
 # Plot peaks, this visualizes the peaks  of the hardtargets range, velocity
 # and acceleration over time (red is marking the detections). Furthermore the the signal to noise ratio is
@@ -230,8 +228,7 @@ direction_of_arrival(
 # Load analysed data, here we also
 
 # load data
-data_generator = load_analysed_data(output_path)
-output: tuple[DOAVars, ExpDef, DOACfgParams, DOAProParams] = list(data_generator)[0]
+output: tuple[DOAVars, ExpDef, DOACfgParams, DOAProParams] = load_analysed_data(output_path)
 out_data, exp_def, cfg_params, pro_params = output
 # plot
 fig, ax = plt.subplots(2, 2)

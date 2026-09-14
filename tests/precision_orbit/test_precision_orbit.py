@@ -170,7 +170,7 @@ def test_verify_analysis_orbit_data(
 
     # Load results
     load_ret: tuple[MFOutArgs, ExpDef, GMFCfgParams, ProParams]
-    load_ret = list(load_analysed_data(output_dir))[0]
+    load_ret: tuple[MFOutArgs, ExpDef, GMFCfgParams, ProParams] = load_analysed_data(output_dir)
     out, exp, cfg, pro = load_ret
 
     # Get satellite position over the analysed interval

@@ -60,11 +60,10 @@ analyse(
 # ---
 # First load results
 
-data_generator = load_analysed_data(output_path)
+out_data, exp_def, cfg_params, pro_params = load_analysed_data(output_path)
 
 # Then we can visualize it with different plots
 
-out_data, exp_def, cfg_params, pro_params = list(data_generator)[0]
 
 # Plot peaks, this visualizes the peaks  of the hardtargets range, velocity
 # and acceleration over time (red is marking the detections). Furthermore the the signal to noise ratio is
@@ -130,8 +129,7 @@ analyse(
     relative_time=True,
 )
 
-optimized_data = load_analysed_data(optimization_path)
-out_data_opt, exp_def_opt, cfg_params_opt, pro_params_opt = list(optimized_data)[0]
+out_data_opt, exp_def_opt, cfg_params_opt, pro_params_opt = load_analysed_data(optimization_path)
 
 # ## Optimization plot
 # ---

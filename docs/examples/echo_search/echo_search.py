@@ -62,8 +62,7 @@ echo_search(
 # ---
 # First load results
 
-data_generator = load_analysed_data(output_path)
-out_data, exp_def, cfg_params, pro_params = list(data_generator)[0]
+out_data, exp_def, cfg_params, pro_params = load_analysed_data(output_path)
 
 # Then we can visualize it with different plots
 

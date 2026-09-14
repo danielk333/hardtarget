@@ -17,7 +17,7 @@ def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("-s", "--start_time", default=None, type=str)
     parser.add_argument("-e", "--end_time", default=None, type=str)
     parser.add_argument("--relative_time", action="store_true")
-    parser.add_argument("--chunk_size", type=int, default=None)
+    parser.add_argument("--chunk_size", type=int, default=1)
     parser.add_argument("--detection_limit", type=float, default=None)
     return parser
 
@@ -38,7 +38,7 @@ def plot_analysed_data(
     start_time: Optional[int | float | str] = None,
     end_time: Optional[int | float | str] = None,
     relative_time: bool = False,
-    chunk_size: Optional[int] = None,
+    chunk_size: int = 1,
     detection_limit: Optional[float] = None,
 ) -> None:
 

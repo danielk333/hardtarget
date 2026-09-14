@@ -57,11 +57,9 @@ target_estimation(
 # ---
 # First load results
 
-data_generator = load_analysed_data(output_path)
+out_data, exp_def, cfg_params, pro_params = load_analysed_data(output_path)
 
 # Then we can plot visualize it with different plots
-
-out_data, exp_def, cfg_params, pro_params = list(data_generator)[0]
 
 # Plot peaks, this visualizes the peaks  of the hardtargets range, velocity
 # and acceleration over time (red is marking the detections). Furthermore the the signal to noise ratio is

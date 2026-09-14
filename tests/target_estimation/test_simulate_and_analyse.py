@@ -178,84 +178,85 @@ class TestTargetEstimation:
             if plot:
                 import matplotlib.pyplot as plt
 
-                data_generator = hardtarget.load_analysed_data(tmp_analysis_path)
-                for _out_args, _exp_def, _cfg_params, _pro_params in data_generator:
-                    t = _out_args.t - np.min(_out_args.t)
+                _out_args, _exp_def, _cfg_params, _pro_params = hardtarget.load_analysed_data(
+                    tmp_analysis_path
+                )
+                t = _out_args.t - np.min(_out_args.t)
 
-                    fig, axes = plt.subplots(2, 2)
-                    hardtarget.plotting.target_estimation_plots.plot_peaks(
-                        axes,
-                        _out_args,
-                        _exp_def,
-                        _cfg_params,
-                        _pro_params,
-                        snr_dB_limit=15.0,
-                    )
-                    fig, axes = plt.subplots(2, 3)
-                    hardtarget.plotting.target_estimation_plots.plot_detections(
-                        axes, _out_args, _exp_def, _cfg_params, _pro_params
-                    )
-                    fig, axes = plt.subplots(3, 1)
-                    hardtarget.plotting.target_estimation_plots.plot_map(
-                        axes, _out_args, _exp_def, _cfg_params, _pro_params
-                    )
+                fig, axes = plt.subplots(2, 2)
+                hardtarget.plotting.target_estimation_plots.plot_peaks(
+                    axes,
+                    _out_args,
+                    _exp_def,
+                    _cfg_params,
+                    _pro_params,
+                    snr_dB_limit=15.0,
+                )
+                fig, axes = plt.subplots(2, 3)
+                hardtarget.plotting.target_estimation_plots.plot_detections(
+                    axes, _out_args, _exp_def, _cfg_params, _pro_params
+                )
+                fig, axes = plt.subplots(3, 1)
+                hardtarget.plotting.target_estimation_plots.plot_map(
+                    axes, _out_args, _exp_def, _cfg_params, _pro_params
+                )
 
-                    fig, axes = plt.subplots(2, 2)
-                    nf_vec = np.nanmedian(_out_args.dc, axis=0)
-                    nf_vec = nf_vec.reshape((1, nf_vec.size))
-                    nf_range = np.nanmedian(nf_vec, axis=0)
-                    snr = hardtarget.noise.snr(_out_args.vals, nf_range)
-                    r_inds = np.argmax(_out_args.vals, axis=1)
-                    coh_inds = np.arange(_out_args.vals.shape[0])
-                    snr = snr[coh_inds, r_inds]
+                fig, axes = plt.subplots(2, 2)
+                nf_vec = np.nanmedian(_out_args.dc, axis=0)
+                nf_vec = nf_vec.reshape((1, nf_vec.size))
+                nf_range = np.nanmedian(nf_vec, axis=0)
+                snr = hardtarget.noise.snr(_out_args.vals, nf_range)
+                r_inds = np.argmax(_out_args.vals, axis=1)
+                coh_inds = np.arange(_out_args.vals.shape[0])
+                snr = snr[coh_inds, r_inds]
 
-                    axes[0, 0].plot(t, _out_args.r_vec * 1e-3 * 0.5, c="blue", label="r_vec")
-                    axes[0, 0].plot(t_abs, sim_r * 1e-3 * 0.5, c="red", label="sim_r")
-                    axes[0, 0].set_xlabel("Time [s]")
-                    axes[0, 0].set_ylabel("range [km]")
-                    axes[0, 0].legend(loc="upper left")
+                axes[0, 0].plot(t, _out_args.r_vec * 1e-3 * 0.5, c="blue", label="r_vec")
+                axes[0, 0].plot(t_abs, sim_r * 1e-3 * 0.5, c="red", label="sim_r")
+                axes[0, 0].set_xlabel("Time [s]")
+                axes[0, 0].set_ylabel("range [km]")
+                axes[0, 0].legend(loc="upper left")
 
-                    axes[0, 1].plot(t, _out_args.v_vec * 1e-3 * 0.5, c="blue", label="v_vec")
-                    axes[0, 1].plot(t_abs, sim_v * 1e-3 * 0.5, c="red", label="sim_v")
-                    axes[0, 1].set_xlabel("Time [s]")
-                    axes[0, 1].set_ylabel("range rate [km/s]")
-                    axes[0, 1].legend(loc="upper left")
+                axes[0, 1].plot(t, _out_args.v_vec * 1e-3 * 0.5, c="blue", label="v_vec")
+                axes[0, 1].plot(t_abs, sim_v * 1e-3 * 0.5, c="red", label="sim_v")
+                axes[0, 1].set_xlabel("Time [s]")
+                axes[0, 1].set_ylabel("range rate [km/s]")
+                axes[0, 1].legend(loc="upper left")
 
-                    axes[1, 0].plot(t, _out_args.a_vec * 0.5, c="blue", label="a_vec")
-                    axes[1, 0].plot(t_abs, sim_a * 0.5, c="red", label="sim_a")
-                    axes[1, 0].set_xlabel("Time [s]")
-                    axes[1, 0].set_ylabel("acceleration [m/s^2]")
-                    axes[1, 0].set_ylim([-300, 300])
-                    axes[1, 0].legend(loc="lower left")
+                axes[1, 0].plot(t, _out_args.a_vec * 0.5, c="blue", label="a_vec")
+                axes[1, 0].plot(t_abs, sim_a * 0.5, c="red", label="sim_a")
+                axes[1, 0].set_xlabel("Time [s]")
+                axes[1, 0].set_ylabel("acceleration [m/s^2]")
+                axes[1, 0].set_ylim([-300, 300])
+                axes[1, 0].legend(loc="lower left")
 
-                    axes[1, 1].plot(t, np.sqrt(snr))
-                    axes[1, 1].set_xlabel("Time [s]")
-                    axes[1, 1].set_ylabel("sqrt(ENR) [1]")
+                axes[1, 1].plot(t, np.sqrt(snr))
+                axes[1, 1].set_xlabel("Time [s]")
+                axes[1, 1].set_ylabel("sqrt(ENR) [1]")
 
                 plt.show()
 
-            data_generator = hardtarget.load_analysed_data(tmp_analysis_path)
-            for out_args, exp_def, cfg_params, pro_params in data_generator:
-                dr = out_args.r_vec - sim_r[:-1]
-                dv = out_args.v_vec - sim_v[:-1]
-                da = out_args.a_vec - sim_a[:-1]
+            out_args, exp_def, cfg_params, pro_params = hardtarget.load_analysed_data(tmp_analysis_path)
 
-                def assert_simulated_vs_estimated(delta, limit, param_str):
-                    mean_error = np.abs(np.mean(delta))
-                    print(f"{param_str} = {mean_error} (std = {np.std(delta)}) < {limit}")
-                    assert mean_error < limit, (
-                        f"mean {param_str} is over the limit, x̄({param_str}): {mean_error}, limit: {limit}"
-                    )
-                    std = np.std(delta)
-                    assert std < limit, (
-                        f"{param_str} standard deviation is to large, std({param_str}): {std} > {limit} "
-                    )
+            dr = out_args.r_vec - sim_r[:-1]
+            dv = out_args.v_vec - sim_v[:-1]
+            da = out_args.a_vec - sim_a[:-1]
 
-                # Assert expected range is equal to estimated range
-                assert_simulated_vs_estimated(dr, range_gate, "delta_r")
+            def assert_simulated_vs_estimated(delta, limit, param_str):
+                mean_error = np.abs(np.mean(delta))
+                print(f"{param_str} = {mean_error} (std = {np.std(delta)}) < {limit}")
+                assert mean_error < limit, (
+                    f"mean {param_str} is over the limit, x̄({param_str}): {mean_error}, limit: {limit}"
+                )
+                std = np.std(delta)
+                assert std < limit, (
+                    f"{param_str} standard deviation is to large, std({param_str}): {std} > {limit} "
+                )
 
-                # Assert expected velocity is equal to estimated velocity
-                assert_simulated_vs_estimated(dv, doppler_gate, "delta_v")
+            # Assert expected range is equal to estimated range
+            assert_simulated_vs_estimated(dr, range_gate, "delta_r")
 
-                # Assert expected acceleration is equal to estimated acceleration
-                assert_simulated_vs_estimated(da, accel_gate, "delta_a")
+            # Assert expected velocity is equal to estimated velocity
+            assert_simulated_vs_estimated(dv, doppler_gate, "delta_v")
+
+            # Assert expected acceleration is equal to estimated acceleration
+            assert_simulated_vs_estimated(da, accel_gate, "delta_a")
