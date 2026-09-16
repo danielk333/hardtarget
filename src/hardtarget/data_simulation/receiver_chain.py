@@ -73,25 +73,20 @@ def cic_decimate(
     x: npt.NDArray[np.complexfloating], decimation: int, combs: int, delay: int = 1
 ) -> npt.NDArray[np.complexfloating]:
     """
-    CIC decimator: N integrators at input rate that is decimated,
-    then N comb stages at output rate with a delay.
+    CIC decimator implemented as its equivalent FIR followed by decimation.
     """
-    y = np.asarray(x, dtype=np.complex128)
+    boxcar_length = decimation * delay
+    stage = np.full(boxcar_length, 1.0 / boxcar_length)
+    fir = stage
+    for _ in range(combs - 1):
+        fir = np.convolve(fir, stage)
 
-    # integrators
-    for _ in range(combs):
-        y = np.cumsum(y)
-
-    # decimate
-    y = y[::decimation]
-
-    # combs
-    for _ in range(combs):
-        y = y - np.concatenate([np.zeros(delay, dtype=y.dtype), y[:-delay]])
-
-    # normalize CIC DC gain
-    y /= (decimation * delay) ** combs
-    return y
+    y = sc_signal.lfilter(  # type: ignore[attr-defined]
+        fir,
+        [1.0],
+        np.asarray(x, dtype=np.complex128),
+    )
+    return y[::decimation]
 
 
 def mu_radar_filter_post_2004(
@@ -106,20 +101,31 @@ def mu_radar_filter_post_2004(
         Radio Sci. 43, RS2013. https://doi.org/10.1029/2006RS003603
 
     """
-    # CIC matched-filter / decimator
-    # TODO: guessing the cic decimation rate of 8, it kinda makes sense beacuse with 16 taps
-    # 8*15=120 which is the total decimation rate... but double check needed!
-    y_cic = cic_decimate(x, decimation=8, combs=6)
+    #TODO: tried this which better fits the paper... maybe??? still needs to be checked by someone
+    # who knows the MU chain hardware
+    cic_decimation = 15
+    fir_decimation = 8
+    cic_stages = 10
+    y_cic = cic_decimate(x, decimation=cic_decimation, combs=cic_stages)
 
-    # 16-tap FIR amplitude/frequency compensator
-    # TODO: gussing the compensating FIR, no coefficients were available in the paper?
-    fir_taps = sc_signal.firwin(  # type: ignore[attr-defined]
+    passband = np.linspace(0.0, 0.20, 9)
+    omega = np.pi * passband
+    cic_gain = np.ones_like(passband)
+    cic_gain[1:] = (
+        np.sin(omega[1:] / 2)
+        / (cic_decimation * np.sin(omega[1:] / (2 * cic_decimation)))
+    ) ** cic_stages
+    frequencies = np.concatenate((passband, [0.25, 1.0]))
+    desired_gain = np.concatenate((1.0 / cic_gain, [0.0, 0.0]))
+    fir_taps = sc_signal.firwin2(  # type: ignore[attr-defined]
         numtaps=16,
-        cutoff=0.8,
+        freq=frequencies,
+        gain=desired_gain,
         window="hamming",
     )
+    fir_taps /= fir_taps.sum()
     y_out = sc_signal.lfilter(fir_taps, [1.0], y_cic)  # type: ignore[attr-defined]
-    y_out = y_out[::15]
+    y_out = y_out[::fir_decimation]
 
     return np.array(y_out)
 
@@ -147,7 +153,8 @@ B414d15Filter = DigitalReceiverChain(
     decimation=15,  # (h_drate+1)*(f_drate+1)
 )
 
-MuPost2004Filter = DigitalReceiverChain(model=mu_radar_filter_post_2004, delay=0, decimation=120)
+# TODO: I dont know what the delay is but it looks like 2?
+MuPost2004Filter = DigitalReceiverChain(model=mu_radar_filter_post_2004, delay=2, decimation=120)
 
 
 def get_reciver_chain(model: ReceiverChainModel | str) -> DigitalReceiverChain:
