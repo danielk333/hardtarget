@@ -115,5 +115,6 @@ class MFOutArgs(OutputBase):
     r_vec: npt.NDArray[np.float64]
     v_vec: npt.NDArray[np.float64]
     a_vec: npt.NDArray[np.float64]
+    p_vec: npt.NDArray[np.float64]
     g_vec: npt.NDArray[np.float64]
     pointing_vec: npt.NDArray[np.float64]

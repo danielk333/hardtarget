@@ -88,8 +88,6 @@ int fgmf(
             for (int ai = 0; ai < n_accs; ai++) {
                 int phasor_i = 2 * ai * echo_len;
 
-                int drg = rgs[ri] / frequency_decimation;
-
                 multiply_acc_phasors(dec_signal, echo, echo_len, acc_phasors, phasor_i, dec_rx_inds, drg);
 
                 // execute fft in and store result in out

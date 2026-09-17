@@ -198,6 +198,7 @@ def test_verify_analysis_orbit_data(
         satellite_enu,
         satellite_enu,
     )
+    p_rel = np.angle(np.exp(1j * ((4 * np.pi * r_rel) / exp.wavelength)))
 
     # Extract indexes where an object is present
     snrdb = 10 * np.log10(out.snr_vec)
@@ -211,9 +212,12 @@ def test_verify_analysis_orbit_data(
     dv = np.abs(v_rel[inds] - out.v_vec[inds])
     dv_limit = 5
 
+    # Calculate delta phase (real vs estimated)
+    dp = np.abs(p_rel[inds] - out.p_vec[inds])
+
     if plot:
         # --- Plot estimation vs real range/velocity ---
-        fig, ax = plt.subplots(2, 2)
+        fig, ax = plt.subplots(3, 2)
 
         # Real vs estimated range
         ax[0, 0].plot(t_analysed, (r_rel * 0.5) / 1000, marker=".", color="g", label="Real range")
@@ -255,6 +259,31 @@ def test_verify_analysis_orbit_data(
         ax[1, 1].set_xlabel("Time [s]")
         ax[1, 1].set_ylabel("Delta velocity [m/s]")
         ax[1, 1].legend()
+
+        # Phase
+        ax[2, 0].plot(
+            t_analysed[inds],
+            np.unwrap(p_rel)[inds] - np.unwrap(p_rel)[0],
+            marker=".",
+            color="g",
+            label="Real phase",
+        )
+        ax[2, 0].plot(
+            t_analysed[inds],
+            np.unwrap(out.p_vec)[inds] - np.unwrap(out.p_vec)[0],
+            marker=".",
+            ls="none",
+            color="r",
+            label="Estimated phase",
+        )
+        ax[2, 0].legend()
+
+        ax[2, 1].plot(t_analysed[inds], dp, marker=".", ls="none", label="|p_delta|")
+        ax[2, 1].axhline(np.mean(dp), linestyle="--", color="g", label="mean |p_delta|")
+        # ax[2, 1].axhline(np.abs(dv_limit), linestyle="--", color="r", label="limit")
+        ax[2, 1].set_xlabel("Time [s]")
+        ax[2, 1].set_ylabel("Delta")
+        ax[2, 1].legend()
 
         # --- Satellite orbit vs radar position ---
 

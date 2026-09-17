@@ -19,27 +19,37 @@ def search_for_sentinel_data(
 
     https://documentation.dataspace.copernicus.eu/Data/SentinelMissions/Sentinel2.html#sentinel-2-precise-orbit-determination-pod-products
 
-    TODO: Add to only search for S2B, S2A does not have the correct orbit.
-
     Args:
         dt_start: start time of file
         dt_end: end time of file
         collection: collection to search available data from {SENTINEL-1/SENTINEL-2/SENTINEL-3}
-        object: Specific satellite to get data from within the collection
+        object: Specific satellite to get data from within the collection (e.g., "S2B")
         product_catalogue: what product catalogue to search from {"AUX_GNSSRD" (RINEX) / "AUX_PROQUA" (Quaternions) / "AUX_POEORB" (Orbit)}
     Returns:
         returns a list of data from the object from the specific product catalogue with a start time within dt_start and dt_end
     """
+    # Exempel på dt_format om det inte är definierat globalt: "%Y-%m-%dT%H:%M:%S.%f" (utan sista Z eftersom det läggs till i strängen)
+    dt_format = "%Y-%m-%dT%H:%M:%S.%f"[:-3]
 
-    query = f"https://catalogue.dataspace.copernicus.eu/odata/v1/Products?$filter=((Collection/Name eq '{collection}') and (ContentDate/Start gt {dt_start.strftime(dt_format)}Z) and (ContentDate/Start lt {dt_end.strftime(dt_format)}Z) and ((Attributes/OData.CSC.StringAttribute/any(i0:i0/Name eq 'productType' and i0/Value eq '{product_catalogue}'))))&$orderby=ContentDate/Start&$top=10"
+    # Genom att lägga till 'and startswith(Name, \'{object}\')' begränsar vi sökningen till produkter som börjar med t.ex. 'S2B'
+    query = (
+        f"https://catalogue.dataspace.copernicus.eu/odata/v1/Products?$filter=("
+        f"(Collection/Name eq '{collection}') and "
+        f"(ContentDate/Start gt {dt_start.strftime(dt_format)}Z) and "
+        f"(ContentDate/Start lt {dt_end.strftime(dt_format)}Z) and "
+        f"(startswith(Name, '{object}')) and "
+        f"((Attributes/OData.CSC.StringAttribute/any(i0:i0/Name eq 'productType' and i0/Value eq '{product_catalogue}')))"
+        f")&$orderby=ContentDate/Start&$top=10"
+    )
+
     json_res = requests.get(query).json()
-
-    value = json_res["value"]
+    value = json_res.get("value", [])
 
     if not value:
-        raise Exception(f"No data for {collection} found between: {dt_start} and {dt_end}")
+        raise Exception(f"No data for {collection} ({object}) found between: {dt_start} and {dt_end}")
 
-    return value
+    assert len(value) == 1
+    return value[0]
 
 
 def get_orbit_data_id(dt_start: dt.datetime, dt_end: dt.datetime):
@@ -50,15 +60,11 @@ def get_orbit_data_id(dt_start: dt.datetime, dt_end: dt.datetime):
     """
 
     # orbit data files are 24h long, with start at 22:59-23:59, so for any input we take back the search one day
-    data = search_for_sentinel_data(dt_start - dt.timedelta(days=1), dt_end, "SENTINEL-2", "AUX_POEORB")
+    data = search_for_sentinel_data(
+        dt_start - dt.timedelta(days=1), dt_end, "SENTINEL-2", "S2B", "AUX_POEORB"
+    )
 
-    # TODO check each file and which has closest start date
-    # for i,value in enumerate(data):
-    #       if value[ContentDate][Start] - dt_start < prev_delta
-    #            best_id = i
-
-    # TODO: Once the query only searches for S2B this 1 can be changed to 0
-    return data[1]["Id"]
+    return data["Id"]
 
 
 def extract_eof_data_block(data_path: Path, dt_start: dt.datetime, dt_end: dt.datetime):

@@ -246,6 +246,7 @@ class TargetEstimationProcess(
         v_vec = all_vars.v[coh_ints, r_inds]
         a_vec = all_vars.a[coh_ints, r_inds]
         g_vec = all_vars.vals[coh_ints, r_inds]
+        p_vec = all_vars.phi[coh_ints, r_inds]
 
         _t_conv = (cfg_params.n_ipp * exp_def.t_ipp_usec) * 1e-6
         t = (np.arange(num_cohints) + 1) * _t_conv + file_idx_sample * exp_def.t_samp_usec * 1e-6
@@ -273,6 +274,7 @@ class TargetEstimationProcess(
             r_vec=r_vec,
             v_vec=v_vec,
             a_vec=a_vec,
+            p_vec=p_vec,
             g_vec=g_vec,
             pointing_vec=pointing_vec,
             epoch_us=int(self.data.epoch_bounds[0]),
@@ -379,7 +381,10 @@ class TargetEstimationProcess(
                 long_name="Acceleration at peak GMF",
             ),
             f"{output.g_vec=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.g_vec, dims=[(str_dims_num_cohints_per_file, str_t)], long_name="Peak GMF"
+                data=output.g_vec, dims=[(str_dims_num_cohints_per_file, "1")], long_name="Peak GMF"
+            ),
+            f"{output.p_vec=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.p_vec, dims=[(str_dims_num_cohints_per_file, "1")], long_name="Phase at peak GMF"
             ),
             f"{output.pointing_vec=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.pointing_vec,
