@@ -67,11 +67,11 @@ def tx_modulation_model(
         fill_value=0,
     )
 
-    super_sample = np.arange(tx_signal.size * filt.decimation) / filt.decimation
+    super_sample = np.arange(tx_signal.size) - filt.delay
 
     for ind in range(len(offsets)):
         x = fun(super_sample - offsets[ind])
-        modulated_tx[tx_stencil, ind] = filt.model(x)[tx_stencil]
+        modulated_tx[tx_stencil, ind] = x[tx_stencil]
 
     return modulated_tx
 
@@ -90,7 +90,7 @@ def simulate_pulse_code(
     t_ind = (t_in_ipp_usec // baud_length_usec).astype(np.int64)
     signal = np.zeros(t_usec.shape, dtype=np.complex128)
     inds = np.logical_and(t_in_ipp_usec >= 0, t_in_ipp_usec < baud_length_usec * len(code))
-    signal[inds] = code[t_ind[inds]]
+    signal[inds] = -code[t_ind[inds]]  # ??? TODO:  does eiscat stores as conjugate?
 
     return signal
 

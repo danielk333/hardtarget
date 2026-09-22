@@ -42,8 +42,9 @@ void compute_echo_signal(
         float p1 = tx_re * rx_re;
         float p2 = tx_im * rx_im;
 
-        float product_re = tx_re * rx_re - tx_im * rx_im;
-        float product_im = tx_re * rx_im + tx_im * rx_re;
+        // rx * conj(tx)
+        float product_re = tx_re * rx_re + tx_im * rx_im;
+        float product_im = tx_re * rx_im - tx_im * rx_re;
 
         // Accumulate in float64 to not accumulate any errors.
         echo_re[tidx] += (double)product_re;

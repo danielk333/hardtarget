@@ -121,7 +121,7 @@ class DPTProcess(TargetEstimationProcess[DPTCfgParams, DPTProParams]):
         # scale transmit waveform to unity power
         tx_pwr = np.sum(np.abs(tx) ** 2.0)
         tx_amp = np.sqrt(tx_pwr)
-        tx = np.conj(tx) / tx_amp
+        tx = tx / tx_amp
 
         if tx_amp > self.cfg_params.tx_amp_limit:
             mfvars = self.lib(

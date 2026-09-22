@@ -46,7 +46,9 @@ def fast_gmf_np(
             # super resolution stuff, currently not done, needs more investigation if needed
 
             # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter), decimate
-            echo = np.sum((zr * tx[:, sub_res]).reshape(-1, cfg_params.frequency_decimation), axis=-1)
+            echo = np.sum(
+                (zr * np.conj(tx[:, sub_res])).reshape(-1, cfg_params.frequency_decimation), axis=-1
+            )
             dec_signal = np.zeros((pro_params.decimated_read_length,), dtype=np.complex64)
             # zero-frequency (DC) is used to get range-dependent noise floor
             index = sub_res + ri * cfg_params.range_gate_sub_resolution

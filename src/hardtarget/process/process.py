@@ -632,11 +632,11 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         # clean up
 
         # Extracting tx data
-        if not self._tx_channel:
+        if not self._tx_channel:  # MAKE CONFIGRUABLE
             assert self.exp_def.code is not None, (
                 "No code available from the metadata, not possible to simulate tx"
             )
-            # TODO: this should probably be configurable in the future, should be cachable aswell
+            # TODO: this should probably be configurable in the future
             tx = self.tx_signal_model(
                 code=tuple(self.exp_def.code),
                 baud_length_usec=self.exp_def.baud_length_usec,

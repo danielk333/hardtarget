@@ -104,7 +104,7 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
         # (N, sub-resolution)
         tx_pwr = np.sum(np.abs(tx) ** 2.0, axis=0)
         tx_amp = np.sqrt(tx_pwr)
-        tx = np.conj(tx) / tx_amp[None, :]
+        tx = tx / tx_amp[None, :]
 
         if np.any(tx_amp > self.cfg_params.tx_amp_limit):
             kwargs = {}
@@ -115,14 +115,13 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
                 tx, rx, np.array(tx_pwr), self.exp_def, self.cfg_params, self.pro_params, **kwargs
             )
             # TODO: for now since we expect physical units at this level do the conversion here
+            # frequency -> velocity
             mfvars.v[:] = mfvars.v * self.exp_def.wavelength
             return mfvars
         else:
-            # TODO: i think i have acceidentally used float64 some places and float32 others, maybe
-            # need to double check those
             return MFVariables(
-                vals=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
-                dc=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
+                vals=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
+                dc=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
                 v=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
                 a=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
                 phi=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),

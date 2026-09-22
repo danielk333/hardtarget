@@ -249,7 +249,7 @@ class TargetEstimationProcess(
         p_vec = all_vars.phi[coh_ints, r_inds]
 
         _t_conv = (cfg_params.n_ipp * exp_def.t_ipp_usec) * 1e-6
-        t = (np.arange(num_cohints) + 1) * _t_conv + file_idx_sample * exp_def.t_samp_usec * 1e-6
+        t = np.arange(num_cohints) * _t_conv + file_idx_sample * exp_def.t_samp_usec * 1e-6
 
         pointing_vec = np.zeros((num_cohints, 2), dtype=np.float64)
         for i in range(num_cohints):

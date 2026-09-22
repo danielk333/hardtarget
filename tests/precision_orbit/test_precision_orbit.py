@@ -61,6 +61,7 @@ gmf_cfg = GMFCfgParams(
     acceleration_steps=1,
     refine_doppler=True,
     refine_acceleration=False,
+    cache=False,
 )
 
 dpt_cfg = DPTCfgParams(
@@ -139,13 +140,7 @@ def test_verify_analysis_orbit_data(
     )
     reader = radar_station.load_data(MEASUREMENT)
     assert reader is not None
-    # TODO: this frequency is apparently present in the tlan file, probably needs to be hardcoded
-    # for each experiment like we did for the tx_start, the way to do it is to go to the tland file,
-    # find this row `AT     40.0  BEAMON,F4,PHA180` and translate F4 to the table at
-    # https://old.eiscat.se/scientist/user-documentation/receiver-documentation/#uhf-receiver
-    # which is here 927.200 MHz
-    # - apparently there is meta data in the matlab data file that documents frequency!
-    exp_def = reader.exp_def.copy(radar_frequency=927.200)
+    exp_def = reader.exp_def
 
     # Analyse data
     comm = get_mpi()
@@ -169,13 +164,14 @@ def test_verify_analysis_orbit_data(
     assert result["dir"] is not None
 
     # Load results
-    load_ret: tuple[MFOutArgs, ExpDef, GMFCfgParams, ProParams]
     load_ret: tuple[MFOutArgs, ExpDef, GMFCfgParams, ProParams] = load_analysed_data(output_dir)
     out, exp, cfg, pro = load_ret
 
     # Get satellite position over the analysed interval
     t_analysed = np.arange(
-        start=start_time.timestamp(), stop=end_time.timestamp(), step=cfg.n_ipp * (exp.t_ipp_usec * 1e-6)
+        start=out.epoch_us * 1e-6 + out.t[0],
+        stop=out.epoch_us * 1e-6 + out.t[-1],
+        step=cfg.n_ipp * (exp.t_ipp_usec * 1e-6),
     )
     satellite_orbit = interpolated_satellite_pos.get_state(t_analysed)
 
@@ -198,7 +194,8 @@ def test_verify_analysis_orbit_data(
         satellite_enu,
         satellite_enu,
     )
-    p_rel = np.angle(np.exp(1j * ((4 * np.pi * r_rel) / exp.wavelength)))
+
+    uw_p_rel = (2 * np.pi * r_rel) / exp.wavelength
 
     # Extract indexes where an object is present
     snrdb = 10 * np.log10(out.snr_vec)
@@ -213,7 +210,11 @@ def test_verify_analysis_orbit_data(
     dv_limit = 5
 
     # Calculate delta phase (real vs estimated)
-    dp = np.abs(p_rel[inds] - out.p_vec[inds])
+    # uw_p_rel = p_rel
+    uw_p_est = out.p_vec
+    aligned_p_rel = uw_p_rel - uw_p_rel[0]
+    aligned_p_est = uw_p_est - uw_p_est[0]
+    dp = np.abs(aligned_p_rel[inds] - aligned_p_est[inds])
 
     if plot:
         # --- Plot estimation vs real range/velocity ---
@@ -240,6 +241,7 @@ def test_verify_analysis_orbit_data(
         ax[0, 1].axhline(np.abs(dr_limit) / 1000, linestyle="--", color="r", label="limit")
         ax[0, 1].set_xlabel("Time [s]")
         ax[0, 1].set_ylabel("Delta range [km]")
+        ax[0, 1].set_title("Delta range")
         ax[0, 1].legend()
 
         # Real vs estimated velocity
@@ -258,24 +260,15 @@ def test_verify_analysis_orbit_data(
         ax[1, 1].axhline(np.abs(dv_limit), linestyle="--", color="r", label="limit")
         ax[1, 1].set_xlabel("Time [s]")
         ax[1, 1].set_ylabel("Delta velocity [m/s]")
+        ax[1, 1].set_title("Delta velocity")
         ax[1, 1].legend()
 
         # Phase
+        ax[2, 0].plot(t_analysed[inds], aligned_p_rel[inds], marker=".", color="g", label="Real phase")
         ax[2, 0].plot(
-            t_analysed[inds],
-            np.unwrap(p_rel)[inds] - np.unwrap(p_rel)[0],
-            marker=".",
-            color="g",
-            label="Real phase",
+            t_analysed[inds], aligned_p_est[inds], marker=".", ls="none", color="r", label="Estimated phase"
         )
-        ax[2, 0].plot(
-            t_analysed[inds],
-            np.unwrap(out.p_vec)[inds] - np.unwrap(out.p_vec)[0],
-            marker=".",
-            ls="none",
-            color="r",
-            label="Estimated phase",
-        )
+        ax[2, 0].set_title("Real vs estimated phase")
         ax[2, 0].legend()
 
         ax[2, 1].plot(t_analysed[inds], dp, marker=".", ls="none", label="|p_delta|")
@@ -283,6 +276,7 @@ def test_verify_analysis_orbit_data(
         # ax[2, 1].axhline(np.abs(dv_limit), linestyle="--", color="r", label="limit")
         ax[2, 1].set_xlabel("Time [s]")
         ax[2, 1].set_ylabel("Delta")
+        ax[2, 1].set_title("Delta phase")
         ax[2, 1].legend()
 
         # --- Satellite orbit vs radar position ---

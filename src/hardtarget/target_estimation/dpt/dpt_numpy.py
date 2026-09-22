@@ -41,7 +41,9 @@ def fast_dpt_np(
             drg = int(rg // cfg_params.frequency_decimation)
             zr = rx[pro_params.il1_rx_window_indices + rg]
             # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter), decimate
-            echo = np.sum((zr * tx[:, sub_res]).reshape(-1, cfg_params.frequency_decimation), axis=-1)
+            echo = np.sum(
+                (zr * np.conj(tx[:, sub_res])).reshape(-1, cfg_params.frequency_decimation), axis=-1
+            )
             dec_signal = np.zeros((pro_params.decimated_read_length,), dtype=np.complex64)
             dec_signal[pro_params.il0_dec_rx_window_indices + drg] = echo
             index = sub_res + ri * cfg_params.range_gate_sub_resolution
