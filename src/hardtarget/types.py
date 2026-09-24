@@ -46,6 +46,7 @@ class CfgParams:
         range_gate_step: The step in range-gates to use when processing, if baud-length is longer
                          than the receiver sampling time this can be increased to sacrifice range-resolution
                          for processing speed.
+        tx_signal_model: Use a signal model instead of a potentially measured tx signal.
         num_cohints_per_file: How many coherent integration periods to include in one output file.
                               Smaller means that lower latency can be achieved.
         tx_amp_limit: The tx amplitude limit, if lower than this the analysis will ignore the cohints.
@@ -58,6 +59,7 @@ class CfgParams:
     min_range_gate: int = 0
     max_range_gate: int = -1
     range_gate_step: int = 1
+    tx_signal_model: bool = False
     num_cohints_per_file: int = 100
     tx_amp_limit: float = 1.0
     node_gpus: int = 1

@@ -84,14 +84,14 @@ def simulate_pulse_code(
     signal_length: int,
     start_samp: float = 0,
 ) -> npt.NDArray[np.complex128]:
+
     t_usec = (np.arange(signal_length) - start_samp) * t_samp_usec
 
     t_in_ipp_usec = t_usec % ipp_t_usec
     t_ind = (t_in_ipp_usec // baud_length_usec).astype(np.int64)
     signal = np.zeros(t_usec.shape, dtype=np.complex128)
     inds = np.logical_and(t_in_ipp_usec >= 0, t_in_ipp_usec < baud_length_usec * len(code))
-    signal[inds] = -code[t_ind[inds]]  # ??? TODO:  does eiscat stores as conjugate?
-
+    signal[inds] = code[t_ind[inds]]
     return signal
 
 
@@ -205,6 +205,8 @@ def tx_signal_model(
 
         # filter according to the receiver chain
         signals[:, ind] = filt.model(signal)[filt.delay :]
+
+    # TODO: Signals are not shifted to the correct tx start!
 
     if normalize:
         mu = np.mean(signals, axis=0)

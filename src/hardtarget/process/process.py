@@ -632,13 +632,19 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         # clean up
 
         # Extracting tx data
-        if not self._tx_channel:  # MAKE CONFIGRUABLE
+        if not self._tx_channel or self.cfg_params.tx_signal_model:
             assert self.exp_def.code is not None, (
                 "No code available from the metadata, not possible to simulate tx"
             )
-            # TODO: this should probably be configurable in the future
+
+            if self.exp_def.code.ndim >= 2:
+                ind = (start_sample // self.exp_def.ipp_samps) % self.exp_def.code.shape[0]
+                code = self.exp_def.code[ind]
+            else:
+                code = self.exp_def.code
+
             tx = self.tx_signal_model(
-                code=tuple(self.exp_def.code),
+                code=tuple(code),
                 baud_length_usec=self.exp_def.baud_length_usec,
                 t_samp_usec=self.exp_def.t_samp_usec,
                 # tx_start_samp=int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec),
@@ -672,7 +678,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 sub_resolution=sub_resolution,
                 filt=self.exp_def.fir_filter,
             )
-
         tx = tx[self.pro_params.tx_stencil, :]
 
         return ExtractedSignals(

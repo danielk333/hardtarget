@@ -61,7 +61,8 @@ gmf_cfg = GMFCfgParams(
     acceleration_steps=1,
     refine_doppler=True,
     refine_acceleration=False,
-    cache=False,
+    tx_signal_model=True,
+    # cache=False,
 )
 
 dpt_cfg = DPTCfgParams(
@@ -157,6 +158,7 @@ def test_verify_analysis_orbit_data(
         comm=comm,
         exp_def=exp_def,
     )
+
     comm.barrier()
     if comm.rank != 0:
         return
