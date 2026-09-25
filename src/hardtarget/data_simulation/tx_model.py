@@ -206,8 +206,6 @@ def tx_signal_model(
         # filter according to the receiver chain
         signals[:, ind] = filt.model(signal)[filt.delay :]
 
-    # TODO: Signals are not shifted to the correct tx start!
-
     if normalize:
         mu = np.mean(signals, axis=0)
         sig = np.std(signals, axis=0)

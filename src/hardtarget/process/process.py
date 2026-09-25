@@ -643,18 +643,23 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             else:
                 code = self.exp_def.code
 
+            tx_start_samp = (
+                start_sample % self.exp_def.ipp_samps
+                - self.cfg_params.samp_offset
+                + int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec)
+            )  # Why better results if samp_offset -1? error in signal model?
+
             tx = self.tx_signal_model(
                 code=tuple(code),
                 baud_length_usec=self.exp_def.baud_length_usec,
                 t_samp_usec=self.exp_def.t_samp_usec,
-                # tx_start_samp=int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec),
                 ipp_samps=self.exp_def.ipp_samps,
                 read_length=read_length,
                 bandwidth=None,
                 # bandwidth=3.5 * 1e6,  # TODO: this needs to be part of the config somewhere - its kinda a
                 # fundamental limits of the radar system but could in principle be configurable per
                 # experiment #Mu = 3.5*1e6
-                start_samp=(start_sample % self.exp_def.ipp_samps) - self.cfg_params.samp_offset,
+                start_samp=tx_start_samp,
                 sub_resolution=sub_resolution,
                 filt=ReceiverChainModel(
                     self.exp_def.fir_filter
