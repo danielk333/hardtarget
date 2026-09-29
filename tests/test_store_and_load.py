@@ -98,6 +98,7 @@ class TestStoreAndLoad:
             r_vec=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
             v_vec=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
             a_vec=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
+            p_vec=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
             g_vec=np.random.rand(cfg_org.num_cohints_per_file).astype(np.float64),
             pointing_vec=np.random.rand(cfg_org.num_cohints_per_file, 2).astype(np.float64),
             epoch_us=100,
