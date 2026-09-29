@@ -85,13 +85,29 @@ def simulate_pulse_code(
     start_samp: float = 0,
 ) -> npt.NDArray[np.complex128]:
 
+    # I code is 2 diemensional it is assumed that the signal lenght is more than 1 ipp
+
     t_usec = (np.arange(signal_length) - start_samp) * t_samp_usec
+
+    code_2d = np.atleast_2d(code)
+    num_pulses, code_length = code_2d.shape
 
     t_in_ipp_usec = t_usec % ipp_t_usec
     t_ind = (t_in_ipp_usec // baud_length_usec).astype(np.int64)
+
     signal = np.zeros(t_usec.shape, dtype=np.complex128)
-    inds = np.logical_and(t_in_ipp_usec >= 0, t_in_ipp_usec < baud_length_usec * len(code))
-    signal[inds] = code[t_ind[inds]]
+
+    pulse_ind = (t_usec // ipp_t_usec).astype(np.int64)
+    inds = np.logical_and.reduce(
+        (
+            t_in_ipp_usec >= 0,
+            t_in_ipp_usec < baud_length_usec * code_length,
+            pulse_ind >= 0,
+            pulse_ind < num_pulses,
+        )
+    )
+
+    signal[inds] = code_2d[pulse_ind[inds], t_ind[inds]]
     return signal
 
 
@@ -139,7 +155,7 @@ def phase_flip_model(
 
 
 def tx_signal_model(
-    code: tuple[float] | npt.NDArray[np.float64],
+    code: tuple[float] | tuple[tuple[float, ...], ...] | npt.NDArray[np.float64],
     baud_length_usec: int,
     t_samp_usec: int,
     ipp_samps: int,
@@ -154,7 +170,7 @@ def tx_signal_model(
     Tx signal simulation, based on a filtered version of a analytic coded finite bandwidth signal.
 
     Args:
-        code: Transmitted code
+        code: Transmitted code, single array for one code, multiple arrays if varying per ipp
         baud_length_usec: Transmission baud length
         t_samp_usec: Receiver sample time
         ipp_samps: interpulse period samples

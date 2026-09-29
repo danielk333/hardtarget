@@ -638,19 +638,31 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             )
 
             if self.exp_def.code.ndim >= 2:
-                ind = (start_sample // self.exp_def.ipp_samps) % self.exp_def.code.shape[0]
-                code = self.exp_def.code[ind]
+                # TODO: If not starting at start of file a code match must be made one time!
+                code_inds = (
+                    np.arange(
+                        (start_sample // self.exp_def.ipp_samps),
+                        (start_sample + read_length) // self.exp_def.ipp_samps,
+                    )
+                    % self.exp_def.code.shape[0]
+                )
+                code = self.exp_def.code[code_inds]
+                if code.ndim >= 2:
+                    code = tuple(map(tuple, code))
+                else:
+                    code = tuple(code)
             else:
-                code = self.exp_def.code
+                code = tuple(self.exp_def.code)
 
             tx_start_samp = (
                 start_sample % self.exp_def.ipp_samps
                 - self.cfg_params.samp_offset
+                + 1
                 + int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec)
-            )  # Why better results if samp_offset -1? error in signal model?
+            )  # Why better results if -(samp_offset+1)? error in signal model?
 
             tx = self.tx_signal_model(
-                code=tuple(code),
+                code=code,
                 baud_length_usec=self.exp_def.baud_length_usec,
                 t_samp_usec=self.exp_def.t_samp_usec,
                 ipp_samps=self.exp_def.ipp_samps,
@@ -693,7 +705,10 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         """Setup cache"""
 
         if self.cfg_params.cache:
-            self.tx_signal_model = functools.lru_cache(maxsize=2)(tx_signal_model)
+            maxsize = (
+                self.exp_def.code.shape[0] // self.cfg_params.n_ipp if self.exp_def.code.ndim >= 2 else 2
+            )
+            self.tx_signal_model = functools.lru_cache(maxsize=maxsize)(tx_signal_model)
         else:
             self.tx_signal_model = tx_signal_model  # type: ignore[assignment]
 

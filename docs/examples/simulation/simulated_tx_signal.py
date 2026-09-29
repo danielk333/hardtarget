@@ -6,11 +6,9 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from radardef.radar_stations.eiscat.experiments import load_radar_code
-from scipy import constants
-from tqdm import tqdm
 
 from hardtarget.constants import ReceiverChainModel
-from hardtarget.data_simulation.tx_model import phase_flip_model, tx_signal_model
+from hardtarget.data_simulation.tx_model import tx_signal_model
 
 # First we define a simple code
 # ```
@@ -69,7 +67,7 @@ for ind in range(tx.shape[1]):
 axes[0].legend()
 axes[1].set_xlim((tx_samples * 0.5, tx_samples * 0.5 + baud_length_usec / t_samp_usec * 1.5))
 
-
+"""
 # We can also model the phase flip behaviour directly
 values, offsets = phase_flip_model(filt=fir_filter, sample_offset=2)
 
@@ -166,7 +164,7 @@ ax.semilogy(noise_sigmas, errors[:, 0] + errors[:, 1], ls="--")
 ax.axhline(base_resolution, c="g")
 ax.axhline(decimated_resolution, c="r")
 
-
+"""
 plt.show()
 
 # This is used during the analysis part for unknown tx signals, the subresolution is configurable in the .ini
