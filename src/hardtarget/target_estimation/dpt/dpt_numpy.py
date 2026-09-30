@@ -47,7 +47,6 @@ def fast_dpt_np(
             dec_signal = np.zeros((pro_params.decimated_read_length,), dtype=np.complex64)
             dec_signal[pro_params.il0_dec_rx_window_indices + drg] = echo
             index = sub_res + ri * cfg_params.range_gate_sub_resolution
-            dc[index] = np.abs(np.sum(echo)) ** 2
 
             dpt2 = dec_signal[pro_params.decimated_ipp_delay_parameter :] * np.conj(
                 dec_signal[: -pro_params.decimated_ipp_delay_parameter]
@@ -63,6 +62,7 @@ def fast_dpt_np(
             ft2 = np.abs(ft) ** 2
             spec_peak = np.argmax(ft2)
 
+            dc[index] = np.median(ft2)
             vals[index] = ft2[spec_peak]
             v[index] = pro_params.fft_frequencies[spec_peak]
             a[index] = pro_params.accelerations[dspec_peak]

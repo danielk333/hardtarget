@@ -36,3 +36,4 @@ void compute_phase_difference(
 );
 int find_fftwf_peak(fftwf_complex* arr, int len);
 void fft_shift_1d(fftwf_complex* data, int len);
+double calc_median_wirth(fftwf_complex* ft, int n, float* scratch);

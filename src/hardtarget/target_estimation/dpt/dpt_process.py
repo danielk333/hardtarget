@@ -137,8 +137,8 @@ class DPTProcess(TargetEstimationProcess[DPTCfgParams, DPTProParams]):
             return mfvars
         else:
             return MFVariables(
-                vals=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
-                dc=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
+                vals=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
+                dc=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
                 v=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
                 a=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
                 phi=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),

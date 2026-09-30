@@ -52,7 +52,6 @@ def fast_gmf_np(
             dec_signal = np.zeros((pro_params.decimated_read_length,), dtype=np.complex64)
             # zero-frequency (DC) is used to get range-dependent noise floor
             index = sub_res + ri * cfg_params.range_gate_sub_resolution
-            dc[index] = np.abs(np.sum(echo)) ** 2
             a_index = -1
             v_index = -1
 
@@ -79,6 +78,7 @@ def fast_gmf_np(
                     a_index = ai
                     # phase at the best acceleration and range rate
                     phi[index] = phi_est
+                    dc[index] = np.median(ft2)
 
             # Refine acceleration and phase
             dec_signal[pro_params.il0_dec_rx_window_indices + drg] = (

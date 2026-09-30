@@ -46,6 +46,7 @@ int fgmf(
     fftwf_complex* dec_opt_signal;
     fftwf_plan p;
     int echo_len;
+    float* ft2 = (float*)malloc(sizeof(float) * dec_signal_len);
 
     echo_len = (int)(tx_len / frequency_decimation);
     echo = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * echo_len);
@@ -67,17 +68,6 @@ int fgmf(
             compute_echo_signal(
                 echo, echo_len, tx, tx_len, rx, rx_len, sri, sub_res_len, frequency_decimation, rgs[ri], rx_window
             );
-
-            // Accumulate in float64 to not accumulate any errors.
-            double echo_sum_real = 0.0;
-            double echo_sum_imag = 0.0;
-
-            for (int i = 0; i < echo_len; i++) {
-                echo_sum_real += (double)crealf(echo[i]);
-                echo_sum_imag += (double)cimagf(echo[i]);
-            }
-
-            dc[ind] = echo_sum_real * echo_sum_real + echo_sum_imag * echo_sum_imag;
 
             // for all accelerations
             // add range gate dependent accelerations
@@ -108,6 +98,8 @@ int fgmf(
                     }
                 }
             }
+
+            dc[ind] = calc_median_wirth(ft, dec_signal_len, ft2);
 
             // Store best results
             v[ind] = fft_frequencies[v_ind];
@@ -142,6 +134,7 @@ int fgmf(
             }
         }
     }
+    free(ft2);
     fftwf_free(dec_signal);
     fftwf_free(dec_opt_signal);
     fftwf_free(ft);

@@ -103,11 +103,8 @@ def test_verify_analysis_orbit_data(
     output_dir = Path(tmp_dir.name) / "analysed"
 
     # Time object is noticed in eiscat data
-    start_time = str_to_dt("2024-07-04T10:21:15.500")
-    # start_time = str_to_dt("2024-07-04T10:21:19.500")
-    end_time = str_to_dt("2024-07-04T10:21:20.000")
-    # start_time = str_to_dt("2024-07-04T10:21:19.400")
-    # end_time = str_to_dt("2024-07-04T10:21:19.900")
+    start_time = str_to_dt("2024-07-04T10:21:13.350")
+    end_time = str_to_dt("2024-07-04T10:21:21.000")
 
     # get precision orbit data to interpolate
     data_id = cdse.get_orbit_data_id(start_time, end_time)

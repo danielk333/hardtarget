@@ -153,3 +153,40 @@ void fft_shift_1d(fftwf_complex* data, int len) {
 
     free(tmp);
 }
+
+double calc_median_wirth(fftwf_complex* ft, int n, float* scratch) {
+    if (n <= 0) return 0.0;
+
+    // Caclulate magnitudes
+    for (int i = 0; i < n; i++) {
+        float r = ft[i][0];
+        float im = ft[i][1];
+        scratch[i] = (r * r) + (im * im);
+    }
+
+    // Wirth iterative search, k = middle
+    int k = n / 2;
+    int l = 0;
+    int m = n - 1;
+
+    while (l < m) {
+        float x = scratch[k];
+        int i = l;
+        int j = m;
+        do {
+            while (scratch[i] < x) i++;
+            while (x < scratch[j]) j--;
+            if (i <= j) {
+                float a = scratch[i];
+                scratch[i] = scratch[j];
+                scratch[j] = a;
+                i++;
+                j--;
+            }
+        } while (i <= j);
+        if (j < k) l = i;
+        if (k < i) m = j;
+    }
+
+    return (double)scratch[k];
+}

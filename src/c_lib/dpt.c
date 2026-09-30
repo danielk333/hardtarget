@@ -56,6 +56,7 @@ int fdpt(
     in_tau = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * dec_tau_samp);
     out_tau = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * dec_tau_samp);
     dec_opt_signal = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * echo_len);
+    float* ft2 = (float*)malloc(sizeof(float) * dec_signal_len);
 
     p = fftwf_plan_dft_1d(dec_signal_len, in, out, FFTW_FORWARD, FFT_PLAN_ID);
     p_tau = fftwf_plan_dft_1d(dec_tau_samp, in_tau, out_tau, FFTW_FORWARD, FFT_PLAN_ID);
@@ -77,7 +78,6 @@ int fdpt(
             compute_echo_signal(
                 echo, echo_len, tx, tx_len, rx, rx_len, sri, sub_res_len, frequency_decimation, rgs[ri], rx_window
             );
-            dc[ind] = compute_echo_power(echo, echo_len);
 
             compute_phase_difference(in, dec_signal_len, in_tau, dec_tau_samp, echo, echo_len, dec_rx_inds, drg);
             fftwf_execute(p_tau);
@@ -103,6 +103,7 @@ int fdpt(
             vals[ind] = (real * real) + (imag * imag);
             v[ind] = fft_frequencies[in_peak];    // frequency index
             a[ind] = accelerations[in_tau_peak];  // acceleration
+            dc[ind] = calc_median_wirth(out, dec_signal_len, ft2);
 
             int v_ind_p = in_peak;
             if (in_peak < fft_frequencies_len - 1) {
@@ -132,6 +133,7 @@ int fdpt(
             }
         }
     }
+    free(ft2);
     fftwf_free(in);
     fftwf_free(out);
     fftwf_free(in_tau);
