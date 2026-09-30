@@ -198,6 +198,7 @@ def tx_signal_model(
         offsets = np.linspace(0, 1, sub_resolution, endpoint=False)
     else:
         offsets = sub_resolution
+
     signals = np.zeros((read_length, len(offsets)), dtype=np.complex128)
 
     for ind in range(len(offsets)):
@@ -207,7 +208,7 @@ def tx_signal_model(
             t_samp_usec=t_samp_usec / filt.decimation,
             ipp_t_usec=ipp_t_usec,
             signal_length=int((read_length + filt.delay) * filt.decimation),
-            start_samp=(start_samp + offsets[ind]) * filt.decimation,
+            start_samp=(start_samp + filt.delay + offsets[ind]) * filt.decimation,
         )
         # filter to the initial bandwidth of the transmitter
         if bandwidth is not None:

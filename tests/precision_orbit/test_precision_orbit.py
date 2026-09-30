@@ -61,8 +61,7 @@ gmf_cfg = GMFCfgParams(
     acceleration_steps=1,
     refine_doppler=True,
     refine_acceleration=False,
-    tx_signal_model=True,
-    # cache=False,
+    # cache=True,
 )
 
 dpt_cfg = DPTCfgParams(
@@ -204,11 +203,11 @@ def test_verify_analysis_orbit_data(
     inds = snrdb > 15.0
 
     # Calculate delta range (real vs estimated)
-    dr = np.abs(r_rel[inds] - out.r_vec[inds])
+    dr = r_rel[inds] - out.r_vec[inds]
     dr_limit = 100
 
     # Calculate delta velocity (real vs estimated)
-    dv = np.abs(v_rel[inds] - out.v_vec[inds])
+    dv = v_rel[inds] - out.v_vec[inds]
     dv_limit = 5
 
     # Calculate delta phase (real vs estimated)
@@ -221,7 +220,9 @@ def test_verify_analysis_orbit_data(
     if plot:
         # --- Plot estimation vs real range/velocity ---
         fig, ax = plt.subplots(3, 2)
-
+        fig.suptitle(
+            f"High precision analysis using {'Simulated' if cfg.tx_signal_model else 'Measured'} TX signal"
+        )
         # Real vs estimated range
         ax[0, 0].plot(t_analysed, (r_rel * 0.5) / 1000, marker=".", color="g", label="Real range")
         ax[0, 0].plot(
@@ -238,11 +239,12 @@ def test_verify_analysis_orbit_data(
         ax[0, 0].legend()
 
         # Range delta
-        ax[0, 1].plot(t_analysed[inds], dr / 1000, marker=".", ls="none", label="|r_delta|")
-        ax[0, 1].axhline(np.mean(dr) / 1000, linestyle="--", color="g", label="mean |r_delta|")
-        ax[0, 1].axhline(np.abs(dr_limit) / 1000, linestyle="--", color="r", label="limit")
+        ax[0, 1].plot(t_analysed[inds], dr, marker=".", ls="none", label=r"$\Delta r$")
+        ax[0, 1].axhline(np.mean(dr), linestyle="--", color="g", label=r"$\bar{\Delta r}$")
+        ax[0, 1].axhline(dr_limit, linestyle="--", color="r", label="limit")
+        ax[0, 1].axhline(-dr_limit, linestyle="--", color="r")
         ax[0, 1].set_xlabel("Time [s]")
-        ax[0, 1].set_ylabel("Delta range [km]")
+        ax[0, 1].set_ylabel("Delta range [m]")
         ax[0, 1].set_title("Delta range")
         ax[0, 1].legend()
 
@@ -257,9 +259,11 @@ def test_verify_analysis_orbit_data(
         ax[1, 0].legend()
 
         # velocity delta
-        ax[1, 1].plot(t_analysed[inds], dv, marker=".", ls="none", label="|v_delta|")
-        ax[1, 1].axhline(np.mean(dv), linestyle="--", color="g", label="mean |v_delta|")
-        ax[1, 1].axhline(np.abs(dv_limit), linestyle="--", color="r", label="limit")
+        ax[1, 1].plot(t_analysed[inds], dv, marker=".", ls="none", label=r"$\Delta v$")
+        ax[1, 1].axhline(np.mean(dv), linestyle="--", color="g", label=r"$\bar{\Delta v}$")
+        ax[1, 1].axhline(dv_limit, linestyle="--", color="r", label="limit")
+        ax[1, 1].axhline(-dv_limit, linestyle="--", color="r")
+
         ax[1, 1].set_xlabel("Time [s]")
         ax[1, 1].set_ylabel("Delta velocity [m/s]")
         ax[1, 1].set_title("Delta velocity")
@@ -389,11 +393,11 @@ def test_verify_analysis_orbit_data(
 
     tmp_dir.cleanup()
 
-    assert np.mean(dr) < dr_limit, (
-        f"Estimated range is far off the real range! limit: {dr_limit} [m] > delta: {np.mean(dr)} [m]"
+    assert np.abs(np.mean(dr)) < dr_limit, (
+        f"Estimated range is far off the real range! limit: {dr_limit} [m] > delta: {np.abs(np.mean(dr))} [m]"
     )
-    assert np.mean(dv) < dv_limit, (
-        f"Estimated velocity is far off the real velocity! limit: {dv_limit} [m/s] > delta: {np.mean(dv)} [m/s]"
+    assert np.abs(np.mean(dv)) < dv_limit, (
+        f"Estimated velocity is far off the real velocity! limit: {dv_limit} [m/s] > delta: {np.abs(np.mean(dv))} [m/s]"
     )
 
 
@@ -436,10 +440,11 @@ if __name__ == "__main__":
     parser.add_argument("--radar-path")
     parser.add_argument("--impl", default="numpy")
     parser.add_argument("--progress", action="store_true")
+    parser.add_argument("--simulated_tx", action="store_true")
     args = parser.parse_args()
     test_verify_analysis_orbit_data(
         args.plot,
         (args.usr, args.pwd, args.radar_path, args.orbit_path, args.impl),
-        (TargetEstimationMethod.fgmf, gmf_cfg),
+        (TargetEstimationMethod.fgmf, gmf_cfg.copy(tx_signal_model=args.simulated_tx)),
         args.progress,
     )

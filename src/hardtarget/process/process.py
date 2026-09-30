@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Generic, Optional, Type
 
 import numpy as np
+import numpy.typing as npt
 from radardef.components import DataLoader
 from radardef.tools.mpi_tools import CommBar
 from radardef.types import Pointing
@@ -165,11 +166,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         if self.cfg_params.cache != self.data.cache_state:
             self.data.cache_state = self.cfg_params.cache
 
-        if self.cfg_params.cache:
-            # TODO: i broke this by editing the types i think?
-            self.tx_signal_model = functools.lru_cache(maxsize=2)(tx_signal_model)
-        else:
-            self.tx_signal_model = tx_signal_model  # type: ignore[assignment]
+        self._setup_cache()
 
         # Define library to be used during process
         self.lib, lib_name, impl = self.get_analysis_lib(method_lib, impl)
@@ -190,6 +187,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self.output_dir = Path(output_dir).resolve() if output_dir is not None else None
         self.store_mode = "w"
         self.store_params = True
+        self.conjugated_tx = None
 
         self.kwargs = kwargs
         self.__post_init__()
@@ -657,9 +655,8 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             tx_start_samp = (
                 start_sample % self.exp_def.ipp_samps
                 - self.cfg_params.samp_offset
-                + 1
                 + int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec)
-            )  # Why better results if -(samp_offset+1)? error in signal model?
+            )
 
             tx = self.tx_signal_model(
                 code=code,
@@ -677,29 +674,82 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                     self.exp_def.fir_filter
                 ),  # TODO: again, probably should change name of this variable
             )
-        elif self._tx_channel == self._rx_channels:
-            tx = ipp.copy()
-            tx = tx_modulation_model(
-                tx_signal=tx,
-                tx_stencil=self.pro_params.tx_stencil,
-                sub_resolution=sub_resolution,
-                filt=self.exp_def.fir_filter,
-            )
+
         else:
-            # TODO: is it possible to have the sub-resolutions already calculated in the data but as
-            # different channels? maybe - could be a future modification
-            tx = self.data.read(self._tx_channel, start_sample, read_length)
+            if self._tx_channel == self._rx_channels:
+                tx = ipp.copy()
+            else:
+                # TODO: is it possible to have the sub-resolutions already calculated in the data but as
+                # different channels? maybe - could be a future modification
+                tx = self.data.read(self._tx_channel, start_sample, read_length)
+
             tx = tx_modulation_model(
                 tx_signal=tx,
                 tx_stencil=self.pro_params.tx_stencil,
                 sub_resolution=sub_resolution,
                 filt=self.exp_def.fir_filter,
             )
+
+            # Check if tx data conjugated in data file.
+            if self.conjugated_tx is None:
+                if self.exp_def.code.ndim >= 2:
+                    code_inds = np.arange(
+                        (start_sample // self.exp_def.ipp_samps),
+                        (start_sample + read_length) // self.exp_def.ipp_samps,
+                    )
+                    code_inds = code_inds % self.exp_def.code.shape[0]
+                    code = self.exp_def.code[code_inds]
+                else:
+                    code = self.exp_def.code
+
+                tx_start_samp = (
+                    start_sample % self.exp_def.ipp_samps
+                    - self.cfg_params.samp_offset
+                    + int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec)
+                )
+
+                tx_sim = self.tx_signal_model(
+                    code=tuple(code) if code.ndim <= 1 else tuple(map(tuple, code)),
+                    baud_length_usec=self.exp_def.baud_length_usec,
+                    t_samp_usec=self.exp_def.t_samp_usec,
+                    ipp_samps=self.exp_def.ipp_samps,
+                    read_length=read_length,
+                    bandwidth=None,
+                    start_samp=tx_start_samp,
+                    filt=ReceiverChainModel(self.exp_def.fir_filter),
+                ).flatten()
+
+                self.conjugated_tx = self._is_tx_conjugated(
+                    ipp[self.pro_params.tx_stencil], tx_sim[self.pro_params.tx_stencil]
+                )
+
+            if self.conjugated_tx:
+                tx = np.conj(tx)
+
         tx = tx[self.pro_params.tx_stencil, :]
 
         return ExtractedSignals(
             tx=tx.astype(np.complex64), rx=rx.astype(np.complex64), ipp=ipp.astype(np.complex64)
         )
+
+    def _is_tx_conjugated(self, tx_real: npt.NDArray, tx_sim: npt.NDArray):
+        """
+        Determine if the true tx signal is stored as conjugated or not.
+
+        Args:
+            tx_real: True measured TX signal
+            tx_sim: Simulated Tx signal
+        Returns:
+            True if the measured tx signal is conjugated.
+
+        """
+        angle = np.mean(np.angle(tx_real * np.conj(tx_sim), deg=True))
+        angle = angle % 360
+
+        dist_to_0 = min(angle, 360 - angle)
+        dist_to_180 = abs(angle - 180)
+
+        return dist_to_0 > dist_to_180
 
     def _setup_cache(self) -> None:
         """Setup cache"""
