@@ -1,4 +1,8 @@
+#include "fftw_utils.h"
+
 #include <fftw3.h>
+#include <stdlib.h>
+#include <string.h>
 
 // complex arrays are indexed as tx[2*index] = real part, tx[2*index+1] = imaginary part
 
@@ -15,35 +19,54 @@ void compute_echo_signal(
     int rg,
     int* rx_window
 ) {
-    // zero echo
-    for (int fi = 0; fi < echo_len; fi++) {
-        echo[fi][0] = 0.0;
-        echo[fi][1] = 0.0;
-    }
-    int tidx;
+    // Temporary double-precision accumulators.
+    double echo_re[echo_len];
+    double echo_im[echo_len];
+
+    memset(echo_re, 0, (size_t)echo_len * sizeof(double));
+    memset(echo_im, 0, (size_t)echo_len * sizeof(double));
+
     for (int ti = 0; ti < tx_len; ti++) {
-        // rea*reb - ima*imb
-        // tx*conj(rx)
-        tidx = ti / decimation;
-        // Real part of z_t[ti]x*rx[rg+ti]
-        int tx_real_i = 2 * ti * (sub_res_len) + sub_res;
+        int tidx = ti / decimation;
+
+        int tx_real_i = 2 * (ti * sub_res_len + sub_res);
         int tx_imag_i = tx_real_i + 1;
-        echo[tidx][0] +=
-            tx[tx_real_i] * rx[(rx_window[ti] + rg) * 2] - tx[tx_imag_i] * rx[(rx_window[ti] + rg) * 2 + 1];
-        // rea*imb + ima*reb
-        // Imag part of z_t[ti]x*rx[rg+ti]
-        echo[tidx][1] +=
-            tx[tx_real_i] * rx[(rx_window[ti] + rg) * 2 + 1] + tx[tx_imag_i] * rx[(rx_window[ti] + rg) * 2];
+
+        int rx_i = 2 * (rx_window[ti] + rg);
+
+        float tx_re = tx[tx_real_i];
+        float tx_im = tx[tx_imag_i];
+        float rx_re = rx[rx_i];
+        float rx_im = rx[rx_i + 1];
+
+        float p1 = tx_re * rx_re;
+        float p2 = tx_im * rx_im;
+
+        // rx * conj(tx)
+        float product_re = tx_re * rx_re + tx_im * rx_im;
+        float product_im = tx_re * rx_im - tx_im * rx_re;
+
+        // Accumulate in float64 to not accumulate any errors.
+        echo_re[tidx] += (double)product_re;
+        echo_im[tidx] += (double)product_im;
+    }
+
+    // Convert to float32 only once, after all accumulation.
+    for (int i = 0; i < echo_len; i++) {
+        echo[i][0] = (float)echo_re[i];
+        echo[i][1] = (float)echo_im[i];
     }
 }
 
-float compute_echo_power(fftwf_complex* echo, int echo_len) {
-    float sum_re = 0;
-    float sum_im = 0;
+double compute_echo_power(fftwf_complex* echo, int echo_len) {
+    double sum_re = 0.0;
+    double sum_im = 0.0;
+
     for (int i = 0; i < echo_len; i++) {
-        sum_re += echo[i][0];
-        sum_im += echo[i][1];
+        sum_re += (double)echo[i][0];
+        sum_im += (double)echo[i][1];
     }
+
     return sum_re * sum_re + sum_im * sum_im;
 }
 
@@ -53,18 +76,29 @@ void multiply_acc_phasors(
     int echo_len,
     float* acc_phasors,
     int phasor_index,
-    int* dec_rx_inds
+    int* dec_rx_inds,
+    int drg
 ) {
-    // echo*acc_phasors
-    float rep, imp;
     for (int tidx = 0; tidx < echo_len; tidx++) {
-        rep = acc_phasors[phasor_index + 2 * tidx];
-        imp = acc_phasors[phasor_index + 2 * tidx + 1];
+        float rep = acc_phasors[phasor_index + 2 * tidx];
+        float imp = acc_phasors[phasor_index + 2 * tidx + 1];
 
-        // rea*reb - ima*imb
-        in[dec_rx_inds[tidx]][0] = echo[tidx][0] * rep - echo[tidx][1] * imp;
-        // rea*imb + ima*reb
-        in[dec_rx_inds[tidx]][1] = echo[tidx][0] * imp + echo[tidx][1] * rep;
+        int out_index = dec_rx_inds[tidx] + drg;
+
+        in[out_index][0] = echo[tidx][0] * rep - echo[tidx][1] * imp;
+
+        in[out_index][1] = echo[tidx][0] * imp + echo[tidx][1] * rep;
+    }
+}
+
+void array_acc_multiply(fftwf_complex* arr1, int arr_len, float* acc_phasors, int phasor_index, fftwf_complex* out) {
+    for (int tidx = 0; tidx < arr_len; tidx++) {
+        float rep = acc_phasors[phasor_index + 2 * tidx];
+        float imp = acc_phasors[phasor_index + 2 * tidx + 1];
+
+        out[tidx][0] = arr1[tidx][0] * rep - arr1[tidx][1] * imp;
+
+        out[tidx][1] = arr1[tidx][0] * imp + arr1[tidx][1] * rep;
     }
 }
 
@@ -75,22 +109,21 @@ void compute_phase_difference(
     int dec_tau_samp,
     fftwf_complex* echo,
     int echo_len,
-    int* dec_rx_inds
+    int* dec_rx_inds,
+    int drg
 ) {
     for (int tidx = 0; tidx < echo_len; tidx++) {
-        in[dec_rx_inds[tidx]][0] = echo[tidx][0];
-        in[dec_rx_inds[tidx]][1] = echo[tidx][1];
+        int out_index = dec_rx_inds[tidx] + drg;
+
+        in[out_index][0] = echo[tidx][0];
+        in[out_index][1] = echo[tidx][1];
     }
-    int ti_inv;
+
     for (int ti = 0; ti < dec_tau_samp; ti++) {
-        ti_inv = dec_tau_samp + ti;
-        // dec_signal[dec_tau_samp:] * np.conj(dec_signal[:-dec_tau_samp])
-        // formula for complex mult
-        // rea*reb - ima*imb
+        int ti_inv = dec_tau_samp + ti;
+
         in_tau[ti][0] = in[ti_inv][0] * in[ti][0] + in[ti_inv][1] * in[ti][1];
-        // rea*imb + ima*reb
         in_tau[ti][1] = -in[ti_inv][0] * in[ti][1] + in[ti_inv][1] * in[ti][0];
-        // But we take imb = -imb for the complex conj
     }
 }
 
@@ -106,4 +139,54 @@ int find_fftwf_peak(fftwf_complex* arr, int len) {
         }
     }
     return index;
+}
+
+void fft_shift_1d(fftwf_complex* data, int len) {
+    // Determine the split point
+    int mid = (len + 1) / 2;
+    fftwf_complex* tmp = (fftwf_complex*)malloc((size_t)len * sizeof(fftwf_complex));
+
+    memcpy(tmp, data + mid, (size_t)(len - mid) * sizeof(fftwf_complex));
+    memcpy(tmp + (len - mid), data, (size_t)mid * sizeof(fftwf_complex));
+
+    memcpy(data, tmp, (size_t)len * sizeof(fftwf_complex));
+
+    free(tmp);
+}
+
+double calc_median_wirth(fftwf_complex* ft, int n, float* scratch) {
+    if (n <= 0) return 0.0;
+
+    // Caclulate magnitudes
+    for (int i = 0; i < n; i++) {
+        float r = ft[i][0];
+        float im = ft[i][1];
+        scratch[i] = (r * r) + (im * im);
+    }
+
+    // Wirth iterative search, k = middle
+    int k = n / 2;
+    int l = 0;
+    int m = n - 1;
+
+    while (l < m) {
+        float x = scratch[k];
+        int i = l;
+        int j = m;
+        do {
+            while (scratch[i] < x) i++;
+            while (x < scratch[j]) j--;
+            if (i <= j) {
+                float a = scratch[i];
+                scratch[i] = scratch[j];
+                scratch[j] = a;
+                i++;
+                j--;
+            }
+        } while (i <= j);
+        if (j < k) l = i;
+        if (k < i) m = j;
+    }
+
+    return (double)scratch[k];
 }

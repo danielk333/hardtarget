@@ -6,135 +6,233 @@ import warnings
 from collections.abc import Generator
 from dataclasses import fields
 from pathlib import Path
-from typing import Any, Optional, TypeVar
+from types import GenericAlias
+from typing import Any, TypeVar, get_args, get_origin, overload
 
 import h5py
 import numpy as np
 
-from hardtarget.constants import AnalysisMethod
+from hardtarget.constants import AnalysisMethod, MethodAbbreviation
 from hardtarget.process import get_analysis_process
-from hardtarget.target_estimation.types import MFOutArgs
 from hardtarget.types import (
     ExpDef,
     GenericCfg,
     GenericOut,
     GenericPro,
     IsDataclass,
+    OutputBase,
     ProParams,
 )
 from hardtarget.utils.h5_tools import get_analysed_h5_files
+from hardtarget.utils.time_conversion import ts_from_str
 
 logger = logging.getLogger(__name__)
 
 
-def load_analysed_data(
-    data_dir: str | Path,
-    start_time: Optional[int | np.datetime64] = None,
-    end_time: Optional[int | np.datetime64] = None,
-    relative_time: bool = False,
-    chunk_size: Optional[int] = None,
+def load_analysed_data_chunks(
+    paths: list, chunk_size: int
 ) -> Generator[tuple[GenericOut, ExpDef, GenericCfg, GenericPro], None, None]:
+    pth_num = len(paths)
+    chunks = pth_num // chunk_size + 1
+    for ind in range(chunks):
+        sub_paths = paths[(ind * chunk_size) : ((ind + 1) * chunk_size)]
+        if sub_paths:
+            yield collect_analysis_data(sub_paths)
+
+
+@overload
+def load_analysed_data(
+    data_dir: str | Path | list[str] | list[Path],
+    chunk_size: None = None,
+    start_time: int | float | np.datetime64 | str | None = None,
+    end_time: int | float | np.datetime64 | str | None = None,
+    relative_time: bool = False,
+    method: AnalysisMethod | None = None,
+) -> tuple[GenericOut, ExpDef, GenericCfg, GenericPro]: ...
+
+
+@overload
+def load_analysed_data(
+    data_dir: str | Path | list[str] | list[Path],
+    chunk_size: int,
+    start_time: int | float | np.datetime64 | str | None = None,
+    end_time: int | float | np.datetime64 | str | None = None,
+    relative_time: bool = False,
+    method: AnalysisMethod | None = None,
+) -> Generator[tuple[GenericOut, ExpDef, GenericCfg, GenericPro], None, None]: ...
+
+
+def load_analysed_data(
+    data_dir: str | Path | list[str] | list[Path],
+    chunk_size: int | None = None,
+    start_time: int | float | np.datetime64 | str | None = None,
+    end_time: int | float | np.datetime64 | str | None = None,
+    relative_time: bool = False,
+    method: AnalysisMethod | None = None,
+) -> (
+    Generator[tuple[GenericOut, ExpDef, GenericCfg, GenericPro], None, None]
+    | tuple[GenericOut, ExpDef, GenericCfg, GenericPro]
+):
     """
     Loads and concatenates all analysed output data from 'data_dir'. Optionally specific timespans can be
-    extracted, the result will be yielded in sizes of 'chunk_size' if given.
+    extracted, the result will be yielded in sizes of 'chunk_size' if given. Not that when merging a whole directory
+    the data amount can cause quite the RAM usage.
 
     Args:
         data_dir: Directory containing the analysed output
-        start_time (optional): start time, files containing data before this will be ignored.
-        end_time (optional): end time, files containing data after this will be ignored.
+        start_time (optional): start time, files containing data before this will be ignored. If relative time it should be declared in seconds.
+        end_time (optional): end time, files containing data after this will be ignored. If relative time it should be declared in seconds.
         relative_time (optional): If relative time should be used.
+        method (optional): Specific method to load data from, if not specified it will try to read all the available data.
         chunk_size (optional): If selected will split the path list in sizes of chunk_size. Each subgroup will
                                be yielded.
     Yields:
         Tuple of experiment params, process specific configuration, process specific params and analysed data.
     """
 
+    if isinstance(start_time, str):
+        try:
+            start_time = ts_from_str(start_time)
+        except ValueError:
+            start_time = float(start_time)
+
+    if isinstance(end_time, str):
+        try:
+            end_time = ts_from_str(end_time)
+        except ValueError:
+            end_time = float(end_time)
+
     paths = collect_paths(
-        data_dir,
-        start_time=start_time,
-        end_time=end_time,
-        relative_time=relative_time,
+        data_dir, start_time=start_time, end_time=end_time, relative_time=relative_time, method=method
     )
 
     paths.sort()
-    pth_num = len(paths)
-    if chunk_size is None:
-        chunks = 1
-        chunk_size = pth_num
-    else:
-        chunks = pth_num // chunk_size + 1
-    for ind in range(chunks):
-        sub_paths = paths[(ind * chunk_size) : ((ind + 1) * chunk_size)]
-        yield collect_analysis_data(sub_paths)
+
+    if chunk_size is None or chunk_size == 0:
+        return collect_analysis_data(paths)
+
+    return load_analysed_data_chunks(paths, chunk_size)
+
+
+def get_start_time(file: str | Path) -> float:
+    file = Path(file)
+    with h5py.File(file, "r") as hf:
+        try:
+            epoch_us = hf["OutArgs"]["epoch_us"][()]
+            t = hf["OutArgs"]["t"][0]
+            time_sec = epoch_us * 1e-6 + t
+        except KeyError:
+            time_sec = 0
+
+    return time_sec
 
 
 def collect_paths(
-    folder: str | Path,
-    start_time: Optional[int | np.datetime64] = None,
-    end_time: Optional[int | np.datetime64] = None,
+    folder: str | Path | list[str] | list[Path],
+    start_time: int | float | np.datetime64 | None = None,
+    end_time: int | float | np.datetime64 | None = None,
     relative_time: bool = False,
+    method: AnalysisMethod | None = None,
 ) -> list[Path]:
     """
     Sorts file according to start time, if requested filters out files that is not within the expected time.
 
     Args:
         folder: Directory containing the analyse output.
-        start_time (optional): Start time, filter out any file before this time.
-        end_time (optional): End time, filter out any file after this time.
+        start_time (optional): Start time, filter out any file before this time. If relative, declare in seconds.
+        end_time (optional): End time, filter out any file after this time. If relative, declare in seconds.
 
     Returns:
         Time sorted list of output paths.
     """
 
-    fl = get_analysed_h5_files(folder)
+    if isinstance(folder, list):
+        folders = list(set(folder))
+
+        fl = []
+        for dir in folders:
+            fl.extend(get_analysed_h5_files(dir, MethodAbbreviation[method] if method else None))  # type: ignore[arg-type]
+    else:
+        fl = get_analysed_h5_files(folder, MethodAbbreviation[method] if method else None)
+
     if not fl:
         return []
 
+    fl = list(set(fl))
     fl.sort()
-    fl_epochs = [int(file.stem.split("-")[1]) * 1e-6 for file in fl]
 
-    epoch_unix = fl_epochs[0]
-    max_unix = fl_epochs[-1]
+    if start_time or end_time:
+        fl_epochs = [get_start_time(file) for file in fl]
 
-    if relative_time:
-        if start_time is None:
-            start = 0.0
+        epoch_unix = fl_epochs[0]
+        max_unix = fl_epochs[-1]
+
+        if relative_time:
+            if start_time is None:
+                start = 0.0
+            else:
+                start = float(start_time)
+            unix_t0 = epoch_unix + start
         else:
-            start = float(start_time)
-        unix_t0 = epoch_unix + start
-    else:
-        if start_time is None:
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=UserWarning)
-                dt64_t0 = np.datetime64(dt.datetime.fromtimestamp(epoch_unix, dt.timezone.utc))
-        elif isinstance(start_time, np.datetime64):
-            dt64_t0 = start_time  # type: ignore[assignment]
+            if start_time is None:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning)
+                    dt64_t0 = np.datetime64(dt.datetime.fromtimestamp(epoch_unix, dt.timezone.utc))
+            elif isinstance(start_time, np.datetime64):
+                dt64_t0 = start_time  # type: ignore[assignment]
+            elif isinstance(start_time, str):
+                dt64_t0 = np.datetime64(int(ts_from_str(start_time) * 1e6), "us")
+            else:
+                dt64_t0 = np.datetime64(int(start_time * 1e6), "us")
+
+            unix_t0 = dt64_t0.astype("datetime64[us]").astype("float64") * 1e-6
+
+        if relative_time:
+            if end_time is None:
+                end = max_unix - epoch_unix
+            else:
+                end = float(end_time)
+            unix_t1 = epoch_unix + end
         else:
-            dt64_t0 = np.datetime64(start_time, "us")
+            if end_time is None:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning)
+                    dt64_t1 = np.datetime64(dt.datetime.fromtimestamp(max_unix, dt.timezone.utc))
+            elif isinstance(end_time, np.datetime64):
+                dt64_t1 = end_time  # type: ignore[assignment]
+            elif isinstance(end_time, str):
+                dt64_t1 = np.datetime64(int(ts_from_str(end_time) * 1e6), "us")
+            else:
+                dt64_t1 = np.datetime64(int(end_time * 1e6), "us")
 
-        unix_t0 = dt64_t0.astype("datetime64[us]").astype("int64") * 1e-6
+            unix_t1 = dt64_t1.astype("datetime64[us]").astype("float64") * 1e-6
 
-    if relative_time:
-        if end_time is None:
-            end = max_unix - epoch_unix
-        else:
-            end = float(end_time)
-        unix_t1 = epoch_unix + end
-    else:
-        if end_time is None:
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=UserWarning)
-                dt64_t1 = np.datetime64(dt.datetime.fromtimestamp(max_unix, dt.timezone.utc))
-        elif isinstance(end_time, np.datetime64):
-            dt64_t1 = end_time  # type: ignore[assignment]
-        else:
-            dt64_t1 = np.datetime64(end_time, "us")
-
-        unix_t1 = dt64_t1.astype("datetime64[us]").astype("int64") * 1e-6
-
-    fl = [file for file, ep in zip(fl, fl_epochs) if ep >= unix_t0 and ep <= unix_t1]
+        fl = [file for file, ep in zip(fl, fl_epochs) if ep >= unix_t0 and ep <= unix_t1]
 
     return fl
+
+
+GenericDataclass = TypeVar("GenericDataclass", bound=IsDataclass)
+
+
+def extract_dataclass(
+    file: h5py.File, dc_type: type[GenericDataclass], group_name: str | None = None
+) -> GenericDataclass:
+    """
+    Args:
+        file: h5py file to gather data from
+        dc_type: Dataclass type to reconstruct from group
+        group_name: If a specific group_name should be extracted from the file, default is the dc_type name
+    """
+
+    # If init is false for the dataclass, ignore it
+    excluded_keys = [field.name for field in fields(dc_type) if not field.init]
+    # Extract keys
+    group_name = group_name if group_name else dc_type.__name__
+    group = file[group_name]
+    key_type = {f.name: f.type for f in fields(dc_type)}
+
+    return dc_type(**{key: read_key(group, key, key_type[key]) for key in group if key not in excluded_keys})
 
 
 def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, GenericCfg, GenericPro]:
@@ -155,70 +253,70 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
 
     cfg_type, pro_type, out_type = get_process_types_from_file(paths[0])
 
-    out_args: dict[str, Any] = {}
+    out_args = None
     exp_def: ExpDef | None = None
     cfg_params: GenericCfg | None = None
     pro_params: GenericPro | None = None
 
+    out_buffer: list[OutputBase] = []
     for path in paths:
-        out_tmp = {}
         with h5py.File(path, "r") as hf:
-            group = hf["OutArgs"]  # TODO: Update to proper type
-
-            out_tmp = {key: read_key(group, key) for key in out_type._fields}
-
-            GenericDataclass = TypeVar("GenericDataclass", bound=IsDataclass)
-
-            def extract_dataclass(file: h5py.File, dc_type: type[GenericDataclass]) -> GenericDataclass:
-                # If init is false for the dataclass, ignore it
-                excluded_keys = [field.name for field in fields(dc_type) if not field.init]
-                # Extract keys
-                group = file[dc_type.__name__]
-                return dc_type(
-                    **{key: read_key(group, key) for key in group.keys() if key not in excluded_keys}
-                )
-
             if exp_def is None:
                 exp_def = extract_dataclass(hf, ExpDef)
             if cfg_params is None:
                 group = hf[cfg_type.__name__]
-                cfg_params = cfg_type(**{key: read_key(group, key) for key in group.keys()})
+                cfg_params = cfg_type(**{key: read_key(group, key) for key in group})
             if pro_params is None:
                 group = hf[pro_type.__name__]
-                pro_params = pro_type(**{key: read_key(group, key) for key in group.keys()})
+                pro_params = pro_type(**{key: read_key(group, key) for key in group})
 
-        def _append_data(main_data: dict, tmp_data: dict, logger: logging.Logger) -> dict:
-            if not main_data:
-                for key in tmp_data:
-                    main_data[key] = tmp_data[key]
+            if not out_args:
+                out_args = extract_dataclass(hf, out_type, "OutArgs")
             else:
-                for key in tmp_data:
-                    # only interested in the epoch start of the measurement TODO: adjust this
-                    if key == f"{MFOutArgs.epoch_us=}".split("=")[0].split(".")[1]:
-                        continue
-                    if isinstance(tmp_data[key], np.ndarray):
-                        logger.debug(f"Append mat {key}: {tmp_data[key].shape} [{tmp_data[key].dtype}]")
-                        main_data[key] = np.append(main_data[key], tmp_data[key], axis=0)
-                    else:
-                        logger.debug(f"Add {key}: {type(tmp_data[key])}")
-                        main_data[key] = main_data[key] + tmp_data[key]
-            return main_data
+                out_buffer.append(extract_dataclass(hf, out_type, "OutArgs"))
 
-        out_args = _append_data(out_args, out_tmp, logger)
-
-    if not exp_def or not cfg_params or not pro_params:
+    if not exp_def or not cfg_params or not pro_params or not out_args:
         raise FileNotFoundError(
-            f"Exp present: {exp_def is not None}, Cfg present: {cfg_params is not None}, Pro present: {pro_params is not None} "
+            f"Exp present: {exp_def is not None}, Cfg present: {cfg_params is not None}, Pro present: {pro_params is not None}, Output present: {out_args is not None} "
         )
+
+    # Concatenate output from all files to one
+    if out_buffer:
+        out_args = out_args.copy_and_concatenate(out_buffer)
+
     return (
-        out_type(**out_args),
+        out_args,
         exp_def,
         cfg_params,
         pro_params,
     )
 
 
-def read_key(group: h5py.Group, key: str, logger: Optional[logging.Logger] = None) -> Any:
+def extract_data_chunk_from_out(data: GenericOut, index: tuple[int, int]) -> GenericOut:
+    data_chunk = {}
+    object_type = type(data)
+
+    t = np.zeros((0,), dtype=np.float32)
+    epoch_us = 0
+
+    for field in fields(data):
+        dtype = field.type.__origin__ if isinstance(field.type, GenericAlias) else field.type
+
+        if field.name == f"{data.t=}".split("=")[0].split(".")[1]:
+            t = data.t[index[0] : index[1]]
+        elif field.name == f"{data.epoch_us=}".split("=")[0].split(".")[1]:
+            epoch_us = data.epoch_us + data.t[index[0]]
+        elif field.name == "num_cohints_per_file":
+            data_chunk[field.name] = index[1] - index[0]
+        elif dtype is np.ndarray or dtype is np.typing.NDArray or dtype is list:
+            data_chunk[field.name] = getattr(data, field.name)[index[0] : index[1]]
+
+    return object_type(t=t, epoch_us=epoch_us, **data_chunk)
+
+
+def read_key(
+    group: h5py.Group, key: str, d_type: Any | None = None, logger: logging.Logger | None = None
+) -> Any:
     """h5py saves dataset string as byte strings, needs to be decoded"""
     data = group[key][()]
     if isinstance(data, bytes):
@@ -230,6 +328,10 @@ def read_key(group: h5py.Group, key: str, logger: Optional[logging.Logger] = Non
         data = [d.decode() for d in data]
     elif isinstance(data, np.integer):
         data = int(data)
+
+    if any(get_origin(arg) is list for arg in get_args(d_type)) and type(data) is np.ndarray:
+        # Integer lists are stored as numpy arrays, must be converted back
+        data = data.tolist()
 
     return data
 
@@ -273,25 +375,21 @@ def stack_analysed_data(
         )
 
     sorted_data_list = list(dict(sorted(data.items())).values())
-    out_type = type(sorted_data_list[0][0])
+    _, exp_def, cfg, pro = sorted_data_list[0]
 
-    gathered_data = {}
-    output_start, exp_def, cfg, pro = sorted_data_list[0]
-    for field in out_type._fields:
-        attr = getattr(output_start, field)
-        if isinstance(attr, np.ndarray):
-            if attr.ndim >= 2:
-                gathered_data[field] = np.vstack(
-                    [getattr(output, field) for output, _, _, _ in sorted_data_list]
-                )
-            else:
-                gathered_data[field] = np.hstack(
-                    [getattr(output, field) for output, _, _, _ in sorted_data_list]
-                )
-        elif field not in gathered_data:
-            gathered_data[field] = getattr(output_start, field)
+    out = None
+    for output, _, _, _ in sorted_data_list:
+        if not out:
+            out = output
+        else:
+            out = out.copy_and_concatenate(output)
 
-    return out_type(**gathered_data), exp_def, cfg, pro  # type: ignore[call-overload]
+    if not exp_def or not cfg or not pro or not out:
+        raise FileNotFoundError(
+            f"Exp present: {exp_def is not None}, Cfg present: {cfg is not None}, Pro present: {pro is not None}, Output present: {out is not None} "
+        )
+
+    return out, exp_def, cfg, pro
 
 
 """

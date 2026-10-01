@@ -7,6 +7,7 @@
 
 import numpy as np
 import numpy.typing as npt
+from radardef.types import ExpDef
 
 from hardtarget.libs import load_cuda_lib
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, GMFProParams
@@ -30,6 +31,7 @@ def fast_gmf_cuda(
     tx: npt.NDArray[np.complexfloating],
     rx: npt.NDArray[np.complexfloating],
     tx_pwr: npt.NDArray,
+    exp_def: ExpDef,
     cfg_params: GMFCfgParams,
     pro_params: GMFProParams,
     gpu_id: int = 0,
@@ -50,7 +52,7 @@ def fast_gmf_cuda(
     """
 
     size = (len(pro_params.ranges),)
-    dc, vals, v_ind, a_ind = default_mf_vars_items(size)
+    dc, vals, v_ind, a_ind, phi = default_mf_vars_items(size)
 
     error_code = gmfcudalib.gmf(
         tx,  # 1
@@ -74,6 +76,6 @@ def fast_gmf_cuda(
     a_ind[:] = pro_params.inds_accelerations[a_ind]
 
     if error_code != 0:
-        raise Exception(f"GMF CUDA-function returned error {error_code}")
+        raise RuntimeError(f"GMF CUDA-function returned error {error_code}")
 
-    return MFVariables(vals=vals, dc=dc, v_ind=v_ind, a_ind=a_ind, tx_pwr=tx_pwr)
+    return MFVariables(vals=vals, dc=dc, v=v_ind, a=a_ind, phi=phi, tx_pwr=tx_pwr)

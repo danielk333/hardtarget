@@ -60,15 +60,14 @@ class OptimizeProcess(
                     f"It is only possible to run optimization on a previous target estimation analysis, not on {method}"
                 )
             try:
-                self.sub_resolution: int = hf[GMFCfgParams.__name__][
-                    f"{GMFCfgParams.range_gate_sub_resolution=}".split("=")[0].split(".")[1]
-                ][()]
+                self.sub_resolution: int = int(
+                    hf[GMFCfgParams.__name__][
+                        f"{GMFCfgParams.range_gate_sub_resolution=}".split("=")[0].split(".")[1]
+                    ][()]
+                )
                 # Extract sample relative to file start
                 self.mf_sample_start: int = int(
-                    (
-                        self.data.epoch_bounds[0]
-                        - int(hf["OutArgs"][f"{MFOutArgs.epoch_us=}".split("=")[0].split(".")[1]][()])
-                    )
+                    (self.data.epoch_bounds[0] - int(hf["OutArgs"]["epoch_us"][()]))
                     / self.exp_def.t_samp_usec
                 )
             except KeyError:
@@ -94,10 +93,10 @@ class OptimizeProcess(
         with h5py.File(self.sorted_mf_files[file_id], "r") as hf:
             # TODO: Should r/v/a_vec from all files be read at start and loaded to RAM to access it faster?
             opt_start = OptStart(
-                r_vec=hf["OutArgs"][f"{MFOutArgs.r_vec=}".split("=")[0].split(".")[1]][cohind],
-                v_vec=hf["OutArgs"][f"{MFOutArgs.v_vec=}".split("=")[0].split(".")[1]][cohind],
-                a_vec=hf["OutArgs"][f"{MFOutArgs.a_vec=}".split("=")[0].split(".")[1]][cohind],
-                dc=hf["OutArgs"][f"{MFOutArgs.dc=}".split("=")[0].split(".")[1]][cohind],
+                r_vec=hf["OutArgs"][f"{MFOutArgs.r_vec=}".split("=")[0].split(".")[1]][cohind],  # type: ignore[misc]
+                v_vec=hf["OutArgs"][f"{MFOutArgs.v_vec=}".split("=")[0].split(".")[1]][cohind],  # type: ignore[misc]
+                a_vec=hf["OutArgs"][f"{MFOutArgs.a_vec=}".split("=")[0].split(".")[1]][cohind],  # type: ignore[misc]
+                dc=hf["OutArgs"][f"{MFOutArgs.dc=}".split("=")[0].split(".")[1]][cohind],  # type: ignore[misc]
                 t=hf["OutArgs"][f"{MFOutArgs.t=}".split("=")[0].split(".")[1]][cohind],
             )
 
@@ -132,7 +131,7 @@ class OptimizeProcess(
             Outcome of optimize analysis
         """
 
-        tx, rx, ipp = self.get_data(
+        tx, _, ipp = self.get_data(
             start_sample, self.pro_params.read_length, sub_resolution=self.sub_resolution
         )
 
@@ -207,7 +206,16 @@ class OptimizeProcess(
         Returns:
             Output data
         """
-        return all_vars
+
+        return MFOptimizeOutArgs(
+            r_vec_opt=all_vars.r_vec_opt,
+            v_vec_opt=all_vars.v_vec_opt,
+            a_vec_opt=all_vars.a_vec_opt,
+            peak_vals=all_vars.peak_vals,
+            dc=all_vars.dc,
+            t=all_vars.t,
+            epoch_us=int(self.data.epoch_bounds[0]),
+        )
 
     def define_h5_vars(self, output: MFOptimizeOutArgs) -> dict[str, DataItem]:
         """
@@ -245,9 +253,13 @@ class OptimizeProcess(
                 # dims=[(str_dims_num_cohints_per_file, str_t), (str_ranges, "r")],
                 long_name="Range dependant noise floor (0-frequency gmf output)",
             ),
+            f"{output.epoch_us=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.epoch_us,
+                long_name="Epoch of the first data sample of the measurement",
+            ),
             f"{output.t=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.t,
-                long_name="time vector",
+                long_name="time vector relative to epoch_us",
                 scale=True,
             ),
         }

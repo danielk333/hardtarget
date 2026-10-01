@@ -13,10 +13,10 @@ from radardef.types import ExpDef
 import hardtarget
 from hardtarget.constants import Impl
 from hardtarget.data_simulation import simulate_h5, tx_signal_model
-from hardtarget.echo_search import EchoSearchOutArgs, EchoSearchProParams
 from hardtarget.echo_search.types import EchoSearchCfgParams
 from hardtarget.libs import load_c_lib
 from hardtarget.plotting import echo_search_plot, rti
+from src.hardtarget.constants import ReceiverChainModel
 
 
 @pytest.mark.parametrize("impl", [Impl.c])  # Impl.numpy
@@ -36,6 +36,7 @@ def test_echo(plot, impl: Impl):
             dtype=np.float64,
         ),
         rx_channels=np.arange(1, 26).tolist(),
+        fir_filter="mu2004",
         samples_per_file=10000000,
     )
 
@@ -120,10 +121,7 @@ def test_echo(plot, impl: Impl):
             exp_def=exp_def,
             implementation=impl,
         )
-        output: tuple[EchoSearchOutArgs, ExpDef, EchoSearchCfgParams, EchoSearchProParams] = list(
-            hardtarget.load_analysed_data(output_analysis)
-        )[0]
-
+        output = hardtarget.load_analysed_data(output_analysis)
         out, exp, _cfg, pro = output
 
         cohint_timepoints = np.arange(0, measurement_length_us, exp.t_ipp_usec * _cfg.n_ipp)
@@ -154,7 +152,7 @@ def test_echo(plot, impl: Impl):
             echo_search_plot.plot_echo_search(ax, exp, out)
             ax[0, 1].plot(np.arange(out.max_corr.shape[0]), target_range * 1e-3, "-r")
             ax[1, 1].plot(np.arange(out.max_corr.shape[0]), target_range_rate * 1e-3, "-r")
-            rti(ax=ax[2, 0], data_loader=station.load_data(output_path, exp_def=exp))
+            rti(ax=ax[2, 0], data_loader=station.load_data(output_path, exp_def=exp, cache=False))
             ax[2, 1].plot(
                 np.arange(out.max_corr.shape[0]),
                 tx_rx_samps - tx_rx_start_delta,
@@ -188,6 +186,7 @@ def test_crosscorrelate_tx_model(plot):
             dtype=np.float64,
         ),
         rx_channels=np.arange(1, 26).tolist(),
+        fir_filter=ReceiverChainModel.mu2004,
         samples_per_file=10000000,
     )
 
@@ -198,9 +197,11 @@ def test_crosscorrelate_tx_model(plot):
             code=exp_def.code,
             baud_length_usec=exp_def.baud_length_usec,
             t_samp_usec=exp_def.t_samp_usec,
-            tx_start_samp=0,
             ipp_samps=len(exp_def.code) * 2,
             read_length=len(exp_def.code) * 2,
+            bandwidth=1e6,
+            start_samp=0,
+            filt=ReceiverChainModel.mu2004,
         )
         .flatten()
         .astype(np.complex64)

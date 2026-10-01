@@ -5,6 +5,7 @@ position and hardtargets range and velocity estimation from the eiscat uhf (Trom
 The object is noticed in the EISCAT_leo_mpark_2.1u_EI@uhf_20240704_100019_278878.hdf5 at 24-07-04T10:21:16
 """
 
+import argparse
 import datetime as dt
 import tempfile
 from pathlib import Path
@@ -13,7 +14,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 import radardef
+import scipy.constants
 from pyant.plotting import gain_heatmap
+from radardef.tools.mpi_tools import get_mpi
 from radardef.types import BeamType, EiscatUHFLocation
 from spacecoords import interpolation, linalg, spherical
 
@@ -23,24 +26,42 @@ from hardtarget.target_estimation.dpt.types import DPTCfgParams
 from hardtarget.target_estimation.gmf.types import GMFCfgParams
 from hardtarget.target_estimation.types import MFOutArgs
 from hardtarget.types import CfgParams, ExpDef, ProParams
-
-from .utils import cdse
-from .utils.dt_standard import str_to_dt
+from tests.precision_orbit.utils import cdse
+from tests.precision_orbit.utils.dt_standard import str_to_dt
 
 # Process specific configurations
+# gmf_cfg = GMFCfgParams(
+#     n_ipp=5,
+#     ipp_offset=0,
+#     samp_offset=3,
+#     min_range_gate=4000,
+#     max_range_gate=8000,
+#     min_acceleration=-100,
+#     max_acceleration=100,
+#     range_gate_step=1,
+#     frequency_decimation=1,
+#     range_gate_sub_resolution=10,
+#     num_cohints_per_file=10,
+#     node_gpus=1,
+#     acceleration_steps=20,
+# )
 gmf_cfg = GMFCfgParams(
     n_ipp=1,
     ipp_offset=0,
     samp_offset=3,
-    min_range_gate=4000,
-    max_range_gate=8000,
+    min_range_gate=5500,
+    max_range_gate=6000,
     min_acceleration=0,
     max_acceleration=0,
     range_gate_step=1,
+    range_gate_sub_resolution=15,
     frequency_decimation=1,
-    num_cohints_per_file=10,
+    num_cohints_per_file=2,
     node_gpus=1,
     acceleration_steps=1,
+    refine_doppler=True,
+    refine_acceleration=False,
+    # cache=True,
 )
 
 dpt_cfg = DPTCfgParams(
@@ -63,29 +84,41 @@ dpt_cfg = DPTCfgParams(
 @pytest.mark.parametrize(
     "params", [(TargetEstimationMethod.fgmf, gmf_cfg), (TargetEstimationMethod.fdpt, dpt_cfg)]
 )
-def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstimationMethod, CfgParams]):
+def test_verify_analysis_orbit_data(
+    plot,
+    data_params,
+    params: tuple[TargetEstimationMethod, CfgParams],
+    snrdb_limit: float = 15.0,
+    progress=False,
+):
 
-    COPERNICUS_USR, COPERNICUS_PWD, MEASUREMENT = data_params
+    COPERNICUS_USR, COPERNICUS_PWD, MEASUREMENT, ORBIT, IMPL = data_params
 
     method_lib, cfg = params
 
-    # Temp dir to store precision orbit data
+    # Temp or given dir to store precision orbit data
     tmp_dir = tempfile.TemporaryDirectory()
+    orb_dir = Path(ORBIT) if ORBIT else Path(tmp_dir.name)
+    # relies on knowing filename from `cdse.download_orbit_data`
+    orb_file = orb_dir / "data.eof"
+    output_dir = Path(tmp_dir.name) / "analysed"
 
     # Time object is noticed in eiscat data
-    start_time = str_to_dt("2024-07-04T10:21:15.500")
-    end_time = str_to_dt("2024-07-04T10:21:20.020")
+    start_time = str_to_dt("2024-07-04T10:21:13.350")
+    end_time = str_to_dt("2024-07-04T10:21:21.000")
 
     # get precision orbit data to interpolate
     data_id = cdse.get_orbit_data_id(start_time, end_time)
-    access_token = cdse.generate_token(COPERNICUS_USR, COPERNICUS_PWD)
-    orbit_data_path = cdse.download_orbit_data(
-        data_id=data_id,
-        access_token=access_token,
-        output_dir=Path(tmp_dir.name) / "orbit_data",
-    )
+    if not orb_file.exists():
+        access_token = cdse.generate_token(COPERNICUS_USR, COPERNICUS_PWD)
+        cdse.download_orbit_data(
+            data_id=data_id,
+            access_token=access_token,
+            output_dir=orb_dir,
+        )
+
     orbit_data = cdse.extract_eof_data_block(
-        orbit_data_path, start_time - dt.timedelta(hours=1), end_time + dt.timedelta(hours=1)
+        orb_file, start_time - dt.timedelta(hours=1), end_time + dt.timedelta(hours=1)
     )
     t, pos = zip(*orbit_data)
 
@@ -99,30 +132,45 @@ def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstim
     interpolated_satellite_pos = interpolation.Legendre8(states=pos, t=t)
 
     # Measurement source station
-    radar_station = radardef.EiscatUHF(location=EiscatUHFLocation.TROMSO, beam_type=BeamType.CASSEGRAIN)
+    radar_station = radardef.EiscatUHF(
+        location=EiscatUHFLocation.TROMSO,
+        beam_type=BeamType.CASSEGRAIN,
+    )
+    reader = radar_station.load_data(MEASUREMENT)
+    assert reader is not None
+    exp_def = reader.exp_def
 
     # Analyse data
+    comm = get_mpi()
     result = target_estimation(
         data=MEASUREMENT,
         config=cfg,
-        output=Path(tmp_dir.name) / "analysed",
+        output=output_dir,
         start_time=start_time,
         end_time=end_time,
         relative_time=False,
-        progress=True,
+        progress=progress,
         method_lib=method_lib,
+        implementation=IMPL,
+        comm=comm,
+        exp_def=exp_def,
     )
+
+    comm.barrier()
+    if comm.rank != 0:
+        return
 
     assert result["dir"] is not None
 
     # Load results
-    load_ret: tuple[MFOutArgs, ExpDef, GMFCfgParams, ProParams]
-    load_ret = list(load_analysed_data(result["dir"]))[0]
+    load_ret: tuple[MFOutArgs, ExpDef, GMFCfgParams, ProParams] = load_analysed_data(output_dir)
     out, exp, cfg, pro = load_ret
 
     # Get satellite position over the analysed interval
     t_analysed = np.arange(
-        start=start_time.timestamp(), stop=end_time.timestamp(), step=cfg.n_ipp * (exp.t_ipp_usec * 1e-6)
+        start=out.epoch_us * 1e-6 + out.t[0],
+        stop=out.epoch_us * 1e-6 + out.t[-1],
+        step=cfg.n_ipp * (exp.t_ipp_usec * 1e-6),
     )
     satellite_orbit = interpolated_satellite_pos.get_state(t_analysed)
 
@@ -136,25 +184,43 @@ def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstim
         satellite_enu,
     )
 
+    # Redo with correct scattering time, TODO: verify this is the correct approach
+    time_correction = 0.5 * r_rel / scipy.constants.c
+    satellite_orbit = interpolated_satellite_pos.get_state(t_analysed + time_correction)
+    satellite_enu = radar_station.enu(satellite_orbit)
+    r_rel, v_rel = generate_measurements(
+        satellite_orbit,
+        satellite_enu,
+        satellite_enu,
+    )
+
+    uw_p_rel = (2 * np.pi * r_rel) / exp.wavelength
+
     # Extract indexes where an object is present
-    r_inds = np.argmax(out.snr, axis=1)
-    coh_inds = np.arange(out.vals.shape[0])
-    snr = out.snr[coh_inds, r_inds]
-    snrdb = 10 * np.log10(snr)
-    inds = snrdb > 15.0
+    snrdb = 10 * np.log10(out.snr_vec)
+    inds = snrdb > snrdb_limit
 
     # Calculate delta range (real vs estimated)
-    dr = np.abs(r_rel[inds] - out.r_vec[inds])
-    dr_limit = 500
+    dr = r_rel[inds] - out.r_vec[inds]
+    dr_limit = 100
 
     # Calculate delta velocity (real vs estimated)
-    dv = np.abs(v_rel[inds] - out.v_vec[inds])
-    dv_limit = 12
+    dv = v_rel[inds] - out.v_vec[inds]
+    dv_limit = 5
+
+    # Calculate delta phase (real vs estimated)
+    # uw_p_rel = p_rel
+    uw_p_est = out.p_vec
+    aligned_p_rel = uw_p_rel - uw_p_rel[0]
+    aligned_p_est = uw_p_est - uw_p_est[0]
+    dp = np.abs(aligned_p_rel[inds] - aligned_p_est[inds])
 
     if plot:
         # --- Plot estimation vs real range/velocity ---
-        fix, ax = plt.subplots(2, 2)
-
+        fig, ax = plt.subplots(3, 2)
+        fig.suptitle(
+            f"High precision analysis using {'Simulated' if cfg.tx_signal_model else 'Measured'} TX signal"
+        )
         # Real vs estimated range
         ax[0, 0].plot(t_analysed, (r_rel * 0.5) / 1000, marker=".", color="g", label="Real range")
         ax[0, 0].plot(
@@ -171,11 +237,13 @@ def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstim
         ax[0, 0].legend()
 
         # Range delta
-        ax[0, 1].plot(t_analysed[inds], dr / 1000, marker=".", ls="none", label="|r_delta|")
-        ax[0, 1].axhline(np.mean(dr) / 1000, linestyle="--", color="g", label="mean |r_delta|")
-        ax[0, 1].axhline(np.abs(dr_limit) / 1000, linestyle="--", color="r", label="limit")
+        ax[0, 1].plot(t_analysed[inds], dr, marker=".", ls="none", label=r"$\Delta r$")
+        ax[0, 1].axhline(np.mean(dr), linestyle="--", color="g", label=r"$\bar{\Delta r}$")
+        ax[0, 1].axhline(dr_limit, linestyle="--", color="r", label="limit")
+        ax[0, 1].axhline(-dr_limit, linestyle="--", color="r")
         ax[0, 1].set_xlabel("Time [s]")
-        ax[0, 1].set_ylabel("Delta range [km]")
+        ax[0, 1].set_ylabel("Delta range [m]")
+        ax[0, 1].set_title("Delta range")
         ax[0, 1].legend()
 
         # Real vs estimated velocity
@@ -189,26 +257,51 @@ def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstim
         ax[1, 0].legend()
 
         # velocity delta
-        ax[1, 1].plot(t_analysed[inds], dv, marker=".", ls="none", label="|v_delta|")
-        ax[1, 1].axhline(np.mean(dv), linestyle="--", color="g", label="mean |v_delta|")
-        ax[1, 1].axhline(np.abs(dv_limit), linestyle="--", color="r", label="limit")
+        ax[1, 1].plot(t_analysed[inds], dv, marker=".", ls="none", label=r"$\Delta v$")
+        ax[1, 1].axhline(np.mean(dv), linestyle="--", color="g", label=r"$\bar{\Delta v}$")
+        ax[1, 1].axhline(dv_limit, linestyle="--", color="r", label="limit")
+        ax[1, 1].axhline(-dv_limit, linestyle="--", color="r")
+
         ax[1, 1].set_xlabel("Time [s]")
         ax[1, 1].set_ylabel("Delta velocity [m/s]")
+        ax[1, 1].set_title("Delta velocity")
         ax[1, 1].legend()
+
+        # Phase
+        ax[2, 0].plot(t_analysed[inds], aligned_p_rel[inds], marker=".", color="g", label="Real phase")
+        ax[2, 0].plot(
+            t_analysed[inds], aligned_p_est[inds], marker=".", ls="none", color="r", label="Estimated phase"
+        )
+        ax[2, 0].set_title("Real vs estimated phase")
+        ax[2, 0].legend()
+
+        ax[2, 1].plot(t_analysed[inds], dp, marker=".", ls="none", label="|p_delta|")
+        ax[2, 1].axhline(np.mean(dp), linestyle="--", color="g", label="mean |p_delta|")
+        # ax[2, 1].axhline(np.abs(dv_limit), linestyle="--", color="r", label="limit")
+        ax[2, 1].set_xlabel("Time [s]")
+        ax[2, 1].set_ylabel("Delta")
+        ax[2, 1].set_title("Delta phase")
+        ax[2, 1].legend()
 
         # --- Satellite orbit vs radar position ---
 
-        #  Orbit vs position TODO: radar pointing in wrong direction in plot
-        pointing_cart = spherical.sph_to_cart(
+        #  Orbit vs position
+        pointing_k = spherical.sph_to_cart(
             np.array([out.pointing_vec[0, 0], out.pointing_vec[0, 1], 1]),
             degrees=True,
-        ).round(decimals=8)
+        )
+        current_param = radar_station.beam_parameters.copy()
+        current_param.pointing = pointing_k
+
+        pointing_cart = pointing_k.copy().round(decimals=8)
         satellite_cart = satellite_enu[:3, :] / np.linalg.norm(satellite_enu[:3, :], axis=0)
         off_axis_angle = linalg.vector_angle(
             satellite_cart,
             pointing_cart,
             degrees=True,
         )
+        gains = radar_station.beam.gain(satellite_cart, current_param)
+        gainsdb = 10.0 * np.log10(gains)
 
         pointing_cart *= 4000e3
         fig = plt.figure(figsize=plt.figaspect(0.5))
@@ -245,14 +338,43 @@ def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstim
 
         # off-axis angle plot
         ax = fig.add_subplot(2, 2, 3)
-        ax.plot(t_analysed, off_axis_angle, color="g", label="Satelite angle from radar pointing")
+
+        ax2 = ax.twinx()
+        ax2.tick_params(axis="y", labelcolor="g")
+        ax2.plot(t_analysed, off_axis_angle, color="g", label="Satelite angle from radar pointing")
+        ax2.set_ylabel("Off-axis angle [deg]")
+        ax.plot(
+            t_analysed[inds],
+            snrdb[inds] / np.nanmax(snrdb[inds]),
+            marker=".",
+            ls="none",
+            color="r",
+            label="Normalized Estimated SNR",
+        )
+        ax.plot(
+            t_analysed,
+            gainsdb / np.nanmax(gainsdb),
+            marker=".",
+            ls="none",
+            color="b",
+            label="Normalized Gain (from POD)",
+        )
         ax.set_xlabel("Time [s]")
-        ax.set_ylabel("Off-axis angle [deg]")
-        ax.legend()
+        ax.set_ylabel("Gain and SNR [1]")
+
+        lines, labels = ax.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax.legend(lines + lines2, labels + labels2)
 
         # Gain heatmap vs satellite position
         ax = fig.add_subplot(2, 2, 4)
-        gain_heatmap(radar_station.beam, radar_station.beam_parameters, ax=ax, min_elevation=87.0)
+        gain_heatmap(
+            radar_station.beam,
+            current_param,
+            ax=ax,
+            min_elevation=87.0,
+            cmap=plt.get_cmap("bone"),
+        )
         ax.plot(satellite_cart[0, :], satellite_cart[1, :], label="satellite path over gain")
         ax.plot(
             satellite_cart[0, inds],
@@ -263,15 +385,17 @@ def test_verify_analysis_orbit_data(plot, data_params, params: tuple[TargetEstim
             label="Positions detected",
         )
 
+        fig.suptitle(f"{method_lib=} vs SENTINEL-2B high precision orbit data")
+
         plt.show()
 
     tmp_dir.cleanup()
 
-    assert np.mean(dr) < dr_limit, (
-        f"Estimated range is far off the real range! limit: {dr_limit} [m] > delta: {np.mean(dr)} [m]"
+    assert np.abs(np.mean(dr)) < dr_limit, (
+        f"Estimated range is far off the real range! limit: {dr_limit} [m] > delta: {np.abs(np.mean(dr))} [m]"
     )
-    assert np.mean(dv) < dv_limit, (
-        f"Estimated velocity is far off the real velocity! limit: {dv_limit} [m/s] > delta: {np.mean(dv)} [m/s]"
+    assert np.abs(np.mean(dv)) < dv_limit, (
+        f"Estimated velocity is far off the real velocity! limit: {dv_limit} [m/s] > delta: {np.abs(np.mean(dv))} [m/s]"
     )
 
 
@@ -303,3 +427,24 @@ def generate_measurements_alt(ecefs, rx_ecef, tx_ecef):
     return r_sim, v_sim
 
     return r_sim, v_sim
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="dev function for algorithms")
+    parser.add_argument("--plot", action="store_true")
+    parser.add_argument("--usr")
+    parser.add_argument("--pwd")
+    parser.add_argument("--orbit-path")
+    parser.add_argument("--radar-path")
+    parser.add_argument("--impl", default="numpy")
+    parser.add_argument("--progress", action="store_true")
+    parser.add_argument("--simulated_tx", action="store_true")
+    parser.add_argument("--snr_db", default=20.0, type=float)
+    args = parser.parse_args()
+    test_verify_analysis_orbit_data(
+        args.plot,
+        (args.usr, args.pwd, args.radar_path, args.orbit_path, args.impl),
+        (TargetEstimationMethod.fgmf, gmf_cfg.copy(tx_signal_model=args.simulated_tx)),
+        args.snr_db,
+        args.progress,
+    )

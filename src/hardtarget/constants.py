@@ -11,6 +11,14 @@ except ImportError:
     )
 
 
+class ReceiverChainModel(StrEnum):
+    """Receiver Chain Model type"""
+
+    b414d15_gaus = "b414d15_gaus"
+    mu2004 = "mu2004"
+    none = "none"
+
+
 class AnalysisMethod(StrEnum):
     """Analysis method type"""
 

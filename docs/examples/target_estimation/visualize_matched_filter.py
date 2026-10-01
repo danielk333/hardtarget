@@ -19,6 +19,7 @@ from radardef.radar_stations.eiscat.experiments import load_radar_code
 from radardef.types import BoundParams, ExpDef
 
 import hardtarget
+from hardtarget.constants import ReceiverChainModel
 
 sys.path.insert(1, str(Path(os.path.abspath("")) / "docs" / "examples" / "extras"))
 import utils
@@ -48,6 +49,7 @@ exp = ExpDef(
     t_cal_off_usec=19997.0,
     code=load_radar_code("leo_bpark"),
     samples_per_file=12800000,
+    fir_filter=ReceiverChainModel.b414d15_gaus,
 )
 # Bounds
 bounds_params = BoundParams(
@@ -143,6 +145,7 @@ c_spec = fft.fft(c_dec_signal_vec)
 
 # FFT frequencay can be extracted from the range_rates
 
+# TODO: is it 2* or not? doppler definition
 fft_freq = pro_params.range_rates / exp.wavelength
 print("FFT len: ", len(fft_freq))
 

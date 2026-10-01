@@ -1,14 +1,14 @@
 """Plotting tools for raw data"""
 
 import logging
-from typing import Optional
+import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.constants as constants
 from matplotlib.axes import Axes
 from matplotlib.collections import QuadMesh
 from radardef import DataLoader, ExpDef
+from scipy import constants
 from scipy.fft import fft, fftfreq
 
 from hardtarget.process.utils import sample_interval_to_closest_ipp
@@ -22,14 +22,14 @@ logger = logging.getLogger(__name__)
 def rti(
     ax: Axes,
     data_loader: DataLoader,
-    start_time: Optional[np.datetime64 | int | str] = None,
-    end_time: Optional[np.datetime64 | int | str] = None,
+    start_time: np.datetime64 | float | int | str | None = None,
+    end_time: np.datetime64 | float | int | str | None = None,
     relative_time: bool = False,
     keep_tx: bool = False,
     axis_units: bool = False,
     log: bool = False,
-    start_range_gate: Optional[int] = None,
-    end_range_gate: Optional[int] = None,
+    start_range_gate: int | float | None = None,
+    end_range_gate: int | float | None = None,
     range_gate_unit: str = "sample",
     monostatic: bool = False,
     colorbar: bool = True,
@@ -65,23 +65,22 @@ def rti(
 
     if isinstance(start_time, str):
         try:
-            ts_from_str(start_time)
-            start_time = int(ts_from_str(start_time) * 1e6)
+            start_time = ts_from_str(start_time)
         except ValueError:
-            start_time = int(start_time)
+            start_time = float(start_time)
 
     if isinstance(end_time, str):
         try:
-            ts_from_str(end_time)
-            end_time = int(ts_from_str(end_time) * 1e6)
+            end_time = ts_from_str(end_time)
         except ValueError:
-            end_time = int(end_time)
+            end_time = float(end_time)
 
     # Extract bounds
     if start_time or end_time:
         request_bounds = time_interval_to_sample_bound(
-            time_bounds=Bounds(
-                int(data_loader.epoch_bounds.ts_start_usec), int(data_loader.epoch_bounds.ts_end_usec)
+            time_bounds=(
+                data_loader.epoch_bounds.ts_start_usec * 1e-6,
+                data_loader.epoch_bounds.ts_end_usec * 1e-6,
             ),
             start_time=start_time,
             end_time=end_time,
@@ -95,6 +94,11 @@ def rti(
 
     # Extract data within bounds
     n_samp = samp_bounds.end - samp_bounds.start
+    if n_samp == 0:
+        raise ValueError(
+            f"Number of samples cannot be 0 for RTI plot ({samp_bounds.start=} {samp_bounds.end=})"
+        )
+
     data_vec = data_loader.read(
         channel=data_loader.exp_def.rx_channels, start_sample=samp_bounds.start, vector_length=n_samp
     )
@@ -121,19 +125,22 @@ def rti(
         else 0
     )
 
-    range_T = t_tx_start_samp / data_loader.exp_def.sample_rate
     samp_vec = np.arange(data_loader.exp_def.ipp_samps)
-    rt_vec = np.arange(t_rx_end_samp - t_rx_start_samp) * data_loader.exp_def.t_samp_usec - range_T
+    rg_vec = np.arange(t_rx_start_samp, t_rx_end_samp, 1) - t_tx_start_samp
+    rt_vec = rg_vec / data_loader.exp_def.sample_rate
 
     if monostatic:
+        mono_str = ""
         rt_vec *= 0.5
         if start_range_gate is not None:
             start_range_gate *= 2
         if end_range_gate is not None:
             end_range_gate *= 2
+    else:
+        mono_str = "Two-way "
 
     mat_shape = (data_vec.size // data_loader.exp_def.ipp_samps, data_loader.exp_def.ipp_samps)
-    data_ipp_vec = data_vec.reshape(mat_shape).T
+    data_ipp_vec = data_vec.reshape(mat_shape)
 
     il0_rg0, il0_rg1 = extract_requested_range_gates(
         start_range_gate, end_range_gate, range_gate_unit, data_loader.exp_def
@@ -152,35 +159,38 @@ def rti(
         f"requested end range gate {il0_rg1} after measurement end {t_rx_end_samp}"
     )
 
-    data_ipp_vec = data_ipp_vec[il0_rg0:il0_rg1, :]
+    data_ipp_vec = data_ipp_vec[:, il0_rg0:il0_rg1]
     samp_vec = samp_vec[il0_rg0:il0_rg1]
+    rt_vec = rt_vec[il0_rg0 - t_rx_start_samp : il0_rg1 - t_rx_start_samp]
 
     # Remove tx-signal (if it exists) and null calibration signal
     if not keep_tx:
         tx_samps = np.logical_and(samp_vec <= t_tx_end_samp, samp_vec >= t_tx_start_samp)
-        data_ipp_vec[tx_samps, :] = 0
-        data_ipp_vec[t_cal_on_samp:t_cal_off_samp, :] = 0
+        data_ipp_vec[:, tx_samps] = 0
+        data_ipp_vec[:, t_cal_on_samp:t_cal_off_samp] = 0
 
     # Calculate signal power
-    powsum = np.log10(np.abs(data_ipp_vec) ** 2) if log else np.abs(data_ipp_vec) ** 2
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        powsum = np.log10(np.abs(data_ipp_vec) ** 2) if log else np.abs(data_ipp_vec) ** 2
 
     # Plot data
     if not axis_units:
         X, Y = np.meshgrid(
-            np.arange(data_ipp_vec.shape[1]),
+            np.arange(data_ipp_vec.shape[0]),
             samp_vec,
         )
         ax.set_xlabel("IPP")
         ax.set_ylabel("Level-0 sample")
     else:
         X, Y = np.meshgrid(
-            np.arange(data_ipp_vec.shape[1]) * data_loader.exp_def.t_ipp_usec * 1e-6,
+            np.arange(data_ipp_vec.shape[0]) * data_loader.exp_def.t_ipp_usec * 1e-6,
             1e-3 * rt_vec * constants.c,
         )
         ax.set_xlabel("Time [s]")
-        ax.set_ylabel("Range [km]")
+        ax.set_ylabel(f"{mono_str}Range [km]")
 
-    pmesh = ax.pcolormesh(X, Y, powsum, **pcolormesh_kw)
+    pmesh = ax.pcolormesh(X, Y, powsum.T, **pcolormesh_kw)
 
     if colorbar:
         cbar = plt.colorbar(pmesh, ax=ax)
@@ -192,14 +202,14 @@ def rti(
 def fti(
     ax: Axes,
     data_loader: DataLoader,
-    start_time: Optional[np.datetime64 | int | str] = None,
-    end_time: Optional[np.datetime64 | int | str] = None,
+    start_time: np.datetime64 | float | int | str | None = None,
+    end_time: np.datetime64 | float | int | str | None = None,
     relative_time: bool = False,
     keep_tx: bool = False,
     axis_units: bool = False,
     log: bool = False,
-    start_range_gate: Optional[int] = None,
-    end_range_gate: Optional[int] = None,
+    start_range_gate: int | None = None,
+    end_range_gate: int | None = None,
     range_gate_unit: str = "sample",
     monostatic: bool = False,
     colorbar: bool = True,
@@ -235,17 +245,15 @@ def fti(
 
     if isinstance(start_time, str):
         try:
-            ts_from_str(start_time)
-            start_time = int(ts_from_str(start_time) * 1e6)
+            start_time = ts_from_str(start_time)
         except ValueError:
-            start_time = int(start_time)
+            start_time = float(start_time)
 
     if isinstance(end_time, str):
         try:
-            ts_from_str(end_time)
-            end_time = int(ts_from_str(end_time) * 1e6)
+            end_time = ts_from_str(end_time)
         except ValueError:
-            end_time = int(end_time)
+            end_time = float(end_time)
 
     # Extract bounds
     if start_time or end_time:
@@ -364,7 +372,10 @@ def fti(
 
 
 def extract_requested_range_gates(
-    start_range_gate: int | None, end_range_gate: int | None, range_gate_unit: str, exp_def: ExpDef
+    start_range_gate: int | float | None,
+    end_range_gate: int | float | None,
+    range_gate_unit: str,
+    exp_def: ExpDef,
 ) -> tuple[int, int]:
     if start_range_gate is None:
         il0_rg0 = exp_def.t_rx_start_usec / exp_def.t_samp_usec

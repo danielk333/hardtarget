@@ -5,22 +5,24 @@ abstract methods filled in. It supports a variety of datatypes.
 """
 
 import datetime as dt
+import functools
 import logging
 import sys
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Generic, Optional, Type
+from typing import Any, Generic
 
 import numpy as np
+import numpy.typing as npt
 from radardef.components import DataLoader
 from radardef.tools.mpi_tools import CommBar
 from radardef.types import Pointing
 
-import hardtarget.process.utils as utils
-from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl, MethodLib
+from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl, MethodLib, ReceiverChainModel
 from hardtarget.data_handling import dump_params_to_file
-from hardtarget.data_simulation.tx_model import tx_signal_model
+from hardtarget.data_simulation.tx_model import tx_modulation_model, tx_signal_model
+from hardtarget.process import utils
 from hardtarget.process.configuration import (
     compute_process_params,
     extract_config_from_dict,
@@ -54,13 +56,13 @@ try:
     # Only available from python 3.12
     from types import get_original_bases  # type: ignore[attr-defined,unused-ignore]
 
-    def orig_bases(cls: Type) -> tuple[Any, ...]:
+    def orig_bases(cls: type) -> tuple[Any, ...]:
         return get_original_bases(cls)
 
 except ImportError:
 
-    def orig_bases(cls: Type) -> tuple[Any, ...]:
-        return cls.__orig_bases__
+    def orig_bases(cls: type) -> tuple[Any, ...]:
+        return cls.__orig_bases__  # type: ignore[attr-defined]
 
 
 class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, GenericLib]):
@@ -133,11 +135,11 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self,
         config: str | Path | GenericCfg,
         data: DataLoader,
-        method_lib: Optional[MethodLib] = None,
-        impl: Optional[Impl] = None,
-        rx_channel: Optional[str | int] = None,
-        excluded_channels: Optional[list[str] | list[int]] = None,
-        output_dir: Optional[str | Path] = None,
+        method_lib: MethodLib | None = None,
+        impl: Impl | None = None,
+        rx_channel: str | int | None = None,
+        excluded_channels: list[str] | list[int] | None = None,
+        output_dir: str | Path | None = None,
         **kwargs: Unpack[ArrayKwargs],
     ) -> None:
         # Local logger
@@ -164,6 +166,8 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         if self.cfg_params.cache != self.data.cache_state:
             self.data.cache_state = self.cfg_params.cache
 
+        self._setup_cache()
+
         # Define library to be used during process
         self.lib, lib_name, impl = self.get_analysis_lib(method_lib, impl)
 
@@ -179,17 +183,17 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
         # Other needed parameters
         t_start_usec, t_end_usec = self.data.epoch_bounds
-        self.epoch = Bounds(int(t_start_usec), int(t_end_usec))
+        self.epoch_usec = Bounds(int(t_start_usec), int(t_end_usec))
         self.output_dir = Path(output_dir).resolve() if output_dir is not None else None
         self.store_mode = "w"
         self.store_params = True
+        self.conjugated_tx: bool | None = None
 
         self.kwargs = kwargs
         self.__post_init__()
 
     def __post_init__(self) -> None:
         """Post init"""
-        pass
 
     @classmethod
     def get_types(cls) -> tuple[type[GenericCfg], type[GenericPro], type[GenericOut]]:
@@ -216,7 +220,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self, lib: MethodLib | None, impl: Impl | None
     ) -> tuple[GenericLib, MethodLib, Impl]:
         """Get specific library to run analysis"""
-        pass
 
     def get_conf_params(self, cfg_path: Path, cfg_params: CfgParams) -> GenericCfg:
         """
@@ -232,10 +235,10 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         cfg_type, _, _ = self.get_types()
         d = extract_config_section(
             cfg_path,
-            self.config_section,
-            cfg_type,
-            cfg_params,
-            self._logger,
+            cfg_type=cfg_type,
+            section=self.config_section,
+            existing_cfg=cfg_params,
+            logger=self._logger,
         )
 
         return cfg_type(**d)
@@ -245,7 +248,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self, exp_def: ExpDef, cfg_params: GenericCfg, pro_params: ProParams
     ) -> GenericPro:
         """Abstract method, process specific parameters"""
-        pass
 
     @abstractmethod
     def analyse_ipps(self, start_sample: int) -> GenericVars:
@@ -259,12 +261,9 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             Outcome of analysis
         """
 
-        pass
-
     @abstractmethod
     def stack_vars(self, vars_list: list[GenericVars]) -> GenericVars:
         """Abstract method, shall stack the results from the analysis"""
-        pass
 
     @abstractmethod
     def generate_output(
@@ -288,8 +287,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             Output data
         """
 
-        pass
-
     @abstractmethod
     def define_h5_vars(self, output: GenericOut) -> dict[str, DataItem]:
         """
@@ -301,10 +298,9 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         Returns:
             A dictionary containing the output with attributes such as dimensions, long names and units.
         """
-        pass
 
     def process_task(
-        self, task_idx: int, file_idx_sample: int, bounds: Bounds, progress_bar: Optional[CommBar]
+        self, task_idx: int, file_idx_sample: int, bounds: Bounds, progress_bar: CommBar | None
     ) -> GenericOut:
         """
         Process one task, extract amount of samples to process, analyse the samples for each coherent
@@ -365,7 +361,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         file_idx_sample: int,
         out_data: GenericOut,
         results: AnalysedResult,
-        filepath: Optional[Path] = None,
+        filepath: Path | None = None,
         clobber: bool = True,
     ) -> AnalysedResult:
         """
@@ -397,7 +393,8 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             )
 
             self._logger.debug(f"Analysed data stored in {filepath}")
-
+            if filepath.parent not in results["file_dir"]:
+                results["file_dir"].append(filepath.parent)
             results["files"].append(filepath.name)
         else:
             # Write data to dict at file_idx_sample
@@ -409,11 +406,11 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self,
         comm_rank: int,
         comm_size: int,
-        start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
-        end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+        start_time: np.datetime64 | int | float | str | dt.datetime | None = None,
+        end_time: np.datetime64 | int | float | str | dt.datetime | None = None,
         relative_time: bool = False,
-        sub_directory: Optional[str] = None,
-        clobber: bool = True,
+        sub_directory: str | None = None,
+        clobber: bool = False,
         progress: bool | CommBar = False,
     ) -> AnalysedResult:
         """
@@ -427,8 +424,8 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         Args:
             comm_rank: rank of the current mpi comm
             comm_size: Amount of available ranks
-            start_time (optional): Start time, if set data before this will be neglected
-            end_time (optional): End time, if set data after this will be neglected
+            start_time (optional): Start time, data before this will be neglected
+            end_time (optional): End time, data after this will be neglected
             relative_time (optional): If relative time should be used
             sub_directory (optional): If data should be stored in a sub directory of the designated output directory.
             clobber (optional): Overwrite previous datasets, default True
@@ -439,20 +436,20 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
         if isinstance(start_time, str):
             try:
-                start_time = int(ts_from_str(start_time) * 1e6)
+                start_time = ts_from_str(start_time)
             except ValueError:
-                start_time = int(start_time)
+                start_time = float(start_time)
         if isinstance(end_time, str):
             try:
-                end_time = int(ts_from_str(end_time) * 1e6)
+                end_time = ts_from_str(end_time)
             except ValueError:
-                end_time = int(end_time)
+                end_time = float(end_time)
         # bounds
         if start_time or end_time:
             sample_bounds = time_interval_to_sample_bound(
                 start_time=start_time,
                 end_time=end_time,
-                time_bounds=self.epoch,
+                time_bounds=(self.epoch_usec.start * 1e-6, self.epoch_usec.end * 1e-6),
                 sample_rate=self.exp_def.sample_rate,
                 relative_time=relative_time,
             )
@@ -469,7 +466,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             sample_bounds.start + self.cfg_params.samp_offset, sample_bounds.end + self.cfg_params.samp_offset
         )
 
-        job_tasks, job_cohints, total_cohints = calculate_tasks(
+        job_tasks, _, total_cohints = calculate_tasks(
             comm_rank,
             comm_size,
             self.cfg_params.n_ipp,
@@ -485,7 +482,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
                 desc=description,
                 tot=total_cohints,
                 parent_progress=parent_progress,
-                transient=bool(parent_progress),
             )
 
         else:
@@ -493,7 +489,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
         self._logger.info(f"starting job {comm_rank}/{comm_size} with {len(job_tasks)} tasks")
 
-        results: AnalysedResult = {"dir": self.output_dir, "files": [], "data": {}}
+        results: AnalysedResult = {"dir": self.output_dir, "file_dir": [], "files": [], "data": {}}
         for idx, task_idx in enumerate(job_tasks):
             # Calculate start sample of task
             file_idx_sample = (
@@ -507,7 +503,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             # Create directory and define filename.
             if self.output_dir is not None:
                 output_path = Path(self.output_dir) / utils.get_filepath(
-                    epoch_unix_us=self.epoch.start,
+                    epoch_unix_us=self.epoch_usec.start,
                     sample_id_us=file_idx_sample,
                     method=self.method,
                     sub_directory=sub_directory,
@@ -521,6 +517,9 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             # If file exists and clobber off, skip analysis.
             if output_path and output_path.is_file() and not clobber:
                 results["files"].append(output_path.name)
+                if output_path.parent not in results["file_dir"]:
+                    results["file_dir"].append(output_path.parent)
+
                 self._logger.debug(
                     f"File already existing and clobber is off, file: {output_path.name} is skipped."
                 )
@@ -555,7 +554,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
     def extract_channels(
         self,
         exp_def: ExpDef,
-        rx_channel: Optional[int | str] = None,
+        rx_channel: int | str | None = None,
         excluded_channels: list[int] | list[str] = [],
     ) -> tuple[int | str | list[int] | list[str], int | str | None]:
         """
@@ -613,31 +612,160 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             else:
                 rx = ipp[self.pro_params.rx_stencil]
 
+        # TODO: im getting conflicting info on the files, in 1997 wannberg it says
+        # "the numerical local oscillator (NCO) in the HSP 45116 downconverter is set
+        # to the corresponding IF center frequency", in the leo-u NCO it says
+        # "NCO 0 8.8  % for RF at 927.2", while in the table on
+        # https://old.eiscat.se/scientist/user-documentation/receiver-documentation/#uhf-receiver
+        # it says "F4 	927.200 	12.800", so which is it?! we should add a note about this as we
+        # clean up
+
         # Extracting tx data
-        if not self._tx_channel:
+        if not self._tx_channel or self.cfg_params.tx_signal_model:
             assert self.exp_def.code is not None, (
                 "No code available from the metadata, not possible to simulate tx"
             )
-            tx = tx_signal_model(
-                code=self.exp_def.code,
+
+            if self.exp_def.code.ndim >= 2:
+                # TODO: If not starting at start of file a code match must be made one time!
+                code_inds = (
+                    np.arange(
+                        (start_sample // self.exp_def.ipp_samps),
+                        (start_sample + read_length) // self.exp_def.ipp_samps,
+                    )
+                    % self.exp_def.code.shape[0]
+                )
+                code = self.exp_def.code[code_inds]
+                if code.ndim >= 2:
+                    code = tuple(map(tuple, code))
+                else:
+                    code = tuple(code)
+            else:
+                code = tuple(self.exp_def.code)
+
+            tx_start_samp = (
+                start_sample % self.exp_def.ipp_samps
+                - self.cfg_params.samp_offset
+                + int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec)
+            )
+
+            tx = self.tx_signal_model(
+                code=code,
                 baud_length_usec=self.exp_def.baud_length_usec,
                 t_samp_usec=self.exp_def.t_samp_usec,
-                tx_start_samp=int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec),
-                start_samp=(start_sample % self.exp_def.ipp_samps) - self.cfg_params.samp_offset,
-                read_length=read_length,
                 ipp_samps=self.exp_def.ipp_samps,
+                read_length=read_length,
+                bandwidth=None,
+                # bandwidth=3.5 * 1e6,  # TODO: this needs to be part of the config somewhere - its kinda a
+                # fundamental limits of the radar system but could in principle be configurable per
+                # experiment #Mu = 3.5*1e6
+                start_samp=tx_start_samp,
                 sub_resolution=sub_resolution,
-                kind="linear",
+                filt=ReceiverChainModel(
+                    self.exp_def.fir_filter
+                ),  # TODO: again, probably should change name of this variable
             )
-        elif self._tx_channel == self._rx_channels:
-            tx = ipp.copy()
-            tx = np.broadcast_to(tx.reshape((tx.size, 1)), (tx.size, sub_resolution))
+
         else:
-            tx = self.data.read(self._tx_channel, start_sample, read_length)
-            tx = np.broadcast_to(tx.reshape((tx.size, 1)), (tx.size, sub_resolution))
+            if self._tx_channel == self._rx_channels:
+                tx = ipp.copy()
+            else:
+                # TODO: is it possible to have the sub-resolutions already calculated in the data but as
+                # different channels? maybe - could be a future modification
+                tx = self.data.read(self._tx_channel, start_sample, read_length)
+
+            tx = tx_modulation_model(
+                tx_signal=tx,
+                tx_stencil=self.pro_params.tx_stencil,
+                sub_resolution=sub_resolution,
+                filt=self.exp_def.fir_filter,
+            )
+
+            # Check if tx data conjugated in data file.
+            if self.conjugated_tx is None:
+                if self.exp_def.code.ndim >= 2:
+                    code_inds = np.arange(
+                        (start_sample // self.exp_def.ipp_samps),
+                        (start_sample + read_length) // self.exp_def.ipp_samps,
+                    )
+                    code_inds = code_inds % self.exp_def.code.shape[0]
+                    code = self.exp_def.code[code_inds]
+                else:
+                    code = self.exp_def.code
+
+                tx_start_samp = (
+                    start_sample % self.exp_def.ipp_samps
+                    - self.cfg_params.samp_offset
+                    + int(self.exp_def.t_tx_start_usec / self.exp_def.t_samp_usec)
+                )
+
+                tx_sim = self.tx_signal_model(
+                    code=tuple(code) if code.ndim <= 1 else tuple(map(tuple, code)),
+                    baud_length_usec=self.exp_def.baud_length_usec,
+                    t_samp_usec=self.exp_def.t_samp_usec,
+                    ipp_samps=self.exp_def.ipp_samps,
+                    read_length=read_length,
+                    bandwidth=None,
+                    start_samp=tx_start_samp,
+                    filt=ReceiverChainModel(self.exp_def.fir_filter),
+                ).flatten()
+
+                self.conjugated_tx = self._is_tx_conjugated(
+                    ipp[self.pro_params.tx_stencil], tx_sim[self.pro_params.tx_stencil]
+                )
+
+            if self.conjugated_tx:
+                tx = np.conj(tx)
 
         tx = tx[self.pro_params.tx_stencil, :]
 
         return ExtractedSignals(
             tx=tx.astype(np.complex64), rx=rx.astype(np.complex64), ipp=ipp.astype(np.complex64)
         )
+
+    def _is_tx_conjugated(self, tx: npt.NDArray, tx_sim: npt.NDArray) -> bool:
+        """
+        Determine if the true tx signal is stored as conjugated or not.
+
+        Args:
+            tx_real: True measured TX signal
+            tx_sim: Simulated Tx signal
+        Returns:
+            True if the measured tx signal is conjugated.
+
+        """
+
+        phase = np.unwrap(2 * np.angle(tx)) / 2
+        phase -= phase[0]
+        comp_tx = np.exp(-1j * phase) * tx
+        angle = np.mean(np.angle(comp_tx * np.conj(tx_sim), deg=True))
+        angle = angle % 360
+
+        dist_to_0 = min(angle, 360 - angle)
+        dist_to_180 = abs(angle - 180)
+        return bool(dist_to_0 > dist_to_180)
+
+    def _setup_cache(self) -> None:
+        """Setup cache"""
+
+        if self.cfg_params.cache:
+            maxsize = (
+                self.exp_def.code.shape[0] // self.cfg_params.n_ipp if self.exp_def.code.ndim >= 2 else 2
+            )
+            self.tx_signal_model = functools.lru_cache(maxsize=maxsize)(tx_signal_model)
+        else:
+            self.tx_signal_model = tx_signal_model  # type: ignore[assignment]
+
+    def __getstate__(self) -> dict:
+        """
+        Prepare object for e.g pickling by removing the decorated functions (not supported by pickle)
+        """
+        state = self.__dict__.copy()
+        if "tx_signal_model" in state:
+            del state["tx_signal_model"]
+        return state
+
+    def __setstate__(self, state: dict) -> None:
+        """Restore object after unpickling"""
+        self.__dict__.update(state)
+        self._setup_cache()

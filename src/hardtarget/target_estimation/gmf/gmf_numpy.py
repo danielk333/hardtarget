@@ -2,8 +2,10 @@
 
 import numpy as np
 import numpy.typing as npt
-import scipy.fft as fft
+from radardef.types import ExpDef
+from scipy import fft
 
+from hardtarget.target_estimation.dtft_solvers import dtft_solve, dtft_solve_with_acceleration
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, GMFProParams
 from hardtarget.target_estimation.types import MFVariables
 from hardtarget.target_estimation.utils import default_mf_vars_items
@@ -13,6 +15,7 @@ def fast_gmf_np(
     tx: npt.NDArray[np.complexfloating],
     rx: npt.NDArray[np.complexfloating],
     tx_pwr: npt.NDArray[np.floating],
+    exp_def: ExpDef,
     cfg_params: GMFCfgParams,
     pro_params: GMFProParams,
 ) -> MFVariables:
@@ -33,40 +36,106 @@ def fast_gmf_np(
     n_acc = pro_params.fgmf_acceleration_phasors.shape[0]
 
     size = (len(pro_params.ranges),)
-    dc, vals, v_ind, a_ind = default_mf_vars_items(size)
+    dc, vals, v, a, phi = default_mf_vars_items(size)
 
     for ri, rg in enumerate(pro_params.rel_rgs):
         for sub_res in range(cfg_params.range_gate_sub_resolution):
             drg = int(rg // cfg_params.frequency_decimation)
             zr = rx[pro_params.il1_rx_window_indices + rg]
+            # TODO: the rx-tx block size should probably have a padding option? like +-1 for the
+            # super resolution stuff, currently not done, needs more investigation if needed
+
             # Matched filter output, stacked IPPs, bandwidth-reduced (boxcar filter), decimate
-            echo = np.sum((zr * tx[:, sub_res]).reshape(-1, cfg_params.frequency_decimation), axis=-1)
+            echo = np.sum(
+                (zr * np.conj(tx[:, sub_res])).reshape(-1, cfg_params.frequency_decimation), axis=-1
+            )
             dec_signal = np.zeros((pro_params.decimated_read_length,), dtype=np.complex64)
             # zero-frequency (DC) is used to get range-dependent noise floor
             index = sub_res + ri * cfg_params.range_gate_sub_resolution
-            dc[index] = np.abs(np.sum(echo)) ** 2
+            a_index = -1
+            v_index = -1
 
             for ai in range(n_acc):
                 dec_signal[pro_params.il0_dec_rx_window_indices + drg] = (
                     pro_params.fgmf_acceleration_phasors[ai] * echo
                 )
-                ft2 = np.abs(fft.fft(dec_signal)) ** 2
+                ft = fft.fftshift(fft.fft(dec_signal))
+                ft2 = np.abs(ft) ** 2
                 mi = np.argmax(ft2)
+                pwr, f_est, phi_est = ft2[mi], pro_params.fft_frequencies[mi], np.angle(ft[mi])
 
-                if ft2[mi] > vals[index]:
-                    vals[index] = ft2[mi]
-                    # index of doppler that gives highest integrated energy at this range gate
-                    v_ind[index] = mi
-                    # index of acceleration that gives highest integrated energy at this range gate
-                    a_ind[index] = pro_params.inds_accelerations[ai]
+                if pwr > vals[index]:
+                    vals[index] = pwr
+                    # TODO: the convention should be that these are signal specific numbers, i.e.
+                    # doppler frequency and cycle acceleration (i.e. cycle/s and cycle/s^2), not
+                    # physical units like m/s och m/s^2
 
-    return MFVariables(vals=vals, dc=dc, v_ind=v_ind, a_ind=a_ind, tx_pwr=tx_pwr)
+                    # doppler that gives highest integrated energy at this range gate
+                    v[index] = f_est
+                    v_index = int(mi)
+                    # acceleration that gives highest integrated energy at this range gate
+                    a[index] = pro_params.accelerations[ai]
+                    a_index = ai
+                    # phase at the best acceleration and range rate
+                    phi[index] = phi_est
+                    dc[index] = np.median(ft2)
+
+            # Refine acceleration and phase
+            dec_signal[pro_params.il0_dec_rx_window_indices + drg] = (
+                pro_params.fgmf_acceleration_phasors[a_index] * echo
+            )
+            v_index_p = v_index
+            if v_index < len(pro_params.fft_frequencies) - 1:
+                v_index_p += 1
+            v_index_m = v_index
+            if v_index > 0:
+                v_index_m = v_index - 1
+            if cfg_params.refine_acceleration:
+                pwr, f_est, a_est, phi_est = dtft_solve_with_acceleration(
+                    decoded_signal=pro_params.fgmf_acceleration_phasors[a_index] * echo,
+                    sample_rate=exp_def.sample_rate / cfg_params.frequency_decimation,
+                    start_freq=pro_params.fft_frequencies[v_index],
+                    # TODO: i think this accel is the wrong variable and the wrong units, verify
+                    start_accel=pro_params.accelerations[a_index],
+                    freq_limits=(
+                        pro_params.fft_frequencies[v_index_m],
+                        pro_params.fft_frequencies[v_index_p],
+                    ),
+                    accel_limits=(
+                        pro_params.accelerations[a_index - 1],
+                        pro_params.accelerations[a_index + 1],
+                    ),
+                )
+                v[index] = f_est
+                a[index] = a_est
+                phi[index] = phi_est
+            elif cfg_params.refine_doppler:
+                pwr, f_est, phi_est = dtft_solve(
+                    decoded_signal=pro_params.fgmf_acceleration_phasors[a_index] * echo,
+                    sample_rate=exp_def.sample_rate / cfg_params.frequency_decimation,
+                    freq_bracket=(
+                        pro_params.fft_frequencies[v_index_m],
+                        pro_params.fft_frequencies[v_index_p],
+                    ),
+                )
+                v[index] = f_est
+                phi[index] = phi_est
+
+    return MFVariables(
+        vals=vals,
+        dc=dc,
+        v=v,
+        a=a,
+        tx_pwr=tx_pwr,
+        phi=phi,
+    )
 
 
 def fast_gmf_no_reduce_np(
     tx: npt.NDArray[np.complexfloating],
     rx: npt.NDArray[np.complexfloating],
     tx_pwr: npt.NDArray,
+    exp_def: ExpDef,
     cfg_params: GMFCfgParams,
     pro_params: GMFProParams,
 ) -> MFVariables:
@@ -88,10 +157,11 @@ def fast_gmf_no_reduce_np(
     # TODO: Correct this function, looks to not have worked in a while
 
     return MFVariables(
-        vals=np.empty((1), dtype=np.float32),
-        dc=np.empty((1), dtype=np.float32),
-        v_ind=np.empty((1), dtype=np.int32),
-        a_ind=np.empty((1), dtype=np.int32),
+        vals=np.empty((1), dtype=np.float64),
+        dc=np.empty((1), dtype=np.float64),
+        v=np.empty((1), dtype=np.float64),
+        a=np.empty((1), dtype=np.float64),
+        phi=np.empty((1), dtype=np.float64),
         tx_pwr=np.empty((1), dtype=np.float32),
     )
 

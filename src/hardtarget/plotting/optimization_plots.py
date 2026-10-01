@@ -1,4 +1,3 @@
-from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -16,7 +15,7 @@ def plot_optimization_peaks(
     cfg: OptimizeCfgParams,
     pro: OptimizeProParams,
     monostatic: bool = True,
-    snr_dB_limit: Optional[float] = None,
+    snr_dB_limit: float | None = None,
 ) -> npt.NDArray:  # of type Axes
     """
     Plot peaks after optimization.

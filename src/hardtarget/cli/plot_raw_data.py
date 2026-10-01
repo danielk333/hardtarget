@@ -17,8 +17,23 @@ def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Adds mandatory and optional positional arguments to the parser."""
 
     parser.add_argument("path", help="path to source directory with raw data")
-    parser.add_argument("-s", "--start_time", default=None, type=str)
-    parser.add_argument("-e", "--end_time", default=None, type=str)
+    parser.add_argument(
+        "-s",
+        "--start_time",
+        default=None,
+        type=str,
+        help=(
+            "Start time for the plotted data, can be an ISO formatted string"
+            "or float in seconds if the --relative_time flag is set"
+        ),
+    )
+    parser.add_argument(
+        "-e",
+        "--end_time",
+        default=None,
+        type=str,
+        help="Same as --start_time but for the end time",
+    )
     parser.add_argument("--relative_time", action="store_true")
     parser.add_argument("--frequency", action="store_true")
     parser.add_argument("--axis_units", action="store_true")
@@ -56,7 +71,7 @@ def main(args: argparse.Namespace) -> None:
             target_formats = radar_def.available_target_formats(source_format)
             converted_files = radar_def.convert(args.path, target_formats[0], converted_data_path)
             if converted_files is None:
-                raise Exception(f"Not possible to convert the file:  {args.path}")
+                raise ValueError(f"Not possible to convert the file:  {args.path}")
             filepath = converted_files[0]
         else:
             # File is already converted
@@ -64,26 +79,30 @@ def main(args: argparse.Namespace) -> None:
 
         data_loader = radar_def.load_data(filepath, cache=False)
         if data_loader is None:
-            raise Exception(f"Not possible to load the given file: {args.path}")
+            raise ValueError(f"Not possible to load the given file: {args.path}")
 
         if args.start_range is not None:
-            args.start_range = float(args.start_range)
+            args.start_range = int(args.start_range) if args.unit == "sample" else float(args.start_range)
         if args.end_range is not None:
-            args.end_range = float(args.end_range)
+            args.end_range = int(args.end_range) if args.unit == "sample" else float(args.end_range)
+        if args.start_time is not None and args.relative_time:
+            args.start_time = float(args.start_time)
+        if args.end_time is not None and args.relative_time:
+            args.end_time = float(args.end_time)
 
         if data_loader is not None:
-            fig, ax = plt.subplots()
+            _, ax = plt.subplots()
 
             if args.frequency:
                 plot_func = plotting.fti
             else:
                 plot_func = plotting.rti
 
-            ax, handles = plot_func(
+            ax, _ = plot_func(
                 ax,
                 data_loader=data_loader,
-                start_time=int(args.start_time) if args.relative_time else args.start_time,
-                end_time=int(args.end_time) if args.relative_time else args.end_time,
+                start_time=args.start_time,
+                end_time=args.end_time,
                 relative_time=args.relative_time,
                 axis_units=args.axis_units,
                 log=args.log,
@@ -96,4 +115,4 @@ def main(args: argparse.Namespace) -> None:
 
             plt.show()
         else:
-            raise Exception(f"Not possible to load the given file: {args.path}")
+            raise ValueError(f"Not possible to load the given file: {args.path}")

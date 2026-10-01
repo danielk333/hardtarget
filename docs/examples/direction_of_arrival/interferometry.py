@@ -47,8 +47,8 @@ mu_station = Mu()
 # In this case we choose to visualize the 500 first ipps of the measurement
 
 output_path = Path(tmp_dir.name) / "analysed"
-start_time = int(reader.exp_def.t_ipp_usec * 50)
-end_time = start_time + int(reader.exp_def.t_ipp_usec * 120)
+start_time = int(reader.exp_def.t_ipp_usec * 50) * 1e-6
+end_time = start_time + int(reader.exp_def.t_ipp_usec * 120) * 1e-6
 cfg = DOACfgParams(
     n_ipp=1,
     ipp_offset=0,
@@ -75,8 +75,7 @@ direction_of_arrival(
 
 # Load analysed data
 
-data_generator = load_analysed_data(output_path)
-output: tuple[DOAVars, ExpDef, DOACfgParams, DOAProParams] = list(data_generator)[0]
+output: tuple[DOAVars, ExpDef, DOACfgParams, DOAProParams] = load_analysed_data(output_path)
 out_data, exp_def, cfg_params, pro_params = output
 
 # ## Plot results

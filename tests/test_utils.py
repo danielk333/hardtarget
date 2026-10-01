@@ -14,18 +14,21 @@ from hardtarget.utils.time_conversion import time_interval_to_sample_bound
 
 def test_time_interval_to_sample_bounds():
 
-    time_max_min_us = Bounds(1772090400000000, 1772090580000000)  # 2026-02-26T07:20:00, 2026-02-26T07:23:00
+    time_max_min_sec = (
+        1772090400000000 * 1e-6,
+        1772090580000000 * 1e-6,
+    )  # 2026-02-26T07:20:00, 2026-02-26T07:23:00
 
     # Start time of 2026-02-26T07:21:00
     start_time_us = 1772090460000000
-    start_time_relative = 60 * 1e6
+    start_time_relative = 60
     start_time_dt = dt.datetime.strptime("2026-02-26T07:21:00", "%Y-%m-%dT%H:%M:%S").replace(
         tzinfo=dt.timezone.utc
     )
 
     # End time of 2026-02-26T07:21:36
     end_time_us = 1772090496000000
-    end_time_relative = 96 * 1e6
+    end_time_relative = 96
     end_time_dt = dt.datetime.strptime("2026-02-26T07:21:36", "%Y-%m-%dT%H:%M:%S").replace(
         tzinfo=dt.timezone.utc
     )
@@ -34,21 +37,25 @@ def test_time_interval_to_sample_bounds():
 
     # Test us since epoch
     sample_bounds = time_interval_to_sample_bound(
-        time_bounds=time_max_min_us, sample_rate=sample_rate, start_time=start_time_us, end_time=end_time_us
+        time_bounds=time_max_min_sec,
+        sample_rate=sample_rate,
+        start_time=start_time_us * 1e-6,
+        end_time=end_time_us * 1e-6,
     )
+
     assert sample_bounds.start == 60
     assert sample_bounds.end == 96
 
     # test datetime
     sample_bounds = time_interval_to_sample_bound(
-        time_bounds=time_max_min_us, sample_rate=sample_rate, start_time=start_time_dt, end_time=end_time_dt
+        time_bounds=time_max_min_sec, sample_rate=sample_rate, start_time=start_time_dt, end_time=end_time_dt
     )
     assert sample_bounds.start == 60
     assert sample_bounds.end == 96
 
     # Test relative time
     sample_bounds = time_interval_to_sample_bound(
-        time_bounds=time_max_min_us,
+        time_bounds=time_max_min_sec,
         sample_rate=sample_rate,
         start_time=int(start_time_relative),
         end_time=int(end_time_relative),
@@ -59,7 +66,7 @@ def test_time_interval_to_sample_bounds():
 
     # Verify unbound
     sample_bounds = time_interval_to_sample_bound(
-        time_bounds=time_max_min_us,
+        time_bounds=time_max_min_sec,
         sample_rate=sample_rate,
     )
     assert sample_bounds.start == 0
@@ -138,7 +145,9 @@ def test_extract_config_section():
         tmp_config_path = Path(tmp_config.name)
 
         # --- Processing section ---
-        processing = extract_config_section(tmp_config_path, ConfigSubSection.PROCCESSING, CfgParams)
+        processing = extract_config_section(
+            tmp_config_path, section=ConfigSubSection.PROCCESSING, cfg_type=CfgParams
+        )
         cfg = CfgParams(**processing)
         assert cfg.n_ipp == 3
         assert cfg.ipp_offset == 0
@@ -152,7 +161,7 @@ def test_extract_config_section():
 
         # --- Target estimation section ---
         target_estimation_params = extract_config_section(
-            tmp_config_path, ConfigSubSection.TARGET_ESTIMATION, TargetEstimationCfgParams
+            tmp_config_path, section=ConfigSubSection.TARGET_ESTIMATION, cfg_type=TargetEstimationCfgParams
         )
         assert target_estimation_params["min_acceleration"] == 30
         assert target_estimation_params["max_acceleration"] == 93
@@ -162,18 +171,20 @@ def test_extract_config_section():
         assert target_estimation_params["node_gpus"] == 1
 
         # --- GMF section ---
-        gmf_params = extract_config_section(tmp_config_path, ConfigSubSection.GMF, GMFCfgParams)
+        gmf_params = extract_config_section(
+            tmp_config_path, section=ConfigSubSection.GMF, cfg_type=GMFCfgParams
+        )
         assert gmf_params["acceleration_steps"] == 10
 
         # --- Optimization section ---
         optimize_params = extract_config_section(
-            tmp_config_path, ConfigSubSection.OPTIMIZATION, OptimizeCfgParams
+            tmp_config_path, section=ConfigSubSection.OPTIMIZATION, cfg_type=OptimizeCfgParams
         )
         assert optimize_params["path"] == "example/path"
 
         # --- Echo search section ---
         echo_search_params = extract_config_section(
-            tmp_config_path, ConfigSubSection.ECHO_SEARCH, EchoSearchCfgParams
+            tmp_config_path, section=ConfigSubSection.ECHO_SEARCH, cfg_type=EchoSearchCfgParams
         )
         assert echo_search_params["doppler_freq_min"] == -30000
         assert echo_search_params["doppler_freq_max"] == 5000

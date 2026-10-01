@@ -57,22 +57,30 @@ def inspect_h5_leaf(
     return path, item
 
 
-def get_analysed_h5_files(path: str | Path) -> list[Path]:
+def get_analysed_h5_files(path: str | Path, method: MethodAbbreviation | None = None) -> list[Path]:
     """
     Collects paths to each file in the directory matching the analysed output naming convention
 
     Args:
         path: Directory containing the analyse output.
+        method: If data from a specific method should be retrived.
 
     Returns:
         List of files matching the output naming convention.
     """
 
-    file_pattern = re.compile(rf"(^|,)({'|'.join(abb for abb in MethodAbbreviation)})-.*\.h5$")
+    if not method:
+        file_pattern = re.compile(rf"(^|,)({'|'.join(abb for abb in MethodAbbreviation)})-.*\.h5$")
+    else:
+        file_pattern = re.compile(rf"^{method}-.*\.h5")
 
     files = []
-    for _path in [p for p in Path(path).rglob("*.*")]:
-        if re.match(file_pattern, _path.name):
-            files.append(_path)
+    path = Path(path)
+    if path.is_file() and re.match(file_pattern, path.name):
+        files.append(path)
+    else:
+        for _path in [p for p in path.rglob("*.*")]:
+            if re.match(file_pattern, _path.name):
+                files.append(_path)
 
     return files

@@ -1,39 +1,35 @@
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "hardtarget"
 version = "0.6.0"
 description = "Hard target processing of radar data"
 readme = { file = "README.md", content-type = "text/markdown" }
 authors = [
-    { name = "Daniel Kastinen", email = "daniel.kastinen@irf.se" },
-    { name = "Hampus Andersson", email = "hampus.andersson@irf.se" },
+  { name = "Daniel Kastinen", email = "daniel.kastinen@irf.se" },
+  { name = "Hampus Andersson", email = "hampus.andersson@irf.se" },
 ]
 maintainers = [
-    { name = "Daniel Kastinen", email = "daniel.kastinen@irf.se" },
-    { name = "Hampus Andersson", email = "hampus.andersson@irf.se" },
+  { name = "Daniel Kastinen", email = "daniel.kastinen@irf.se" },
+  { name = "Hampus Andersson", email = "hampus.andersson@irf.se" },
 ]
 license = { file = "LICENSE" }
 classifiers = [
-    "Environment :: GPU :: NVIDIA CUDA",
-    "Intended Audience :: Science/Research",
-    "Natural Language :: English",
-    "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: C",
+  "Environment :: GPU :: NVIDIA CUDA",
+  "Intended Audience :: Science/Research",
+  "Natural Language :: English",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: C",
+  "Programming Language :: Python :: 3",
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "h5py >= 2.10.0",
-    "digital_rf >= 2.6.6",
-    "numpy >= 2.0",
-    "scipy >= 1.4.1",
-    "lxml",
-    "radardef>=0.5.0",
-    "strenum ; python_version<'3.11'",
-    "typing_extensions ; python_version<'3.11'"
+  "digital_rf >= 2.6.6",
+  "h5py >= 2.10.0",
+  "lxml",
+  "numpy >= 2.0",
+  "radardef>=0.6.0",
+  "scipy >= 1.4.1",
+  "strenum ; python_version<'3.11'",
+  "typing_extensions ; python_version<'3.11'",
 ]
 
 [project.urls]
@@ -44,60 +40,79 @@ Repository = "https://github.com/danielk333/hardtarget"
 hardtarget = "hardtarget.cli:main"
 
 [project.optional-dependencies]
+all = [
+  "hardtarget[develop]",
+  "hardtarget[documentation]",
+  "hardtarget[mpi]",
+  "hardtarget[type_checker]",
+  "hardtarget[plotting]",
+  "hardtarget[profiling]",
+  "hardtarget[test]",
+]
 develop = [
-    "pytest >= 6.2.5",
-    "wheel >= 0.37.0",
-    "build >= 0.7.0",
-    "twine >= 3.4.2",
-    "matplotlib >= 3.5.1",
-    "numpydoc >= 1.2",
-    "pre-commit > 3.0.0",
-    "auditwheel >= 5.4.0",
-    "patchelf >= 0.14",
-    "ruff",
+  "pytest >= 6.2.5",
+  "wheel >= 0.37.0",
+  "build >= 0.7.0",
+  "twine >= 3.4.2",
+  "matplotlib >= 3.5.1",
+  "numpydoc >= 1.2",
+  "pre-commit > 3.0.0",
+  "auditwheel >= 5.4.0",
+  "patchelf >= 0.14",
+  "ruff",
 ]
 documentation = [
-    "docstr-coverage",
-    "mkdocs-material",
-    "mkdocstrings[python]",
-    "mkdocs-jupyter",
-    "mkdocs-gen-files",
-    "mkdocs-literate-nav",
-    "mkdocs-section-index",
-    "mkdocs-bibtex",
-    "matplotlib",
+  "docstr-coverage",
+  "mkdocs-material",
+  "mkdocstrings[python]",
+  "mkdocs-jupyter",
+  "mkdocs-gen-files",
+  "mkdocs-literate-nav",
+  "mkdocs-section-index",
+  "mkdocs-bibtex",
+  "matplotlib",
 ]
 mpi = ["mpi4py >= 3.1.1"]
-type_checker = ["mypy >= 1.18.2", "xenon"]
 plotting = ["matplotlib >= 3.3.4"]
 profiling = ["yappi >= 1.4.0"]
 test = [
-    "pytest",
-    "pytest-cov >= 4.1.0",
-    "matplotlib >= 3.3.4",
-    "yappi >= 1.4.0",
-    "spacecoords >= 0.1.6",
-    "pyant",
-    "requests",
-    "pytest-dependency",
-    "mpi-pytest",
+  "pytest",
+  "pytest-cov >= 4.1.0",
+  "matplotlib >= 3.3.4",
+  "yappi >= 1.4.0",
+  "spacecoords >= 0.1.6",
+  "pyant",
+  "requests",
+  "pytest-dependency",
+  "mpi-pytest",
 ]
-all = [
-    "hardtarget[develop]",
-    "hardtarget[documentation]",
-    "hardtarget[mpi]",
-    "hardtarget[type_checker]",
-    "hardtarget[plotting]",
-    "hardtarget[profiling]",
-    "hardtarget[test]",
+type_checker = ["mypy >= 1.18.2", "xenon"]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.coverage]
+parallel = true
+combine = true
+
+[tool.coverage.run]
+include = ["hardtarget"]
+source = ["./src/"]
+
+[tool.coverage.report]
+exclude_also = [
+  # Don't complain if tests don't hit defensive assertion code:
+  "raise AssertionError",
+  "raise NotImplementedError",
+
+  # Don't complain if non-runnable code isn't run:
+  "if 0:",
+  "if __name__ == .__main__.:",
+
+  # Don't complain about abstract methods, they aren't run:
+  "@(abc\\.)?abstractmethod",
 ]
-
-[tool.setuptools]
-include-package-data = true
-license-files = ["LICENSE"]
-
-[tool.setuptools.packages.find]
-where = ["src"]
 
 [tool.mypy]
 disallow_untyped_defs = true
@@ -105,38 +120,23 @@ follow_untyped_imports = true
 warn_unused_ignores = true
 packages = ["hardtarget"]
 
+[tool.pytest]
+addopts = ["-v", "-m", "not cuda", "-p", "no:warnings"]
+testpaths = ["tests"]
+
 [tool.ruff]
 line-length = 110
 include = ["src/hardtarget/**"]
 
-[tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401","E402"]
-
 [tool.ruff.lint]
-ignore = ["E203","D203","E251","E501","E226"]
+ignore = ["E203", "D203", "E251", "E501", "E226", "UP035", "PYI041", "B006", "C408", "B008"]
 
-[tool.pytest]
-addopts =["-v","-m","not cuda","-p","no:warnings"]
-testpaths = ["tests"]
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "E402"]
 
-[tool.coverage]
-parallel = true
-combine = true
+[tool.setuptools]
+include-package-data = true
+license-files = ["LICENSE"]
 
-[tool.coverage.run]
-include= ["hardtarget"]
-source = ["./src/"]
-
-[tool.coverage.report]
-exclude_also = [
-    # Don't complain if tests don't hit defensive assertion code:
-    "raise AssertionError",
-    "raise NotImplementedError",
-
-    # Don't complain if non-runnable code isn't run:
-    "if 0:",
-    "if __name__ == .__main__.:",
-
-    # Don't complain about abstract methods, they aren't run:
-    "@(abc\\.)?abstractmethod",
-]
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -10,6 +10,7 @@ from scipy import constants
 import hardtarget
 from hardtarget.constants import Impl, TargetEstimationMethod
 from hardtarget.data_simulation import DRFSimParams, simulate_drf
+from src.hardtarget.constants import ReceiverChainModel
 
 
 class TestTargetEstimation:
@@ -18,18 +19,20 @@ class TestTargetEstimation:
     """
 
     @pytest.mark.parametrize("mf_impl", [Impl.numpy, Impl.c])
-    def test_dpt(self, mf_impl, plot):
-        self.run_test(TargetEstimationMethod.fdpt, mf_impl, plot)
+    @pytest.mark.parametrize("refine_results", [False, True])
+    def test_dpt(self, mf_impl, refine_results, plot):
+        self.run_test(TargetEstimationMethod.fdpt, mf_impl, refine_results, False, plot)
 
     @pytest.mark.parametrize("mf_impl", [Impl.numpy, Impl.c])
-    def test_gmf(self, mf_impl, plot):
-        self.run_test(TargetEstimationMethod.fgmf, mf_impl, plot)
+    @pytest.mark.parametrize("refine_results", [False, True])
+    def test_gmf(self, mf_impl, refine_results, plot):
+        self.run_test(TargetEstimationMethod.fgmf, mf_impl, refine_results, False, plot)
 
     @pytest.mark.cuda
     def test_gmf_cuda(self, plot):
-        self.run_test(TargetEstimationMethod.fgmf, Impl.cuda, plot)
+        self.run_test(TargetEstimationMethod.fgmf, Impl.cuda, False, False, plot)
 
-    def run_test(self, mf_method, mf_impl, plot):
+    def run_test(self, mf_method, mf_impl, refine_doppler, refine_acceleration, plot):
         """Simulate echoes without noise and analyse the echoes to verify parameters are recovered.
 
         There is a minimum acceleration thats theoretically detectable depending
@@ -62,6 +65,8 @@ class TestTargetEstimation:
             min_acceleration=-300.0
             max_acceleration=300.0
             frequency_decimation={frequency_decimation}
+            refine_doppler={refine_doppler}
+            refine_acceleration={refine_acceleration}
         [dpt]
             ipp_delay_parameter={tau_ipp}
         [gmf]
@@ -114,6 +119,7 @@ class TestTargetEstimation:
             t_cal_on_usec=19900,
             t_cal_off_usec=19997,
             code=load_radar_code("leo_bpark"),
+            fir_filter=ReceiverChainModel.b414d15_gaus,
             samples_per_file=12800000,
         )
 
@@ -138,14 +144,10 @@ class TestTargetEstimation:
             tempfile.TemporaryDirectory() as tmp_analysis_path,
             tempfile.NamedTemporaryFile(mode="w+") as tmp_config,
         ):
-            path = Path("test_drf")
-
             # hacky way to create a temp config
             tmp_config.write(config_str)
             tmp_config.seek(0)
             tmp_config_path = tmp_config.name
-
-            print(f"{tmp_config_path=}")
 
             simulate_drf(
                 Path(tmp_sim_path),
@@ -162,8 +164,8 @@ class TestTargetEstimation:
             _ = hardtarget.target_estimation(
                 data=Path(tmp_sim_path).resolve(),
                 config=tmp_config_path,
-                start_time=simulation_params.start_time_us,
-                end_time=simulation_params.end_time_us,
+                start_time=simulation_params.start_time_us * 1e-6,
+                end_time=simulation_params.end_time_us * 1e-6,
                 relative_time=True,
                 method_lib=mf_method,
                 implementation=mf_impl,
@@ -172,88 +174,89 @@ class TestTargetEstimation:
                 progress=False,
             )
 
-            data_generator = hardtarget.load_analysed_data(tmp_analysis_path)
-            for out_args, exp_def, cfg_params, pro_params in data_generator:
-                dr = out_args.r_vec - sim_r[:-1]
-                dv = out_args.v_vec - sim_v[:-1]
-                da = out_args.a_vec - sim_a[:-1]
-
-                def assert_simulated_vs_estimated(delta, limit, param_str):
-                    mean_error = np.abs(np.mean(delta))
-                    print(f"{param_str} = {mean_error} (std = {np.std(delta)}) < {limit}")
-                    assert mean_error < limit, (
-                        f"mean {param_str} is over the limit, x̄({param_str}): {mean_error}, limit: {limit}"
-                    )
-                    std = np.std(delta)
-                    assert std < limit, (
-                        f"{param_str} standard deviation is to large, std({param_str}): {std} > {limit} "
-                    )
-
-                # Assert expected range is equal to estimated range
-                assert_simulated_vs_estimated(dr, range_gate, "delta_r")
-
-                # Assert expected velocity is equal to estimated velocity
-                assert_simulated_vs_estimated(dv, doppler_gate, "delta_v")
-
-                # Assert expected acceleration is equal to estimated acceleration
-                assert_simulated_vs_estimated(da, accel_gate, "delta_a")
-
             # # This is test debugging code
             if plot:
                 import matplotlib.pyplot as plt
 
-                data_generator = hardtarget.load_analysed_data(tmp_analysis_path)
-                for _out_args, _exp_def, _cfg_params, _pro_params in data_generator:
-                    t = _out_args.t - np.min(_out_args.t)
+                _out_args, _exp_def, _cfg_params, _pro_params = hardtarget.load_analysed_data(
+                    tmp_analysis_path
+                )
+                t = _out_args.t - np.min(_out_args.t)
 
-                    fig, axes = plt.subplots(2, 2)
-                    hardtarget.plotting.target_estimation_plots.plot_peaks(
-                        axes,
-                        _out_args,
-                        _exp_def,
-                        _cfg_params,
-                        _pro_params,
-                        snr_dB_limit=15.0,
-                    )
-                    fig, axes = plt.subplots(2, 3)
-                    hardtarget.plotting.target_estimation_plots.plot_detections(
-                        axes, _out_args, _exp_def, _cfg_params, _pro_params
-                    )
-                    fig, axes = plt.subplots(3, 1)
-                    hardtarget.plotting.target_estimation_plots.plot_map(
-                        axes, _out_args, _exp_def, _cfg_params, _pro_params
-                    )
+                fig, axes = plt.subplots(2, 2)
+                hardtarget.plotting.target_estimation_plots.plot_peaks(
+                    axes,
+                    _out_args,
+                    _exp_def,
+                    _cfg_params,
+                    _pro_params,
+                    snr_dB_limit=15.0,
+                )
+                fig, axes = plt.subplots(2, 3)
+                hardtarget.plotting.target_estimation_plots.plot_detections(
+                    axes, _out_args, _exp_def, _cfg_params, _pro_params
+                )
+                fig, axes = plt.subplots(3, 1)
+                hardtarget.plotting.target_estimation_plots.plot_map(
+                    axes, _out_args, _exp_def, _cfg_params, _pro_params
+                )
 
-                    fig, axes = plt.subplots(2, 2)
-                    nf_vec = np.nanmedian(_out_args.dc, axis=0)
-                    nf_vec = nf_vec.reshape((1, nf_vec.size))
-                    nf_range = np.nanmedian(nf_vec, axis=0)
-                    snr = hardtarget.noise.snr(_out_args.vals, nf_range)
-                    r_inds = np.argmax(_out_args.vals, axis=1)
-                    coh_inds = np.arange(_out_args.vals.shape[0])
-                    snr = snr[coh_inds, r_inds]
+                fig, axes = plt.subplots(2, 2)
+                nf_vec = np.nanmedian(_out_args.dc, axis=0)
+                nf_vec = nf_vec.reshape((1, nf_vec.size))
+                nf_range = np.nanmedian(nf_vec, axis=0)
+                snr = hardtarget.noise.snr(_out_args.vals, nf_range)
+                r_inds = np.argmax(_out_args.vals, axis=1)
+                coh_inds = np.arange(_out_args.vals.shape[0])
+                snr = snr[coh_inds, r_inds]
 
-                    axes[0, 0].plot(t, _out_args.r_vec * 1e-3 * 0.5, c="blue", label="r_vec")
-                    axes[0, 0].plot(t_abs, sim_r * 1e-3 * 0.5, c="red", label="sim_r")
-                    axes[0, 0].set_xlabel("Time [s]")
-                    axes[0, 0].set_ylabel("range [km]")
-                    axes[0, 0].legend(loc="upper left")
+                axes[0, 0].plot(t, _out_args.r_vec * 1e-3 * 0.5, c="blue", label="r_vec")
+                axes[0, 0].plot(t_abs, sim_r * 1e-3 * 0.5, c="red", label="sim_r")
+                axes[0, 0].set_xlabel("Time [s]")
+                axes[0, 0].set_ylabel("range [km]")
+                axes[0, 0].legend(loc="upper left")
 
-                    axes[0, 1].plot(t, _out_args.v_vec * 1e-3 * 0.5, c="blue", label="v_vec")
-                    axes[0, 1].plot(t_abs, sim_v * 1e-3 * 0.5, c="red", label="sim_v")
-                    axes[0, 1].set_xlabel("Time [s]")
-                    axes[0, 1].set_ylabel("range rate [km/s]")
-                    axes[0, 1].legend(loc="upper left")
+                axes[0, 1].plot(t, _out_args.v_vec * 1e-3 * 0.5, c="blue", label="v_vec")
+                axes[0, 1].plot(t_abs, sim_v * 1e-3 * 0.5, c="red", label="sim_v")
+                axes[0, 1].set_xlabel("Time [s]")
+                axes[0, 1].set_ylabel("range rate [km/s]")
+                axes[0, 1].legend(loc="upper left")
 
-                    axes[1, 0].plot(t, _out_args.a_vec * 0.5, c="blue", label="a_vec")
-                    axes[1, 0].plot(t_abs, sim_a * 0.5, c="red", label="sim_a")
-                    axes[1, 0].set_xlabel("Time [s]")
-                    axes[1, 0].set_ylabel("acceleration [m/s^2]")
-                    axes[1, 0].set_ylim([-300, 300])
-                    axes[1, 0].legend(loc="lower left")
+                axes[1, 0].plot(t, _out_args.a_vec * 0.5, c="blue", label="a_vec")
+                axes[1, 0].plot(t_abs, sim_a * 0.5, c="red", label="sim_a")
+                axes[1, 0].set_xlabel("Time [s]")
+                axes[1, 0].set_ylabel("acceleration [m/s^2]")
+                axes[1, 0].set_ylim([-300, 300])
+                axes[1, 0].legend(loc="lower left")
 
-                    axes[1, 1].plot(t, np.sqrt(snr))
-                    axes[1, 1].set_xlabel("Time [s]")
-                    axes[1, 1].set_ylabel("sqrt(ENR) [1]")
+                axes[1, 1].plot(t, np.sqrt(snr))
+                axes[1, 1].set_xlabel("Time [s]")
+                axes[1, 1].set_ylabel("sqrt(ENR) [1]")
 
                 plt.show()
+
+            out_args, exp_def, cfg_params, pro_params = hardtarget.load_analysed_data(tmp_analysis_path)
+
+            dr = out_args.r_vec - sim_r[:-1]
+            dv = out_args.v_vec - sim_v[:-1]
+            da = out_args.a_vec - sim_a[:-1]
+
+            def assert_simulated_vs_estimated(delta, limit, param_str):
+                mean_error = np.abs(np.mean(delta))
+                print(f"{param_str} = {mean_error} (std = {np.std(delta)}) < {limit}")
+                assert mean_error < limit, (
+                    f"mean {param_str} is over the limit, x̄({param_str}): {mean_error}, limit: {limit}"
+                )
+                std = np.std(delta)
+                assert std < limit, (
+                    f"{param_str} standard deviation is to large, std({param_str}): {std} > {limit} "
+                )
+
+            # Assert expected range is equal to estimated range
+            assert_simulated_vs_estimated(dr, range_gate, "delta_r")
+
+            # Assert expected velocity is equal to estimated velocity
+            assert_simulated_vs_estimated(dv, doppler_gate, "delta_v")
+
+            # Assert expected acceleration is equal to estimated acceleration
+            assert_simulated_vs_estimated(da, accel_gate, "delta_a")

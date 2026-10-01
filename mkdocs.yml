@@ -69,8 +69,12 @@ plugins:
         - examples/target_estimation/estimate_errors.py
         - examples/target_estimation/precision_orbit_analysis.py
         - examples/target_estimation/profile_speed.py
+        - examples/target_estimation/find_temperature_calibration.py
+        - examples/target_estimation/analyse_pulse.py
         - examples/back_to_basics/part3_sweep_acceleration.py
         - examples/direction_of_arrival/doa_error_per_resolution.py
+        - examples/simulation/interactive_tx_signal.py
+        - examples/simulation/simulated_filters.py
 
       include_source: false
       ignore: ["_wip*"]
@@ -126,6 +130,7 @@ nav:
           - Visualization of matched filter: examples/target_estimation/visualize_matched_filter.py
           - Visualization of raw data: examples/target_estimation/plot_raw_data.py
           - Visualization of raw data (frequency): examples/target_estimation/plot_raw_frequency_content.py
+          - Fit Trajectory: examples/target_estimation/fit_trajectory.py
       - Optimization:
           - Optimizing Target Estimation: examples/optimization/optimization.py
       - Echo Search:

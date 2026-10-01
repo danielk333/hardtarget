@@ -1,100 +1,143 @@
-#include "mf.h"
-#include "utils/fftw_utils.h"
+#include <complex.h>
 #include <fftw3.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
+#include "mf.h"
+#include "optimize/solvers.h"
+#include "utils/fftw_utils.h"
 
 /*
   Range-Velocity-Acceleration matched filter
-
-  todo optimizations:
-    - avx
-    - range dependent acceleration grid. The expected acceleration is a function
-      of altitude. we only would need to search through a finite grid around
-      the expected value. This would save a lot of computation.
-
-  Notes:
-    - Here the input signals are complex but interpreted as floats making
-      them 2*len long and interpreted as [ind0_re, ind0_im, ind0_re...]
-
-    The commented numbers are the argument numbers, useful for debugging the ctypes interface.
-
+  The commented numbers are the argument numbers, useful for debugging the ctypes interface.
  */
 
 int fgmf(
-    float* tx,         // 1
-    int tx_len,        // 2
-    float* rx,         // 3
-    int rx_len,        // 4
-    int sub_res_len,     // 5
-    float* acc_phasors,  // 6
-    int n_accs,          // 7
-    int* rgs,            // 8
-    int n_rg,            // 9
-    int dec,             // 10
-    float* gmf_vec,      // 11
-    float* gmf_dc_vec,   // 12
-    int* v_vec,          // 13
-    int* a_vec,          // 14
-    int* rx_window,      // 15
-    int* dec_rx_inds,    // 16
-    int dec_signal_len   // 17
+    float* tx,                 // 1
+    int tx_len,                // 2
+    float* rx,                 // 3
+    int rx_len,                // 4
+    int sub_res_len,           // 5
+    float* acc_phasors,        // 6
+    int n_accs,                // 7
+    double* accelerations,     // 8
+    int* rgs,                  // 9
+    int n_rg,                  // 10
+    int frequency_decimation,  // 11
+    double* vals,              // 12
+    double* dc,                // 13
+    double* v,                 // 14
+    double* a,                 // 15
+    double* phi,               // 16
+    int* rx_window,            // 17
+    int* dec_rx_inds,          // 18
+    int dec_signal_len,        // 19
+    double* fft_frequencies,   // 20
+    int fft_frequencies_len,   // 21
+    float sample_rate,         // 22
+    int refine_acceleration,   // 23
+    int refine_doppler         // 24
 ) {
     fftwf_complex* echo;
-    fftwf_complex* in;
-    fftwf_complex* out;
-
+    fftwf_complex* dec_signal;
+    fftwf_complex* ft;
+    fftwf_complex* dec_opt_signal;
     fftwf_plan p;
     int echo_len;
+    float* ft2 = (float*)malloc(sizeof(float) * dec_signal_len);
 
-    echo_len = (int)(tx_len / dec);
+    echo_len = (int)(tx_len / frequency_decimation);
     echo = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * echo_len);
-    in = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * dec_signal_len);
-    out = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * dec_signal_len);
-
-    p = fftwf_plan_dft_1d(dec_signal_len, in, out, FFTW_FORWARD, FFT_PLAN_ID);
+    dec_signal = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * dec_signal_len);
+    ft = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * dec_signal_len);
+    dec_opt_signal = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * echo_len);
+    p = fftwf_plan_dft_1d(dec_signal_len, dec_signal, ft, FFTW_FORWARD, FFT_PLAN_ID);
 
     // for each range gate
     for (int ri = 0; ri < n_rg; ri++) {
+        int drg = rgs[ri] / frequency_decimation;
+        // For each sub resolution
         for (int sri = 0; sri < sub_res_len; sri++) {
             int ind = sri + ri * sub_res_len;
-            for (int fi = 0; fi < dec_signal_len; fi++) {
-                in[fi][0] = 0.0;
-                in[fi][1] = 0.0;
-            }
+
+            // Reset dec_signal
+            memset(dec_signal, 0, sizeof(*dec_signal) * dec_signal_len);
+
             compute_echo_signal(
-                echo, echo_len, tx, tx_len, rx, rx_len, sri, sub_res_len, dec, rgs[ri], rx_window
+                echo, echo_len, tx, tx_len, rx, rx_len, sri, sub_res_len, frequency_decimation, rgs[ri], rx_window
             );
 
             // for all accelerations
             // add range gate dependent accelerations
+            int v_ind = -1;
+            int a_ind = -1;
+            float best_real = 0.0f;
+            float best_imag = 0.0f;
             for (int ai = 0; ai < n_accs; ai++) {
                 int phasor_i = 2 * ai * echo_len;
 
-                multiply_acc_phasors(in, echo, echo_len, acc_phasors, phasor_i, dec_rx_inds);
+                multiply_acc_phasors(dec_signal, echo, echo_len, acc_phasors, phasor_i, dec_rx_inds, drg);
 
-                // fft in and store result in out
+                // execute fft in and store result in out
                 fftwf_execute(p);
+                // Shift ft
+                fft_shift_1d(ft, dec_signal_len);
 
-                float gmf2;
                 for (int ti = 0; ti < dec_signal_len; ti++) {
-                    gmf2 = out[ti][0] * out[ti][0] + out[ti][1] * out[ti][1];
-                    if (ai == 0 && ti == 0) {
-                        // zero-frequency (DC) component in FFTW out[0] according to docs
-                        gmf_dc_vec[ind] = gmf2;
-                    }
-                    if (gmf2 > gmf_vec[ind]) {
-                        gmf_vec[ind] = gmf2;
-                        v_vec[ind] = ti;  // frequency index
-                        a_vec[ind] = ai;  // acceleration index
+                    float real = crealf(ft[ti]);
+                    float imag = cimagf(ft[ti]);
+                    float pwr = (real * real) + (imag * imag);
+                    if (pwr > vals[ind]) {
+                        vals[ind] = pwr;
+                        v_ind = ti;
+                        a_ind = ai;
+                        best_real = real;
+                        best_imag = imag;
                     }
                 }
             }
+
+            dc[ind] = calc_median_wirth(ft, dec_signal_len, ft2);
+
+            // Store best results
+            v[ind] = fft_frequencies[v_ind];
+            a[ind] = accelerations[a_ind];
+            phi[ind] = atan2f(best_imag, best_real);
+
+            int v_ind_p = v_ind;
+            if (v_ind < fft_frequencies_len - 1) {
+                v_ind_p += 1;
+            }
+            int v_ind_m = v_ind;
+            if (v_ind > 0) {
+                v_ind_m -= 1;
+            }
+
+            if (refine_acceleration) {
+                // do stuff
+            } else if (refine_doppler) {
+                double pwr = 0;
+
+                array_acc_multiply(echo, echo_len, acc_phasors, 2 * a_ind * echo_len, dec_opt_signal);
+
+                v[ind] = dtft_solve(
+                    dec_opt_signal,
+                    echo_len,
+                    sample_rate / frequency_decimation,
+                    fft_frequencies[v_ind_m],
+                    fft_frequencies[v_ind_p],
+                    &pwr,
+                    &phi[ind]
+                );
+            }
         }
     }
-    fftwf_free(in);
-    fftwf_free(out);
+    free(ft2);
+    fftwf_free(dec_signal);
+    fftwf_free(dec_opt_signal);
+    fftwf_free(ft);
     fftwf_free(echo);
     fftwf_destroy_plan(p);
     return 0;  // Success

@@ -4,7 +4,7 @@ from typing import NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from hardtarget.types import CfgParams, ProParams
+from hardtarget.types import CfgParams, OutputBase, ProParams
 
 
 @dataclass(frozen=True)
@@ -36,9 +36,9 @@ class DOAVars(NamedTuple):
     elevation: npt.NDArray[np.float32]
 
 
-class DOAOutArgs(NamedTuple):
+@dataclass(frozen=True)
+class DOAOutArgs(OutputBase):
     k_vec: npt.NDArray[np.float32]
     peak: npt.NDArray[np.complex64] | np.complex64
     azimuth: npt.NDArray[np.float32]
     elevation: npt.NDArray[np.float32]
-    epoch_us: int

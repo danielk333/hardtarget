@@ -4,7 +4,7 @@ from typing import NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from hardtarget.types import CfgParams, ProParams
+from hardtarget.types import CfgParams, OutputBase, ProParams
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,8 @@ class EchoSearchVars(NamedTuple):
     std_dev: np.floating | npt.NDArray[np.floating]
 
 
-class EchoSearchOutArgs(NamedTuple):
+@dataclass(frozen=True)
+class EchoSearchOutArgs(OutputBase):
     """
     Each object is per ipp except epoch
 
@@ -55,7 +56,6 @@ class EchoSearchOutArgs(NamedTuple):
     tot_pow: Sum of all readings from the raw data of the ipp.
     mean: Mean value of the raw data reading.
     std_dev: Standard deviation of the raw data reading.
-    epoch_us: Data timepoint of analysis start
 
     """
 
@@ -66,4 +66,3 @@ class EchoSearchOutArgs(NamedTuple):
     tot_pow: npt.NDArray[np.floating]
     mean: npt.NDArray[np.floating]
     std_dev: npt.NDArray[np.floating]
-    epoch_us: int

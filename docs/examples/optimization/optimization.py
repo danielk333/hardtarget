@@ -52,7 +52,7 @@ analyse(
     method_lib=TargetEstimationMethod.fgmf,
     output=output_path,
     start_time=0,
-    end_time=500 * 3120,  # 3120 = t_ipp_usec
+    end_time=(500 * 3120) * 1e-6,  # 3120 = t_ipp_usec
     relative_time=True,
 )
 
@@ -60,11 +60,10 @@ analyse(
 # ---
 # First load results
 
-data_generator = load_analysed_data(output_path)
+out_data, exp_def, cfg_params, pro_params = load_analysed_data(output_path)
 
 # Then we can visualize it with different plots
 
-out_data, exp_def, cfg_params, pro_params = list(data_generator)[0]
 
 # Plot peaks, this visualizes the peaks  of the hardtargets range, velocity
 # and acceleration over time (red is marking the detections). Furthermore the the signal to noise ratio is
@@ -126,12 +125,11 @@ analyse(
     method_lib=OptimizationMethod.optimize_grid_gmf,
     output=optimization_path,
     start_time=0,
-    end_time=500 * 3120,  # 3120 = t_ipp_usec
+    end_time=(500 * 3120) * 1e-6,  # 3120 = t_ipp_usec
     relative_time=True,
 )
 
-optimized_data = load_analysed_data(optimization_path)
-out_data_opt, exp_def_opt, cfg_params_opt, pro_params_opt = list(optimized_data)[0]
+out_data_opt, exp_def_opt, cfg_params_opt, pro_params_opt = load_analysed_data(optimization_path)
 
 # ## Optimization plot
 # ---

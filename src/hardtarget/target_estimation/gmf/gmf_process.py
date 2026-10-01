@@ -13,7 +13,7 @@ from hardtarget.target_estimation.types import (
     MFVariables,
     TargetEstimationProParams,
 )
-from hardtarget.types import AnalysisLib, MethodLib
+from hardtarget.types import MethodLib, TargetEstimationLib
 
 
 class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
@@ -21,7 +21,7 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
 
     def get_analysis_lib(
         self, lib: MethodLib | None, impl: Impl | None
-    ) -> tuple[AnalysisLib, TargetEstimationMethod, Impl]:
+    ) -> tuple[TargetEstimationLib, TargetEstimationMethod, Impl]:
         return get_gmf_lib(lib, impl)
 
     def get_lib_specific_process_params(
@@ -87,7 +87,7 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
             Outcome of GMF analysis
         """
 
-        tx, rx, ipp = self.get_data(
+        tx, rx, _ = self.get_data(
             start_sample,
             self.pro_params.read_length,
             sub_resolution=self.cfg_params.range_gate_sub_resolution,
@@ -100,21 +100,30 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
 
         # conjugate, so that when matched filtering, it will cancel out phase of transmit waveform.
         # scale transmit waveform to unity power
-        tx_pwr = np.sum(np.abs(tx) ** 2.0)
+        # NOTE: we are doing this per TX signal if there is sub-resolution, it is assumed shape is
+        # (N, sub-resolution)
+        tx_pwr = np.sum(np.abs(tx) ** 2.0, axis=0)
         tx_amp = np.sqrt(tx_pwr)
-        tx = np.conj(tx) / tx_amp
+        tx = tx / tx_amp[None, :]
 
-        if tx_amp > self.cfg_params.tx_amp_limit:
+        if np.any(tx_amp > self.cfg_params.tx_amp_limit):
             kwargs = {}
             if self.pro_params.implementation == Impl.cuda:
                 kwargs["gpu_id"] = 1 % self.cfg_params.node_gpus  # TODO:1 should be job.idx
 
-            return self.lib(tx, rx, np.array(tx_pwr), self.cfg_params, self.pro_params, **kwargs)
+            mfvars = self.lib(
+                tx, rx, np.array(tx_pwr), self.exp_def, self.cfg_params, self.pro_params, **kwargs
+            )
+            # TODO: for now since we expect physical units at this level do the conversion here
+            # frequency -> velocity
+            mfvars.v[:] = mfvars.v * self.exp_def.wavelength
+            return mfvars
         else:
             return MFVariables(
-                vals=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
-                dc=np.zeros((len(self.pro_params.ranges),), dtype=np.float32),
-                v_ind=np.zeros((len(self.pro_params.ranges),), dtype=np.int32),
-                a_ind=np.zeros((len(self.pro_params.ranges),), dtype=np.int32),
+                vals=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
+                dc=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
+                v=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
+                a=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
+                phi=np.zeros((len(self.pro_params.ranges),), dtype=np.float64),
                 tx_pwr=np.array(tx_pwr),
             )

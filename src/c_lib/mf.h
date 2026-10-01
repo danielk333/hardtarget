@@ -21,7 +21,7 @@ Choosing FFTW plan flag, citing [fftw.org docs](https://www.fftw.org/fftw3_doc/P
 #define FFT_PLAN_ID FFTW_MEASURE
 
 
-int fgmf(
+int fgmf_old(
     float* tx,
     int tx_len,
     float* rx,
@@ -41,25 +41,59 @@ int fgmf(
     int dec_signal_len
 );
 
+int fgmf(
+    float* tx,                 // 1
+    int tx_len,                // 2
+    float* rx,                 // 3
+    int rx_len,                // 4
+    int sub_res_len,           // 5
+    float* acc_phasors,        // 6
+    int n_accs,                // 7
+    double* accelerations,     // 8
+    int* rgs,                  // 9
+    int n_rg,                  // 10
+    int frequency_decimation,  // 11
+    double* vals,              // 12
+    double* dc,                // 13
+    double* v,                 // 14
+    double* a,                 // 15
+    double* phi,               // 16
+    int* rx_window,            // 17
+    int* dec_rx_inds,          // 18
+    int dec_signal_len,        // 19
+    double* fft_frequencies,   // 20
+    int fft_frequencies_len,   // 21
+    float sample_rate,         // 22
+    int refine_acceleration,   // 23
+    int refine_doppler         // 24
+);
+
+
 int fdpt(
-    float* tx,
-    int tx_len,
-    float* rx,
-    int rx_len,
-    int sub_res_len,
-    float* acc_phasors,
-    int n_accs,
-    int* rgs,
-    int n_rg,
-    int dec,
-    float* gmf_vec,
-    float* gmf_dc_vec,
-    int* v_vec,
-    int* a_vec,
-    int* rx_window,
-    int* dec_rx_inds,
-    int dec_signal_len,
-    int dec_tau_samp
+    float* tx,                 // 1
+    int tx_len,                // 2
+    float* rx,                 // 3
+    int rx_len,                // 4
+    int sub_res_len,           // 5
+    float* acc_phasors,        // 6
+    double* accelerations,     // 7
+    int* rgs,                  // 8
+    int n_rg,                  // 9
+    int frequency_decimation,  // 10
+    double* vals,              // 11
+    double* dc,                // 12
+    double* v,                 // 13
+    double* a,                 // 14
+    double* phi,               // 15
+    int* rx_window,            // 16
+    int* dec_rx_inds,          // 17
+    int dec_signal_len,        // 18
+    int dec_tau_samp,          // 19
+    double* fft_frequencies,   // 20
+    int fft_frequencies_len,   // 21
+    float sample_rate,         // 22
+    int refine_acceleration,   // 23
+    int refine_doppler         // 24
 );
 
 int xcorr_echo_search(

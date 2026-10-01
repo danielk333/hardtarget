@@ -122,8 +122,6 @@ def test_analysis(method, sub_methods, get_data):
         cfg = create_cfg(tmp_dir)
         analysed_data_path = get_analysed_path(tmp_dir, method.name)
 
-        # if method == AnalysisMethod.optimize:
-        # breakpoint()
         # CLI request
         args_str = [
             str(data_dir),
@@ -137,7 +135,7 @@ def test_analysis(method, sub_methods, get_data):
             "--s",
             "0",
             "--e",
-            "10000",
+            "0.1",
             "--clobber",
         ]
         if method == AnalysisMethod.direction_of_arrival:
@@ -232,7 +230,7 @@ def test_plot_raw_data(monkeypatch, get_data):
     data_dir, _ = get_data
 
     parser = plot_raw_data.parser_build(argparse.ArgumentParser())
-    args = parser.parse_args([str(data_dir), "--relative_time", "-s", "0", "-e", "10000"])
+    args = parser.parse_args([str(data_dir), "--relative_time", "-s", "0", "-e", "0.1"])
     plot_raw_data.main(args)
 
 
@@ -244,7 +242,7 @@ def test_plot_raw_data_freq(monkeypatch, get_data):
     data_dir, _ = get_data
 
     parser = plot_raw_data.parser_build(argparse.ArgumentParser())
-    args = parser.parse_args([str(data_dir), "--relative_time", "-s", "0", "-e", "10000", "--frequency"])
+    args = parser.parse_args([str(data_dir), "--relative_time", "-s", "0", "-e", "0.1", "--frequency"])
     plot_raw_data.main(args)
 
 

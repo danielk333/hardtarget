@@ -4,7 +4,7 @@ Range conversion tools
 
 import numpy.typing as npt
 import scipy.constants
-import scipy.constants as constants
+from scipy import constants
 
 LUNAR_DISTANCE = 3.84399e8  # m
 EARTH_RADIUS = 6.3781e6  # m

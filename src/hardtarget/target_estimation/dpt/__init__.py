@@ -2,13 +2,13 @@ import logging
 from typing import Optional
 
 from hardtarget.constants import Impl, TargetEstimationMethod
-from hardtarget.types import AnalysisLib, MethodLib
+from hardtarget.types import MethodLib, TargetEstimationLib
 
 logger = logging.getLogger(__name__)
 
 
 # available libs
-DPT_LIBS: dict[TargetEstimationMethod, dict[Impl, AnalysisLib]] = {
+DPT_LIBS: dict[TargetEstimationMethod, dict[Impl, TargetEstimationLib]] = {
     method: {} for method in TargetEstimationMethod
 }
 
@@ -30,8 +30,8 @@ else:
 
 
 def get_dbt_lib(
-    method_lib: Optional[MethodLib] = None, implementation: Optional[Impl] = None
-) -> tuple[AnalysisLib, TargetEstimationMethod, Impl]:
+    method_lib: MethodLib | None = None, implementation: Impl | None = None
+) -> tuple[TargetEstimationLib, TargetEstimationMethod, Impl]:
 
     if method_lib is None:
         logger.debug("No method defined, default lib will be used")
@@ -45,11 +45,13 @@ def get_dbt_lib(
         try:
             method_lib = TargetEstimationMethod(method_lib)
         except ValueError:
-            raise Exception(f"Method: {method_lib} is not available for target estimation")
+            raise NotImplementedError(f"Method: {method_lib} is not available for target estimation")
 
     lib = DPT_LIBS[method_lib].get(implementation, None)
     if lib is None:
-        raise Exception(f"Ther is no available {implementation} implementation for method lib {method_lib}")
+        raise NotImplementedError(
+            f"Ther is no available {implementation} implementation for method lib {method_lib}"
+        )
 
     return lib, method_lib, implementation
 

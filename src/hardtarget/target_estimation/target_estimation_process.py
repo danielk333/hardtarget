@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Generic, TypeVar
 
 import numpy as np
-import scipy.fft as fft
+from scipy import fft
 from scipy.signal import savgol_filter  # type: ignore[attr-defined]
 
 from hardtarget.constants import AnalysisMethod, ConfigSubSection
@@ -21,10 +21,10 @@ from hardtarget.target_estimation.types import (
     TargetEstimationProParams,
 )
 from hardtarget.types import (
-    AnalysisLib,
     DataItem,
     ExpDef,
     ProParams,
+    TargetEstimationLib,
 )
 from hardtarget.utils import noise
 from hardtarget.utils.range_conversion import range_gate_to_range
@@ -44,7 +44,7 @@ class TargetEstimationProcess(
         TargetEstimationProParams,
         MFVariables,
         MFOutArgs,
-        AnalysisLib[TeLibCfg, TeLibPro, MFVariables],
+        TargetEstimationLib[TeLibCfg, TeLibPro, MFVariables],
     ],
     Generic[TeLibCfg, TeLibPro],
 ):
@@ -68,10 +68,10 @@ class TargetEstimationProcess(
         cfg_type, _, _ = self.get_types()
         d = extract_config_section(
             cfg_path,
-            self.config_sub_section,
-            cfg_type,
-            cfg_params,
-            self._logger,
+            cfg_type=cfg_type,
+            section=self.config_sub_section,
+            existing_cfg=cfg_params,
+            logger=self._logger,
         )
 
         return cfg_type(**d)  # type: ignore[return-value]
@@ -166,12 +166,14 @@ class TargetEstimationProcess(
         # ---- Velocity related parameters ----
 
         # frequency vector
-        _fft_frequencies = fft.fftfreq(
-            decimated_read_length,
-            d=cfg_params.frequency_decimation / exp_def.sample_rate,
+        fft_frequencies = fft.fftshift(
+            fft.fftfreq(
+                decimated_read_length,
+                d=cfg_params.frequency_decimation / exp_def.sample_rate,
+            )
         )  # Hz
 
-        range_rates = (exp_def.wavelength * _fft_frequencies).astype(np.float64)
+        range_rates = (exp_def.wavelength * fft_frequencies).astype(np.float64)
 
         return TargetEstimationProParams(
             **asdict(pro_params),
@@ -182,6 +184,7 @@ class TargetEstimationProcess(
             il0_rx_window_indices=il0_rx_window_indices,
             il0_dec_rx_window_indices=il0_dec_rx_window_indices,
             range_rates=range_rates,
+            fft_frequencies=fft_frequencies,
         )
 
     @abstractmethod
@@ -199,8 +202,9 @@ class TargetEstimationProcess(
         return MFVariables(
             vals=np.stack([x.vals for x in vars_list], axis=0),
             dc=np.stack([x.dc for x in vars_list], axis=0),
-            v_ind=np.stack([x.v_ind for x in vars_list], axis=0),
-            a_ind=np.stack([x.a_ind for x in vars_list], axis=0),
+            v=np.stack([x.v for x in vars_list], axis=0),
+            a=np.stack([x.a for x in vars_list], axis=0),
+            phi=np.stack([x.phi for x in vars_list], axis=0),
             tx_pwr=np.stack([x.tx_pwr for x in vars_list], axis=0),
         )
 
@@ -237,17 +241,17 @@ class TargetEstimationProcess(
 
         # finding peaks
         r_inds = np.argmax(snr, axis=1)
+        snr_vec = snr[coh_ints, r_inds]
         r_vec = pro_params.ranges[r_inds]
-        v_vec = pro_params.range_rates[all_vars.v_ind[coh_ints, r_inds]]
-        a_vec = pro_params.accelerations[all_vars.a_ind[coh_ints, r_inds]]  # type: ignore[attr-defined]
+        v_vec = all_vars.v[coh_ints, r_inds]
+        a_vec = all_vars.a[coh_ints, r_inds]
         g_vec = all_vars.vals[coh_ints, r_inds]
-
-        epoch_us = int(self.data.epoch_bounds[0] + file_idx_sample * exp_def.t_samp_usec)
+        p_vec = all_vars.phi[coh_ints, r_inds]
 
         _t_conv = (cfg_params.n_ipp * exp_def.t_ipp_usec) * 1e-6
-        t = (np.arange(num_cohints) + 1) * _t_conv + file_idx_sample * exp_def.t_samp_usec * 1e-6
+        t = np.arange(num_cohints) * _t_conv + file_idx_sample * exp_def.t_samp_usec * 1e-6
 
-        pointing_vec = np.zeros((num_cohints, 2), dtype=np.float32)
+        pointing_vec = np.zeros((num_cohints, 2), dtype=np.float64)
         for i in range(num_cohints):
             pointing = self.get_pointing(file_idx_sample + i * (cfg_params.n_ipp * exp_def.ipp_samps))
             pointing_vec[i, 0] = pointing.azimuth
@@ -261,17 +265,20 @@ class TargetEstimationProcess(
             sample_numbers=sample_numbers,
             vals=all_vars.vals,
             dc=all_vars.dc,
-            v_ind=all_vars.v_ind,
-            a_ind=all_vars.a_ind,
             tx_pwr=all_vars.tx_pwr,
             snr=snr,
+            v=all_vars.v,
+            a=all_vars.a,
+            phi=all_vars.phi,
+            snr_vec=snr_vec,
             r_vec=r_vec,
             v_vec=v_vec,
             a_vec=a_vec,
+            p_vec=p_vec,
             g_vec=g_vec,
             pointing_vec=pointing_vec,
+            epoch_us=int(self.data.epoch_bounds[0]),
             t=t,
-            epoch_us=epoch_us,
         )
 
     def define_h5_vars(self, output: MFOutArgs) -> dict[str, DataItem]:
@@ -288,15 +295,11 @@ class TargetEstimationProcess(
         str_dims_num_cohints_per_file = f"{output.num_cohints_per_file=}".split("=")[0].split(".")[1]
         str_t = f"{output.t=}".split("=")[0].split(".")[1]
         str_ranges = f"{output.ranges=}".split("=")[0].split(".")[1]
+        # TODO: add phase to output
         return {
             str_dims_num_cohints_per_file: DataItem(
                 data=output.num_cohints_per_file,
                 long_name="Number of cohints per file",
-                scale=True,
-            ),
-            str_t: DataItem(
-                data=output.t,
-                long_name="time vector",
                 scale=True,
             ),
             str_ranges: DataItem(
@@ -329,17 +332,23 @@ class TargetEstimationProcess(
                 dims=[(str_dims_num_cohints_per_file, str_t), (str_ranges, "r")],
                 long_name="Range dependant noise floor (0-frequency gmf output)",
             ),
-            f"{output.v_ind=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.v_ind,
+            f"{output.v=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.v,
                 dims=[(str_dims_num_cohints_per_file, str_t), (str_ranges, "r")],
-                long_name="If range_rate is reduced, contains the best range rate index "
-                "for each left over axis",
+                # TODO: update the long names descriptions, we no longer allow output
+                # with no reduction
+                long_name="If range_rate is reduced, contains the best range rate for each left over axis",
             ),
-            f"{output.a_ind=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.a_ind,
+            f"{output.a=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.a,
                 dims=[(str_dims_num_cohints_per_file, str_t), (str_ranges, "r")],
                 long_name="If acceleration is reduced, contains the best acceleration "
                 "index for each left over axis",
+            ),
+            f"{output.phi=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.a,
+                dims=[(str_dims_num_cohints_per_file, str_t), (str_ranges, "r")],
+                long_name="Phase",
             ),
             f"{output.tx_pwr=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.tx_pwr,
@@ -349,25 +358,33 @@ class TargetEstimationProcess(
             f"{output.snr=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.snr,
                 dims=[(str_dims_num_cohints_per_file, str_t)],
-                long_name="SNR for best range gate index",
+                long_name="SNR for all gates",
+            ),
+            f"{output.snr_vec=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.snr_vec,
+                dims=[(str_dims_num_cohints_per_file, "1")],
+                long_name="SNR at peak GMF",
             ),
             f"{output.r_vec=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.r_vec,
-                dims=[(str_dims_num_cohints_per_file, str_t)],
+                dims=[(str_dims_num_cohints_per_file, "1")],
                 long_name="Range at peak GMF",
             ),
             f"{output.v_vec=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.v_vec,
-                dims=[(str_dims_num_cohints_per_file, str_t)],
+                dims=[(str_dims_num_cohints_per_file, "1")],
                 long_name="Range rate at peak GMF",
             ),
             f"{output.a_vec=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.a_vec,
-                dims=[(str_dims_num_cohints_per_file, str_t)],
+                dims=[(str_dims_num_cohints_per_file, "1")],
                 long_name="Acceleration at peak GMF",
             ),
             f"{output.g_vec=}".split("=")[0].split(".")[1]: DataItem(
-                data=output.g_vec, dims=[(str_dims_num_cohints_per_file, str_t)], long_name="Peak GMF"
+                data=output.g_vec, dims=[(str_dims_num_cohints_per_file, "1")], long_name="Peak GMF"
+            ),
+            f"{output.p_vec=}".split("=")[0].split(".")[1]: DataItem(
+                data=output.p_vec, dims=[(str_dims_num_cohints_per_file, "1")], long_name="Phase at peak GMF"
             ),
             f"{output.pointing_vec=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.pointing_vec,
@@ -376,7 +393,12 @@ class TargetEstimationProcess(
             ),
             f"{output.epoch_us=}".split("=")[0].split(".")[1]: DataItem(
                 data=output.epoch_us,
-                long_name="Epoch of the first analysed datapoint in microseconds",
+                long_name="Epoch of the first data sample of the measurement",
+                scale=True,
+            ),
+            str_t: DataItem(
+                data=output.t,
+                long_name="time vector relative to epoch_us",
                 scale=True,
             ),
         }

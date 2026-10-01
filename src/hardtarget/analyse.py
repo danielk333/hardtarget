@@ -1,7 +1,6 @@
 import datetime as dt
 import sys
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 from pyant.models.array import Array, ArrayParams
@@ -28,18 +27,18 @@ def analyse(
     data: str | Path | DataLoader,
     config: str | Path | GenericCfg | dict,
     method: AnalysisMethod,
-    method_lib: Optional[MethodLib] = None,
-    implementation: Optional[Impl] = None,
-    rx_channel: Optional[str | int] = None,
-    excluded_channels: Optional[list[str] | list[int]] = None,
-    start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
-    end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+    method_lib: MethodLib | None = None,
+    implementation: Impl | None = None,
+    rx_channel: str | int | None = None,
+    excluded_channels: list[str] | list[int] | None = None,
+    start_time: np.datetime64 | int | float | str | dt.datetime | None = None,
+    end_time: np.datetime64 | int | float | str | dt.datetime | None = None,
     relative_time: bool = False,
-    exp_def: Optional[ExpDef] = None,
+    exp_def: ExpDef | None = None,
     progress: bool | mpi_tools.CommBar = False,
-    clobber: bool = True,
-    output: Optional[str | Path] = None,
-    sub_directory: Optional[str] = None,
+    clobber: bool = False,
+    output: str | Path | None = None,
+    sub_directory: str | None = None,
     comm: mpi_tools.CommObject = mpi_tools.CommMock(),
     **kwargs: Unpack[ArrayKwargs],
 ) -> AnalysedResult:
@@ -56,23 +55,24 @@ def analyse(
         implementation (optional): Implementation of the method to be used during the analysis (Numpy/Cuda/C),
                                    will override any implementation defined in the config params.
         rx_channel (optional): Specific rx channel to analyse, if none chosen all will be used from the meta data
-        start_time (optional): Start time of analysis
-        end_time (optional): End time of analysis
-        relative_time (optional): If to use relative time
+        start_time (optional): Start time of analysis, datetime object, date string or seconds since epoch.
+        end_time (optional): End time of analysis,datetime object, date string or seconds since epoch.
+        relative_time (optional): If to use relative time, start and end time must be specified in int or float then.
         exp_def (optional): If working with custom experiments it is needed to be able to load the data.
         progress (optional): If a progress bar should be visualized.
         clobber (optional): If previous analysis should be overwritten.
         output (optional): Output directory for the analysed files, if None no files will be saved.
                            Path will be output/YYYY-MM-DD/HH-00-00
-        sub_directory(optional): Sub directory, stated if there is a need to store data in a specific subfolder in the output path.
+        sub_directory (optional): Sub directory, stated if there is a need to store data in a specific subfolder in the output path.
                                  More specifically output/YYYY-MM-DD/HH-00-00/sub_directory/
+        comm (optional): Mpi communication object if analysis is expected to run on MPI or a specific Comm object.
         **kwargs (optional): Extra data such as Beam and Beam parameters (needed for interferometry)
 
     """
 
     if comm.rank == 0:
         # Access data
-        if isinstance(data, str) or isinstance(data, Path):
+        if isinstance(data, (str, Path)):
             data_loader = RadarDef().load_data(Path(data), exp_def=exp_def)
             if data_loader is None:
                 raise ValueError(f"Not possible to load data file from: {data}")
@@ -127,18 +127,18 @@ def analyse(
 def target_estimation(
     data: str | Path | DataLoader,
     config: str | Path | GenericCfg | dict,
-    method_lib: Optional[MethodLib] = None,
-    implementation: Optional[Impl] = None,
-    rx_channel: Optional[str | int] = None,
-    excluded_channels: Optional[list[str] | list[int]] = None,
-    start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
-    end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+    method_lib: MethodLib | None = None,
+    implementation: Impl | None = None,
+    rx_channel: str | int | None = None,
+    excluded_channels: list[str] | list[int] | None = None,
+    start_time: np.datetime64 | int | float | str | dt.datetime | None = None,
+    end_time: np.datetime64 | int | float | str | dt.datetime | None = None,
     relative_time: bool = False,
-    exp_def: Optional[ExpDef] = None,
+    exp_def: ExpDef | None = None,
     progress: bool | mpi_tools.CommBar = False,
-    clobber: bool = True,
-    output: Optional[str | Path] = None,
-    sub_directory: Optional[str] = None,
+    clobber: bool = False,
+    output: str | Path | None = None,
+    sub_directory: str | None = None,
     comm: mpi_tools.CommObject = mpi_tools.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for Target Estimations"""
@@ -166,18 +166,18 @@ def target_estimation(
 def optimize(
     data: str | Path | DataLoader,
     config: str | Path | GenericCfg | dict,
-    method_lib: Optional[MethodLib] = None,
-    implementation: Optional[Impl] = None,
-    rx_channel: Optional[str | int] = None,
-    excluded_channels: Optional[list[str] | list[int]] = None,
-    start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
-    end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+    method_lib: MethodLib | None = None,
+    implementation: Impl | None = None,
+    rx_channel: str | int | None = None,
+    excluded_channels: list[str] | list[int] | None = None,
+    start_time: np.datetime64 | int | float | str | dt.datetime | None = None,
+    end_time: np.datetime64 | int | float | str | dt.datetime | None = None,
     relative_time: bool = False,
-    exp_def: Optional[ExpDef] = None,
+    exp_def: ExpDef | None = None,
     progress: bool | mpi_tools.CommBar = False,
-    clobber: bool = True,
-    output: Optional[str | Path] = None,
-    sub_directory: Optional[str] = None,
+    clobber: bool = False,
+    output: str | Path | None = None,
+    sub_directory: str | None = None,
     comm: mpi_tools.CommObject = mpi_tools.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for Target Estimation optimization"""
@@ -205,18 +205,18 @@ def optimize(
 def echo_search(
     data: str | Path | DataLoader,
     config: str | Path | GenericCfg | dict,
-    method_lib: Optional[MethodLib] = None,
-    implementation: Optional[Impl] = None,
-    rx_channel: Optional[str | int] = None,
-    excluded_channels: Optional[list[str] | list[int]] = None,
-    start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
-    end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+    method_lib: MethodLib | None = None,
+    implementation: Impl | None = None,
+    rx_channel: str | int | None = None,
+    excluded_channels: list[str] | list[int] | None = None,
+    start_time: np.datetime64 | int | float | str | dt.datetime | None = None,
+    end_time: np.datetime64 | int | float | str | dt.datetime | None = None,
     relative_time: bool = False,
-    exp_def: Optional[ExpDef] = None,
+    exp_def: ExpDef | None = None,
     progress: bool | mpi_tools.CommBar = False,
-    clobber: bool = True,
-    output: Optional[str | Path] = None,
-    sub_directory: Optional[str] = None,
+    clobber: bool = False,
+    output: str | Path | None = None,
+    sub_directory: str | None = None,
     comm: mpi_tools.CommObject = mpi_tools.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for echo search"""
@@ -246,18 +246,18 @@ def direction_of_arrival(
     config: str | Path | GenericCfg | dict,
     array_beam: Array,
     beam_params: ArrayParams,
-    method_lib: Optional[MethodLib] = None,
-    implementation: Optional[Impl] = None,
-    rx_channel: Optional[str | int] = None,
-    excluded_channels: Optional[list[str] | list[int]] = None,
-    start_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
-    end_time: Optional[np.datetime64 | int | str | dt.datetime] = None,
+    method_lib: MethodLib | None = None,
+    implementation: Impl | None = None,
+    rx_channel: str | int | None = None,
+    excluded_channels: list[str] | list[int] | None = None,
+    start_time: np.datetime64 | int | float | str | dt.datetime | None = None,
+    end_time: np.datetime64 | int | float | str | dt.datetime | None = None,
     relative_time: bool = False,
-    exp_def: Optional[ExpDef] = None,
+    exp_def: ExpDef | None = None,
     progress: bool | mpi_tools.CommBar = False,
-    clobber: bool = True,
-    output: Optional[str | Path] = None,
-    sub_directory: Optional[str] = None,
+    clobber: bool = False,
+    output: str | Path | None = None,
+    sub_directory: str | None = None,
     comm: mpi_tools.CommObject = mpi_tools.CommMock(),
 ) -> AnalysedResult:
     """Wrapper around analyse for Direction of Arrival"""
@@ -286,11 +286,18 @@ def direction_of_arrival(
 
 def merge_results_from_all_ranks(results: list[AnalysedResult]) -> AnalysedResult:
 
-    result: AnalysedResult = {"dir": results[0]["dir"], "files": [], "data": {}}
+    result: AnalysedResult = {"dir": results[0]["dir"], "file_dir": [], "files": [], "data": {}}
 
     for res in results:
         for key, value in res.items():
-            if key == "files":
+            if key == "file_dir":
+                if isinstance(value, list):
+                    if key not in result:
+                        result["file_dir"] = value
+                    else:
+                        if value not in result["file_dir"]:
+                            result["file_dir"].extend(value)
+            elif key == "files":
                 if isinstance(value, list):
                     if key not in result:
                         result["files"] = value
@@ -302,12 +309,11 @@ def merge_results_from_all_ranks(results: list[AnalysedResult]) -> AnalysedResul
                         result["data"] = value
                     else:
                         result["data"].update(value)
-            elif key == "dir":
-                if isinstance(value, Path) or isinstance(value, str) or value is None:
-                    if key not in result:
-                        result["dir"] = value
-                    else:
-                        if value != result["dir"]:
-                            raise Exception("Output data stored in different directories")
+            elif key == "dir" and (isinstance(value, (Path, str)) or value is None):
+                if key not in result:
+                    result["dir"] = value
+                else:
+                    if value != result["dir"]:
+                        raise ValueError("Output data stored in different directories")
 
     return result

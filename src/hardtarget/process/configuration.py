@@ -9,21 +9,21 @@ import configparser
 import logging
 from dataclasses import asdict, fields
 from pathlib import Path
-from typing import Any, Optional, Type
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
 
 from hardtarget.constants import AnalysisMethod, ConfigSubSection, MethodLib
-from hardtarget.types import CfgParams, ExpDef, GenericCfg, Impl, ProParams
+from hardtarget.types import CfgParams, ExpDef, GenericCfg, Impl, IsDataclass, ProParams
 
 
 def extract_config_section(
     cfg_pth: Path,
-    section: str,
-    cfg_type: Type[CfgParams],
-    existing_cfg: Optional[CfgParams] = None,
-    logger: Optional[logging.Logger] = None,
+    cfg_type: type[IsDataclass],
+    section: str | None = None,
+    existing_cfg: CfgParams | None = None,
+    logger: logging.Logger | None = None,
 ) -> dict[str, Any]:
     """
     Extract a specific section from the given .ini file, if a exising config the new section will be
@@ -31,8 +31,8 @@ def extract_config_section(
 
     Args:
         cfg_pth: Path to config
-        section: Config section to extract data from
         cfg_type: Config type
+        section(optional): Config section to extract data from, if none specified extraction will be done from all sections
         existing_cfg (optional): Existing configuration that shold be extended
 
     Returns:
@@ -52,20 +52,35 @@ def extract_config_section(
     config = configparser.ConfigParser()
     config.read(cfg_pth)
 
+    if section and section in config:
+        iter_keys = {section: list(config[section].keys())}
+    else:
+        section = None
+        iter_keys = {section: config.options(section) for section in config.sections()}
+
     try:
-        for key in config[section].keys():
-            if key not in default_dict.keys():
-                raise ValueError(f"'{key}' option found in config file is not a valid config parameter")
-            # Convert values to specific types
-            if isinstance(default_dict[key], bool):
-                default_dict[key] = config.getboolean(section, key)
-            elif isinstance(default_dict[key], int):
-                default_dict[key] = config.getint(section, key)
-            elif isinstance(default_dict[key], float):
-                default_dict[key] = config.getfloat(section, key)
-            else:
-                # string
-                default_dict[key] = config.get(section, key).strip("'").strip('"')
+        for cfg_section, keys in iter_keys.items():
+            for key in keys:
+                if key not in default_dict and section:
+                    raise ValueError(f"'{key}' option found in config file is not a valid config parameter")
+                elif key not in default_dict and not section:
+                    continue
+                # Convert values to specific types
+                if isinstance(default_dict[key], bool):
+                    default_dict[key] = config.getboolean(cfg_section, key)
+                elif isinstance(default_dict[key], int):
+                    default_dict[key] = config.getint(cfg_section, key)
+                elif isinstance(default_dict[key], float):
+                    default_dict[key] = config.getfloat(cfg_section, key)
+                elif isinstance(default_dict[key], tuple):
+                    tuple_types = [type(i) for i in default_dict[key]]
+                    default_dict[key] = tuple(
+                        tuple_types[i](k.strip())
+                        for i, k in enumerate(config.get(cfg_section, key)[1:-1].split(","))
+                    )
+                else:
+                    # string
+                    default_dict[key] = config.get(cfg_section, key).strip("'").strip('"')
     except KeyError:
         if logger:
             logger.debug(f"No subsection {section} available in config file, default values will be used")
@@ -73,7 +88,7 @@ def extract_config_section(
     return default_dict
 
 
-def extract_config_from_dict(d: dict, cfg_type: Type[GenericCfg]) -> GenericCfg:
+def extract_config_from_dict(d: dict, cfg_type: type[GenericCfg]) -> GenericCfg:
     new_dict = {}
     for field in fields(cfg_type):
         if field.name in d:
@@ -95,7 +110,7 @@ def load_config_params(configfile: Path | str) -> CfgParams:
     """
 
     cfg_pth = Path(configfile)
-    d = extract_config_section(cfg_pth, ConfigSubSection.PROCCESSING, CfgParams)
+    d = extract_config_section(cfg_pth, section=ConfigSubSection.PROCCESSING, cfg_type=CfgParams)
     return CfgParams(**d)
 
 
@@ -159,10 +174,14 @@ def compute_process_params(
     # ---- Range gates ----
 
     # Sample index in ipp
-    _il0_rgs_min = tx_start_samp + 1
+    # TODO: i removed the +1 at _il0_rgs_min, because thats how i got range to line up in the
+    # stand-alone example but someone needs to review our conventions _again_ to make sure this
+    # makes sense and is consistent troughout the code and not a "two wrongs made an accidental
+    # right" thing
+    _il0_rgs_min = tx_start_samp
     _il0_rgs_max = rx_end_samp - tx_pulse_samps
     _il0_min_range_gate = cfg_params.min_range_gate
-    _il0_min_range_gate += _il0_rgs_min if cfg_params.min_range_gate >= 0 else _il0_rgs_min
+    _il0_min_range_gate += _il0_rgs_min
     _il0_max_range_gate = cfg_params.max_range_gate
     _il0_max_range_gate += _il0_rgs_min if cfg_params.max_range_gate >= 0 else _il0_rgs_max
 
@@ -217,7 +236,7 @@ def get_ilx_windows(
     _il0_max_range_gate = cfg_params.max_range_gate
     _il0_max_range_gate += _il0_rgs_min if cfg_params.max_range_gate >= 0 else _il0_rgs_max
     _il0_min_range_gate = cfg_params.min_range_gate
-    _il0_min_range_gate += _il0_rgs_min if cfg_params.min_range_gate >= 0 else _il0_rgs_min
+    _il0_min_range_gate += _il0_rgs_min
 
     il0_rgs = np.arange(_il0_min_range_gate, _il0_max_range_gate, cfg_params.range_gate_step, dtype=np.int32)
 

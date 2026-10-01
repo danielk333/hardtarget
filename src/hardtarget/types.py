@@ -5,7 +5,8 @@ but not too verbose in the code itself.
 
 import argparse
 import sys
-from dataclasses import dataclass, field
+from copy import deepcopy
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Generic, NamedTuple, Protocol, TypeAlias, TypeVar
 
@@ -22,9 +23,9 @@ from hardtarget.constants import (
 
 if (sys.version_info.major, sys.version_info.minor) <= (3, 10):
     # in python 3.10 there is a bug present for TypedDict
-    from typing_extensions import TypedDict
+    from typing_extensions import Self, TypedDict
 else:
-    from typing import TypedDict
+    from typing import Self, TypedDict
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,7 @@ class CfgParams:
         range_gate_step: The step in range-gates to use when processing, if baud-length is longer
                          than the receiver sampling time this can be increased to sacrifice range-resolution
                          for processing speed.
+        tx_signal_model: Use a signal model instead of a potentially measured tx signal.
         num_cohints_per_file: How many coherent integration periods to include in one output file.
                               Smaller means that lower latency can be achieved.
         tx_amp_limit: The tx amplitude limit, if lower than this the analysis will ignore the cohints.
@@ -57,10 +59,16 @@ class CfgParams:
     min_range_gate: int = 0
     max_range_gate: int = -1
     range_gate_step: int = 1
+    tx_signal_model: bool = False
     num_cohints_per_file: int = 100
     tx_amp_limit: float = 1.0
     node_gpus: int = 1
     cache: bool = True
+
+    def copy(self: Self, **modifications: Any) -> Self:
+        kwargs = {key.name: deepcopy(getattr(self, key.name)) for key in fields(self) if key.init}
+        kwargs.update(modifications)
+        return self.__class__(**kwargs)
 
 
 @dataclass(frozen=True)
@@ -87,6 +95,69 @@ class ProParams:
     tx_stencil: npt.NDArray = field(default_factory=lambda: np.zeros((1,), dtype=bool))
     rel_rgs: npt.NDArray[np.int32] = field(default_factory=lambda: np.empty(2, dtype=np.int32))
     range_gates: npt.NDArray[np.int32] = field(default_factory=lambda: np.zeros((1,), dtype=np.int32))
+
+
+@dataclass(frozen=True)
+class OutputBase:
+    """
+    Base output for any process
+
+    epoch_us: Date of first analysed sample
+    t: time of coherent integration relative to epoch_us
+    """
+
+    epoch_us: int
+    t: npt.NDArray[np.float32]
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """
+        Initiates each variable name to attributes
+
+        """
+        super().__init_subclass__(**kwargs)
+        for base in cls.__mro__:
+            if hasattr(base, "__annotations__"):
+                for field_name in base.__annotations__:
+                    if not hasattr(cls, field_name):
+                        setattr(cls, field_name, field_name)
+
+    def copy_and_concatenate(self, additonal_data: Self | list[Self]) -> Self:
+        concatenated_data = asdict(self)
+
+        if not isinstance(additonal_data, list):
+            for arg in fields(additonal_data):
+                key = arg.name
+                data = getattr(additonal_data, key)
+                # only interested in the epoch start of the measurement TODO: adjust this
+                if key == f"{self.epoch_us=}".split("=")[0].split(".")[1]:
+                    continue
+                if isinstance(data, np.ndarray):
+                    if data.ndim >= 2:
+                        concatenated_data[key] = np.vstack([concatenated_data[key], data])
+                    else:
+                        concatenated_data[key] = np.hstack([concatenated_data[key], data])
+                else:
+                    concatenated_data[key] = concatenated_data[key] + data
+        elif additonal_data:
+            tmp_buffer: dict[str, Any] = {key: [] for key in asdict(self)}
+            # Fill each key with a list containing data from the new data points
+            for obj in additonal_data:
+                for arg in fields(obj):
+                    tmp_buffer[arg.name].append(getattr(obj, arg.name))
+            # Merge the data from all lists to create one single object
+            for key, data in tmp_buffer.items():
+                # only interested in the epoch start of the measurement
+                if key == f"{self.epoch_us=}".split("=")[0].split(".")[1]:
+                    continue
+                if isinstance(data[0], np.ndarray):
+                    if data[0].ndim >= 2:
+                        concatenated_data[key] = np.vstack((concatenated_data[key], np.vstack(data)))
+                    else:
+                        concatenated_data[key] = np.hstack((concatenated_data[key], np.hstack(data)))
+                else:
+                    concatenated_data[key] += np.sum(data)
+
+        return self.__class__(**concatenated_data)
 
 
 class ExtractedSignals(NamedTuple):
@@ -154,7 +225,7 @@ class ArrayKwargs(TypedDict, total=False):
 GenericCfg = TypeVar("GenericCfg", bound=CfgParams)
 GenericPro = TypeVar("GenericPro", bound=ProParams)
 GenericVars = TypeVar("GenericVars", bound=NamedTuple)
-GenericOut = TypeVar("GenericOut", bound=NamedTuple)
+GenericOut = TypeVar("GenericOut", bound=OutputBase)
 GenericLib = TypeVar("GenericLib", bound=Callable)
 
 
@@ -164,22 +235,25 @@ class AnalysedResult(TypedDict, Generic[GenericOut, GenericCfg, GenericPro]):
     to access the data easily.
 
     Args:
-        dir: directory of stored files
+        dir: output directory of stored files
+        file_dir: List of each root directory of the files.
         files: list of all files
         data: if the data is not saved to file the data is stored here during runtime with start sample
               index as key
     """
 
     dir: str | Path | None
+    file_dir: list[Path]
     files: list[str]
     data: dict[int, tuple[GenericOut, ExpDef, GenericCfg, GenericPro]]
 
 
-AnalysisLib: TypeAlias = Callable[
+TargetEstimationLib: TypeAlias = Callable[
     [
         npt.NDArray[np.complex64],
         npt.NDArray[np.complex64],
         npt.NDArray[np.floating],
+        ExpDef,
         GenericCfg,
         GenericPro,
     ],
@@ -191,7 +265,7 @@ OptimizeLib: TypeAlias = Callable[
     tuple[float, float, float, float],
 ]
 
-EventSearchLib: TypeAlias = Callable[
+EchoSearchLib: TypeAlias = Callable[
     [
         npt.NDArray[np.complex64],
         npt.NDArray[np.complex64],
@@ -207,7 +281,7 @@ InterferometryLib: TypeAlias = Callable[
     GenericVars,
 ]
 
-LibType: TypeAlias = AnalysisLib | OptimizeLib | EventSearchLib | InterferometryLib
+LibType: TypeAlias = TargetEstimationLib | OptimizeLib | EchoSearchLib | InterferometryLib
 
 
 # Type hinting for a common declaration of what func_get_data should be passed to the processes

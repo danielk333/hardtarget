@@ -81,10 +81,10 @@ def xcorr_numpy(
     if max_corr > cfg_params.corr_filter_limit:
         end_samp = delay + len(tx) + 1
         rx_real_filtered = np.delete(
-            rx.real, np.arange(delay, end_samp if end_samp <= len(rx.real) else len(rx.real)), axis=1
+            rx.real, np.arange(delay, min(end_samp, len(rx.real))), axis=1
         )
         rx_imag_filtered = np.delete(
-            rx.imag, np.arange(delay, end_samp if end_samp <= len(rx.imag) else len(rx.imag)), axis=1
+            rx.imag, np.arange(delay, min(end_samp, len(rx.imag))), axis=1
         )
         rx_samps = np.concatenate(
             (rx_real_filtered, rx_imag_filtered),

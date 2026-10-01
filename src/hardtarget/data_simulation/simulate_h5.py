@@ -4,7 +4,7 @@ Simulate multichannel h5 data.
 
 import datetime as dt
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 import h5py
 import numpy as np
@@ -56,14 +56,14 @@ def simulate_h5(
     exp_def: ExpDef,
     start_time: dt.datetime | int,
     end_time: dt.datetime | int,
-    target_start_time: Optional[dt.datetime | int] = None,
-    target_end_time: Optional[dt.datetime | int] = None,
+    target_start_time: dt.datetime | int | None = None,
+    target_end_time: dt.datetime | int | None = None,
     target_relative_time: bool = False,
     trajectory_function: TrajectoryFunction = default_trajectory_function,
-    beam: Optional[Array] = None,
-    beam_params: Optional[ArrayParams] = None,
-    snr_function: Optional[Callable] = None,
-    noise_sigma: Optional[float] = None,
+    beam: Array | None = None,
+    beam_params: ArrayParams | None = None,
+    snr_function: Callable | None = None,
+    noise_sigma: float | None = None,
 ) -> Path:
     """
     Simulate H5 data from a multichannel radar, note only rx samples are stored. The dataloader is padding the data later.
@@ -92,7 +92,7 @@ def simulate_h5(
         target_start_us = target_start_time
         target_end_us = target_end_time
     else:
-        raise ValueError("Target start and end time should be in the same format")
+        raise TypeError("Target start and end time should be in the same format")
 
     if isinstance(start_time, dt.datetime) and isinstance(end_time, dt.datetime):
         start_time_us = start_time.timestamp() * 1e6
@@ -100,10 +100,10 @@ def simulate_h5(
     elif isinstance(start_time, int) and isinstance(end_time, int):
         start_time_us = start_time
         end_time_us = end_time
-        start_time = dt.datetime.fromtimestamp(start_time * 1e-6)
-        end_time = dt.datetime.fromtimestamp(end_time * 1e-6)
+        start_time = dt.datetime.fromtimestamp(start_time * 1e-6, tz=dt.timezone.utc)
+        end_time = dt.datetime.fromtimestamp(end_time * 1e-6, tz=dt.timezone.utc)
     else:
-        raise ValueError("Measurement start and end time should be in the same format")
+        raise TypeError("Measurement start and end time should be in the same format")
 
     n_ipps = int((end_time_us - start_time_us) // exp_def.t_ipp_usec)
     if target_relative_time:
@@ -196,10 +196,10 @@ def generate_rx_vectors(
     is_object_present: bool,
     tx_wave: npt.NDArray[np.complex64],
     trajectory_function: TrajectoryFunction,
-    beam: Optional[Array] = None,
-    beam_params: Optional[ArrayParams] = None,
-    noise_sigma: Optional[float] = None,
-    snr_function: Optional[Callable] = None,
+    beam: Array | None = None,
+    beam_params: ArrayParams | None = None,
+    noise_sigma: float | None = None,
+    snr_function: Callable | None = None,
 ) -> npt.NDArray:
     """
     Generate rx vectors for each channel.
@@ -265,7 +265,7 @@ def generate_rx_wave(
     tx_wave: npt.NDArray[np.complex64],
     ranges: npt.NDArray,
     snr: float,
-    noise_sigma: Optional[float] = None,
+    noise_sigma: float | None = None,
 ) -> npt.NDArray[np.complex64]:
     """
     Generate an rx wave from the existing tx wave based on what range the object is at.

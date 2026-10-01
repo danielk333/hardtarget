@@ -4,6 +4,7 @@ Main entry for the CLI functionality
 
 import argparse
 import logging
+import sys
 from typing import Callable
 
 from hardtarget import __version__
@@ -72,7 +73,7 @@ def main() -> None:
         # Handle non-commands
         if args.version:
             print(__version__)
-            exit()
+            sys.exit()
         else:
             parser.print_help()
     else:

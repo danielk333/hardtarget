@@ -6,7 +6,6 @@ Error estimations
 
 import shutil
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -16,7 +15,8 @@ from scipy import constants
 
 from hardtarget import load_analysed_data
 from hardtarget.analyse import target_estimation
-from hardtarget.constants import Impl, TargetEstimationMethod
+from hardtarget.constants import Impl, ReceiverChainModel, TargetEstimationMethod
+from hardtarget.target_estimation.types import MFOutArgs, TargetEstimationCfgParams, TargetEstimationProParams
 
 from .simulate_drf import DRFSimParams, simulate_drf
 
@@ -31,7 +31,7 @@ def linearized_mle_covariance(
     dv: float = 1.0,
     da: float = 1.0,
 ) -> npt.NDArray[np.floating]:
-    """ """
+    """TODO Docstring"""
     exp_def = ExpDef(
         name="leo_bpark",
         radar_frequency=929.6,
@@ -48,6 +48,7 @@ def linearized_mle_covariance(
         t_cal_off_usec=19997.0,
         code=load_radar_code("leo_bpark"),
         samples_per_file=12800000,
+        fir_filter=ReceiverChainModel.b414d15_gaus,
     )
     snr = 10.0 ** (snr_db * 0.1)
     simulation_params = DRFSimParams(
@@ -170,6 +171,7 @@ def monte_carlo_sample_errors(
         t_cal_off_usec=0,
         code=load_radar_code("leo_bpark"),
         samples_per_file=12800000,
+        fir_filter=ReceiverChainModel.b414d15_gaus,
     )
 
     bounds_params = BoundParams()
@@ -272,25 +274,23 @@ def monte_carlo_sample_errors(
         "delta_a": np.full((samples * snr_len,), np.nan, dtype=np.float64),
         "delta_snr": np.full((samples * snr_len,), np.nan, dtype=np.float64),
     }
-    data_generator: Any = load_analysed_data(analysed_path)
-    index = 0
-    for out_data, exp_def, cfg_params, pro_params in data_generator:
-        data_len = len(out_data.r_vec)
-        print(f"loading {data_len} results")
-        dr = out_data.r_vec - range0
-        dv = out_data.v_vec - vel0
-        da = out_data.a_vec - acel0
-        results["range"] = out_data.r_vec
-        results["range_rate"] = out_data.v_vec
-        results["acceleration"] = out_data.a_vec
-        results["snr"] = np.max(out_data.snr, axis=1)
-        dsnr = np.max(out_data.snr, axis=1)
-        for ind in range(snr_len):
-            dsnr[(ind * samples) : ((ind + 1) * samples)] = -snr[ind]
-        results["delta_r"][index : (index + data_len)] = dr
-        results["delta_v"][index : (index + data_len)] = dv
-        results["delta_a"][index : (index + data_len)] = da
-        results["delta_snr"][index : (index + data_len)] = dsnr
-        index += data_len
-        results["cov"] = np.cov(np.stack([out_data.r_vec, out_data.v_vec, out_data.a_vec]))
+
+    output: tuple[MFOutArgs, ExpDef, TargetEstimationCfgParams, TargetEstimationProParams] = (
+        load_analysed_data(analysed_path)
+    )
+    out_data, exp_def, _, _ = output
+
+    results["range"] = out_data.r_vec
+    results["range_rate"] = out_data.v_vec
+    results["acceleration"] = out_data.a_vec
+    results["snr"] = np.max(out_data.snr, axis=1)
+    dsnr = np.max(out_data.snr, axis=1)
+    for ind in range(snr_len):
+        dsnr[(ind * samples) : ((ind + 1) * samples)] = -snr[ind]
+    results["delta_r"] = out_data.r_vec - range0
+    results["delta_v"] = out_data.v_vec - vel0
+    results["delta_a"] = out_data.a_vec - acel0
+    results["delta_snr"] = dsnr
+    results["cov"] = np.cov(np.stack([out_data.r_vec, out_data.v_vec, out_data.a_vec]))
+
     return results

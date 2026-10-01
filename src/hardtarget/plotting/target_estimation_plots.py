@@ -1,7 +1,5 @@
 """Plotting tools for analysed output"""
 
-from typing import Optional
-
 import numpy as np
 import numpy.typing as npt
 from matplotlib.axes import Axes
@@ -25,7 +23,7 @@ def plot_peaks(
     cfg: TargetEstimationCfgParams,
     pro: ExtendedTargetEstimationProParams,
     monostatic: bool = True,
-    snr_dB_limit: Optional[float] = None,
+    snr_dB_limit: float | None = None,
 ) -> tuple[npt.NDArray, None]:  # of type Axes
     """
     Plot peaks
@@ -201,7 +199,7 @@ def plot_map(
     max_range = cfg.max_range_gate
     gmf_data_dB = 10 * np.log10(np.abs(out_data.vals.T))
 
-    range_num, coh_int_num = gmf_data_dB.shape
+    _, coh_int_num = gmf_data_dB.shape
     coh_ints = np.arange(0, coh_int_num)
     range_gates = np.arange(min_range, max_range, cfg.range_gate_step / cfg.range_gate_sub_resolution)
 
