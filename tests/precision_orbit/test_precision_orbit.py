@@ -88,6 +88,7 @@ def test_verify_analysis_orbit_data(
     plot,
     data_params,
     params: tuple[TargetEstimationMethod, CfgParams],
+    snrdb_limit: float = 15.0,
     progress=False,
 ):
 
@@ -197,7 +198,7 @@ def test_verify_analysis_orbit_data(
 
     # Extract indexes where an object is present
     snrdb = 10 * np.log10(out.snr_vec)
-    inds = snrdb > 15.0
+    inds = snrdb > snrdb_limit
 
     # Calculate delta range (real vs estimated)
     dr = r_rel[inds] - out.r_vec[inds]
@@ -438,10 +439,12 @@ if __name__ == "__main__":
     parser.add_argument("--impl", default="numpy")
     parser.add_argument("--progress", action="store_true")
     parser.add_argument("--simulated_tx", action="store_true")
+    parser.add_argument("--snr_db", default=20.0, type=float)
     args = parser.parse_args()
     test_verify_analysis_orbit_data(
         args.plot,
         (args.usr, args.pwd, args.radar_path, args.orbit_path, args.impl),
         (TargetEstimationMethod.fgmf, gmf_cfg.copy(tx_signal_model=args.simulated_tx)),
+        args.snr_db,
         args.progress,
     )

@@ -187,7 +187,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self.output_dir = Path(output_dir).resolve() if output_dir is not None else None
         self.store_mode = "w"
         self.store_params = True
-        self.conjugated_tx = None
+        self.conjugated_tx: bool | None = None
 
         self.kwargs = kwargs
         self.__post_init__()
@@ -732,7 +732,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             tx=tx.astype(np.complex64), rx=rx.astype(np.complex64), ipp=ipp.astype(np.complex64)
         )
 
-    def _is_tx_conjugated(self, tx_real: npt.NDArray, tx_sim: npt.NDArray):
+    def _is_tx_conjugated(self, tx_real: npt.NDArray, tx_sim: npt.NDArray) -> bool:
         """
         Determine if the true tx signal is stored as conjugated or not.
 
@@ -749,7 +749,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         dist_to_0 = min(angle, 360 - angle)
         dist_to_180 = abs(angle - 180)
 
-        return dist_to_0 > dist_to_180
+        return bool(dist_to_0 > dist_to_180)
 
     def _setup_cache(self) -> None:
         """Setup cache"""
