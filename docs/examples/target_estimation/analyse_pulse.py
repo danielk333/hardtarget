@@ -420,6 +420,15 @@ def plot_full_diagnostics(
     window = max(1, 5 * int(exp_def.baud_length_usec * 1e-6 * sample_rate))
     padded = np.pad(phase, (window // 2, window - 1 - window // 2), mode="edge")
     smooth_phase = np.convolve(padded, np.ones(window) / window, mode="valid")
+
+    comp_tx = np.exp(-1j * phase) * data.tx
+
+    fig, ax = plt.subplots(figsize=(10, 4), constrained_layout=True)
+    ax.plot(data.tx.real, label="Measured tx")
+    ax.plot(comp_tx.real, label="Phase compensated tx")
+    ax.legend()
+    figures.append(fig)
+
     fig, ax = plt.subplots(figsize=(10, 4), constrained_layout=True)
     ax.plot(phase, alpha=0.55, label="Measured phase")
     ax.plot(smooth_phase, "--", linewidth=2, label="Smoothed phase")
