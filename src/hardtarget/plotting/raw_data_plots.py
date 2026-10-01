@@ -171,7 +171,8 @@ def rti(
         data_ipp_vec[:, t_cal_on_samp:t_cal_off_samp] = 0
 
     # Calculate signal power
-    with warnings.catch_warnings(action="ignore", category=RuntimeWarning):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
         powsum = np.log10(np.abs(data_ipp_vec) ** 2) if log else np.abs(data_ipp_vec) ** 2
 
     # Plot data
