@@ -8,7 +8,7 @@ import sys
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Generic, NamedTuple, Protocol, Self, TypeAlias, TypeVar
+from typing import Any, Callable, ClassVar, Generic, NamedTuple, Protocol, TypeAlias, TypeVar
 
 import numpy as np
 import numpy.typing as npt
