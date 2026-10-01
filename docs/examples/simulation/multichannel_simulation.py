@@ -12,6 +12,7 @@ import numpy.typing as npt
 from radardef import Mu, RadarDef
 from radardef.types import ExpDef
 
+from hardtarget.constants import ReceiverChainModel
 from hardtarget.data_simulation import simulate_h5
 from hardtarget.plotting import rti
 
@@ -37,6 +38,7 @@ exp_def = ExpDef(
     ),
     rx_channels=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25],
     samples_per_file=10000000,
+    fir_filter=ReceiverChainModel.mu2004,
 )
 
 # ## Define a objects trajectory function,
