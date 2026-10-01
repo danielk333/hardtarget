@@ -2,8 +2,8 @@
 
 import numpy as np
 import numpy.typing as npt
-import scipy.fft as fft
 from radardef.types import ExpDef
+from scipy import fft
 
 from hardtarget.target_estimation.dpt.types import DPTCfgParams, DPTProParams
 from hardtarget.target_estimation.dtft_solvers import dtft_solve, dtft_solve_with_acceleration
@@ -76,7 +76,7 @@ def fast_dpt_np(
             if spec_peak > 0:
                 v_index_m = spec_peak - 1
             if cfg_params.refine_acceleration:
-                pwr, f_est, a_est, phi_est = dtft_solve_with_acceleration(
+                _, f_est, a_est, phi_est = dtft_solve_with_acceleration(
                     decoded_signal=pro_params.acceleration_phasors[dspec_peak] * echo,
                     sample_rate=exp_def.sample_rate / cfg_params.frequency_decimation,
                     start_freq=pro_params.fft_frequencies[spec_peak],
@@ -95,7 +95,7 @@ def fast_dpt_np(
                 a[index] = a_est
                 phi[index] = phi_est
             elif cfg_params.refine_doppler:
-                pwr, f_est, phi_est = dtft_solve(
+                _, f_est, phi_est = dtft_solve(
                     decoded_signal=pro_params.acceleration_phasors[dspec_peak] * echo,
                     sample_rate=exp_def.sample_rate / cfg_params.frequency_decimation,
                     freq_bracket=(

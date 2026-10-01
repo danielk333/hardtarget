@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import h5py
 import numpy as np
@@ -57,7 +57,7 @@ def inspect_h5_leaf(
     return path, item
 
 
-def get_analysed_h5_files(path: str | Path, method: Optional[MethodAbbreviation] = None) -> list[Path]:
+def get_analysed_h5_files(path: str | Path, method: MethodAbbreviation | None = None) -> list[Path]:
     """
     Collects paths to each file in the directory matching the analysed output naming convention
 

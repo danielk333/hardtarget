@@ -11,7 +11,7 @@ import sys
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Generic, Optional, Type
+from typing import Any, Generic
 
 import numpy as np
 import numpy.typing as npt
@@ -19,10 +19,10 @@ from radardef.components import DataLoader
 from radardef.tools.mpi_tools import CommBar
 from radardef.types import Pointing
 
-import hardtarget.process.utils as utils
 from hardtarget.constants import AnalysisMethod, ConfigSubSection, Impl, MethodLib, ReceiverChainModel
 from hardtarget.data_handling import dump_params_to_file
 from hardtarget.data_simulation.tx_model import tx_modulation_model, tx_signal_model
+from hardtarget.process import utils
 from hardtarget.process.configuration import (
     compute_process_params,
     extract_config_from_dict,
@@ -56,13 +56,13 @@ try:
     # Only available from python 3.12
     from types import get_original_bases  # type: ignore[attr-defined,unused-ignore]
 
-    def orig_bases(cls: Type) -> tuple[Any, ...]:
+    def orig_bases(cls: type) -> tuple[Any, ...]:
         return get_original_bases(cls)
 
 except ImportError:
 
-    def orig_bases(cls: Type) -> tuple[Any, ...]:
-        return cls.__orig_bases__
+    def orig_bases(cls: type) -> tuple[Any, ...]:
+        return cls.__orig_bases__  # type: ignore[attr-defined]
 
 
 class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, GenericLib]):
@@ -135,11 +135,11 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self,
         config: str | Path | GenericCfg,
         data: DataLoader,
-        method_lib: Optional[MethodLib] = None,
-        impl: Optional[Impl] = None,
-        rx_channel: Optional[str | int] = None,
-        excluded_channels: Optional[list[str] | list[int]] = None,
-        output_dir: Optional[str | Path] = None,
+        method_lib: MethodLib | None = None,
+        impl: Impl | None = None,
+        rx_channel: str | int | None = None,
+        excluded_channels: list[str] | list[int] | None = None,
+        output_dir: str | Path | None = None,
         **kwargs: Unpack[ArrayKwargs],
     ) -> None:
         # Local logger
@@ -194,7 +194,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
 
     def __post_init__(self) -> None:
         """Post init"""
-        pass
 
     @classmethod
     def get_types(cls) -> tuple[type[GenericCfg], type[GenericPro], type[GenericOut]]:
@@ -221,7 +220,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self, lib: MethodLib | None, impl: Impl | None
     ) -> tuple[GenericLib, MethodLib, Impl]:
         """Get specific library to run analysis"""
-        pass
 
     def get_conf_params(self, cfg_path: Path, cfg_params: CfgParams) -> GenericCfg:
         """
@@ -250,7 +248,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self, exp_def: ExpDef, cfg_params: GenericCfg, pro_params: ProParams
     ) -> GenericPro:
         """Abstract method, process specific parameters"""
-        pass
 
     @abstractmethod
     def analyse_ipps(self, start_sample: int) -> GenericVars:
@@ -264,12 +261,9 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             Outcome of analysis
         """
 
-        pass
-
     @abstractmethod
     def stack_vars(self, vars_list: list[GenericVars]) -> GenericVars:
         """Abstract method, shall stack the results from the analysis"""
-        pass
 
     @abstractmethod
     def generate_output(
@@ -293,8 +287,6 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             Output data
         """
 
-        pass
-
     @abstractmethod
     def define_h5_vars(self, output: GenericOut) -> dict[str, DataItem]:
         """
@@ -306,10 +298,9 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         Returns:
             A dictionary containing the output with attributes such as dimensions, long names and units.
         """
-        pass
 
     def process_task(
-        self, task_idx: int, file_idx_sample: int, bounds: Bounds, progress_bar: Optional[CommBar]
+        self, task_idx: int, file_idx_sample: int, bounds: Bounds, progress_bar: CommBar | None
     ) -> GenericOut:
         """
         Process one task, extract amount of samples to process, analyse the samples for each coherent
@@ -370,7 +361,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         file_idx_sample: int,
         out_data: GenericOut,
         results: AnalysedResult,
-        filepath: Optional[Path] = None,
+        filepath: Path | None = None,
         clobber: bool = True,
     ) -> AnalysedResult:
         """
@@ -415,10 +406,10 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
         self,
         comm_rank: int,
         comm_size: int,
-        start_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
-        end_time: Optional[np.datetime64 | int | float | str | dt.datetime] = None,
+        start_time: np.datetime64 | int | float | str | dt.datetime | None = None,
+        end_time: np.datetime64 | int | float | str | dt.datetime | None = None,
         relative_time: bool = False,
-        sub_directory: Optional[str] = None,
+        sub_directory: str | None = None,
         clobber: bool = False,
         progress: bool | CommBar = False,
     ) -> AnalysedResult:
@@ -475,7 +466,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             sample_bounds.start + self.cfg_params.samp_offset, sample_bounds.end + self.cfg_params.samp_offset
         )
 
-        job_tasks, job_cohints, total_cohints = calculate_tasks(
+        job_tasks, _, total_cohints = calculate_tasks(
             comm_rank,
             comm_size,
             self.cfg_params.n_ipp,
@@ -563,7 +554,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
     def extract_channels(
         self,
         exp_def: ExpDef,
-        rx_channel: Optional[int | str] = None,
+        rx_channel: int | str | None = None,
         excluded_channels: list[int] | list[str] = [],
     ) -> tuple[int | str | list[int] | list[str], int | str | None]:
         """

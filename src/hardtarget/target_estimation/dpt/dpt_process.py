@@ -3,8 +3,8 @@
 from dataclasses import asdict
 
 import numpy as np
-import scipy.fft as fft
 from radardef.types import ExpDef
+from scipy import fft
 
 from hardtarget.constants import ConfigSubSection, Impl, TargetEstimationMethod
 from hardtarget.target_estimation.dpt import get_dbt_lib
@@ -104,7 +104,7 @@ class DPTProcess(TargetEstimationProcess[DPTCfgParams, DPTProParams]):
             Outcome of DPT analysis
         """
 
-        tx, rx, ipp = self.get_data(
+        tx, rx, _ = self.get_data(
             start_sample,
             self.pro_params.read_length,
             sub_resolution=self.cfg_params.range_gate_sub_resolution,

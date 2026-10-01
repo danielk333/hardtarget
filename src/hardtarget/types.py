@@ -139,7 +139,7 @@ class OutputBase:
                 else:
                     concatenated_data[key] = concatenated_data[key] + data
         elif additonal_data:
-            tmp_buffer: dict[str, Any] = {key: [] for key in asdict(self).keys()}
+            tmp_buffer: dict[str, Any] = {key: [] for key in asdict(self)}
             # Fill each key with a list containing data from the new data points
             for obj in additonal_data:
                 for arg in fields(obj):

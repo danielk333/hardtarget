@@ -9,9 +9,9 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-import scipy.constants as constants
 from radardef import RadarDef
 from radardef.types import SourceFormat
+from scipy import constants
 
 from hardtarget.types import ParserArgs, SubParser
 from hardtarget.utils.range_conversion import SI_to_unit, unit_to_SI
@@ -58,7 +58,7 @@ def range_gates_main(args: argparse.Namespace) -> None:
             target_formats = radar_def.available_target_formats(source_format)
             converted_files = radar_def.convert(args.path, target_formats[0], converted_data_path)
             if converted_files is None:
-                raise Exception(f"Not possible to convert the file:  {args.path}")
+                raise TypeError(f"Not possible to convert the file:  {args.path}")
             filepath = converted_files[0]
         else:
             # File is already converted
@@ -119,7 +119,9 @@ def range_gates_main(args: argparse.Namespace) -> None:
         rg0_unit = SI_to_unit(rg0_sec * constants.c, args.unit.lower())
 
         rg0 = il0_rg0 - (T_tx_start_samp + 1)
-        print(f" - Requested start two-way range ({rg0_unit} {args.unit}): IL0 sample {il0_rg0} (range-gate {rg0})")
+        print(
+            f" - Requested start two-way range ({rg0_unit} {args.unit}): IL0 sample {il0_rg0} (range-gate {rg0})"
+        )
         assert il0_rg0 <= T_rx_end_samp, "start range gate cannot be after than RX end"
         assert il0_rg0 > T_rx_start_samp, "start range gate cannot be before than RX start"
 
@@ -131,7 +133,9 @@ def range_gates_main(args: argparse.Namespace) -> None:
         rg1_unit = SI_to_unit(rg1_sec * constants.c, args.unit.lower())
 
         rg1 = il0_rg1 - (T_tx_start_samp + 1)
-        print(f" - Requested end two-way range ({rg1_unit} {args.unit}): IL0 sample {il0_rg1} (range-gate {rg1})")
+        print(
+            f" - Requested end two-way range ({rg1_unit} {args.unit}): IL0 sample {il0_rg1} (range-gate {rg1})"
+        )
         assert il0_rg1 <= T_rx_end_samp, "end range gate cannot be after than RX end"
         assert il0_rg1 > T_rx_start_samp, "end range gate cannot be before than RX start"
 
@@ -151,15 +155,17 @@ def cuda_main(args: argparse.Namespace) -> None:
     except ImportError as e:
         print(e)
 
+
 def accelerations_parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Adds mandatory and optional positional arguments to the parser."""
 
-    parser.add_argument("minimum_acceleration",type=float, help="Desired acceleration minimum limit [m/s^2]")
-    parser.add_argument("maximum_acceleration",type=float, help="Desired acceleration maximum limit [m/s^2]")
-    parser.add_argument("integration_time",type=float, help="The largest integration time to consider [s]")
+    parser.add_argument("minimum_acceleration", type=float, help="Desired acceleration minimum limit [m/s^2]")
+    parser.add_argument("maximum_acceleration", type=float, help="Desired acceleration maximum limit [m/s^2]")
+    parser.add_argument("integration_time", type=float, help="The largest integration time to consider [s]")
     parser.add_argument("frequency", type=float, help="The radar frequency [MHz]")
     parser.add_argument("--minimum_cycle_resolution", type=float, default=0.2)
     return parser
+
 
 def accelerations_main(args: argparse.Namespace) -> None:
     lam = constants.c / (args.frequency * 1e6)
@@ -171,9 +177,10 @@ def accelerations_main(args: argparse.Namespace) -> None:
     print(f" - Integration time: {args.integration_time} s")
     print(f" - Maximum acceleration: {args.maximum_acceleration} m/s^2")
     print(f" - Cycle drift at end of integration: {alpha_rate} cycle/(cycle/s^2)")
-    print(f" - Accelecation step resulting in cycle dift {args.minimum_cycle_resolution:.2f}: {accel_step} m/s^2")
+    print(
+        f" - Accelecation step resulting in cycle dift {args.minimum_cycle_resolution:.2f}: {accel_step} m/s^2"
+    )
     print(f" - Accelecation steps to cover range: {step_num}")
-
 
 
 SOURCES: dict[str, SubParser] = {
@@ -201,9 +208,9 @@ def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Adds mandatory and optional positional arguments to the parser."""
     subparsers = parser.add_subparsers(help="hardtarget check types", dest="checktype")
     subparsers.required = True
-    for source in SOURCES:
-        cmd_parser = subparsers.add_parser(source, **SOURCES[source].parser_args)
-        parser_builder = SOURCES[source].parser_build
+    for source, sub_parser in SOURCES.items():
+        cmd_parser = subparsers.add_parser(source, **sub_parser.parser_args)
+        parser_builder = sub_parser.parser_build
         parser_builder(cmd_parser)
     return parser
 

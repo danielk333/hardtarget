@@ -1,4 +1,3 @@
-from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -10,7 +9,7 @@ def plot_direction_of_arrival(
     axes: npt.NDArray,  # of type Axes
     out_data: DOAVars,
     pro: DOAProParams,
-    limit: Optional[float] = None,
+    limit: float | None = None,
 ) -> npt.NDArray:  # of type Axes:
     """
     Plots direction of arrival results, axes needs to be of atleast size (2,2).

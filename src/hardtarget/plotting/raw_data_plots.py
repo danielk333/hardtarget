@@ -2,14 +2,13 @@
 
 import logging
 import warnings
-from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.constants as constants
 from matplotlib.axes import Axes
 from matplotlib.collections import QuadMesh
 from radardef import DataLoader, ExpDef
+from scipy import constants
 from scipy.fft import fft, fftfreq
 
 from hardtarget.process.utils import sample_interval_to_closest_ipp
@@ -23,14 +22,14 @@ logger = logging.getLogger(__name__)
 def rti(
     ax: Axes,
     data_loader: DataLoader,
-    start_time: Optional[np.datetime64 | float | int | str] = None,
-    end_time: Optional[np.datetime64 | float | int | str] = None,
+    start_time: np.datetime64 | float | int | str | None = None,
+    end_time: np.datetime64 | float | int | str | None = None,
     relative_time: bool = False,
     keep_tx: bool = False,
     axis_units: bool = False,
     log: bool = False,
-    start_range_gate: Optional[int | float] = None,
-    end_range_gate: Optional[int | float] = None,
+    start_range_gate: int | float | None = None,
+    end_range_gate: int | float | None = None,
     range_gate_unit: str = "sample",
     monostatic: bool = False,
     colorbar: bool = True,
@@ -203,14 +202,14 @@ def rti(
 def fti(
     ax: Axes,
     data_loader: DataLoader,
-    start_time: Optional[np.datetime64 | float | int | str] = None,
-    end_time: Optional[np.datetime64 | float | int | str] = None,
+    start_time: np.datetime64 | float | int | str | None = None,
+    end_time: np.datetime64 | float | int | str | None = None,
     relative_time: bool = False,
     keep_tx: bool = False,
     axis_units: bool = False,
     log: bool = False,
-    start_range_gate: Optional[int] = None,
-    end_range_gate: Optional[int] = None,
+    start_range_gate: int | None = None,
+    end_range_gate: int | None = None,
     range_gate_unit: str = "sample",
     monostatic: bool = False,
     colorbar: bool = True,

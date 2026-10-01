@@ -71,7 +71,7 @@ def main(args: argparse.Namespace) -> None:
             target_formats = radar_def.available_target_formats(source_format)
             converted_files = radar_def.convert(args.path, target_formats[0], converted_data_path)
             if converted_files is None:
-                raise Exception(f"Not possible to convert the file:  {args.path}")
+                raise ValueError(f"Not possible to convert the file:  {args.path}")
             filepath = converted_files[0]
         else:
             # File is already converted
@@ -79,7 +79,7 @@ def main(args: argparse.Namespace) -> None:
 
         data_loader = radar_def.load_data(filepath, cache=False)
         if data_loader is None:
-            raise Exception(f"Not possible to load the given file: {args.path}")
+            raise ValueError(f"Not possible to load the given file: {args.path}")
 
         if args.start_range is not None:
             args.start_range = int(args.start_range) if args.unit == "sample" else float(args.start_range)
@@ -91,14 +91,14 @@ def main(args: argparse.Namespace) -> None:
             args.end_time = float(args.end_time)
 
         if data_loader is not None:
-            fig, ax = plt.subplots()
+            _, ax = plt.subplots()
 
             if args.frequency:
                 plot_func = plotting.fti
             else:
                 plot_func = plotting.rti
 
-            ax, handles = plot_func(
+            ax, _ = plot_func(
                 ax,
                 data_loader=data_loader,
                 start_time=args.start_time,
@@ -115,4 +115,4 @@ def main(args: argparse.Namespace) -> None:
 
             plt.show()
         else:
-            raise Exception(f"Not possible to load the given file: {args.path}")
+            raise ValueError(f"Not possible to load the given file: {args.path}")

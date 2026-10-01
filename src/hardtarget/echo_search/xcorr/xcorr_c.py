@@ -78,12 +78,12 @@ def xcorr_c(
         end_samp = delay + len(tx) + 1
         rx_real_filtered = np.delete(
             rx.real,
-            np.arange(delay, end_samp if end_samp <= len(rx.real) else len(rx.real)),
+            np.arange(delay, min(end_samp, len(rx.real))),
             axis=1 if rx.ndim > 1 else 0,
         )
         rx_imag_filtered = np.delete(
             rx.imag,
-            np.arange(delay, end_samp if end_samp <= len(rx.imag) else len(rx.imag)),
+            np.arange(delay, min(end_samp, len(rx.imag))),
             axis=1 if rx.ndim > 1 else 0,
         )
         rx_samps = np.concatenate(

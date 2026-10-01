@@ -7,7 +7,7 @@ from collections.abc import Generator
 from dataclasses import fields
 from pathlib import Path
 from types import GenericAlias
-from typing import Any, Optional, TypeVar, get_args, get_origin, overload
+from typing import Any, TypeVar, get_args, get_origin, overload
 
 import h5py
 import numpy as np
@@ -44,10 +44,10 @@ def load_analysed_data_chunks(
 def load_analysed_data(
     data_dir: str | Path | list[str] | list[Path],
     chunk_size: None = None,
-    start_time: Optional[int | float | np.datetime64 | str] = None,
-    end_time: Optional[int | float | np.datetime64 | str] = None,
+    start_time: int | float | np.datetime64 | str | None = None,
+    end_time: int | float | np.datetime64 | str | None = None,
     relative_time: bool = False,
-    method: Optional[AnalysisMethod] = None,
+    method: AnalysisMethod | None = None,
 ) -> tuple[GenericOut, ExpDef, GenericCfg, GenericPro]: ...
 
 
@@ -55,20 +55,20 @@ def load_analysed_data(
 def load_analysed_data(
     data_dir: str | Path | list[str] | list[Path],
     chunk_size: int,
-    start_time: Optional[int | float | np.datetime64 | str] = None,
-    end_time: Optional[int | float | np.datetime64 | str] = None,
+    start_time: int | float | np.datetime64 | str | None = None,
+    end_time: int | float | np.datetime64 | str | None = None,
     relative_time: bool = False,
-    method: Optional[AnalysisMethod] = None,
+    method: AnalysisMethod | None = None,
 ) -> Generator[tuple[GenericOut, ExpDef, GenericCfg, GenericPro], None, None]: ...
 
 
 def load_analysed_data(
     data_dir: str | Path | list[str] | list[Path],
     chunk_size: int | None = None,
-    start_time: Optional[int | float | np.datetime64 | str] = None,
-    end_time: Optional[int | float | np.datetime64 | str] = None,
+    start_time: int | float | np.datetime64 | str | None = None,
+    end_time: int | float | np.datetime64 | str | None = None,
     relative_time: bool = False,
-    method: Optional[AnalysisMethod] = None,
+    method: AnalysisMethod | None = None,
 ) -> (
     Generator[tuple[GenericOut, ExpDef, GenericCfg, GenericPro], None, None]
     | tuple[GenericOut, ExpDef, GenericCfg, GenericPro]
@@ -129,10 +129,10 @@ def get_start_time(file: str | Path) -> float:
 
 def collect_paths(
     folder: str | Path | list[str] | list[Path],
-    start_time: Optional[int | float | np.datetime64] = None,
-    end_time: Optional[int | float | np.datetime64] = None,
+    start_time: int | float | np.datetime64 | None = None,
+    end_time: int | float | np.datetime64 | None = None,
     relative_time: bool = False,
-    method: Optional[AnalysisMethod] = None,
+    method: AnalysisMethod | None = None,
 ) -> list[Path]:
     """
     Sorts file according to start time, if requested filters out files that is not within the expected time.
@@ -216,7 +216,7 @@ GenericDataclass = TypeVar("GenericDataclass", bound=IsDataclass)
 
 
 def extract_dataclass(
-    file: h5py.File, dc_type: type[GenericDataclass], group_name: Optional[str] = None
+    file: h5py.File, dc_type: type[GenericDataclass], group_name: str | None = None
 ) -> GenericDataclass:
     """
     Args:
@@ -232,9 +232,7 @@ def extract_dataclass(
     group = file[group_name]
     key_type = {f.name: f.type for f in fields(dc_type)}
 
-    return dc_type(
-        **{key: read_key(group, key, key_type[key]) for key in group.keys() if key not in excluded_keys}
-    )
+    return dc_type(**{key: read_key(group, key, key_type[key]) for key in group if key not in excluded_keys})
 
 
 def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, GenericCfg, GenericPro]:
@@ -267,10 +265,10 @@ def collect_analysis_data(paths: list[Path]) -> tuple[GenericOut, ExpDef, Generi
                 exp_def = extract_dataclass(hf, ExpDef)
             if cfg_params is None:
                 group = hf[cfg_type.__name__]
-                cfg_params = cfg_type(**{key: read_key(group, key) for key in group.keys()})
+                cfg_params = cfg_type(**{key: read_key(group, key) for key in group})
             if pro_params is None:
                 group = hf[pro_type.__name__]
-                pro_params = pro_type(**{key: read_key(group, key) for key in group.keys()})
+                pro_params = pro_type(**{key: read_key(group, key) for key in group})
 
             if not out_args:
                 out_args = extract_dataclass(hf, out_type, "OutArgs")
@@ -310,16 +308,14 @@ def extract_data_chunk_from_out(data: GenericOut, index: tuple[int, int]) -> Gen
             epoch_us = data.epoch_us + data.t[index[0]]
         elif field.name == "num_cohints_per_file":
             data_chunk[field.name] = index[1] - index[0]
-        elif dtype is np.ndarray or dtype is np.typing.NDArray:
-            data_chunk[field.name] = getattr(data, field.name)[index[0] : index[1]]
-        elif dtype is list:
+        elif dtype is np.ndarray or dtype is np.typing.NDArray or dtype is list:
             data_chunk[field.name] = getattr(data, field.name)[index[0] : index[1]]
 
     return object_type(t=t, epoch_us=epoch_us, **data_chunk)
 
 
 def read_key(
-    group: h5py.Group, key: str, d_type: Optional[Any] = None, logger: Optional[logging.Logger] = None
+    group: h5py.Group, key: str, d_type: Any | None = None, logger: logging.Logger | None = None
 ) -> Any:
     """h5py saves dataset string as byte strings, needs to be decoded"""
     data = group[key][()]

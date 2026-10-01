@@ -9,7 +9,7 @@ import re
 import shutil
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 import digital_rf as drf
 import numpy as np
@@ -30,7 +30,7 @@ def simulate_drf(
     sim_params: DRFSimParams,
     exp_def: ExpDef,
     bounds_params: BoundParams,
-    snr_function: Optional[Callable] = None,
+    snr_function: Callable | None = None,
     compression_level: int = 0,
     dir_cadence_secs: int = 3600,
     file_cadence_millisecs: int = 1000,
@@ -206,7 +206,7 @@ def simulate_drf(
     return simulated_signal
 
 
-def write_metadata(exp_def: ExpDef, bounds_params: BoundParams, dstdir: Optional[Path] = None) -> None:
+def write_metadata(exp_def: ExpDef, bounds_params: BoundParams, dstdir: Path | None = None) -> None:
     meta = configparser.ConfigParser()
     meta.add_section(Metaparam.EXPERIMENT)
     meta.add_section(Metaparam.BOUNDS)

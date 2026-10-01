@@ -131,7 +131,7 @@ class OptimizeProcess(
             Outcome of optimize analysis
         """
 
-        tx, rx, ipp = self.get_data(
+        tx, _, ipp = self.get_data(
             start_sample, self.pro_params.read_length, sub_resolution=self.sub_resolution
         )
 

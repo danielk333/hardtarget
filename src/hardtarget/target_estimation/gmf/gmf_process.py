@@ -87,7 +87,7 @@ class GMFProcess(TargetEstimationProcess[GMFCfgParams, GMFProParams]):
             Outcome of GMF analysis
         """
 
-        tx, rx, ipp = self.get_data(
+        tx, rx, _ = self.get_data(
             start_sample,
             self.pro_params.read_length,
             sub_resolution=self.cfg_params.range_gate_sub_resolution,

@@ -113,7 +113,7 @@ include = ["src/hardtarget/**"]
 "__init__.py" = ["F401","E402"]
 
 [tool.ruff.lint]
-ignore = ["E203","D203","E251","E501","E226"]
+ignore = ["E203","D203","E251","E501","E226","UP035","PYI041","B006", "C408", "B008"]
 
 [tool.pytest]
 addopts =["-v","-m","not cuda","-p","no:warnings"]

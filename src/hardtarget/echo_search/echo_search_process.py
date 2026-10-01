@@ -62,7 +62,7 @@ class EchoSearchProcess(
             Outcome of xcorr analysis
         """
 
-        tx, rx, ipp = self.get_data(start_sample, self.pro_params.read_length, sum_rx_channels=False)
+        tx, rx, _ = self.get_data(start_sample, self.pro_params.read_length, sum_rx_channels=False)
 
         return self.lib(
             tx,

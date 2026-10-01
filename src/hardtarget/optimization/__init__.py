@@ -22,7 +22,7 @@ else:
 
 
 def get_optimize_lib(
-    method_lib: Optional[MethodLib] = None, implementation: Optional[Impl] = None
+    method_lib: MethodLib | None = None, implementation: Impl | None = None
 ) -> tuple[OptimizeLib, OptimizationMethod, Impl]:
 
     if method_lib is None:
@@ -37,11 +37,13 @@ def get_optimize_lib(
         try:
             method_lib = OptimizationMethod(method_lib)
         except ValueError:
-            raise Exception(f"Method: {method_lib} is not available for optimization")
+            raise NotImplementedError(f"Method: {method_lib} is not available for optimization")
 
     lib = OPTIMIZE_LIBS[method_lib].get(implementation, None)
     if lib is None:
-        raise Exception(f"There is no available {implementation} implementation for method lib {method_lib}")
+        raise NotImplementedError(
+            f"There is no available {implementation} implementation for method lib {method_lib}"
+        )
 
     return lib, method_lib, implementation
 

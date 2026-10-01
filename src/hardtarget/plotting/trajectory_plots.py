@@ -1,5 +1,4 @@
 import datetime as dt
-from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -23,7 +22,7 @@ def plot_true_vs_estimated_trajectory(
     measurement_end: dt.datetime,
     target_start_us: int,
     target_end_us: int,
-    detection_limit: Optional[float] = None,
+    detection_limit: float | None = None,
 ) -> Axes:
     """
     Plot the true trajectory of object and the estimated trajectory relative to the radarstation.

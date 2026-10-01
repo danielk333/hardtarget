@@ -67,6 +67,6 @@ def fast_dpt_c(
     )
 
     if error_code != 0:
-        raise Exception(f"DPT C-function returned error {error_code}")
+        raise RuntimeError(f"DPT C-function returned error {error_code}")
 
     return MFVariables(vals=vals, dc=dc, v=v, a=a, phi=phi, tx_pwr=tx_pwr)

@@ -6,7 +6,7 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable, Optional, Pattern
+from typing import Any, Callable, Pattern
 
 from radardef.tools import mpi_tools
 
@@ -59,7 +59,7 @@ def modify_subloggers(matching_regex: str | Pattern[str]) -> None:
 
 
 def setup_loggers(
-    log_folder: Optional[Path | str] = None, stdout: bool = True, verbosity: int = 0
+    log_folder: Path | str | None = None, stdout: bool = True, verbosity: int = 0
 ) -> logging.Logger:
     parallel, rank = check_parallel()
     if parallel:
@@ -76,7 +76,7 @@ def setup_loggers(
     if log_folder is not None:
         if not isinstance(log_folder, pathlib.Path):
             log_folder = pathlib.Path(log_folder)
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(datetime.timezone.utc)
         datetime_str = now.strftime("%Y-%m-%d_at_%H-%M")
         if not log_folder.is_dir():
             assert not log_folder.is_file(), f"Cannot use '{log_folder}', is a file not a folder"
@@ -132,11 +132,11 @@ def profile() -> None:
 
 
 @check_yappi
-def get_profile(modules: Optional[list[str]] = None) -> tuple[yappi.YFuncStats, float]:
+def get_profile(modules: list[str] | None = None) -> tuple[yappi.YFuncStats, float]:
     if modules is None:
         modules = [PACKAGE_NAME]
     stats = yappi.get_func_stats(
-        filter_callback=lambda x: any(list(_path_to_module(x.module).startswith(mod) for mod in modules)),
+        filter_callback=lambda x: any(_path_to_module(x.module).startswith(mod) for mod in modules),
     )
     stats = stats.sort("ttot", "desc")
 
@@ -144,9 +144,7 @@ def get_profile(modules: Optional[list[str]] = None) -> tuple[yappi.YFuncStats, 
     return stats, total
 
 
-def print_profile(
-    stats: yappi.YFuncStats, total: Optional[float] = None, max_rows: Optional[int] = None
-) -> None:
+def print_profile(stats: yappi.YFuncStats, total: float | None = None, max_rows: int | None = None) -> None:
     header = [
         "Name",
         "Module",
@@ -189,8 +187,7 @@ def print_profile(
     ]
     for data in datas:
         for ind in range(3):
-            if column_sizes[ind] < len(data[ind]):
-                column_sizes[ind] = len(data[ind])
+            column_sizes[ind] = max(column_sizes[ind], len(data[ind]))
 
     _str = " | ".join([f"{title:^{size}}" for title, size in zip(header, column_sizes)])
     print(_str)

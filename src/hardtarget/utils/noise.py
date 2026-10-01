@@ -1,4 +1,3 @@
-from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -7,7 +6,7 @@ import numpy.typing as npt
 def snr(
     gmf_values: npt.NDArray[np.floating | np.integer],
     noise_floor: npt.NDArray,
-    range_gates: Optional[npt.NDArray[np.integer]] = None,
+    range_gates: npt.NDArray[np.integer] | None = None,
     dB: bool = False,
 ) -> npt.NDArray:
     """Convert matched filter value to SNR based on range dependant noise floor

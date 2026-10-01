@@ -2,9 +2,9 @@
 
 import numpy as np
 import numpy.typing as npt
-import scipy.constants as constants
 import scipy.optimize as sco
 from radardef.types import ExpDef
+from scipy import constants
 
 from hardtarget.optimization.types import OptimizeCfgParams, OptimizeProParams
 from hardtarget.utils.time_conversion import ipp_time_to_sample

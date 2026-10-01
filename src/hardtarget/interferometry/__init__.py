@@ -26,7 +26,7 @@ else:
 
 
 def get_doa_lib(
-    method_lib: Optional[MethodLib] = None, implementation: Optional[Impl] = None
+    method_lib: MethodLib | None = None, implementation: Impl | None = None
 ) -> tuple[InterferometryLib, DOAMethod, Impl]:
 
     if method_lib is None:
@@ -41,11 +41,13 @@ def get_doa_lib(
         try:
             method_lib = DOAMethod(method_lib)
         except ValueError:
-            raise Exception(f"Method: {method_lib} is not available for direction of arrival")
+            raise NotImplementedError(f"Method: {method_lib} is not available for direction of arrival")
 
     lib = DOA_LIBS[method_lib].get(implementation, None)
     if lib is None:
-        raise Exception(f"Ther is no available {implementation} implementation for method lib {method_lib}")
+        raise NotImplementedError(
+            f"There is no available {implementation} implementation for method lib {method_lib}"
+        )
 
     return lib, method_lib, implementation
 

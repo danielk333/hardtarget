@@ -2,8 +2,8 @@
 
 import numpy as np
 import numpy.typing as npt
-import scipy.fft as fft
 from radardef.types import ExpDef
+from scipy import fft
 
 from hardtarget.target_estimation.dtft_solvers import dtft_solve, dtft_solve_with_acceleration
 from hardtarget.target_estimation.gmf.types import GMFCfgParams, GMFProParams

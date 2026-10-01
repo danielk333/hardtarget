@@ -76,6 +76,6 @@ def fast_gmf_cuda(
     a_ind[:] = pro_params.inds_accelerations[a_ind]
 
     if error_code != 0:
-        raise Exception(f"GMF CUDA-function returned error {error_code}")
+        raise RuntimeError(f"GMF CUDA-function returned error {error_code}")
 
     return MFVariables(vals=vals, dc=dc, v=v_ind, a=a_ind, phi=phi, tx_pwr=tx_pwr)

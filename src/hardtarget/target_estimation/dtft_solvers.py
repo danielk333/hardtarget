@@ -2,8 +2,7 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
-import scipy.fft as fft
-from scipy import optimize
+from scipy import fft, optimize
 
 
 def dtft_sub_resolution(

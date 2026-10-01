@@ -1,4 +1,3 @@
-from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -13,7 +12,7 @@ def plot_echo_search(
     exp: ExpDef,
     out_data: EchoSearchOutArgs,
     convert_axis: bool = True,
-    limit: Optional[float] = None,
+    limit: float | None = None,
 ) -> npt.NDArray:  # of type axes
     """
     Plot result from echo search, axis of size (2,2) is a must

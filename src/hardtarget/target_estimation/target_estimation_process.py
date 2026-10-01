@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Generic, TypeVar
 
 import numpy as np
-import scipy.fft as fft
+from scipy import fft
 from scipy.signal import savgol_filter  # type: ignore[attr-defined]
 
 from hardtarget.constants import AnalysisMethod, ConfigSubSection

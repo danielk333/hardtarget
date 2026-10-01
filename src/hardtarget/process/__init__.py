@@ -20,7 +20,7 @@ PROCESSES: dict[AnalysisMethod, type[Process] | dict[MethodLib, type[Process]]] 
 }
 
 
-def get_analysis_process(method: AnalysisMethod, method_lib: Optional[MethodLib] = None) -> type[Process]:
+def get_analysis_process(method: AnalysisMethod, method_lib: MethodLib | None = None) -> type[Process]:
     """
     Get process for the intended method and specific method_lib if requested
 

@@ -34,9 +34,9 @@ def parser_build(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(help="hardtarget file types", dest="filetype")
     subparsers.required = True
-    for source in SOURCES:
-        cmd_parser = subparsers.add_parser(source, **SOURCES[source].parser_args)
-        parser_builder = SOURCES[source].parser_build
+    for source, sub_parser in SOURCES.items():
+        cmd_parser = subparsers.add_parser(source, **sub_parser.parser_args)
+        parser_builder = sub_parser.parser_build
         parser_builder(cmd_parser)
     return parser
 

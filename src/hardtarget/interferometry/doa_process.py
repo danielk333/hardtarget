@@ -38,7 +38,7 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
             raise ValueError("Not possible to run the interferometry calculations without beam data")
 
         if not isinstance(self.beam, Array):
-            raise ValueError("Beam is not an array, not possible to run interferometery")
+            raise TypeError("Beam is not an array, not possible to run interferometery")
 
     def get_analysis_lib(
         self, lib: MethodLib | None, impl: Impl | None
@@ -84,7 +84,7 @@ class DOAProcess(Process[DOACfgParams, DOAProParams, DOAVars, DOAOutArgs, Interf
             Outcome of interferometry analysis
         """
 
-        tx, rx, ipp = self.get_data(
+        _, rx, _ = self.get_data(
             start_sample=start_sample, read_length=self.pro_params.read_length, sum_rx_channels=False
         )
 

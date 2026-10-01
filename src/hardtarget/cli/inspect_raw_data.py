@@ -32,14 +32,14 @@ def main(args: argparse.Namespace) -> None:
             target_formats = radar_def.available_target_formats(source_format)
             converted_files = radar_def.convert(args.path, target_formats[0], converted_data_path)
             if converted_files is None:
-                raise Exception(f"Not possible to convert the file:  {args.path}")
+                raise ValueError(f"Not possible to convert the file:  {args.path}")
             filepath = converted_files[0]
         else:
             filepath = Path(args.path)
 
         data_loader = radar_def.load_data(filepath)
         if data_loader is None:
-            raise Exception(f"Not possible to load the given file: {args.path}")
+            raise ValueError(f"Not possible to load the given file: {args.path}")
 
         d = []
         channels = data_loader.channels

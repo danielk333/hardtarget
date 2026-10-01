@@ -1,6 +1,5 @@
 import argparse
 from pathlib import Path
-from typing import Optional
 
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
@@ -33,10 +32,10 @@ def main(args: argparse.Namespace) -> None:
 
 def plot_analysed_data(
     path: Path,
-    start_time: Optional[int | float | str] = None,
-    end_time: Optional[int | float | str] = None,
+    start_time: int | float | str | None = None,
+    end_time: int | float | str | None = None,
     relative_time: bool = False,
-    detection_limit: Optional[float] = None,
+    detection_limit: float | None = None,
 ) -> None:
 
     out, exp, cfg, pro = load_analysed_data(  # type: ignore[var-annotated]

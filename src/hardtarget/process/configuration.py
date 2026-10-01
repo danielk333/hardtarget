@@ -9,7 +9,7 @@ import configparser
 import logging
 from dataclasses import asdict, fields
 from pathlib import Path
-from typing import Any, Optional, Type
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -20,10 +20,10 @@ from hardtarget.types import CfgParams, ExpDef, GenericCfg, Impl, IsDataclass, P
 
 def extract_config_section(
     cfg_pth: Path,
-    cfg_type: Type[IsDataclass],
-    section: Optional[str] = None,
-    existing_cfg: Optional[CfgParams] = None,
-    logger: Optional[logging.Logger] = None,
+    cfg_type: type[IsDataclass],
+    section: str | None = None,
+    existing_cfg: CfgParams | None = None,
+    logger: logging.Logger | None = None,
 ) -> dict[str, Any]:
     """
     Extract a specific section from the given .ini file, if a exising config the new section will be
@@ -52,7 +52,7 @@ def extract_config_section(
     config = configparser.ConfigParser()
     config.read(cfg_pth)
 
-    if section and section in config.keys():
+    if section and section in config:
         iter_keys = {section: list(config[section].keys())}
     else:
         section = None
@@ -61,9 +61,9 @@ def extract_config_section(
     try:
         for cfg_section, keys in iter_keys.items():
             for key in keys:
-                if key not in default_dict.keys() and section:
+                if key not in default_dict and section:
                     raise ValueError(f"'{key}' option found in config file is not a valid config parameter")
-                elif key not in default_dict.keys() and not section:
+                elif key not in default_dict and not section:
                     continue
                 # Convert values to specific types
                 if isinstance(default_dict[key], bool):
@@ -88,7 +88,7 @@ def extract_config_section(
     return default_dict
 
 
-def extract_config_from_dict(d: dict, cfg_type: Type[GenericCfg]) -> GenericCfg:
+def extract_config_from_dict(d: dict, cfg_type: type[GenericCfg]) -> GenericCfg:
     new_dict = {}
     for field in fields(cfg_type):
         if field.name in d:
@@ -236,7 +236,7 @@ def get_ilx_windows(
     _il0_max_range_gate = cfg_params.max_range_gate
     _il0_max_range_gate += _il0_rgs_min if cfg_params.max_range_gate >= 0 else _il0_rgs_max
     _il0_min_range_gate = cfg_params.min_range_gate
-    _il0_min_range_gate += _il0_rgs_min if cfg_params.min_range_gate >= 0 else _il0_rgs_min
+    _il0_min_range_gate += _il0_rgs_min
 
     il0_rgs = np.arange(_il0_min_range_gate, _il0_max_range_gate, cfg_params.range_gate_step, dtype=np.int32)
 

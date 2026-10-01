@@ -3,7 +3,6 @@
 import datetime as dt
 import logging
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -99,7 +98,7 @@ def calculate_tasks(
 
 
 def get_filepath(
-    epoch_unix_us: int, sample_id_us: int, method: AnalysisMethod, sub_directory: Optional[str] = None
+    epoch_unix_us: int, sample_id_us: int, method: AnalysisMethod, sub_directory: str | None = None
 ) -> Path:
     """
     Generates a file path for a h5 file.

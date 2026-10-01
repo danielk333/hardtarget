@@ -4,7 +4,7 @@ Tx signal models, used to simulate tx signals when not available.
 
 import numpy as np
 import numpy.typing as npt
-import scipy.interpolate as interpolate
+from scipy import interpolate
 from scipy.fft import fft, fftfreq, ifft
 
 from hardtarget.constants import ReceiverChainModel
