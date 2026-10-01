@@ -732,7 +732,7 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             tx=tx.astype(np.complex64), rx=rx.astype(np.complex64), ipp=ipp.astype(np.complex64)
         )
 
-    def _is_tx_conjugated(self, tx_real: npt.NDArray, tx_sim: npt.NDArray) -> bool:
+    def _is_tx_conjugated(self, tx: npt.NDArray, tx_sim: npt.NDArray) -> bool:
         """
         Determine if the true tx signal is stored as conjugated or not.
 
@@ -743,12 +743,15 @@ class Process(ABC, Generic[GenericCfg, GenericPro, GenericVars, GenericOut, Gene
             True if the measured tx signal is conjugated.
 
         """
-        angle = np.mean(np.angle(tx_real * np.conj(tx_sim), deg=True))
+
+        phase = np.unwrap(2 * np.angle(tx)) / 2
+        phase -= phase[0]
+        comp_tx = np.exp(-1j * phase) * tx
+        angle = np.mean(np.angle(comp_tx * np.conj(tx_sim), deg=True))
         angle = angle % 360
 
         dist_to_0 = min(angle, 360 - angle)
         dist_to_180 = abs(angle - 180)
-
         return bool(dist_to_0 > dist_to_180)
 
     def _setup_cache(self) -> None:
