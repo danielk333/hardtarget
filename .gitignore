@@ -5,6 +5,7 @@
 docs/build/
 docs/source/apidoc
 docs/reference/
+site/
 
 #examples data
 examples/data
@@ -119,5 +120,3 @@ cache_error*
 
 
 /.DS_Store
-
-

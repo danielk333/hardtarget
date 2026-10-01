@@ -5,7 +5,6 @@
 
 import numpy as np
 from matplotlib import pyplot as plt
-from radardef.radar_stations.eiscat.experiments import load_radar_code
 
 from hardtarget.constants import ReceiverChainModel
 from hardtarget.data_simulation.tx_model import tx_signal_model
@@ -16,16 +15,20 @@ from hardtarget.data_simulation.tx_model import tx_signal_model
 #        |__|  |_| |_|
 # ```
 
-code = load_radar_code("leo_bpark")[0, :]
-fir_filter = ReceiverChainModel.b414d15_gaus
-t_samp_usec = 1
-baud_length_usec = 30
-decimation = 15
+code = np.array(
+    [1, 1, 1, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1],
+    dtype=np.float64,
+)
+
 
 # Lets say we have a ipp with 56 samples, we want to read all of them and we start at 0. We should then get
 # a signal similar to the one we inserted, but decimated. The source of the signal has a baud length of 12 us,
-# but we want to sample the signal at 6 us, thus we will oversample it.
+# but we want to sample the signal at 6 us, thus we will oversample it. On top of that we also include the fir
+# filter to simulate the true sent signal.
 
+t_samp_usec = 6
+baud_length_usec = 12
+fir_filter = ReceiverChainModel.mu2004
 tx_samples = len(code) * int(baud_length_usec / t_samp_usec)
 tx = tx_signal_model(
     code=code,
@@ -47,7 +50,7 @@ ax.plot(np.imag(tx), c=ls.get_color(), ls="--")
 # samples. In the example below we set the subresolution to 4, meaning we will get additional data from each
 # 0.25 decimal inbetween each sample:
 
-example_sub_resolution = np.linspace(0, 1, num=4)
+example_sub_resolution = 4
 tx = tx_signal_model(
     code=code,
     baud_length_usec=baud_length_usec,
@@ -63,9 +66,12 @@ fig, axes = plt.subplots(2, 1)
 for ind in range(tx.shape[1]):
     axes[0].plot(np.real(tx[:, ind]), label=f"Sub step: {ind}")
     axes[1].plot(np.real(tx[:, ind]))
-
+#
 axes[0].legend()
+axes[0].set_title(f"Simulated TX Signal, subresolution: {example_sub_resolution}")
 axes[1].set_xlim((tx_samples * 0.5, tx_samples * 0.5 + baud_length_usec / t_samp_usec * 1.5))
+axes[1].set_title("Window view")
+plt.show()
 
 """
 # We can also model the phase flip behaviour directly
@@ -165,26 +171,3 @@ ax.axhline(base_resolution, c="g")
 ax.axhline(decimated_resolution, c="r")
 
 """
-plt.show()
-
-# This is used during the analysis part for unknown tx signals, the subresolution is configurable in the .ini
-# file, more details can be found at [Config parameters](../stuff/config_parameters.md).
-
-# def obj_func(offset):
-#     sub_resolution = np.array([offset])
-#     tx_match = tx_signal_model(
-#         code=code,
-#         baud_length_usec=baud_length_usec,
-#         t_samp_usec=t_samp_usec,
-#         start_samp=tx_samples * 0.5,
-#         ipp_samps=tx_samples * 10,
-#         read_length=tx_samples * 2,
-#         sub_resolution=sub_resolution,
-#         filt=fir_filter,
-#         bandwidth=1e6,
-#     )
-#     match = np.abs(np.sum(noisy_signal * np.conj(tx_match[:, 0])))
-#     return -match
-#
-#
-# res = minimize_scalar(obj_func, bounds=(0, 1))
